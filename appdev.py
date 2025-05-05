@@ -585,7 +585,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         st.error(f"Error displaying metrics: {str(e)}")
 
 @st.cache_data
-def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = None, facility: str = None):
+def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, region: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
         # State code to name mapping
@@ -645,59 +645,95 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = Non
             hover_template_count = "<b>%{customdata}</b><br>Count: %{y:,}<extra></extra>"
         else:
             hover_template_facility = "<b>%{customdata}</b><br>RN Care HPRD: %{y:.2f}<extra></extra>"
+
+        # Create two separate figures - one for mobile, one for desktop
+        # Mobile figure (2 charts)
+        mobile_fig = make_subplots(rows=2, cols=1,
+                                 subplot_titles=('Total Nurse HPRD', 'Average Daily Census'),
+                                 vertical_spacing=0.2)
         
-        # Create subplots with responsive layout
-        fig = make_subplots(rows=3, cols=2,
-                          subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
-                                        'RN HPRD', 'Nurse Assistant HPRD',
-                                        'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'),
-                          vertical_spacing=0.15,
-                          horizontal_spacing=0.1)
+        # Add traces for mobile view
+        mobile_fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
+                                      mode='lines+markers', name='Total HPRD',
+                                      customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                      hovertemplate=hover_template), row=1, col=1)
+        
+        mobile_fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
+                                      mode='lines+markers', name='Avg Census',
+                                      customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                      hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
+        
+        # Update mobile layout
+        mobile_fig.update_layout(
+            height=800,
+            title_text=f"{title_prefix} Staffing Trends",
+            showlegend=False,
+            margin=dict(l=50, r=50, t=80, b=200),
+            hovermode='x unified'
+        )
+        
+        # Update mobile x-axes
+        for i in range(1, 3):
+            mobile_fig.update_xaxes(
+                tickvals=tick_values,
+                tickangle=45,
+                row=i,
+                col=1,
+                showline=True,
+                linewidth=1,
+                linecolor="rgba(200, 200, 200, 0.1)",
+                range=[tick_values[0], tick_values[-1]],
+                nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
+                tickmode='auto'
+            )
+        
+        # Desktop figure (6 charts)
+        desktop_fig = make_subplots(rows=3, cols=2,
+                                  subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
+                                                'RN HPRD', 'Nurse Assistant HPRD',
+                                                'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'),
+                                  vertical_spacing=0.15,
+                                  horizontal_spacing=0.1)
 
-        # Plot 1: Total Nurse HPRD
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
-                               mode='lines+markers', name='Total HPRD',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template), row=1, col=1)
+        # Add all traces for desktop view
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
+                                       mode='lines+markers', name='Total HPRD',
+                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                       hovertemplate=hover_template), row=1, col=1)
 
-        # Plot 2: Contract Staff Percentage
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Staff_Percentage'],
-                               mode='lines+markers', name='Contract %',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=1, col=2)
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Staff_Percentage'],
+                                       mode='lines+markers', name='Contract %',
+                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                       hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=1, col=2)
 
-        # Plot 3: RN HPRD
-        fig.add_trace(go.Scatter(x=data['date'], y=data['RN_HPRD'],
-                               mode='lines+markers', name='RN HPRD',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template), row=2, col=1)
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_HPRD'],
+                                       mode='lines+markers', name='RN HPRD',
+                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                       hovertemplate=hover_template), row=2, col=1)
 
-        # Plot 4: Nurse Assistant HPRD
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Nurse_Assistant_HPRD'],
-                               mode='lines+markers', name='NA HPRD',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template), row=2, col=2)
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Nurse_Assistant_HPRD'],
+                                       mode='lines+markers', name='NA HPRD',
+                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                       hovertemplate=hover_template), row=2, col=2)
 
-        # Plot 5: Average Daily Census
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
-                               mode='lines+markers', name='Avg Census',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=3, col=1)
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
+                                       mode='lines+markers', name='Avg Census',
+                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                       hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=3, col=1)
 
-        # Plot 6: Facility Count or RN Care HPRD
         if not facility:
-            fig.add_trace(go.Scatter(x=data['date'], y=data['Facility_Count'],
-                                   mode='lines+markers', name='Facilities',
-                                   customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                   hovertemplate=hover_template_count), row=3, col=2)
+            desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Facility_Count'],
+                                          mode='lines+markers', name='Facilities',
+                                          customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                          hovertemplate=hover_template_count), row=3, col=2)
         else:
-            fig.add_trace(go.Scatter(x=data['date'], y=data['RN_Care_HPRD'],
-                                   mode='lines+markers', name='RN Care HPRD',
-                                   customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                   hovertemplate=hover_template_facility), row=3, col=2)
+            desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_Care_HPRD'],
+                                          mode='lines+markers', name='RN Care HPRD',
+                                          customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                          hovertemplate=hover_template_facility), row=3, col=2)
 
-        # Update layout with responsive settings
-        fig.update_layout(
+        # Update desktop layout
+        desktop_fig.update_layout(
             height=1200,
             title_text=f"{title_prefix} Staffing Trends",
             showlegend=False,
@@ -709,14 +745,13 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = Non
                 xgap=0.1,
                 ygap=0.15
             ),
-            # Add responsive layout settings
             autosize=True
         )
         
-        # Update x-axes with responsive settings
+        # Update desktop x-axes
         for i in range(1, 4):
             for j in range(1, 3):
-                fig.update_xaxes(
+                desktop_fig.update_xaxes(
                     tickvals=tick_values,
                     tickangle=45,
                     row=i,
@@ -725,109 +760,16 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = Non
                     linewidth=1,
                     linecolor="rgba(200, 200, 200, 0.1)",
                     range=[tick_values[0], tick_values[-1]],
-                    # Add responsive settings for x-axis
                     nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
                     tickmode='auto'
                 )
-        
-        # Update y-axis labels
-        fig.update_yaxes(title_text="Hours per Resident Day", row=1, col=1)
-        fig.update_yaxes(title_text="Percentage", row=1, col=2)
-        fig.update_yaxes(title_text="Hours per Resident Day", row=2, col=1)
-        fig.update_yaxes(title_text="Hours per Resident Day", row=2, col=2)
-        fig.update_yaxes(title_text="Residents", row=3, col=1)
-        if not facility:
-            fig.update_yaxes(title_text="Number of Facilities", row=3, col=2)
-        else:
-            fig.update_yaxes(title_text="Hours per Resident Day", row=3, col=2)
-            # Update subplot title for facility view plot 6
-            fig.layout.annotations[5].update(text='RN Care HPRD')
-        
-        # Add individual footer annotations for each subplot using subplot-specific coordinates
-        # Top row
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=1,
-            col=1
-        )
-        
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=1,
-            col=2
-        )
-        
-        # Middle row
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=2,
-            col=1
-        )
-        
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=2,
-            col=2
-        )
-        
-        # Bottom row
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=3,
-            col=1
-        )
-        
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=3,
-            col=2
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
+
+        # Return the appropriate figure based on view mode
+        return mobile_fig if view_mode == "Mobile View" else desktop_fig
+
     except Exception as e:
         st.error(f"Error plotting trends: {str(e)}")
+        return None
 
 # Function to create PDF report
 def create_pdf_report(provnum: str, selected_quarter: str) -> bytes:
@@ -976,28 +918,16 @@ st.markdown("""
     
     /* Mobile-specific styles */
     @media (max-width: 768px) {
-        /* Make charts full width and stack vertically */
-        .js-plotly-plot {
-            width: 100% !important;
-            margin-bottom: 20px !important;
-        }
-        
-        /* Adjust subplot layout for mobile */
-        .js-plotly-plot .plot-container {
-            height: 400px !important;
-        }
-        
-        /* Reduce x-axis label frequency on mobile */
-        .js-plotly-plot .xtick {
+        .mobile-hidden {
             display: none !important;
         }
-        .js-plotly-plot .xtick:nth-child(4n) {
+        .mobile-only {
             display: block !important;
         }
-        
-        /* Adjust spacing for mobile */
-        .stMetric {
-            margin-bottom: 12px;
+    }
+    @media (min-width: 769px) {
+        .mobile-only {
+            display: none !important;
         }
     }
 </style>
@@ -1470,6 +1400,42 @@ def display_facility_info(provnum: str):
             div.facility-info-item a:hover {
                 text-decoration: underline;
             }
+            
+            /* Mobile-specific styles */
+            @media (max-width: 768px) {
+                div.facility-info-box {
+                    padding: 12px 16px;
+                }
+                div.facility-info-grid {
+                    flex-direction: column;
+                    gap: 8px;
+                    align-items: flex-start;
+                }
+                div.facility-info-item {
+                    width: 100%;
+                    padding: 4px 0;
+                }
+                div.facility-info-item:not(:last-child):after {
+                    display: none;
+                }
+                div.facility-info-item a {
+                    margin-left: 0;
+                    margin-top: 8px;
+                    display: block;
+                }
+                /* Hide labels on mobile */
+                div.facility-info-item span.label {
+                    display: none;
+                }
+                /* Adjust spacing for mobile */
+                div.facility-info-item {
+                    margin-bottom: 4px;
+                }
+                /* Make text slightly larger on mobile */
+                div.facility-info-item strong {
+                    font-size: 1.1em;
+                }
+            }
             </style>
         """, unsafe_allow_html=True)
 
@@ -1494,19 +1460,10 @@ def display_facility_info(provnum: str):
             <div class="facility-info-box">
                 <div class="facility-info-grid">
                     <div class="facility-info-item">
-                        Provider: <strong>{formatted_provider_name}</strong>
+                        <span class="label">Provider:</span> <strong>{formatted_provider_name} ({facility_info['ccn']})</strong>
                     </div>
                     <div class="facility-info-item">
-                        CCN: <strong>{facility_info['ccn']}</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        State: <strong>{facility_info['state']}</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        County: <strong>{facility_info['county']}</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        City: <strong>{formatted_city}</strong>
+                        <span class="label">Location:</span> <strong>{formatted_city}, {facility_info['state']}</strong>
                     </div>
                     <div class="facility-info-item">
                         <a href="https://www.medicare.gov/care-compare/details/nursing-home/{facility_info['ccn']}?state={facility_info['state']}" target="_blank">View on Care Compare</a>
@@ -1517,6 +1474,13 @@ def display_facility_info(provnum: str):
 
     except Exception as e:
         st.error(f"Error displaying facility info: {str(e)}")
+
+def on_mobile_change():
+    """Callback function to handle mobile detection state changes."""
+    if st.session_state.get('is_mobile', False):
+        st.session_state['view_mode'] = "Mobile View"
+    else:
+        st.session_state['view_mode'] = "Desktop View"
 
 def main() -> None:
     """Main app layout and data flow."""
@@ -1645,6 +1609,14 @@ def main() -> None:
             st.error(f"Error processing selection: {str(e)}")
             return
         
+        # Add view toggle in the sidebar
+        view_mode = st.sidebar.radio(
+            "View Mode",
+            ["Desktop View", "Mobile View"],
+            index=0,
+            help="Choose between full desktop view or simplified mobile view"
+        )
+
         # Get filtered data
         try:
             filtered_data = get_filtered_data(level, selected_value, start_quarter, end_quarter)
@@ -1661,58 +1633,18 @@ def main() -> None:
                     display_metrics(filtered_data, level)
                     
                     # 3. Display trends
-                    plot_quarterly_trends(filtered_data, 
-                                        state=selected_value if level == "State" else None,
-                                        region=selected_value if level == "Region" else None,
-                                        facility=selected_value if level == "Facility" else None)
+                    fig = plot_quarterly_trends(filtered_data, 
+                                          view_mode=view_mode,
+                                          state=selected_value if level == "State" else None,
+                                          region=selected_value if level == "Region" else None,
+                                          facility=selected_value if level == "Facility" else None)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
 
                     # 4. Display citations
-                    st.markdown("---")
-                    st.markdown("### Recent Citations (Sample)")
-                    citations = get_dummy_citations(selected_value)
-                    if not citations.empty:
-                        # Format the citations data
-                        citations_display = citations[[
-                            'CITATION_DATE',
-                            'CITATION_NUMBER',
-                            'CITATION_DESCRIPTION',
-                            'CITATION_SEVERITY',
-                            'CITATION_STATUS',
-                            'PDF_URL'
-                        ]].copy()
-                        
-                        # Rename columns for display
-                        citations_display.columns = [
-                            'Date',
-                            'Citation Number',
-                            'Description',
-                            'Severity',
-                            'Status',
-                            'CMS Report'
-                        ]
-                        
-                        # Sort by date, most recent first
-                        citations_display['Date'] = pd.to_datetime(citations_display['Date'])
-                        citations_display = citations_display.sort_values('Date', ascending=False)
-                        
-                        # Add Report Summary column with dummy PDF links
-                        citations_display['Report Summary'] = citations_display.apply(
-                            lambda row: f'<a href="{row["CMS Report"]}" target="_blank">View Summary</a>', 
-                            axis=1
-                        )
-                        
-                        # Create hyperlinks for CMS Reports
-                        citations_display['CMS Report'] = citations_display.apply(
-                            lambda row: f'<a href="{row["CMS Report"]}" target="_blank">View Report</a>', 
-                            axis=1
-                        )
-                        
-                        # Display the table with HTML
-                        st.markdown(citations_display.to_html(escape=False, index=False), unsafe_allow_html=True)
-                    else:
-                        st.warning("No citations found for this facility.")
+                    display_facility_citations(selected_value)
 
-                    # 5. Add custom reports button at the bottom
+                    # 5. Add custom reports button
                     st.markdown("---")
                     facility_name = get_facility_info(selected_value)
                     if facility_name:
@@ -1739,6 +1671,14 @@ def main() -> None:
                             .custom-reports-button:hover {
                                 background-color: #1565C0;
                             }
+                            @media (max-width: 768px) {
+                                .custom-reports-button {
+                                    width: 100%;
+                                    text-align: center;
+                                    padding: 16px 24px;
+                                    font-size: 16px;
+                                }
+                            }
                             </style>
                         """, unsafe_allow_html=True)
                         
@@ -1753,10 +1693,13 @@ def main() -> None:
             else:
                 if not filtered_data.empty:
                     display_metrics(filtered_data, level)
-                    plot_quarterly_trends(filtered_data, 
-                                        state=selected_value if level == "State" else None,
-                                        region=selected_value if level == "Region" else None,
-                                        facility=selected_value if level == "Facility" else None)
+                    fig = plot_quarterly_trends(filtered_data, 
+                                              view_mode=view_mode,
+                                              state=selected_value if level == "State" else None,
+                                              region=selected_value if level == "Region" else None,
+                                              facility=selected_value if level == "Facility" else None)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.warning("No data available for the selected filters.")
         except Exception as e:
