@@ -646,11 +646,13 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = Non
         else:
             hover_template_facility = "<b>%{customdata}</b><br>RN Care HPRD: %{y:.2f}<extra></extra>"
         
-        # Create subplots
+        # Create subplots with responsive layout
         fig = make_subplots(rows=3, cols=2,
                           subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
                                         'RN HPRD', 'Nurse Assistant HPRD',
-                                        'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'))
+                                        'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'),
+                          vertical_spacing=0.15,
+                          horizontal_spacing=0.1)
 
         # Plot 1: Total Nurse HPRD
         fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
@@ -694,34 +696,38 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = Non
                                    customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                    hovertemplate=hover_template_facility), row=3, col=2)
 
-        # Update layout
+        # Update layout with responsive settings
         fig.update_layout(
-            height=1200,  # Increased height for better visibility
+            height=1200,
             title_text=f"{title_prefix} Staffing Trends",
             showlegend=False,
-            margin=dict(l=50, r=50, t=80, b=200),  # Increased bottom margin
+            margin=dict(l=50, r=50, t=80, b=200),
             hovermode='x unified',
             grid=dict(
                 rows=3,
                 columns=2,
-                xgap=0.1,  # Horizontal spacing between subplots
-                ygap=0.15  # Vertical spacing between subplots
-            )
+                xgap=0.1,
+                ygap=0.15
+            ),
+            # Add responsive layout settings
+            autosize=True
         )
-
-        # Update x-axes to show only years and set line color
+        
+        # Update x-axes with responsive settings
         for i in range(1, 4):
             for j in range(1, 3):
                 fig.update_xaxes(
-                    ticktext=tick_text,
                     tickvals=tick_values,
-                    tickangle=45,  # Set diagonal angle
+                    tickangle=45,
                     row=i,
                     col=j,
                     showline=True,
                     linewidth=1,
-                    linecolor="rgba(200, 200, 200, 0.1)",  # Made even more faint
-                    range=[tick_values[0], tick_values[-1]]  # Ensure consistent range across all subplots
+                    linecolor="rgba(200, 200, 200, 0.1)",
+                    range=[tick_values[0], tick_values[-1]],
+                    # Add responsive settings for x-axis
+                    nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
+                    tickmode='auto'
                 )
         
         # Update y-axis labels
@@ -966,62 +972,33 @@ st.markdown("""
     }
     .stMetric [data-testid="stMetricValue"] {
         font-size: 20px;
-        font-weight: bold;
-        color: #1E88E5;
-        margin-bottom: 4px;
     }
-    .stMetric [data-testid="stMetricLabel"] {
-        font-size: 12px;
-        color: #666;
-    }
-    .section-header {
-        font-size: 16px;
-        color: #1E88E5;
-        margin-bottom: 8px;
-        font-weight: 600;
-    }
-    .metric-container {
-        background-color: #f8f9fa;
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 16px;
-    }
-    .main {
-        padding: 2rem;
-    }
-    .metric-value {
-        font-size: 1.5rem;
-        font-weight: bold;
-    }
-    .metric-label {
-        font-size: 1rem;
-        color: #666;
-    }
-    .stButton>button {
-        width: 100%;
-        border-radius: 0.5rem;
-        padding: 0.5rem;
-        font-weight: bold;
-    }
-    .stSelectbox {
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
-    }
-    .stSelectbox > div {
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
-    }
-    .stSelectbox > div > div {
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
-    }
-    /* Ensure consistent height for header row */
-    [data-testid="column"] {
-        min-height: 45px !important;
-    }
-    /* Adjust vertical alignment of header text */
-    .section-header {
-        line-height: 35px !important;
+    
+    /* Mobile-specific styles */
+    @media (max-width: 768px) {
+        /* Make charts full width and stack vertically */
+        .js-plotly-plot {
+            width: 100% !important;
+            margin-bottom: 20px !important;
+        }
+        
+        /* Adjust subplot layout for mobile */
+        .js-plotly-plot .plot-container {
+            height: 400px !important;
+        }
+        
+        /* Reduce x-axis label frequency on mobile */
+        .js-plotly-plot .xtick {
+            display: none !important;
+        }
+        .js-plotly-plot .xtick:nth-child(4n) {
+            display: block !important;
+        }
+        
+        /* Adjust spacing for mobile */
+        .stMetric {
+            margin-bottom: 12px;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1642,7 +1619,7 @@ def main() -> None:
             elif level == "Facility":
                 # Facility search with auto-complete
                 search_container = st.sidebar.container()
-                search_term = search_container.text_input("Enter Facility ID or Name", key="facility_search")
+                search_term = search_container.text_input("Enter Provider CCN or Name", key="facility_search")
                 
                 if search_term:
                     matching_facilities = search_facilities(search_term)
