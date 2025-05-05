@@ -33,4 +33,8 @@ This is a beta version of the application. Please report any issues on GitHub.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. 
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Support
+
+For support, please open an issue on GitHub or contact 320 Consulting. 
