@@ -29,4 +29,8 @@ MIT License - See LICENSE file for details
 
 ## Development
 
-This is a beta version of the application. Please report any issues on GitHub. 
+This is a beta version of the application. Please report any issues on GitHub.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. 
