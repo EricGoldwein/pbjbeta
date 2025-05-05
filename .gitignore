@@ -23,6 +23,7 @@ var/
 # Virtual Environment
 venv/
 ENV/
+.venv/
 
 # IDE
 .idea/
@@ -31,19 +32,20 @@ ENV/
 *.swo
 
 # Project specific
-# Ignore raw data files
-nursing_home_data*.csv
-PBJ_Nurse/*.csv
-PBJ_NonNurse/*.csv
+# Keep only the main app file
+*.py
+!appdev.py
+!requirements.txt
 
-# Keep processed data files
+# Keep only essential data files
+*.csv
 !national_quarterly_metrics.csv
 !state_quarterly_metrics.csv
 !region_quarterly_metrics.csv
 !facility_quarterly_metrics.csv
 !NH_ProviderInfo_Mar2025.csv
 
-# Other data files
+# Ignore all databases and binary files
 *.db
 *.sqlite3
 *.pdf
@@ -52,5 +54,22 @@ PBJ_NonNurse/*.csv
 *.jpeg
 *.gif
 *.ico
+
+# Other
 *.log
-.DS_Store 
+.DS_Store
+.env
+.cursorrules
+data/
+scripts/
+outputs/
+templates/
+notebooks/
+PBJ_Nurse/
+test/
+.pytest_cache/
+
+# Keep documentation
+!README.md
+!LICENSE
+!pbj_staffing_dashboard.md 
