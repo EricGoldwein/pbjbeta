@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+# Ignore raw data files
+nursing_home_data*.csv
+PBJ_Nurse/*.csv
+PBJ_NonNurse/*.csv
+
+# Keep processed data files
+!national_quarterly_metrics.csv
+!state_quarterly_metrics.csv
+!region_quarterly_metrics.csv
+!facility_quarterly_metrics.csv
+!NH_ProviderInfo_Mar2025.csv
+
+# Other data files
+*.db
+*.sqlite3
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.log
+.DS_Store 
