@@ -9,7 +9,6 @@ import sqlite3
 import os
 import time
 import glob
-from openai import OpenAI
 from dotenv import load_dotenv
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -26,7 +25,6 @@ import duckdb
 from functools import lru_cache
 from streamlit_searchbox import st_searchbox
 from typing import Dict, Optional, List, Tuple, Any
-from fix_pdf import create_pdf_report
 
 # Set page configuration with a more professional theme
 st.set_page_config(
@@ -38,9 +36,6 @@ st.set_page_config(
 
 # Load environment variables
 load_dotenv()
-
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Initialize DuckDB connection for facility data
 facility_db = duckdb.connect(':memory:')
@@ -955,80 +950,6 @@ def create_pdf_report(provnum: str, selected_quarter: str) -> bytes:
         print(f"Error creating PDF: {str(e)}")
         return None
 
-# Get the assistant
-def get_assistant():
-    assistant_id = os.getenv('OPENAI_ASSISTANT_ID')
-    return client.beta.assistants.retrieve(assistant_id)
-
-# Function to generate AI report
-def generate_ai_report(state_data, report_type="brief", prompt_type=""):
-    try:
-        # Debug output
-        st.write("Debug: state_data keys:", list(state_data.keys()))
-        
-        # Get the assistant
-        assistant = get_assistant()
-        
-        # Create a thread
-        thread = client.beta.threads.create()
-        
-        # Prepare the data context
-        context = f"""
-        State: {state_data['state']}
-        Time Period: {state_data['quarter']}
-        
-        Key Metrics:
-        - Total HPRD: {state_data['total_hprd']:.2f} (National: {state_data['national_total_hprd']:.2f})
-        - RN HPRD: {state_data['rn_hprd']:.2f} (National: {state_data['national_rn_hprd']:.2f})
-        - Number of Facilities: {state_data['facility_count']}
-        - Average Daily Residents: {state_data['avg_daily_residents']:,.0f}
-        
-        Additional Metrics:
-        - Nurse Care Staff HPRD: {state_data['nurse_care_hprd']:.2f}
-        - RN Care Staff HPRD: {state_data['rn_care_hprd']:.2f}
-        - Nurse Assistant HPRD: {state_data['nurse_assistant_hprd']:.2f}
-        
-        Contract Staff Metrics:
-        - Contract Staff Percentage: {state_data['contract_staff_percentage']:.1f}% (National: {state_data['national_contract_percentage']:.1f}%)
-        - Median Contract Staff Percentage: {state_data['median_contract_percentage']:.1f}%
-        """
-        
-        # Create the message
-        prompt = f"Please generate a {report_type} report analyzing the nursing home staffing trends in {state_data['state']} based on the following data. Focus on key insights, patterns, and recommendations. {prompt_type}"
-        
-        # Add the message to the thread
-        message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=f"{prompt}\n\nData:\n{context}"
-        )
-        
-        # Run the assistant
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id
-        )
-        
-        # Wait for completion
-        while True:
-            run = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            if run.status == 'completed':
-                break
-            time.sleep(1)
-        
-        # Get the response
-        messages = client.beta.threads.messages.list(thread_id=thread.id)
-        report = messages.data[0].content[0].text.value
-        
-        return report
-        
-    except Exception as e:
-        st.error(f"Error generating report: {str(e)}")
-        return None
-
 # Add custom CSS for better styling
 st.markdown("""
 <style>
@@ -1131,61 +1052,12 @@ def search_facilities(search_term: str) -> List[Dict[str, str]]:
         st.error(f"Error searching facilities: {str(e)}")
         return []
 
-def init_citations_db():
-    """Initialize citations database with DuckDB."""
-    try:
-        citations_db = duckdb.connect(':memory:')
-        
-        # Read citations CSV directly into DuckDB with all necessary columns
-        citations_db.execute("""
-            CREATE TABLE IF NOT EXISTS citations AS 
-            SELECT 
-                "CMS Certification Number (CCN)" as provnum,
-                "Survey Date" as survey_date,
-                "Deficiency Tag Number" as tag_number,
-                "Scope Severity Code" as severity_code,
-                "Standard Deficiency" as standard_deficiency,
-                "Complaint Deficiency" as complaint_deficiency,
-                "Infection Control Inspection Deficiency" as infection_deficiency,
-                "Deficiency Category" as deficiency_category
-            FROM read_csv('NH_HealthCitations_Mar2025.csv')
-        """)
-        
-        # Create indexes for faster lookups
-        citations_db.execute("CREATE INDEX IF NOT EXISTS idx_citations_provnum ON citations(provnum)")
-        citations_db.execute("CREATE INDEX IF NOT EXISTS idx_citations_date ON citations(survey_date)")
-        
-        return citations_db
-    except Exception as e:
-        st.error(f"Error initializing citations database: {str(e)}")
-        return None
-
 @st.cache_data
 def get_facility_citations(provnum: str, limit: int = 100) -> pd.DataFrame:
     """Get citations for a specific facility with caching."""
     try:
-        citations_db = init_citations_db()
-        if citations_db is None:
-            return pd.DataFrame()
-            
-        query = f"""
-            SELECT 
-                survey_date,
-                tag_number,
-                severity_code,
-                standard_deficiency,
-                complaint_deficiency,
-                infection_deficiency,
-                deficiency_category
-            FROM citations 
-            WHERE provnum = '{provnum}'
-            ORDER BY survey_date DESC
-            LIMIT {limit}
-        """
-        
-        result = citations_db.execute(query).fetchdf()
-        citations_db.close()  # Close the connection after use
-        return result
+        # Use dummy citations data instead of real database
+        return get_dummy_citations(provnum)
     except Exception as e:
         st.error(f"Error getting facility citations: {str(e)}")
         return pd.DataFrame()
@@ -1202,27 +1074,8 @@ def get_quarter_from_date(date_str):
 def display_facility_citations(provnum: str):
     """Display citations for a facility in a clean table format."""
     try:
-        citations_db = init_citations_db()
-        if citations_db is None:
-            return
-            
-        # Get all citations for the facility
-        query = f"""
-            SELECT 
-                survey_date,
-                tag_number,
-                severity_code,
-                standard_deficiency,
-                complaint_deficiency,
-                infection_deficiency,
-                deficiency_category
-            FROM citations 
-            WHERE provnum = '{provnum}'
-            ORDER BY survey_date DESC
-        """
-        
-        citations = citations_db.execute(query).fetchdf()
-        citations_db.close()
+        # Get dummy citations data
+        citations = get_dummy_citations(provnum)
         
         if citations.empty:
             st.info("No citations found for this facility.")
@@ -1362,96 +1215,30 @@ def display_facility_citations(provnum: str):
         st.error(f"Error displaying citations: {str(e)}")
 
 def generate_citations_section(provnum: str) -> str:
-    """Generate the citations section of the report."""
+    """Generate HTML section for recent citations."""
     try:
-        citations_db = init_citations_db()
-        if citations_db is None:
-            return ""
-            
-        # Get all citations for the facility
-        query = f"""
-            SELECT 
-                survey_date,
-                tag_number,
-                severity_code,
-                standard_deficiency,
-                complaint_deficiency,
-                infection_deficiency,
-                deficiency_category
-            FROM citations 
-            WHERE provnum = '{provnum}'
-            ORDER BY survey_date DESC
-        """
-        
-        citations = citations_db.execute(query).fetchdf()
-        citations_db.close()
-        
+        # Get citations from database
+        citations = get_facility_citations(provnum, limit=5)
         if citations.empty:
-            return "<h2>Recent Citations</h2><p>No citations found for this facility.</p>"
+            return "<p>No recent citations found.</p>"
             
-        # Format the data for display
-        citations['survey_date'] = pd.to_datetime(citations['survey_date']).dt.strftime('%Y-%m-%d')
-        citations['survey_quarter'] = citations['survey_date'].apply(get_quarter_from_date)
-        
-        # Create hyperlinks based on deficiency types
-        def create_hyperlink(row):
-            links = []
-            if row['standard_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/health-inspection?date={row["survey_date"]}" target="_blank">View Standard Report</a>')
-            if row['complaint_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/complaint-inspection?date={row["survey_date"]}" target="_blank">View Complaint Report</a>')
-            if row['infection_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/infection-control-inspection?date={row["survey_date"]}" target="_blank">View Infection Report</a>')
-            return ' | '.join(links) if links else 'N/A'
-        
-        citations['Links'] = citations.apply(create_hyperlink, axis=1)
-        
         # Generate HTML table
-        citations_html = citations[['survey_date', 'survey_quarter', 'tag_number', 'severity_code', 'Links']].to_html(
-            escape=False,
-            index=False,
-            classes='citations-table',
-            columns={
-                'survey_date': 'Survey Date',
-                'survey_quarter': 'Survey Quarter',
-                'tag_number': 'Deficiency Tag',
-                'severity_code': 'Severity',
-                'Links': 'Inspection Reports'
-            }
-        )
+        html = "<h3>Recent Citations</h3><table>"
+        html += "<tr><th>Date</th><th>Citation</th><th>Severity</th></tr>"
         
-        return f"""
-            <h2>Recent Citations</h2>
-            <style>
-            .citations-table {{
-                margin-top: 1rem;
-                width: 100%;
-                border-collapse: collapse;
-            }}
-            .citations-table th {{
-                background-color: #f8f9fa;
-                font-weight: 600;
-                padding: 8px;
-                text-align: left;
-                border: 1px solid #dee2e6;
-            }}
-            .citations-table td {{
-                font-size: 0.9em;
-                padding: 8px;
-                border: 1px solid #dee2e6;
-            }}
-            .citations-table a {{
-                color: #1E88E5;
-                text-decoration: none;
-            }}
-            .citations-table a:hover {{
-                text-decoration: underline;
-            }}
-            </style>
-            {citations_html}
-        """
+        for _, row in citations.iterrows():
+            html += f"""
+                <tr>
+                    <td>{row['CITATION_DATE']}</td>
+                    <td>{row['CITATION_NUMBER']}</td>
+                    <td>{row['SEVERITY']}</td>
+                </tr>
+            """
+            
+        html += "</table>"
+        return html
     except Exception as e:
-        return f"<h2>Recent Citations</h2><p>Error generating citations section: {str(e)}</p>"
+        return f"<p>Error retrieving citations: {str(e)}</p>"
 
 def get_facility_info(provnum: str) -> dict:
     """Get facility information from the database."""
