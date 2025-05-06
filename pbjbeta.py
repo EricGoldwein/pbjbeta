@@ -558,8 +558,39 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         with header_col1:
             st.markdown(f'<div class="section-header" style="margin-top: 8px;">{header_text}</div>', unsafe_allow_html=True)
             
-        # Display metrics in columns
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # Add mobile-specific CSS
+        st.markdown("""
+            <style>
+            @media (max-width: 768px) {
+                .mobile-metrics {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 8px;
+                    margin: 0 -8px;
+                }
+                .mobile-metrics .stMetric {
+                    margin: 0;
+                    padding: 8px;
+                }
+                .mobile-metrics .stMetric [data-testid="stMetricValue"] {
+                    font-size: 16px;
+                }
+                .mobile-metrics .stMetric [data-testid="stMetricLabel"] {
+                    font-size: 12px;
+                }
+                .mobile-metrics .stMetric [data-testid="stMetricDelta"] {
+                    font-size: 12px;
+                }
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Display metrics in columns with mobile optimization
+        if st.session_state.get('view_mode') == "Mobile":
+            st.markdown('<div class="mobile-metrics">', unsafe_allow_html=True)
+            col1, col2, col3, col4, col5 = st.columns(5)
+        else:
+            col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             st.metric("MDS Census", 
@@ -581,6 +612,10 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             st.metric("Contract Staff %", 
                      format_metric(current_metrics['Contract_Staff_Percentage'].iloc[0], decimal_places=1, percentage=True),
                      format_metric(current_metrics['Contract_Staff_Percentage'].iloc[0] - prev_metrics['Contract_Staff_Percentage'].iloc[0], decimal_places=1, percentage=True) if not prev_metrics.empty else None)
+        
+        if st.session_state.get('view_mode') == "Mobile":
+            st.markdown('</div>', unsafe_allow_html=True)
+            
     except Exception as e:
         st.error(f"Error displaying metrics: {str(e)}")
 
@@ -645,7 +680,7 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
             hover_template_count = "<b>%{customdata}</b><br>Count: %{y:,}<extra></extra>"
         else:
             hover_template_facility = "<b>%{customdata}</b><br>RN Care HPRD: %{y:.2f}<extra></extra>"
-
+        
         # Create two separate figures - one for mobile, one for desktop
         # Mobile figure (2 charts)
         mobile_fig = make_subplots(rows=2, cols=1,
@@ -672,6 +707,33 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
             hovermode='x unified'
         )
         
+        # Add footer annotations for mobile view
+        mobile_fig.add_annotation(
+            text="320 Consulting | Source: CMS PBJ Data",
+            x=0.95,
+            y=-0.33,
+            xref="x domain",
+            yref="y domain",
+            showarrow=False,
+            font=dict(size=10, color="gray"),
+            align="right",
+            row=1,
+            col=1
+        )
+        
+        mobile_fig.add_annotation(
+            text="320 Consulting | Source: CMS PBJ Data",
+            x=0.95,
+            y=-0.33,
+            xref="x domain",
+            yref="y domain",
+            showarrow=False,
+            font=dict(size=10, color="gray"),
+            align="right",
+            row=2,
+            col=1
+        )
+        
         # Update mobile x-axes
         for i in range(1, 3):
             mobile_fig.update_xaxes(
@@ -689,48 +751,48 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
         
         # Desktop figure (6 charts)
         desktop_fig = make_subplots(rows=3, cols=2,
-                                  subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
-                                                'RN HPRD', 'Nurse Assistant HPRD',
+                          subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
+                                        'RN HPRD', 'Nurse Assistant HPRD',
                                                 'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'),
                                   vertical_spacing=0.15,
                                   horizontal_spacing=0.1)
 
         # Add all traces for desktop view
         desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
-                                       mode='lines+markers', name='Total HPRD',
-                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                       hovertemplate=hover_template), row=1, col=1)
+                               mode='lines+markers', name='Total HPRD',
+                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                               hovertemplate=hover_template), row=1, col=1)
 
         desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Staff_Percentage'],
-                                       mode='lines+markers', name='Contract %',
-                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                       hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=1, col=2)
+                               mode='lines+markers', name='Contract %',
+                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                               hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=1, col=2)
 
         desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_HPRD'],
-                                       mode='lines+markers', name='RN HPRD',
-                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                       hovertemplate=hover_template), row=2, col=1)
+                               mode='lines+markers', name='RN HPRD',
+                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                               hovertemplate=hover_template), row=2, col=1)
 
         desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Nurse_Assistant_HPRD'],
-                                       mode='lines+markers', name='NA HPRD',
-                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                       hovertemplate=hover_template), row=2, col=2)
+                               mode='lines+markers', name='NA HPRD',
+                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                               hovertemplate=hover_template), row=2, col=2)
 
         desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
-                                       mode='lines+markers', name='Avg Census',
-                                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                       hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=3, col=1)
+                               mode='lines+markers', name='Avg Census',
+                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                               hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=3, col=1)
 
         if not facility:
             desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Facility_Count'],
-                                          mode='lines+markers', name='Facilities',
-                                          customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                          hovertemplate=hover_template_count), row=3, col=2)
+                                   mode='lines+markers', name='Facilities',
+                                   customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                   hovertemplate=hover_template_count), row=3, col=2)
         else:
             desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_Care_HPRD'],
-                                          mode='lines+markers', name='RN Care HPRD',
-                                          customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                          hovertemplate=hover_template_facility), row=3, col=2)
+                                   mode='lines+markers', name='RN Care HPRD',
+                                   customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                   hovertemplate=hover_template_facility), row=3, col=2)
 
         # Update desktop layout
         desktop_fig.update_layout(
@@ -747,6 +809,22 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
             ),
             autosize=True
         )
+        
+        # Add footer annotations for desktop view
+        for row in range(1, 4):
+            for col in range(1, 3):
+                desktop_fig.add_annotation(
+                    text="320 Consulting | Source: CMS PBJ Data",
+                    x=0.95,
+                    y=-0.33,
+                    xref="x domain",
+                    yref="y domain",
+                    showarrow=False,
+                    font=dict(size=10, color="gray"),
+                    align="right",
+                    row=row,
+                    col=col
+                )
         
         # Update desktop x-axes
         for i in range(1, 4):
@@ -979,145 +1057,48 @@ def get_quarter_from_date(date_str):
         return "N/A"
 
 def display_facility_citations(provnum: str):
-    """Display citations for a facility in a clean table format."""
+    """Display citations in a formatted table."""
     try:
-        # Get dummy citations data
         citations = get_dummy_citations(provnum)
-        
-        if citations.empty:
-            st.info("No citations found for this facility.")
-            return
+        if not citations.empty:
+            # Format the citations data
+            citations_display = citations[[
+                'CITATION_DATE',
+                'CITATION_NUMBER',
+                'CITATION_DESCRIPTION',
+                'CITATION_SEVERITY',
+                'CITATION_STATUS',
+                'PDF_URL'
+            ]].copy()
             
-        # Format the data for display
-        citations['survey_date'] = pd.to_datetime(citations['survey_date']).dt.strftime('%m-%d-%Y')
-        
-        # Create hyperlinks based on deficiency types
-        def create_hyperlink(row):
-            links = []
-            # Convert display date back to datetime for hyperlink format
-            link_date = pd.to_datetime(row['survey_date']).strftime('%Y-%m-%d')
-            if row['standard_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/health-inspection?date={link_date}" target="_blank">View Standard Report</a>')
-            if row['complaint_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/complaint-inspection?date={link_date}" target="_blank">View Complaint Report</a>')
-            if row['infection_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/infection-control-inspection?date={link_date}" target="_blank">View Infection Report</a>')
-            return ' | '.join(links) if links else 'N/A'
-        
-        citations['Links'] = citations.apply(create_hyperlink, axis=1)
-        
-        # Create a styled table with reduced column widths and sorting
-        st.markdown("""
-            <style>
-            .citations-table {
-                margin-top: 1rem;
-                width: 100%;
-                border-collapse: collapse;
-                table-layout: fixed;
-            }
-            .citations-table th {
-                background-color: #f8f9fa;
-                font-weight: 600;
-                padding: 8px;
-                text-align: left;
-                border: 1px solid #dee2e6;
-                cursor: pointer;
-                position: relative;
-            }
-            .citations-table th:hover {
-                background-color: #e9ecef;
-            }
-            .citations-table th::after {
-                content: '↕';
-                position: absolute;
-                right: 8px;
-                opacity: 0.5;
-            }
-            .citations-table td {
-                font-size: 0.9em;
-                padding: 8px;
-                border: 1px solid #dee2e6;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .citations-table a {
-                color: #1E88E5;
-                text-decoration: none;
-            }
-            .citations-table a:hover {
-                text-decoration: underline;
-            }
-            .citations-table th:nth-child(1) { width: 15%; }  /* Survey Date */
-            .citations-table th:nth-child(2) { width: 10%; }  /* F-Tag */
-            .citations-table th:nth-child(3) { width: 20%; }  /* Category */
-            .citations-table th:nth-child(4) { width: 10%; }  /* Severity */
-            .citations-table th:nth-child(5) { width: 45%; }  /* PDF */
-            </style>
+            # Rename columns for display
+            citations_display.columns = [
+                'Date',
+                'Citation Number',
+                'Description',
+                'Severity',
+                'Status',
+                'Report'
+            ]
             
-            <script>
-            function sortTable(n) {
-                var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-                table = document.querySelector('.citations-table');
-                switching = true;
-                dir = "asc";
-                
-                while (switching) {
-                    switching = false;
-                    rows = table.rows;
-                    
-                    for (i = 1; i < (rows.length - 1); i++) {
-                        shouldSwitch = false;
-                        x = rows[i].getElementsByTagName("TD")[n];
-                        y = rows[i + 1].getElementsByTagName("TD")[n];
-                        
-                        if (dir == "asc") {
-                            if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                                shouldSwitch = true;
-                                break;
-                            }
-                        } else if (dir == "desc") {
-                            if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                                shouldSwitch = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (shouldSwitch) {
-                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                        switching = true;
-                        switchcount++;
-                    } else {
-                        if (switchcount == 0 && dir == "asc") {
-                            dir = "desc";
-                            switching = true;
-                        }
-                    }
-                }
-            }
-            </script>
-        """, unsafe_allow_html=True)
-        
-        # Prepare the display DataFrame with renamed columns
-        display_df = citations[['survey_date', 'tag_number', 'deficiency_category', 'severity_code', 'Links']].copy()
-        display_df.columns = ['Survey Date', 'F-Tag', 'Category', 'Severity', 'PDF']
-        
-        # Create the table HTML with sorting functionality
-        table_html = display_df.to_html(
-            escape=False,
-            index=False,
-            classes='citations-table'
-        )
-        
-        # Add onclick handlers to the header cells
-        table_html = table_html.replace('<th>', '<th onclick="sortTable(Array.from(this.parentNode.children).indexOf(this))">')
-        
-        # Display the table
-        st.markdown("---")
-        st.header("Recent Citations")
-        st.markdown(table_html, unsafe_allow_html=True)
-        
+            # Sort by date, most recent first
+            citations_display['Date'] = pd.to_datetime(citations_display['Date'])
+            citations_display = citations_display.sort_values('Date', ascending=False)
+            
+            # Create hyperlinks for PDFs and summaries
+            def create_hyperlinks(row):
+                pdf_link = f'<a href="{row["Report"]}" target="_blank">View Report</a>'
+                summary_link = f'<a href="https://example.com/summary/{provnum}/{row["Citation Number"]}" target="_blank">View Summary</a>'
+                return pd.Series([pdf_link, summary_link])
+            
+            # Apply hyperlinks and add summary column
+            citations_display[['Report', '320 Summary']] = citations_display.apply(create_hyperlinks, axis=1)
+            
+            # Display the table with HTML
+            st.markdown("### Sample Citation Table")
+            st.markdown(citations_display.to_html(escape=False, index=False), unsafe_allow_html=True)
+        else:
+            st.warning("No citations found for this facility.")
     except Exception as e:
         st.error(f"Error displaying citations: {str(e)}")
 
@@ -1128,7 +1109,7 @@ def generate_citations_section(provnum: str) -> str:
         citations = get_facility_citations(provnum, limit=5)
         if citations.empty:
             return "<p>No recent citations found.</p>"
-            
+        
         # Generate HTML table
         html = "<h3>Recent Citations</h3><table>"
         html += "<tr><th>Date</th><th>Citation</th><th>Severity</th></tr>"
@@ -1482,14 +1463,103 @@ def on_mobile_change():
     else:
         st.session_state['view_mode'] = "Desktop View"
 
+def create_subscription_db():
+    """Create a database table for storing email subscriptions."""
+    try:
+        conn = sqlite3.connect('subscriptions.db')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                entity_name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error creating subscription database: {str(e)}")
+
+def add_subscription(email: str, entity_type: str, entity_id: str, entity_name: str) -> bool:
+    """Add a new subscription to the database."""
+    try:
+        conn = sqlite3.connect('subscriptions.db')
+        conn.execute(
+            'INSERT INTO subscriptions (email, entity_type, entity_id, entity_name) VALUES (?, ?, ?, ?)',
+            (email, entity_type, entity_id, entity_name)
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        st.error("This email is already subscribed to this entity.")
+        return False
+    except Exception as e:
+        st.error(f"Error adding subscription: {str(e)}")
+        return False
+
+def show_subscription_form(entity_type: str, entity_id: str, entity_name: str):
+    """Show the subscription form in a modal."""
+    with st.form(key=f"subscription_form_{entity_id}"):
+        st.markdown("### Subscribe to 320 Consulting for Custom Reports")
+        email = st.text_input("Enter your email address")
+        submit = st.form_submit_button("Subscribe")
+        
+        if submit and email:
+            if add_subscription(email, entity_type, entity_id, entity_name):
+                st.success(f"Successfully subscribed to {entity_name} reports!")
+
+def display_subscription_button(entity_type: str, entity_id: str, entity_name: str):
+    """Display the subscription button with a modal form."""
+    st.markdown("""
+        <style>
+        .subscription-button {
+            width: 100%;
+            padding: 12px 24px;
+            background-color: #1E88E5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            text-align: center;
+            display: block;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .subscription-button:hover {
+            background-color: #1565C0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    if st.button(f"Subscribe for custom report on {entity_name}", key=f"subscribe_{entity_id}"):
+        show_subscription_form(entity_type, entity_id, entity_name)
+
 def main() -> None:
     """Main app layout and data flow."""
     try:
+        # Initialize subscription database
+        create_subscription_db()
+        
+        # Initialize session state variables at the very start
+        if 'view_mode' not in st.session_state:
+            st.session_state.view_mode = "Desktop"
+
         # Title with custom styling
         st.markdown("""
             <div>
-                <h1 class="main-header" style="margin-bottom: 0;">Nursing Home Staffing Analysis (Beta)</h1>
-                <p style="color: #666; font-size: 0.9em; margin-top: 2px;">By 320 Consulting</p>
+                <h1 class="main-header" style="margin-bottom: 0;">PBJ Reports (Beta)</h1>
+                <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
+                    By 320 Consulting | 
+                    <a href="/Premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
+                        ⭐ Premium
+                    </a>
+                </p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -1510,10 +1580,21 @@ def main() -> None:
             .sidebar .stSelectbox {
                 margin-bottom: 0;
             }
+            .sidebar h3 {
+                margin-bottom: 0.5rem;
+            }
             </style>
         """, unsafe_allow_html=True)
         
         st.sidebar.title("Filters")
+
+        # Add view mode selection at the top of filters
+        view_mode = st.sidebar.radio(
+            "",
+            ["Desktop", "Mobile"],
+            index=0 if st.session_state.view_mode == "Desktop" else 1,
+            key="view_mode"
+        )
 
         # Add level selection
         level = st.sidebar.radio(
@@ -1609,14 +1690,6 @@ def main() -> None:
             st.error(f"Error processing selection: {str(e)}")
             return
         
-        # Add view toggle in the sidebar
-        view_mode = st.sidebar.radio(
-            "View Mode",
-            ["Desktop View", "Mobile View"],
-            index=0,
-            help="Choose between full desktop view or simplified mobile view"
-        )
-
         # Get filtered data
         try:
             filtered_data = get_filtered_data(level, selected_value, start_quarter, end_quarter)
@@ -1635,59 +1708,17 @@ def main() -> None:
                     # 3. Display trends
                     fig = plot_quarterly_trends(filtered_data, 
                                           view_mode=view_mode,
-                                          state=selected_value if level == "State" else None,
-                                          region=selected_value if level == "Region" else None,
-                                          facility=selected_value if level == "Facility" else None)
+                                        state=selected_value if level == "State" else None,
+                                        region=selected_value if level == "Region" else None,
+                                        facility=selected_value if level == "Facility" else None)
                     if fig:
                         st.plotly_chart(fig, use_container_width=True)
 
                     # 4. Display citations
                     display_facility_citations(selected_value)
-
-                    # 5. Add custom reports button
-                    st.markdown("---")
-                    facility_name = get_facility_info(selected_value)
-                    if facility_name:
-                        # Add custom CSS for the button
-                        st.markdown("""
-                            <style>
-                            .custom-reports-section {
-                                margin: 20px 0;
-                            }
-                            .custom-reports-button {
-                                background-color: #1E88E5;
-                                color: white;
-                                padding: 12px 24px;
-                                border: none;
-                                border-radius: 6px;
-                                cursor: pointer;
-                                font-weight: 500;
-                                font-size: 14px;
-                                transition: background-color 0.3s;
-                                width: fit-content;
-                                text-align: left;
-                                display: inline-block;
-                            }
-                            .custom-reports-button:hover {
-                                background-color: #1565C0;
-                            }
-                            @media (max-width: 768px) {
-                                .custom-reports-button {
-                                    width: 100%;
-                                    text-align: center;
-                                    padding: 16px 24px;
-                                    font-size: 16px;
-                                }
-                            }
-                            </style>
-                        """, unsafe_allow_html=True)
-                        
-                        button_text = f"Subscribe to generate custom report on {facility_name['provider_name']}"
-                        st.markdown(f"""
-                            <div class="custom-reports-section">
-                                <button class="custom-reports-button">{button_text}</button>
-                            </div>
-                        """, unsafe_allow_html=True)
+                    
+                    # 5. Add subscription button
+                    display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
 
             # For other levels (National, State, Region)
             else:
@@ -1695,11 +1726,19 @@ def main() -> None:
                     display_metrics(filtered_data, level)
                     fig = plot_quarterly_trends(filtered_data, 
                                               view_mode=view_mode,
-                                              state=selected_value if level == "State" else None,
-                                              region=selected_value if level == "Region" else None,
-                                              facility=selected_value if level == "Facility" else None)
+                                        state=selected_value if level == "State" else None,
+                                        region=selected_value if level == "Region" else None,
+                                        facility=selected_value if level == "Facility" else None)
                     if fig:
                         st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Add subscription button for all levels
+                    if level == "National":
+                        display_subscription_button("national", "national", "National Data")
+                    elif level == "State":
+                        display_subscription_button("state", selected_value, f"{selected_value} State Data")
+                    elif level == "Region":
+                        display_subscription_button("region", selected_value, f"{selected_value} Region Data")
                 else:
                     st.warning("No data available for the selected filters.")
         except Exception as e:
@@ -1897,48 +1936,6 @@ def get_dummy_citations(provnum: str) -> pd.DataFrame:
         }
     ]
     return pd.DataFrame(citations)
-
-def display_facility_citations(provnum: str):
-    """Display citations in a formatted table."""
-    try:
-        citations = get_dummy_citations(provnum)
-        if not citations.empty:
-            # Format the citations data
-            citations_display = citations[[
-                'CITATION_DATE',
-                'CITATION_NUMBER',
-                'CITATION_DESCRIPTION',
-                'CITATION_SEVERITY',
-                'CITATION_STATUS',
-                'PDF_URL'
-            ]].copy()
-            
-            # Rename columns for display
-            citations_display.columns = [
-                'Date',
-                'Citation Number',
-                'Description',
-                'Severity',
-                'Status',
-                'PDF'
-            ]
-            
-            # Sort by date, most recent first
-            citations_display['Date'] = pd.to_datetime(citations_display['Date'])
-            citations_display = citations_display.sort_values('Date', ascending=False)
-            
-            # Create hyperlinks for PDFs
-            def create_hyperlink(row):
-                return f'<a href="{row["PDF"]}" target="_blank">View PDF</a>'
-            
-            citations_display['PDF'] = citations_display.apply(create_hyperlink, axis=1)
-            
-            # Display the table with HTML
-            st.markdown(citations_display.to_html(escape=False, index=False), unsafe_allow_html=True)
-        else:
-            st.warning("No citations found for this facility.")
-    except Exception as e:
-        st.error(f"Error displaying citations: {str(e)}")
 
 if __name__ == "__main__":
     main()

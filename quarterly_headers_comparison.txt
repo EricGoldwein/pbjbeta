@@ -1,0 +1,10 @@
+HEADER COMPARISON ACROSS QUARTERS
+==================================================
+
+Header Presence Matrix:
+Quarter         | 
+------------------
+
+
+STRUCTURAL DIFFERENCES
+==================================================

@@ -34,7 +34,7 @@ ENV/
 # Project specific
 # Keep only the main app file
 *.py
-!appdev.py
+!pbjbeta.py
 !requirements.txt
 
 # Keep only essential data files

@@ -20,7 +20,7 @@ Note: The data files are not included in this repository due to their size. Plea
 ## Running the Application
 
 ```bash
-streamlit run appdev.py
+streamlit run pbjbeta.py
 ```
 
 ## License

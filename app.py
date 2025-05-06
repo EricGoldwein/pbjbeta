@@ -1855,7 +1855,7 @@ def main() -> None:
             elif level == "Facility":
                 # Facility search with auto-complete
                 search_container = st.sidebar.container()
-                search_term = search_container.text_input("Enter Facility ID or Name", key="facility_search")
+                search_term = search_container.text_input("Enter Provider CCN or Name", key="facility_search")
                 
                 if search_term:
                     matching_facilities = search_facilities(search_term)
