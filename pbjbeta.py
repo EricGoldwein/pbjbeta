@@ -249,50 +249,72 @@ def get_provider_info(provnum: str, info_type: str) -> str:
         if not target_columns:
             return 'N/A'
         
-        # Try different encodings
-        encodings = ['latin1', 'cp1252', 'utf-8']
-        pbj_files = sorted(glob.glob('PBJ_Nurse/*.csv'), reverse=True)
+        # First try to get info from facility_metrics
+        try:
+            query = f"""
+                SELECT DISTINCT {', '.join(target_columns)}
+                FROM facility_metrics 
+                WHERE PROVNUM = '{provnum}'
+                LIMIT 1
+            """
+            result = facility_db.execute(query).fetchdf()
+            if not result.empty:
+                value = result.iloc[0][0]  # Get first column value
+                # Apply proper title case to name and city
+                if info_type in ['name', 'city']:
+                    value = proper_title_case(value)
+                # Cache the result
+                provider_info_cache[cache_key] = value
+                return value
+        except Exception:
+            pass  # Continue to PBJ_Nurse files if facility_metrics fails
         
-        for pbj_file in pbj_files:
-            for encoding in encodings:
-                try:
-                    df = pd.read_csv(pbj_file, encoding=encoding, dtype={'PROVNUM': str, 'provnum': str})
-                    
-                    # Standardize PROVNUM column
-                    prov_col = next(
-                        (col for col in df.columns 
-                         if col.lower() in ['provnum', 'provider_number']),
-                        None
-                    )
-                    if not prov_col:
+        # Try PBJ_Nurse files as fallback
+        if os.path.exists('PBJ_Nurse'):
+            # Try different encodings
+            encodings = ['latin1', 'cp1252', 'utf-8']
+            pbj_files = sorted(glob.glob('PBJ_Nurse/*.csv'), reverse=True)
+            
+            for pbj_file in pbj_files:
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(pbj_file, encoding=encoding, dtype={'PROVNUM': str, 'provnum': str})
+                        
+                        # Standardize PROVNUM column
+                        prov_col = next(
+                            (col for col in df.columns 
+                             if col.lower() in ['provnum', 'provider_number']),
+                            None
+                        )
+                        if not prov_col:
+                            continue
+                        
+                        df.rename(columns={prov_col: 'PROVNUM'}, inplace=True)
+                        
+                        # Find matching info column
+                        info_col = next(
+                            (col for col in df.columns 
+                             if col in target_columns),
+                            None
+                        )
+                        if not info_col:
+                            continue
+                        
+                        provider_data = df[df['PROVNUM'] == provnum]
+                        if not provider_data.empty:
+                            value = provider_data.iloc[0][info_col]
+                            # Apply proper title case to name and city
+                            if info_type in ['name', 'city']:
+                                value = proper_title_case(value)
+                            # Cache the result
+                            provider_info_cache[cache_key] = value
+                            return value
+                        
+                    except UnicodeDecodeError:
                         continue
-                    
-                    df.rename(columns={prov_col: 'PROVNUM'}, inplace=True)
-                    
-                    # Find matching info column
-                    info_col = next(
-                        (col for col in df.columns 
-                         if col in target_columns),
-                        None
-                    )
-                    if not info_col:
+                    except Exception as e:
+                        st.error(f"Error processing {pbj_file}: {str(e)}")
                         continue
-                    
-                    provider_data = df[df['PROVNUM'] == provnum]
-                    if not provider_data.empty:
-                        value = provider_data.iloc[0][info_col]
-                        # Apply proper title case to name and city
-                        if info_type in ['name', 'city']:
-                            value = proper_title_case(value)
-                        # Cache the result
-                        provider_info_cache[cache_key] = value
-                        return value
-                    
-                except UnicodeDecodeError:
-                    continue
-                except Exception as e:
-                    st.error(f"Error processing {pbj_file}: {str(e)}")
-                    continue
         
         return 'N/A'
     except Exception as e:
@@ -652,7 +674,10 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
             # Get facility name and state
             facility_name = get_provider_info(facility, 'name')
             facility_state = get_provider_info(facility, 'state')
-            title_prefix = f"{facility_name} ({facility_state})"
+            if facility_name and facility_state:
+                title_prefix = f"{facility_name} ({facility_state})"
+            else:
+                title_prefix = f"Facility {facility}"
             data = df[df['PROVNUM'] == facility].copy()
         else:
             title_prefix = "National"
@@ -681,159 +706,66 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
         else:
             hover_template_facility = "<b>%{customdata}</b><br>RN Care HPRD: %{y:.2f}<extra></extra>"
         
-        # Create two separate figures - one for mobile, one for desktop
-        # Mobile figure (2 charts)
-        mobile_fig = make_subplots(rows=2, cols=1,
-                                 subplot_titles=('Total Nurse HPRD', 'Average Daily Census'),
-                                 vertical_spacing=0.2)
-        
-        # Add traces for mobile view
-        mobile_fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
-                                      mode='lines+markers', name='Total HPRD',
-                                      customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                      hovertemplate=hover_template), row=1, col=1)
-        
-        mobile_fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
-                                      mode='lines+markers', name='Avg Census',
-                                      customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                      hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
-        
-        # Update mobile layout
-        mobile_fig.update_layout(
-            height=800,
-            title_text=f"{title_prefix} Staffing Trends",
-            showlegend=False,
-            margin=dict(l=50, r=50, t=80, b=200),
-            hovermode='x unified'
-        )
-        
-        # Add footer annotations for mobile view
-        mobile_fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,
-            y=-0.33,
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",
-            row=1,
-            col=1
-        )
-        
-        mobile_fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,
-            y=-0.33,
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",
-            row=2,
-            col=1
-        )
-        
-        # Update mobile x-axes
-        for i in range(1, 3):
-            mobile_fig.update_xaxes(
-                tickvals=tick_values,
-                tickangle=45,
-                row=i,
-                col=1,
-                showline=True,
-                linewidth=1,
-                linecolor="rgba(200, 200, 200, 0.1)",
-                range=[tick_values[0], tick_values[-1]],
-                nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
-                tickmode='auto'
+        if view_mode == "Mobile":
+            # Mobile figure (2 charts)
+            fig = make_subplots(rows=2, cols=1,
+                             subplot_titles=('Total Nurse HPRD', 'Average Daily Census'),
+                             vertical_spacing=0.2)
+            
+            # Add traces for mobile view
+            fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
+                                  mode='lines+markers', name='Total HPRD',
+                                  customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                  hovertemplate=hover_template), row=1, col=1)
+            
+            fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
+                                  mode='lines+markers', name='Avg Census',
+                                  customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                  hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
+            
+            # Update mobile layout
+            fig.update_layout(
+                height=800,
+                title_text=f"{title_prefix} Staffing Trends",
+                showlegend=False,
+                margin=dict(l=50, r=50, t=80, b=200),
+                hovermode='x unified'
             )
-        
-        # Desktop figure (6 charts)
-        desktop_fig = make_subplots(rows=3, cols=2,
-                          subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
-                                        'RN HPRD', 'Nurse Assistant HPRD',
-                                                'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'),
-                                  vertical_spacing=0.15,
-                                  horizontal_spacing=0.1)
-
-        # Add all traces for desktop view
-        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
-                               mode='lines+markers', name='Total HPRD',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template), row=1, col=1)
-
-        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Staff_Percentage'],
-                               mode='lines+markers', name='Contract %',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=1, col=2)
-
-        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_HPRD'],
-                               mode='lines+markers', name='RN HPRD',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template), row=2, col=1)
-
-        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Nurse_Assistant_HPRD'],
-                               mode='lines+markers', name='NA HPRD',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template), row=2, col=2)
-
-        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
-                               mode='lines+markers', name='Avg Census',
-                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                               hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=3, col=1)
-
-        if not facility:
-            desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Facility_Count'],
-                                   mode='lines+markers', name='Facilities',
-                                   customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                   hovertemplate=hover_template_count), row=3, col=2)
-        else:
-            desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_Care_HPRD'],
-                                   mode='lines+markers', name='RN Care HPRD',
-                                   customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                   hovertemplate=hover_template_facility), row=3, col=2)
-
-        # Update desktop layout
-        desktop_fig.update_layout(
-            height=1200,
-            title_text=f"{title_prefix} Staffing Trends",
-            showlegend=False,
-            margin=dict(l=50, r=50, t=80, b=200),
-            hovermode='x unified',
-            grid=dict(
-                rows=3,
-                columns=2,
-                xgap=0.1,
-                ygap=0.15
-            ),
-            autosize=True
-        )
-        
-        # Add footer annotations for desktop view
-        for row in range(1, 4):
-            for col in range(1, 3):
-                desktop_fig.add_annotation(
-                    text="320 Consulting | Source: CMS PBJ Data",
-                    x=0.95,
-                    y=-0.33,
-                    xref="x domain",
-                    yref="y domain",
-                    showarrow=False,
-                    font=dict(size=10, color="gray"),
-                    align="right",
-                    row=row,
-                    col=col
-                )
-        
-        # Update desktop x-axes
-        for i in range(1, 4):
-            for j in range(1, 3):
-                desktop_fig.update_xaxes(
+            
+            # Add footer annotations for mobile view
+            fig.add_annotation(
+                text="320 Consulting | Source: CMS PBJ Data",
+                x=0.95,
+                y=-0.33,
+                xref="x domain",
+                yref="y domain",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+                align="right",
+                row=1,
+                col=1
+            )
+            
+            fig.add_annotation(
+                text="320 Consulting | Source: CMS PBJ Data",
+                x=0.95,
+                y=-0.33,
+                xref="x domain",
+                yref="y domain",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+                align="right",
+                row=2,
+                col=1
+            )
+            
+            # Update mobile x-axes
+            for i in range(1, 3):
+                fig.update_xaxes(
                     tickvals=tick_values,
                     tickangle=45,
                     row=i,
-                    col=j,
+                    col=1,
                     showline=True,
                     linewidth=1,
                     linecolor="rgba(200, 200, 200, 0.1)",
@@ -841,10 +773,95 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
                     nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
                     tickmode='auto'
                 )
+        else:
+            # Desktop figure (6 charts)
+            fig = make_subplots(rows=3, cols=2,
+                      subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
+                                    'RN HPRD', 'Nurse Assistant HPRD',
+                                            'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'),
+                              vertical_spacing=0.15,
+                              horizontal_spacing=0.1)
 
-        # Return the appropriate figure based on view mode
-        return mobile_fig if view_mode == "Mobile View" else desktop_fig
+            # Add all traces for desktop view
+            fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
+                           mode='lines+markers', name='Total HPRD',
+                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                           hovertemplate=hover_template), row=1, col=1)
 
+            fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Staff_Percentage'],
+                           mode='lines+markers', name='Contract %',
+                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                           hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=1, col=2)
+
+            fig.add_trace(go.Scatter(x=data['date'], y=data['RN_HPRD'],
+                           mode='lines+markers', name='RN HPRD',
+                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                           hovertemplate=hover_template), row=2, col=1)
+
+            fig.add_trace(go.Scatter(x=data['date'], y=data['Nurse_Assistant_HPRD'],
+                           mode='lines+markers', name='NA HPRD',
+                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                           hovertemplate=hover_template), row=2, col=2)
+
+            fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
+                           mode='lines+markers', name='Avg Census',
+                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                           hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=3, col=1)
+
+            if not facility:
+                fig.add_trace(go.Scatter(x=data['date'], y=data['Facility_Count'],
+                               mode='lines+markers', name='Facilities',
+                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                               hovertemplate=hover_template_count), row=3, col=2)
+            else:
+                fig.add_trace(go.Scatter(x=data['date'], y=data['RN_Care_HPRD'],
+                               mode='lines+markers', name='RN Care HPRD',
+                               customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                               hovertemplate=hover_template_facility), row=3, col=2)
+
+            # Update desktop layout
+            fig.update_layout(
+                height=1200,
+                title_text=f"{title_prefix} Staffing Trends",
+                showlegend=False,  # Remove legend
+                margin=dict(l=50, r=50, t=100, b=100),  # Increase bottom margin
+                hovermode='x unified'
+            )
+            
+            # Add footer annotations for desktop view
+            for row in range(1, 4):
+                for col in range(1, 3):
+                    fig.add_annotation(
+                        text="320 Consulting | Source: CMS PBJ Data",
+                        x=0.95,
+                        y=-0.25,  # Move footer up
+                        xref="x domain",
+                        yref="y domain",
+                        showarrow=False,
+                        font=dict(size=10, color="gray"),
+                        align="right",
+                        row=row,
+                        col=col
+                    )
+            
+            # Update desktop x-axes
+            for row in range(1, 4):
+                for col in range(1, 3):
+                    fig.update_xaxes(
+                        tickvals=tick_values,
+                        tickangle=45,
+                        row=row,
+                        col=col,
+                        showline=True,
+                        linewidth=1,
+                        linecolor="rgba(200, 200, 200, 0.1)",
+                        range=[tick_values[0], tick_values[-1]],
+                        nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
+                        tickmode='auto'
+                    )
+        
+        return fig
+        
     except Exception as e:
         st.error(f"Error plotting trends: {str(e)}")
         return None
@@ -1662,20 +1679,28 @@ def main() -> None:
                 )
                 selected_value = selected_region
             elif level == "Facility":
-                # Facility search with auto-complete
                 search_container = st.sidebar.container()
                 search_term = search_container.text_input("Enter Provider CCN or Name", key="facility_search")
-                
+                matching_facilities = []
+                search_triggered = False
+
+                if st.session_state.view_mode == "Mobile":
+                    # On mobile, add a search button
+                    if search_container.button("Search", key="facility_search_button"):
+                        search_triggered = True
+                    if search_triggered and search_term:
+                        matching_facilities = search_facilities(search_term)
+                else:
+                    # On desktop, search as you type
+                    if search_term:
+                        matching_facilities = search_facilities(search_term)
+
                 if search_term:
-                    matching_facilities = search_facilities(search_term)
-                    
                     if matching_facilities:
-                        # Create a formatted display string for each facility
                         facility_options = [
                             f"{fac['PROVNUM']} - {fac['PROVNAME']}"
                             for fac in matching_facilities
                         ]
-                        
                         selected_facility_display = search_container.selectbox(
                             "Select Facility",
                             facility_options,
