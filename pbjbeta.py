@@ -9,7 +9,6 @@ import sqlite3
 import os
 import time
 import glob
-from openai import OpenAI
 from dotenv import load_dotenv
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -26,7 +25,6 @@ import duckdb
 from functools import lru_cache
 from streamlit_searchbox import st_searchbox
 from typing import Dict, Optional, List, Tuple, Any
-from fix_pdf import create_pdf_report
 
 # Set page configuration with a more professional theme
 st.set_page_config(
@@ -38,9 +36,6 @@ st.set_page_config(
 
 # Load environment variables
 load_dotenv()
-
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Initialize DuckDB connection for facility data
 facility_db = duckdb.connect(':memory:')
@@ -563,8 +558,39 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         with header_col1:
             st.markdown(f'<div class="section-header" style="margin-top: 8px;">{header_text}</div>', unsafe_allow_html=True)
             
-        # Display metrics in columns
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # Add mobile-specific CSS
+        st.markdown("""
+            <style>
+            @media (max-width: 768px) {
+                .mobile-metrics {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 8px;
+                    margin: 0 -8px;
+                }
+                .mobile-metrics .stMetric {
+                    margin: 0;
+                    padding: 8px;
+                }
+                .mobile-metrics .stMetric [data-testid="stMetricValue"] {
+                    font-size: 16px;
+                }
+                .mobile-metrics .stMetric [data-testid="stMetricLabel"] {
+                    font-size: 12px;
+                }
+                .mobile-metrics .stMetric [data-testid="stMetricDelta"] {
+                    font-size: 12px;
+                }
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Display metrics in columns with mobile optimization
+        if st.session_state.get('view_mode') == "Mobile":
+            st.markdown('<div class="mobile-metrics">', unsafe_allow_html=True)
+            col1, col2, col3, col4, col5 = st.columns(5)
+        else:
+            col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             st.metric("MDS Census", 
@@ -586,11 +612,15 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             st.metric("Contract Staff %", 
                      format_metric(current_metrics['Contract_Staff_Percentage'].iloc[0], decimal_places=1, percentage=True),
                      format_metric(current_metrics['Contract_Staff_Percentage'].iloc[0] - prev_metrics['Contract_Staff_Percentage'].iloc[0], decimal_places=1, percentage=True) if not prev_metrics.empty else None)
+        
+        if st.session_state.get('view_mode') == "Mobile":
+            st.markdown('</div>', unsafe_allow_html=True)
+            
     except Exception as e:
         st.error(f"Error displaying metrics: {str(e)}")
 
 @st.cache_data
-def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = None, facility: str = None):
+def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, region: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
         # State code to name mapping
@@ -651,182 +681,173 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, region: str = Non
         else:
             hover_template_facility = "<b>%{customdata}</b><br>RN Care HPRD: %{y:.2f}<extra></extra>"
         
-        # Create subplots
-        fig = make_subplots(rows=3, cols=2,
+        # Create two separate figures - one for mobile, one for desktop
+        # Mobile figure (2 charts)
+        mobile_fig = make_subplots(rows=2, cols=1,
+                                 subplot_titles=('Total Nurse HPRD', 'Average Daily Census'),
+                                 vertical_spacing=0.2)
+        
+        # Add traces for mobile view
+        mobile_fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
+                                      mode='lines+markers', name='Total HPRD',
+                                      customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                      hovertemplate=hover_template), row=1, col=1)
+        
+        mobile_fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
+                                      mode='lines+markers', name='Avg Census',
+                                      customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                                      hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
+        
+        # Update mobile layout
+        mobile_fig.update_layout(
+            height=800,
+            title_text=f"{title_prefix} Staffing Trends",
+            showlegend=False,
+            margin=dict(l=50, r=50, t=80, b=200),
+            hovermode='x unified'
+        )
+        
+        # Add footer annotations for mobile view
+        mobile_fig.add_annotation(
+            text="320 Consulting | Source: CMS PBJ Data",
+            x=0.95,
+            y=-0.33,
+            xref="x domain",
+            yref="y domain",
+            showarrow=False,
+            font=dict(size=10, color="gray"),
+            align="right",
+            row=1,
+            col=1
+        )
+        
+        mobile_fig.add_annotation(
+            text="320 Consulting | Source: CMS PBJ Data",
+            x=0.95,
+            y=-0.33,
+            xref="x domain",
+            yref="y domain",
+            showarrow=False,
+            font=dict(size=10, color="gray"),
+            align="right",
+            row=2,
+            col=1
+        )
+        
+        # Update mobile x-axes
+        for i in range(1, 3):
+            mobile_fig.update_xaxes(
+                tickvals=tick_values,
+                tickangle=45,
+                row=i,
+                col=1,
+                showline=True,
+                linewidth=1,
+                linecolor="rgba(200, 200, 200, 0.1)",
+                range=[tick_values[0], tick_values[-1]],
+                nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
+                tickmode='auto'
+            )
+        
+        # Desktop figure (6 charts)
+        desktop_fig = make_subplots(rows=3, cols=2,
                           subplot_titles=('Total Nurse HPRD', 'Contract Staff Percentage',
                                         'RN HPRD', 'Nurse Assistant HPRD',
-                                        'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'))
+                                                'Average Daily Census', 'Facility Count' if not facility else 'RN Care HPRD'),
+                                  vertical_spacing=0.15,
+                                  horizontal_spacing=0.1)
 
-        # Plot 1: Total Nurse HPRD
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
+        # Add all traces for desktop view
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Total_HPRD'],
                                mode='lines+markers', name='Total HPRD',
                                customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                hovertemplate=hover_template), row=1, col=1)
 
-        # Plot 2: Contract Staff Percentage
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Staff_Percentage'],
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Staff_Percentage'],
                                mode='lines+markers', name='Contract %',
                                customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=1, col=2)
 
-        # Plot 3: RN HPRD
-        fig.add_trace(go.Scatter(x=data['date'], y=data['RN_HPRD'],
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_HPRD'],
                                mode='lines+markers', name='RN HPRD',
                                customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                hovertemplate=hover_template), row=2, col=1)
 
-        # Plot 4: Nurse Assistant HPRD
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Nurse_Assistant_HPRD'],
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Nurse_Assistant_HPRD'],
                                mode='lines+markers', name='NA HPRD',
                                customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                hovertemplate=hover_template), row=2, col=2)
 
-        # Plot 5: Average Daily Census
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
+        desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Avg_Daily_Census'],
                                mode='lines+markers', name='Avg Census',
                                customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=3, col=1)
 
-        # Plot 6: Facility Count or RN Care HPRD
         if not facility:
-            fig.add_trace(go.Scatter(x=data['date'], y=data['Facility_Count'],
+            desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['Facility_Count'],
                                    mode='lines+markers', name='Facilities',
                                    customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                    hovertemplate=hover_template_count), row=3, col=2)
         else:
-            fig.add_trace(go.Scatter(x=data['date'], y=data['RN_Care_HPRD'],
+            desktop_fig.add_trace(go.Scatter(x=data['date'], y=data['RN_Care_HPRD'],
                                    mode='lines+markers', name='RN Care HPRD',
                                    customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                                    hovertemplate=hover_template_facility), row=3, col=2)
 
-        # Update layout
-        fig.update_layout(
-            height=1200,  # Increased height for better visibility
+        # Update desktop layout
+        desktop_fig.update_layout(
+            height=1200,
             title_text=f"{title_prefix} Staffing Trends",
             showlegend=False,
-            margin=dict(l=50, r=50, t=80, b=200),  # Increased bottom margin
+            margin=dict(l=50, r=50, t=80, b=200),
             hovermode='x unified',
             grid=dict(
                 rows=3,
                 columns=2,
-                xgap=0.1,  # Horizontal spacing between subplots
-                ygap=0.15  # Vertical spacing between subplots
-            )
+                xgap=0.1,
+                ygap=0.15
+            ),
+            autosize=True
         )
-
-        # Update x-axes to show only years and set line color
+        
+        # Add footer annotations for desktop view
+        for row in range(1, 4):
+            for col in range(1, 3):
+                desktop_fig.add_annotation(
+                    text="320 Consulting | Source: CMS PBJ Data",
+                    x=0.95,
+                    y=-0.33,
+                    xref="x domain",
+                    yref="y domain",
+                    showarrow=False,
+                    font=dict(size=10, color="gray"),
+                    align="right",
+                    row=row,
+                    col=col
+                )
+        
+        # Update desktop x-axes
         for i in range(1, 4):
             for j in range(1, 3):
-                fig.update_xaxes(
-                    ticktext=tick_text,
+                desktop_fig.update_xaxes(
                     tickvals=tick_values,
-                    tickangle=45,  # Set diagonal angle
+                    tickangle=45,
                     row=i,
                     col=j,
                     showline=True,
                     linewidth=1,
-                    linecolor="rgba(200, 200, 200, 0.1)",  # Made even more faint
-                    range=[tick_values[0], tick_values[-1]]  # Ensure consistent range across all subplots
+                    linecolor="rgba(200, 200, 200, 0.1)",
+                    range=[tick_values[0], tick_values[-1]],
+                    nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
+                    tickmode='auto'
                 )
-        
-        # Update y-axis labels
-        fig.update_yaxes(title_text="Hours per Resident Day", row=1, col=1)
-        fig.update_yaxes(title_text="Percentage", row=1, col=2)
-        fig.update_yaxes(title_text="Hours per Resident Day", row=2, col=1)
-        fig.update_yaxes(title_text="Hours per Resident Day", row=2, col=2)
-        fig.update_yaxes(title_text="Residents", row=3, col=1)
-        if not facility:
-            fig.update_yaxes(title_text="Number of Facilities", row=3, col=2)
-        else:
-            fig.update_yaxes(title_text="Hours per Resident Day", row=3, col=2)
-            # Update subplot title for facility view plot 6
-            fig.layout.annotations[5].update(text='RN Care HPRD')
-        
-        # Add individual footer annotations for each subplot using subplot-specific coordinates
-        # Top row
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=1,
-            col=1
-        )
-        
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=1,
-            col=2
-        )
-        
-        # Middle row
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=2,
-            col=1
-        )
-        
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=2,
-            col=2
-        )
-        
-        # Bottom row
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=3,
-            col=1
-        )
-        
-        fig.add_annotation(
-            text="320 Consulting | Source: CMS PBJ Data",
-            x=0.95,  # Moved to right
-            y=-0.33,  # Keep the lower position
-            xref="x domain",
-            yref="y domain",
-            showarrow=False,
-            font=dict(size=10, color="gray"),
-            align="right",  # Changed to right alignment
-            row=3,
-            col=2
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
+
+        # Return the appropriate figure based on view mode
+        return mobile_fig if view_mode == "Mobile View" else desktop_fig
+
     except Exception as e:
         st.error(f"Error plotting trends: {str(e)}")
+        return None
 
 # Function to create PDF report
 def create_pdf_report(provnum: str, selected_quarter: str) -> bytes:
@@ -955,80 +976,6 @@ def create_pdf_report(provnum: str, selected_quarter: str) -> bytes:
         print(f"Error creating PDF: {str(e)}")
         return None
 
-# Get the assistant
-def get_assistant():
-    assistant_id = os.getenv('OPENAI_ASSISTANT_ID')
-    return client.beta.assistants.retrieve(assistant_id)
-
-# Function to generate AI report
-def generate_ai_report(state_data, report_type="brief", prompt_type=""):
-    try:
-        # Debug output
-        st.write("Debug: state_data keys:", list(state_data.keys()))
-        
-        # Get the assistant
-        assistant = get_assistant()
-        
-        # Create a thread
-        thread = client.beta.threads.create()
-        
-        # Prepare the data context
-        context = f"""
-        State: {state_data['state']}
-        Time Period: {state_data['quarter']}
-        
-        Key Metrics:
-        - Total HPRD: {state_data['total_hprd']:.2f} (National: {state_data['national_total_hprd']:.2f})
-        - RN HPRD: {state_data['rn_hprd']:.2f} (National: {state_data['national_rn_hprd']:.2f})
-        - Number of Facilities: {state_data['facility_count']}
-        - Average Daily Residents: {state_data['avg_daily_residents']:,.0f}
-        
-        Additional Metrics:
-        - Nurse Care Staff HPRD: {state_data['nurse_care_hprd']:.2f}
-        - RN Care Staff HPRD: {state_data['rn_care_hprd']:.2f}
-        - Nurse Assistant HPRD: {state_data['nurse_assistant_hprd']:.2f}
-        
-        Contract Staff Metrics:
-        - Contract Staff Percentage: {state_data['contract_staff_percentage']:.1f}% (National: {state_data['national_contract_percentage']:.1f}%)
-        - Median Contract Staff Percentage: {state_data['median_contract_percentage']:.1f}%
-        """
-        
-        # Create the message
-        prompt = f"Please generate a {report_type} report analyzing the nursing home staffing trends in {state_data['state']} based on the following data. Focus on key insights, patterns, and recommendations. {prompt_type}"
-        
-        # Add the message to the thread
-        message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=f"{prompt}\n\nData:\n{context}"
-        )
-        
-        # Run the assistant
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id
-        )
-        
-        # Wait for completion
-        while True:
-            run = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            if run.status == 'completed':
-                break
-            time.sleep(1)
-        
-        # Get the response
-        messages = client.beta.threads.messages.list(thread_id=thread.id)
-        report = messages.data[0].content[0].text.value
-        
-        return report
-        
-    except Exception as e:
-        st.error(f"Error generating report: {str(e)}")
-        return None
-
 # Add custom CSS for better styling
 st.markdown("""
 <style>
@@ -1045,62 +992,21 @@ st.markdown("""
     }
     .stMetric [data-testid="stMetricValue"] {
         font-size: 20px;
-        font-weight: bold;
-        color: #1E88E5;
-        margin-bottom: 4px;
     }
-    .stMetric [data-testid="stMetricLabel"] {
-        font-size: 12px;
-        color: #666;
+    
+    /* Mobile-specific styles */
+    @media (max-width: 768px) {
+        .mobile-hidden {
+            display: none !important;
+        }
+        .mobile-only {
+            display: block !important;
+        }
     }
-    .section-header {
-        font-size: 16px;
-        color: #1E88E5;
-        margin-bottom: 8px;
-        font-weight: 600;
-    }
-    .metric-container {
-        background-color: #f8f9fa;
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 16px;
-    }
-    .main {
-        padding: 2rem;
-    }
-    .metric-value {
-        font-size: 1.5rem;
-        font-weight: bold;
-    }
-    .metric-label {
-        font-size: 1rem;
-        color: #666;
-    }
-    .stButton>button {
-        width: 100%;
-        border-radius: 0.5rem;
-        padding: 0.5rem;
-        font-weight: bold;
-    }
-    .stSelectbox {
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
-    }
-    .stSelectbox > div {
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
-    }
-    .stSelectbox > div > div {
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
-    }
-    /* Ensure consistent height for header row */
-    [data-testid="column"] {
-        min-height: 45px !important;
-    }
-    /* Adjust vertical alignment of header text */
-    .section-header {
-        line-height: 35px !important;
+    @media (min-width: 769px) {
+        .mobile-only {
+            display: none !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1131,61 +1037,12 @@ def search_facilities(search_term: str) -> List[Dict[str, str]]:
         st.error(f"Error searching facilities: {str(e)}")
         return []
 
-def init_citations_db():
-    """Initialize citations database with DuckDB."""
-    try:
-        citations_db = duckdb.connect(':memory:')
-        
-        # Read citations CSV directly into DuckDB with all necessary columns
-        citations_db.execute("""
-            CREATE TABLE IF NOT EXISTS citations AS 
-            SELECT 
-                "CMS Certification Number (CCN)" as provnum,
-                "Survey Date" as survey_date,
-                "Deficiency Tag Number" as tag_number,
-                "Scope Severity Code" as severity_code,
-                "Standard Deficiency" as standard_deficiency,
-                "Complaint Deficiency" as complaint_deficiency,
-                "Infection Control Inspection Deficiency" as infection_deficiency,
-                "Deficiency Category" as deficiency_category
-            FROM read_csv('NH_HealthCitations_Mar2025.csv')
-        """)
-        
-        # Create indexes for faster lookups
-        citations_db.execute("CREATE INDEX IF NOT EXISTS idx_citations_provnum ON citations(provnum)")
-        citations_db.execute("CREATE INDEX IF NOT EXISTS idx_citations_date ON citations(survey_date)")
-        
-        return citations_db
-    except Exception as e:
-        st.error(f"Error initializing citations database: {str(e)}")
-        return None
-
 @st.cache_data
 def get_facility_citations(provnum: str, limit: int = 100) -> pd.DataFrame:
     """Get citations for a specific facility with caching."""
     try:
-        citations_db = init_citations_db()
-        if citations_db is None:
-            return pd.DataFrame()
-            
-        query = f"""
-            SELECT 
-                survey_date,
-                tag_number,
-                severity_code,
-                standard_deficiency,
-                complaint_deficiency,
-                infection_deficiency,
-                deficiency_category
-            FROM citations 
-            WHERE provnum = '{provnum}'
-            ORDER BY survey_date DESC
-            LIMIT {limit}
-        """
-        
-        result = citations_db.execute(query).fetchdf()
-        citations_db.close()  # Close the connection after use
-        return result
+        # Use dummy citations data instead of real database
+        return get_dummy_citations(provnum)
     except Exception as e:
         st.error(f"Error getting facility citations: {str(e)}")
         return pd.DataFrame()
@@ -1200,258 +1057,76 @@ def get_quarter_from_date(date_str):
         return "N/A"
 
 def display_facility_citations(provnum: str):
-    """Display citations for a facility in a clean table format."""
+    """Display citations in a formatted table."""
     try:
-        citations_db = init_citations_db()
-        if citations_db is None:
-            return
+        citations = get_dummy_citations(provnum)
+        if not citations.empty:
+            # Format the citations data
+            citations_display = citations[[
+                'CITATION_DATE',
+                'CITATION_NUMBER',
+                'CITATION_DESCRIPTION',
+                'CITATION_SEVERITY',
+                'CITATION_STATUS',
+                'PDF_URL'
+            ]].copy()
             
-        # Get all citations for the facility
-        query = f"""
-            SELECT 
-                survey_date,
-                tag_number,
-                severity_code,
-                standard_deficiency,
-                complaint_deficiency,
-                infection_deficiency,
-                deficiency_category
-            FROM citations 
-            WHERE provnum = '{provnum}'
-            ORDER BY survey_date DESC
-        """
-        
-        citations = citations_db.execute(query).fetchdf()
-        citations_db.close()
-        
-        if citations.empty:
-            st.info("No citations found for this facility.")
-            return
+            # Rename columns for display
+            citations_display.columns = [
+                'Date',
+                'Citation Number',
+                'Description',
+                'Severity',
+                'Status',
+                'Report'
+            ]
             
-        # Format the data for display
-        citations['survey_date'] = pd.to_datetime(citations['survey_date']).dt.strftime('%m-%d-%Y')
-        
-        # Create hyperlinks based on deficiency types
-        def create_hyperlink(row):
-            links = []
-            # Convert display date back to datetime for hyperlink format
-            link_date = pd.to_datetime(row['survey_date']).strftime('%Y-%m-%d')
-            if row['standard_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/health-inspection?date={link_date}" target="_blank">View Standard Report</a>')
-            if row['complaint_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/complaint-inspection?date={link_date}" target="_blank">View Complaint Report</a>')
-            if row['infection_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/infection-control-inspection?date={link_date}" target="_blank">View Infection Report</a>')
-            return ' | '.join(links) if links else 'N/A'
-        
-        citations['Links'] = citations.apply(create_hyperlink, axis=1)
-        
-        # Create a styled table with reduced column widths and sorting
-        st.markdown("""
-            <style>
-            .citations-table {
-                margin-top: 1rem;
-                width: 100%;
-                border-collapse: collapse;
-                table-layout: fixed;
-            }
-            .citations-table th {
-                background-color: #f8f9fa;
-                font-weight: 600;
-                padding: 8px;
-                text-align: left;
-                border: 1px solid #dee2e6;
-                cursor: pointer;
-                position: relative;
-            }
-            .citations-table th:hover {
-                background-color: #e9ecef;
-            }
-            .citations-table th::after {
-                content: '↕';
-                position: absolute;
-                right: 8px;
-                opacity: 0.5;
-            }
-            .citations-table td {
-                font-size: 0.9em;
-                padding: 8px;
-                border: 1px solid #dee2e6;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .citations-table a {
-                color: #1E88E5;
-                text-decoration: none;
-            }
-            .citations-table a:hover {
-                text-decoration: underline;
-            }
-            .citations-table th:nth-child(1) { width: 15%; }  /* Survey Date */
-            .citations-table th:nth-child(2) { width: 10%; }  /* F-Tag */
-            .citations-table th:nth-child(3) { width: 20%; }  /* Category */
-            .citations-table th:nth-child(4) { width: 10%; }  /* Severity */
-            .citations-table th:nth-child(5) { width: 45%; }  /* PDF */
-            </style>
+            # Sort by date, most recent first
+            citations_display['Date'] = pd.to_datetime(citations_display['Date'])
+            citations_display = citations_display.sort_values('Date', ascending=False)
             
-            <script>
-            function sortTable(n) {
-                var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-                table = document.querySelector('.citations-table');
-                switching = true;
-                dir = "asc";
-                
-                while (switching) {
-                    switching = false;
-                    rows = table.rows;
-                    
-                    for (i = 1; i < (rows.length - 1); i++) {
-                        shouldSwitch = false;
-                        x = rows[i].getElementsByTagName("TD")[n];
-                        y = rows[i + 1].getElementsByTagName("TD")[n];
-                        
-                        if (dir == "asc") {
-                            if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                                shouldSwitch = true;
-                                break;
-                            }
-                        } else if (dir == "desc") {
-                            if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                                shouldSwitch = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (shouldSwitch) {
-                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                        switching = true;
-                        switchcount++;
-                    } else {
-                        if (switchcount == 0 && dir == "asc") {
-                            dir = "desc";
-                            switching = true;
-                        }
-                    }
-                }
-            }
-            </script>
-        """, unsafe_allow_html=True)
-        
-        # Prepare the display DataFrame with renamed columns
-        display_df = citations[['survey_date', 'tag_number', 'deficiency_category', 'severity_code', 'Links']].copy()
-        display_df.columns = ['Survey Date', 'F-Tag', 'Category', 'Severity', 'PDF']
-        
-        # Create the table HTML with sorting functionality
-        table_html = display_df.to_html(
-            escape=False,
-            index=False,
-            classes='citations-table'
-        )
-        
-        # Add onclick handlers to the header cells
-        table_html = table_html.replace('<th>', '<th onclick="sortTable(Array.from(this.parentNode.children).indexOf(this))">')
-        
-        # Display the table
-        st.markdown("---")
-        st.header("Recent Citations")
-        st.markdown(table_html, unsafe_allow_html=True)
-        
+            # Create hyperlinks for PDFs and summaries
+            def create_hyperlinks(row):
+                pdf_link = f'<a href="{row["Report"]}" target="_blank">View Report</a>'
+                summary_link = f'<a href="https://example.com/summary/{provnum}/{row["Citation Number"]}" target="_blank">View Summary</a>'
+                return pd.Series([pdf_link, summary_link])
+            
+            # Apply hyperlinks and add summary column
+            citations_display[['Report', '320 Summary']] = citations_display.apply(create_hyperlinks, axis=1)
+            
+            # Display the table with HTML
+            st.markdown("### Sample Citation Table")
+            st.markdown(citations_display.to_html(escape=False, index=False), unsafe_allow_html=True)
+        else:
+            st.warning("No citations found for this facility.")
     except Exception as e:
         st.error(f"Error displaying citations: {str(e)}")
 
 def generate_citations_section(provnum: str) -> str:
-    """Generate the citations section of the report."""
+    """Generate HTML section for recent citations."""
     try:
-        citations_db = init_citations_db()
-        if citations_db is None:
-            return ""
-            
-        # Get all citations for the facility
-        query = f"""
-            SELECT 
-                survey_date,
-                tag_number,
-                severity_code,
-                standard_deficiency,
-                complaint_deficiency,
-                infection_deficiency,
-                deficiency_category
-            FROM citations 
-            WHERE provnum = '{provnum}'
-            ORDER BY survey_date DESC
-        """
-        
-        citations = citations_db.execute(query).fetchdf()
-        citations_db.close()
-        
+        # Get citations from database
+        citations = get_facility_citations(provnum, limit=5)
         if citations.empty:
-            return "<h2>Recent Citations</h2><p>No citations found for this facility.</p>"
-            
-        # Format the data for display
-        citations['survey_date'] = pd.to_datetime(citations['survey_date']).dt.strftime('%Y-%m-%d')
-        citations['survey_quarter'] = citations['survey_date'].apply(get_quarter_from_date)
-        
-        # Create hyperlinks based on deficiency types
-        def create_hyperlink(row):
-            links = []
-            if row['standard_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/health-inspection?date={row["survey_date"]}" target="_blank">View Standard Report</a>')
-            if row['complaint_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/complaint-inspection?date={row["survey_date"]}" target="_blank">View Complaint Report</a>')
-            if row['infection_deficiency'] == 'Y':
-                links.append(f'<a href="https://www.medicare.gov/care-compare/inspections/pdf/nursing-home/{provnum}/health/infection-control-inspection?date={row["survey_date"]}" target="_blank">View Infection Report</a>')
-            return ' | '.join(links) if links else 'N/A'
-        
-        citations['Links'] = citations.apply(create_hyperlink, axis=1)
+            return "<p>No recent citations found.</p>"
         
         # Generate HTML table
-        citations_html = citations[['survey_date', 'survey_quarter', 'tag_number', 'severity_code', 'Links']].to_html(
-            escape=False,
-            index=False,
-            classes='citations-table',
-            columns={
-                'survey_date': 'Survey Date',
-                'survey_quarter': 'Survey Quarter',
-                'tag_number': 'Deficiency Tag',
-                'severity_code': 'Severity',
-                'Links': 'Inspection Reports'
-            }
-        )
+        html = "<h3>Recent Citations</h3><table>"
+        html += "<tr><th>Date</th><th>Citation</th><th>Severity</th></tr>"
         
-        return f"""
-            <h2>Recent Citations</h2>
-            <style>
-            .citations-table {{
-                margin-top: 1rem;
-                width: 100%;
-                border-collapse: collapse;
-            }}
-            .citations-table th {{
-                background-color: #f8f9fa;
-                font-weight: 600;
-                padding: 8px;
-                text-align: left;
-                border: 1px solid #dee2e6;
-            }}
-            .citations-table td {{
-                font-size: 0.9em;
-                padding: 8px;
-                border: 1px solid #dee2e6;
-            }}
-            .citations-table a {{
-                color: #1E88E5;
-                text-decoration: none;
-            }}
-            .citations-table a:hover {{
-                text-decoration: underline;
-            }}
-            </style>
-            {citations_html}
-        """
+        for _, row in citations.iterrows():
+            html += f"""
+                <tr>
+                    <td>{row['CITATION_DATE']}</td>
+                    <td>{row['CITATION_NUMBER']}</td>
+                    <td>{row['SEVERITY']}</td>
+                </tr>
+            """
+            
+        html += "</table>"
+        return html
     except Exception as e:
-        return f"<h2>Recent Citations</h2><p>Error generating citations section: {str(e)}</p>"
+        return f"<p>Error retrieving citations: {str(e)}</p>"
 
 def get_facility_info(provnum: str) -> dict:
     """Get facility information from the database."""
@@ -1656,7 +1331,7 @@ def load_provider_info():
         return pd.DataFrame()
 
 def display_facility_info(provnum: str):
-    """Display facility information including provider info data."""
+    """Display facility information in a formatted box."""
     try:
         # Get basic facility info
         facility_info = get_facility_info(provnum)
@@ -1706,6 +1381,42 @@ def display_facility_info(provnum: str):
             div.facility-info-item a:hover {
                 text-decoration: underline;
             }
+            
+            /* Mobile-specific styles */
+            @media (max-width: 768px) {
+                div.facility-info-box {
+                    padding: 12px 16px;
+                }
+                div.facility-info-grid {
+                    flex-direction: column;
+                    gap: 8px;
+                    align-items: flex-start;
+                }
+                div.facility-info-item {
+                    width: 100%;
+                    padding: 4px 0;
+                }
+                div.facility-info-item:not(:last-child):after {
+                    display: none;
+                }
+                div.facility-info-item a {
+                    margin-left: 0;
+                    margin-top: 8px;
+                    display: block;
+                }
+                /* Hide labels on mobile */
+                div.facility-info-item span.label {
+                    display: none;
+                }
+                /* Adjust spacing for mobile */
+                div.facility-info-item {
+                    margin-bottom: 4px;
+                }
+                /* Make text slightly larger on mobile */
+                div.facility-info-item strong {
+                    font-size: 1.1em;
+                }
+            }
             </style>
         """, unsafe_allow_html=True)
 
@@ -1730,19 +1441,10 @@ def display_facility_info(provnum: str):
             <div class="facility-info-box">
                 <div class="facility-info-grid">
                     <div class="facility-info-item">
-                        Provider: <strong>{formatted_provider_name}</strong>
+                        <span class="label">Provider:</span> <strong>{formatted_provider_name} ({facility_info['ccn']})</strong>
                     </div>
                     <div class="facility-info-item">
-                        CCN: <strong>{facility_info['ccn']}</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        State: <strong>{facility_info['state']}</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        County: <strong>{facility_info['county']}</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        City: <strong>{formatted_city}</strong>
+                        <span class="label">Location:</span> <strong>{formatted_city}, {facility_info['state']}</strong>
                     </div>
                     <div class="facility-info-item">
                         <a href="https://www.medicare.gov/care-compare/details/nursing-home/{facility_info['ccn']}?state={facility_info['state']}" target="_blank">View on Care Compare</a>
@@ -1754,14 +1456,110 @@ def display_facility_info(provnum: str):
     except Exception as e:
         st.error(f"Error displaying facility info: {str(e)}")
 
+def on_mobile_change():
+    """Callback function to handle mobile detection state changes."""
+    if st.session_state.get('is_mobile', False):
+        st.session_state['view_mode'] = "Mobile View"
+    else:
+        st.session_state['view_mode'] = "Desktop View"
+
+def create_subscription_db():
+    """Create a database table for storing email subscriptions."""
+    try:
+        conn = sqlite3.connect('subscriptions.db')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                entity_name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error creating subscription database: {str(e)}")
+
+def add_subscription(email: str, entity_type: str, entity_id: str, entity_name: str) -> bool:
+    """Add a new subscription to the database."""
+    try:
+        conn = sqlite3.connect('subscriptions.db')
+        conn.execute(
+            'INSERT INTO subscriptions (email, entity_type, entity_id, entity_name) VALUES (?, ?, ?, ?)',
+            (email, entity_type, entity_id, entity_name)
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        st.error("This email is already subscribed to this entity.")
+        return False
+    except Exception as e:
+        st.error(f"Error adding subscription: {str(e)}")
+        return False
+
+def show_subscription_form(entity_type: str, entity_id: str, entity_name: str):
+    """Show the subscription form in a modal."""
+    with st.form(key=f"subscription_form_{entity_id}"):
+        st.markdown("### Subscribe to 320 Consulting for Custom Reports")
+        email = st.text_input("Enter your email address")
+        submit = st.form_submit_button("Subscribe")
+        
+        if submit and email:
+            if add_subscription(email, entity_type, entity_id, entity_name):
+                st.success(f"Successfully subscribed to {entity_name} reports!")
+
+def display_subscription_button(entity_type: str, entity_id: str, entity_name: str):
+    """Display the subscription button with a modal form."""
+    st.markdown("""
+        <style>
+        .subscription-button {
+            width: 100%;
+            padding: 12px 24px;
+            background-color: #1E88E5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            text-align: center;
+            display: block;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .subscription-button:hover {
+            background-color: #1565C0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    if st.button(f"Subscribe for custom report on {entity_name}", key=f"subscribe_{entity_id}"):
+        show_subscription_form(entity_type, entity_id, entity_name)
+
 def main() -> None:
     """Main app layout and data flow."""
     try:
+        # Initialize subscription database
+        create_subscription_db()
+        
+        # Initialize session state variables at the very start
+        if 'view_mode' not in st.session_state:
+            st.session_state.view_mode = "Desktop"
+
         # Title with custom styling
         st.markdown("""
             <div>
-                <h1 class="main-header" style="margin-bottom: 0;">Nursing Home Staffing Analysis (Beta)</h1>
-                <p style="color: #666; font-size: 0.9em; margin-top: 2px;">By 320 Consulting</p>
+                <h1 class="main-header" style="margin-bottom: 0;">PBJ Reports (Beta)</h1>
+                <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
+                    By 320 Consulting | 
+                    <a href="/Premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
+                        ⭐ Premium
+                    </a>
+                </p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -1782,10 +1580,21 @@ def main() -> None:
             .sidebar .stSelectbox {
                 margin-bottom: 0;
             }
+            .sidebar h3 {
+                margin-bottom: 0.5rem;
+            }
             </style>
         """, unsafe_allow_html=True)
         
         st.sidebar.title("Filters")
+
+        # Add view mode selection at the top of filters
+        view_mode = st.sidebar.radio(
+            "",
+            ["Desktop", "Mobile"],
+            index=0 if st.session_state.view_mode == "Desktop" else 1,
+            key="view_mode"
+        )
 
         # Add level selection
         level = st.sidebar.radio(
@@ -1897,73 +1706,39 @@ def main() -> None:
                     display_metrics(filtered_data, level)
                     
                     # 3. Display trends
-                    plot_quarterly_trends(filtered_data, 
+                    fig = plot_quarterly_trends(filtered_data, 
+                                          view_mode=view_mode,
                                         state=selected_value if level == "State" else None,
                                         region=selected_value if level == "Region" else None,
                                         facility=selected_value if level == "Facility" else None)
-                    
-                    # 4. Display provider info table
-                    st.markdown("---")
-                    st.markdown("### Provider Info Data")
-                    provider_info = load_provider_info()
-                    if not provider_info.empty:
-                        facility_provider_info = provider_info[provider_info['PROVNUM'] == selected_value].iloc[0]
-                        # Format the affiliated entity name
-                        def format_entity_name(name):
-                            if pd.isna(name):
-                                return 'N/A'
-                            words = name.split()
-                            formatted_words = []
-                            for i, word in enumerate(words):
-                                if i == 0 or word.lower() not in ['and', 'at', 'of', 'the', 'in', 'on', 'for', 'to', 'with']:
-                                    formatted_words.append(word.capitalize())
-                                else:
-                                    formatted_words.append(word.lower())
-                            return ' '.join(formatted_words)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
 
-                        # Convert numeric values to strings to avoid Arrow type conversion issues
-                        provider_info_data = {
-                            'CMS Certification Number (CCN)': str(facility_provider_info['PROVNUM']),
-                            'Ownership Type': str(facility_provider_info['OWNERSHIP_TYPE']),
-                            'Affiliated Entity Name': format_entity_name(facility_provider_info['AFFILIATED_ENTITY_NAME']),
-                            'Affiliated Entity ID': str(int(facility_provider_info['AFFILIATED_ENTITY_ID'])) if pd.notna(facility_provider_info['AFFILIATED_ENTITY_ID']) else 'N/A',
-                            'Special Focus Status': str(facility_provider_info['SPECIAL_FOCUS_STATUS']),
-                            'Abuse Icon': 'Yes' if facility_provider_info['ABUSE_ICON'] == 'Y' else 'No',
-                            'Most Recent Health Inspection More Than 2 Years Ago': 'Yes' if facility_provider_info['INSPECTION_OVER_2_YEARS'] == 'Y' else 'No',
-                            'Provider Changed Ownership in Last 12 Months': 'Yes' if facility_provider_info['OWNERSHIP_CHANGED'] == 'Y' else 'No',
-                            'Overall Rating': str(int(facility_provider_info['OVERALL_RATING'])) if pd.notna(facility_provider_info['OVERALL_RATING']) else 'N/A',
-                            'Staffing Rating': str(int(facility_provider_info['STAFFING_RATING'])) if pd.notna(facility_provider_info['STAFFING_RATING']) else 'N/A',
-                            'Total nursing staff turnover': f"{facility_provider_info['NURSE_TURNOVER']:.1f}%" if pd.notna(facility_provider_info['NURSE_TURNOVER']) else 'N/A',
-                            'Number of administrators who have left': str(int(facility_provider_info['ADMIN_TURNOVER'])) if pd.notna(facility_provider_info['ADMIN_TURNOVER']) else 'N/A',
-                            'Nursing Case-Mix Index': f"{facility_provider_info['CASE_MIX_INDEX']:.2f}" if pd.notna(facility_provider_info['CASE_MIX_INDEX']) else 'N/A',
-                            'Latitude': str(facility_provider_info['LATITUDE']),
-                            'Longitude': str(facility_provider_info['LONGITUDE']),
-                            'Processing Date': str(facility_provider_info['PROCESSING_DATE'])
-                        }
-                        
-                        # Create DataFrame for display
-                        display_df = pd.DataFrame(list(provider_info_data.items()), columns=['Field', 'Value'])
-                        st.table(display_df.style.hide(axis="index"))
-                    
-                    # 5. Display citations
+                    # 4. Display citations
                     display_facility_citations(selected_value)
                     
-                    # 6. Display quarterly data table
-                    st.header("Quarterly Data")
-                    table_data = create_quarterly_table(filtered_data, level)
-                    st.dataframe(table_data, use_container_width=True)
+                    # 5. Add subscription button
+                    display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
 
             # For other levels (National, State, Region)
             else:
                 if not filtered_data.empty:
                     display_metrics(filtered_data, level)
-                    plot_quarterly_trends(filtered_data, 
+                    fig = plot_quarterly_trends(filtered_data, 
+                                              view_mode=view_mode,
                                         state=selected_value if level == "State" else None,
                                         region=selected_value if level == "Region" else None,
                                         facility=selected_value if level == "Facility" else None)
-                    st.header("Quarterly Data")
-                    table_data = create_quarterly_table(filtered_data, level)
-                    st.dataframe(table_data, use_container_width=True)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Add subscription button for all levels
+                    if level == "National":
+                        display_subscription_button("national", "national", "National Data")
+                    elif level == "State":
+                        display_subscription_button("state", selected_value, f"{selected_value} State Data")
+                    elif level == "Region":
+                        display_subscription_button("region", selected_value, f"{selected_value} Region Data")
                 else:
                     st.warning("No data available for the selected filters.")
         except Exception as e:
@@ -2109,6 +1884,58 @@ def generate_test_data_for_facility(conn, facility_id="015009"):
     except Exception as e:
         print(f"Error generating test data: {str(e)}")
         return None
+
+def get_dummy_provider_info(provnum: str) -> dict:
+    """Get dummy provider information."""
+    return {
+        'PROVNUM': provnum,
+        'PROVNAME': 'Sample Nursing Home',
+        'OWNERSHIP_TYPE': 'For-Profit Corporation',
+        'AFFILIATED_ENTITY_NAME': '••••••••••',
+        'AFFILIATED_ENTITY_ID': '••••••••••',
+        'SPECIAL_FOCUS_STATUS': 'None',
+        'ABUSE_ICON': 'N',
+        'INSPECTION_OVER_2_YEARS': 'N',
+        'OWNERSHIP_CHANGED': 'N',
+        'OVERALL_RATING': 4,
+        'STAFFING_RATING': 3,
+        'NURSE_TURNOVER': 25.5,
+        'ADMIN_TURNOVER': 1,
+        'CASE_MIX_INDEX': 1.25,
+        'LATITUDE': 40.7128,
+        'LONGITUDE': -74.0060,
+        'PROCESSING_DATE': '2024-03-15'
+    }
+
+def get_dummy_citations(provnum: str) -> pd.DataFrame:
+    """Get dummy citations data."""
+    citations = [
+        {
+            'CITATION_DATE': '2024-02-15',
+            'CITATION_NUMBER': 'F689',
+            'CITATION_DESCRIPTION': '••••••••••',
+            'CITATION_SEVERITY': 'D',
+            'CITATION_STATUS': 'Active',
+            'PDF_URL': f'https://example.com/citations/{provnum}/F689.pdf'
+        },
+        {
+            'CITATION_DATE': '2023-11-30',
+            'CITATION_NUMBER': 'F686',
+            'CITATION_DESCRIPTION': '••••••••••',
+            'CITATION_SEVERITY': 'E',
+            'CITATION_STATUS': 'Active',
+            'PDF_URL': f'https://example.com/citations/{provnum}/F686.pdf'
+        },
+        {
+            'CITATION_DATE': '2023-08-15',
+            'CITATION_NUMBER': 'F684',
+            'CITATION_DESCRIPTION': '••••••••••',
+            'CITATION_SEVERITY': 'D',
+            'CITATION_STATUS': 'Active',
+            'PDF_URL': f'https://example.com/citations/{provnum}/F684.pdf'
+        }
+    ]
+    return pd.DataFrame(citations)
 
 if __name__ == "__main__":
     main()
