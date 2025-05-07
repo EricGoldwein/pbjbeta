@@ -34,6 +34,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Title with custom styling
+st.markdown("""
+    <div>
+        <h1 class="main-header" style="margin-bottom: 0;">PBJ Reports (Beta)</h1>
+        <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
+            By 320 Consulting | 
+            <a href="/Premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
+                ⭐ Premium
+            </a>
+        </p>
+    </div>
+""", unsafe_allow_html=True)
+
 # Load environment variables
 load_dotenv()
 
