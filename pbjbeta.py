@@ -34,19 +34,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Title with custom styling
-st.markdown("""
-    <div>
-        <h1 class="main-header" style="margin-bottom: 0;">PBJ Reports (Beta)</h1>
-        <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
-            By 320 Consulting | 
-            <a href="/Premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
-                ⭐ Premium
-            </a>
-        </p>
-    </div>
-""", unsafe_allow_html=True)
-
 # Load environment variables
 load_dotenv()
 
@@ -1594,132 +1581,139 @@ def main() -> None:
         """, unsafe_allow_html=True)
 
         # Sidebar
-        with st.sidebar:
-            st.markdown("""
-                <style>
-                .sidebar-filters {
-                    margin-bottom: 20px;
-                }
-                .quarter-selectors {
-                    display: flex;
-                    gap: 10px;
-                    margin-bottom: 15px;
-                }
-                .quarter-selectors > div {
-                    flex: 1;
-                }
-                .sidebar .stSelectbox {
-                    margin-bottom: 0;
-                }
-                .sidebar h3 {
-                    margin-bottom: 0.5rem;
-                }
-                </style>
-            """, unsafe_allow_html=True)
+        st.sidebar.markdown("""
+            <style>
+            .sidebar-filters {
+                margin-bottom: 20px;
+            }
+            .quarter-selectors {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 15px;
+            }
+            .quarter-selectors > div {
+                flex: 1;
+            }
+            .sidebar .stSelectbox {
+                margin-bottom: 0;
+            }
+            .sidebar h3 {
+                margin-bottom: 0.5rem;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        st.sidebar.title("Filters")
+
+        # Add view mode selection at the top of filters
+        view_mode = st.sidebar.radio(
+            "",
+            ["Desktop", "Mobile"],
+            index=0 if st.session_state.view_mode == "Desktop" else 1,
+            key="view_mode"
+        )
+
+        # Add level selection
+        level = st.sidebar.radio(
+            "Select Level",
+            ["National", "State", "Region", "Facility"],
+            key="level_selector"
+        )
+
+        # Date range selection with all available quarters
+        try:
+            all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
+            all_quarters_reversed = sort_quarters(all_quarters, reverse=True)  # Newest to oldest
             
-            st.title("Filters")
-
-            # Add view mode selection at the top of filters
-            view_mode = st.radio(
-                "View Mode",
-                ["Desktop", "Mobile"],
-                index=0 if st.session_state.view_mode == "Desktop" else 1,
-                key="view_mode"
-            )
-
-            # Add level selection
-            level = st.radio(
-                "Select Level",
-                ["National", "State", "Region", "Facility"],
-                key="level_selector"
-            )
-
-            # Date range selection with all available quarters
-            try:
-                all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
-                all_quarters_reversed = sort_quarters(all_quarters, reverse=True)  # Newest to oldest
-                
-                # Create two columns for quarter selection
-                st.markdown('<div class="quarter-selectors">', unsafe_allow_html=True)
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    start_quarter = st.selectbox(
-                        "From",
-                        all_quarters,  # Oldest to newest
-                        index=0,
-                        key="start_quarter",
-                        format_func=format_quarter_display
-                    )
-                    start_quarter = normalize_quarter(start_quarter)
-                
-                with col2:
-                    end_quarter = st.selectbox(
-                        "To",
-                        all_quarters_reversed,  # Newest to oldest
-                        index=0,
-                        key="end_quarter",
-                        format_func=format_quarter_display
-                    )
-                    end_quarter = normalize_quarter(end_quarter)
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-            except Exception as e:
-                st.error(f"Error loading quarters: {str(e)}")
-                return
+            # Create two columns for quarter selection
+            st.sidebar.markdown('<div class="quarter-selectors">', unsafe_allow_html=True)
+            col1, col2 = st.sidebar.columns(2)
             
-            # Get selected value based on level
-            selected_value = None
-            try:
-                if level == "State":
-                    # Get unique states and sort them
-                    states = sorted(state_metrics['STATE'].unique().tolist())
-                    # Set default to first state
-                    selected_state = st.selectbox(
-                        "Select State",
-                        states,
-                        index=0
-                    )
-                    selected_value = selected_state
-                elif level == "Region":
-                    # Get unique regions in sorted order
-                    regions = sorted(region_metrics['Region'].unique(), 
-                                key=lambda x: int(x.split()[-1]))
-                    # Default to first region
-                    selected_region = st.selectbox(
-                        "Select Region",
-                        regions,
-                        index=0
-                    )
-                    selected_value = selected_region
-                elif level == "Facility":
-                    st.markdown("### Facility Search")
-                    search_term = st.text_input(
-                        "Enter Provider CCN or Name",
-                        key="facility_search",
-                        placeholder="Search by CCN or facility name..."
-                    )
-                    
+            with col1:
+                start_quarter = st.selectbox(
+                    "From",
+                    all_quarters,  # Oldest to newest
+                    index=0,
+                    key="start_quarter",
+                    format_func=format_quarter_display
+                )
+                start_quarter = normalize_quarter(start_quarter)
+            
+            with col2:
+                end_quarter = st.selectbox(
+                    "To",
+                    all_quarters_reversed,  # Newest to oldest
+                    index=0,
+                    key="end_quarter",
+                    format_func=format_quarter_display
+                )
+                end_quarter = normalize_quarter(end_quarter)
+            st.sidebar.markdown('</div>', unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.error(f"Error loading quarters: {str(e)}")
+            return
+        
+        # Get selected value based on level
+        selected_value = None
+        try:
+            if level == "State":
+                # Get unique states and sort them
+                states = sorted(state_metrics['STATE'].unique().tolist())
+                # Set default to first state
+                selected_state = st.sidebar.selectbox(
+                    "Select State",
+                    states,
+                    index=0
+                )
+                selected_value = selected_state
+            elif level == "Region":
+                # Get unique regions in sorted order
+                regions = sorted(region_metrics['Region'].unique(), 
+                            key=lambda x: int(x.split()[-1]))
+                # Default to first region
+                selected_region = st.sidebar.selectbox(
+                    "Select Region",
+                    regions,
+                    index=0
+                )
+                selected_value = selected_region
+            elif level == "Facility":
+                search_container = st.sidebar.container()
+                search_term = search_container.text_input("Enter Provider CCN or Name", key="facility_search")
+                matching_facilities = []
+                search_triggered = False
+
+                if st.session_state.view_mode == "Mobile":
+                    # On mobile, add a search button
+                    if search_container.button("Search", key="facility_search_button"):
+                        search_triggered = True
+                    if search_triggered and search_term:
+                        matching_facilities = search_facilities(search_term)
+                else:
+                    # On desktop, search as you type
                     if search_term:
                         matching_facilities = search_facilities(search_term)
-                        if matching_facilities:
-                            facility_options = [
-                                f"{fac['PROVNUM']} - {fac['PROVNAME']}"
-                                for fac in matching_facilities
-                            ]
-                            selected_facility_display = st.selectbox(
-                                "Select Facility",
-                                facility_options,
-                                key="facility_selector"
-                            )
-                            if selected_facility_display:
-                                selected_value = selected_facility_display.split(" - ")[0]
-                        else:
-                            st.info("No matching facilities found")
 
-            except Exception as e:
-                st.error(f"Error processing selection: {str(e)}")
-                return
+                if search_term:
+                    if matching_facilities:
+                        facility_options = [
+                            f"{fac['PROVNUM']} - {fac['PROVNAME']}"
+                            for fac in matching_facilities
+                        ]
+                        selected_facility_display = search_container.selectbox(
+                            "Select Facility",
+                            facility_options,
+                            key="facility_selector",
+                            label_visibility="collapsed"
+                        )
+                        if selected_facility_display:
+                            selected_value = selected_facility_display.split(" - ")[0]
+                    else:
+                        search_container.info("No matching facilities found")
+        except Exception as e:
+            st.error(f"Error processing selection: {str(e)}")
+            return
         
         # Get filtered data
         try:
