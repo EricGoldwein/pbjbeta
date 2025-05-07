@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Set page config
+# Set page config - this must be the first Streamlit command
 st.set_page_config(
     page_title="320 Premium Services",
     page_icon="⭐",
@@ -9,10 +9,11 @@ st.set_page_config(
 )
 
 # Add to sidebar
-st.sidebar.title("Premium Services")
-st.sidebar.markdown("""
-    Access our premium features to get deeper insights into nursing home staffing data.
-""")
+with st.sidebar:
+    st.title("Premium Services")
+    st.markdown("""
+        Access our premium features to get deeper insights into nursing home staffing data.
+    """)
 
 # Custom CSS for premium styling
 st.markdown("""
