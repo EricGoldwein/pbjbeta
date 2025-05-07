@@ -32,10 +32,11 @@ ENV/
 *.swo
 
 # Project specific
-# Keep only the main app file
+# Keep only the main app file and pages
 *.py
 !pbjbeta.py
 !requirements.txt
+!pages/*.py
 
 # Keep only essential data files
 *.csv
