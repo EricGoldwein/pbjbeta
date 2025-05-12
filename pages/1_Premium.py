@@ -65,13 +65,12 @@ st.markdown("""
 st.markdown("""
     <div class="premium-header">
         <h1>320 Premium Services</h1>
-        <p style="font-size: 1.2em; margin-bottom: 0;">Supporting resident advocacy through data transparency</p>
+        <p style="font-size: 1.2em; margin-bottom: 0;">Digging deeper into nursing home data</p>
     </div>
 """, unsafe_allow_html=True)
 
 # Introduction
 st.markdown("""
-    ### Who We Serve
     320 Consulting provides specialized data analysis and reporting services for attorneys, advocates, journalists, 
     researchers, and consumers who are working to support nursing home residents. Our tools help you understand 
     staffing patterns, identify potential issues, and make data-driven decisions to bolster transparency and resident care.
@@ -144,9 +143,8 @@ st.markdown("""
 # Contact Section
 st.markdown("""
     <div class="contact-section">
-        <h3>320 Premium Reports</h3>
-        <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.</p>
-        <p>To request a report or talk through what you need:</p>
+        <h3>Ready to get started?</h3>
+        <p>Contact Eric to request a custom report or talk through your project:</p>
         <p><a href="mailto:eric@320insight.com" class="contact-link">📧 eric@320insight.com</a></p>
     </div>
 """, unsafe_allow_html=True)
