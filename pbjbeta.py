@@ -699,6 +699,9 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
         tick_values = [pd.Timestamp(f"{year}-01-01") for year in all_years]
         tick_text = [str(year) for year in all_years]
         
+        # Get the actual date range from the data
+        date_range = [data['date'].min(), data['date'].max()]
+        
         # Define hover template
         hover_template = "<b>%{customdata}</b><br>Value: %{y:.2f}<extra></extra>"
         if not facility:
@@ -769,7 +772,7 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
                     showline=True,
                     linewidth=1,
                     linecolor="rgba(200, 200, 200, 0.1)",
-                    range=[tick_values[0], tick_values[-1]],
+                    range=date_range,
                     nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
                     tickmode='auto'
                 )
@@ -855,7 +858,7 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
                         showline=True,
                         linewidth=1,
                         linecolor="rgba(200, 200, 200, 0.1)",
-                        range=[tick_values[0], tick_values[-1]],
+                        range=date_range,
                         nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
                         tickmode='auto'
                     )
@@ -1517,45 +1520,46 @@ def add_subscription(email: str, entity_type: str, entity_id: str, entity_name: 
         st.error(f"Error adding subscription: {str(e)}")
         return False
 
-def show_subscription_form(entity_type: str, entity_id: str, entity_name: str):
-    """Show the subscription form in a modal."""
-    with st.form(key=f"subscription_form_{entity_id}"):
-        st.markdown("### Subscribe to 320 Consulting for Custom Reports")
-        email = st.text_input("Enter your email address")
-        submit = st.form_submit_button("Subscribe")
-        
-        if submit and email:
-            if add_subscription(email, entity_type, entity_id, entity_name):
-                st.success(f"Successfully subscribed to {entity_name} reports!")
-
 def display_subscription_button(entity_type: str, entity_id: str, entity_name: str):
-    """Display the subscription button with a modal form."""
+    """Display the subscription button with a direct email link."""
     st.markdown("""
         <style>
-        .subscription-button {
-            width: 100%;
-            padding: 12px 24px;
-            background-color: #1E88E5;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 14px;
-            transition: background-color 0.3s;
-            text-align: center;
-            display: block;
-            max-width: 800px;
+        .premium-services {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
             margin: 20px auto;
+            max-width: 800px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
         }
-        .subscription-button:hover {
-            background-color: #1565C0;
+        .premium-services h3 {
+            color: #2c3338;
+            margin-bottom: 15px;
+        }
+        .premium-services p {
+            color: #555;
+            margin-bottom: 15px;
+        }
+        .premium-services a {
+            color: #1E88E5;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .premium-services a:hover {
+            text-decoration: underline;
         }
         </style>
     """, unsafe_allow_html=True)
     
-    if st.button(f"Subscribe for custom report on {entity_name}", key=f"subscribe_{entity_id}"):
-        show_subscription_form(entity_type, entity_id, entity_name)
+    st.markdown(f"""
+        <div class="premium-services">
+            <h3>320 Premium Reports</h3>
+            <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.</p>
+            <p>To request a report or talk through what you need:</p>
+            <p><a href="mailto:eric@320insight.com">📧 eric@320insight.com</a></p>
+        </div>
+    """, unsafe_allow_html=True)
 
 def main() -> None:
     """Main app layout and data flow."""

@@ -144,9 +144,10 @@ st.markdown("""
 # Contact Section
 st.markdown("""
     <div class="contact-section">
-        <h3>Get Started with Premium Services</h3>
-        <p>For custom reports and additional data analysis services, contact us at:</p>
-        <p style="font-size: 1.2em; font-weight: bold;">📧 <a href="mailto:eric@320insight.com">eric@320insight.com</a></p>
+        <h3>320 Premium Reports</h3>
+        <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.</p>
+        <p>To request a report or talk through what you need:</p>
+        <p><a href="mailto:eric@320insight.com" class="contact-link">📧 eric@320insight.com</a></p>
     </div>
 """, unsafe_allow_html=True)
 
