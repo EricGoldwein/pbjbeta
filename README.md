@@ -6,9 +6,9 @@ A Streamlit application for analyzing nursing home staffing data.
 
 1. Clone this repository
 2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+```
 3. Place your nursing home data CSV files in the project root directory. The application expects files named `nursing_home_data_YYYY.csv` where YYYY is the year.
 
 ## Data Files
