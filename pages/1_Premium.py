@@ -71,10 +71,9 @@ st.markdown("""
 
 # Introduction
 st.markdown("""
-    320 Consulting provides specialized data analysis and reporting services for attorneys, advocates, journalists, 
-    researchers, and consumers who are working to support nursing home residents. Our tools help you understand 
-    staffing patterns, identify potential issues, and make data-driven decisions to bolster transparency and resident care.
-""")
+<b>320 Consulting</b> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.<br><br>
+To request a report or talk through what you need: eric@320insight.com
+""", unsafe_allow_html=True)
 
 # Premium Features
 st.markdown("### Premium Services")
