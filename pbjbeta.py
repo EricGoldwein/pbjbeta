@@ -167,52 +167,49 @@ provider_cache = ProviderInfoCache()
 def load_provider_info_cache() -> None:
     """Load all provider information into cache at startup."""
     global provider_info_cache
-    
-    # Map of info types to possible column names
-    column_maps = {
-        'name': ['PROVNAME', 'provname', 'PROVIDER_NAME', 'provider_name'],
-        'state': ['STATE', 'state'],
-        'county': ['COUNTY_NAME', 'county_name', 'COUNTY', 'county'],
-        'city': ['CITY', 'city']
-    }
-    
-    pbj_files = sorted(glob.glob('PBJ_Nurse/*.csv'), reverse=True)
-    
-    for pbj_file in pbj_files:
+    provider_info_cache = {}
+
+    provider_file = 'NH_ProviderInfo_Mar2025.csv'
+    st.write(f"[DEBUG] Current working directory: {os.getcwd()}")
+    st.write(f"[DEBUG] Files in root: {os.listdir('.')}")
+    if os.path.exists(provider_file):
+        st.write(f"[DEBUG] Loading provider info from {provider_file}")
         try:
-            df = pd.read_csv(pbj_file, dtype={'PROVNUM': str, 'provnum': str})
-            
-            # Standardize PROVNUM column
-            prov_col = next(
-                (col for col in df.columns 
-                 if col.lower() in ['provnum', 'provider_number']),
-                None
-            )
-            if not prov_col:
-                continue
-                
-            df.rename(columns={prov_col: 'PROVNUM'}, inplace=True)
-            
-            # Process each info type
-            for info_type, target_columns in column_maps.items():
-                info_col = next(
-                    (col for col in df.columns 
-                     if col in target_columns),
-                    None
-                )
-                if not info_col:
-                    continue
-                    
-                # Update cache for each provider
-                for _, row in df.iterrows():
-                    provnum = row['PROVNUM']
-                    if provnum not in provider_info_cache:
-                        provider_info_cache[provnum] = {}
-                    provider_info_cache[provnum][info_type] = row[info_col]
-                    
+            df = pd.read_csv(provider_file, dtype={'CMS Certification Number (CCN)': str})
+            st.write(f"[DEBUG] Provider info columns: {df.columns.tolist()}")
+            # Standardize column names
+            column_map = {
+                'PROVNUM': ['PROVNUM', 'provnum', 'CCN', 'Provider Number', 'CMS Certification Number (CCN)'],
+                'name': ['PROVNAME', 'Provider Name', 'Facility Name'],
+                'state': ['STATE', 'State'],
+                'county': ['COUNTY', 'County/Parish', 'County Name'],
+                'city': ['CITY', 'City/Town']
+            }
+            for target, possible_cols in column_map.items():
+                for col in possible_cols:
+                    if col in df.columns:
+                        df.rename(columns={col: target}, inplace=True)
+                        break
+            st.write(f"[DEBUG] Renamed columns: {df.columns.tolist()}")
+            # Fill provider cache
+            for _, row in df.iterrows():
+                provnum = str(row.get('PROVNUM', '')).strip()
+                if provnum:
+                    provider_info_cache[provnum] = {
+                        'name': str(row.get('name', '')).strip(),
+                        'state': str(row.get('state', '')).strip(),
+                        'county': str(row.get('county', '')).strip(),
+                        'city': str(row.get('city', '')).strip()
+                    }
+            st.write(f"[DEBUG] Loaded {len(provider_info_cache)} providers into cache. Example keys: {list(provider_info_cache.keys())[:5]}")
+            # Debug a specific provider
+            test_provnum = '015009'
+            if test_provnum in provider_info_cache:
+                st.write(f"[DEBUG] Test provider {test_provnum} info: {provider_info_cache[test_provnum]}")
         except Exception as e:
-            st.error(f"Error processing {pbj_file}: {str(e)}")
-            continue
+            st.error(f"Error loading provider file: {str(e)}")
+    else:
+        st.error(f"Provider info file {provider_file} not found.")
 
 def proper_title_case(text: str) -> str:
     """
@@ -242,93 +239,39 @@ def proper_title_case(text: str) -> str:
 def get_provider_info(provnum: str, info_type: str) -> str:
     """Get provider information with optimized caching."""
     try:
-        # Check cache first
-        cache_key = f"{provnum}_{info_type}"
-        if cache_key in provider_info_cache:
-            value = provider_info_cache[cache_key]
+        # Always treat provnum as string
+        provnum = str(provnum).strip()
+        if provnum in provider_info_cache:
+            value = provider_info_cache[provnum].get(info_type, 'N/A')
             # Apply proper title case to name and city
             if info_type in ['name', 'city']:
                 value = proper_title_case(value)
             return value
         
-        # Map of info types to possible column names
-        column_maps = {
-            'name': ['PROVNAME', 'provname', 'PROVIDER_NAME', 'provider_name'],
-            'state': ['STATE', 'state'],
-            'county': ['COUNTY_NAME', 'county_name', 'COUNTY', 'county'],
-            'city': ['CITY', 'city']
-        }
-        
-        target_columns = column_maps.get(info_type.lower(), [])
-        if not target_columns:
-            return 'N/A'
-        
-        # First try to get info from facility_metrics
+        # If not in cache, try to get from facility_metrics
         try:
             query = f"""
-                SELECT DISTINCT {', '.join(target_columns)}
+                SELECT DISTINCT PROVNAME, STATE, COUNTY_NAME, CITY
                 FROM facility_metrics 
                 WHERE PROVNUM = '{provnum}'
                 LIMIT 1
             """
             result = facility_db.execute(query).fetchdf()
             if not result.empty:
-                value = result.iloc[0][0]  # Get first column value
+                value = result.iloc[0][info_type.upper() if info_type != 'name' else 'PROVNAME']
                 # Apply proper title case to name and city
                 if info_type in ['name', 'city']:
                     value = proper_title_case(value)
                 # Cache the result
-                provider_info_cache[cache_key] = value
+                provider_info_cache[provnum] = {
+                    'name': str(result.iloc[0]['PROVNAME']).strip(),
+                    'state': str(result.iloc[0]['STATE']).strip(),
+                    'county': str(result.iloc[0]['COUNTY_NAME']).strip(),
+                    'city': str(result.iloc[0]['CITY']).strip()
+                }
                 return value
-        except Exception:
-            pass  # Continue to PBJ_Nurse files if facility_metrics fails
-        
-        # Try PBJ_Nurse files as fallback
-        if os.path.exists('PBJ_Nurse'):
-            # Try different encodings
-            encodings = ['latin1', 'cp1252', 'utf-8']
-            pbj_files = sorted(glob.glob('PBJ_Nurse/*.csv'), reverse=True)
-            
-            for pbj_file in pbj_files:
-                for encoding in encodings:
-                    try:
-                        df = pd.read_csv(pbj_file, encoding=encoding, dtype={'PROVNUM': str, 'provnum': str})
-                        
-                        # Standardize PROVNUM column
-                        prov_col = next(
-                            (col for col in df.columns 
-                             if col.lower() in ['provnum', 'provider_number']),
-                            None
-                        )
-                        if not prov_col:
-                            continue
-                        
-                        df.rename(columns={prov_col: 'PROVNUM'}, inplace=True)
-                        
-                        # Find matching info column
-                        info_col = next(
-                            (col for col in df.columns 
-                             if col in target_columns),
-                            None
-                        )
-                        if not info_col:
-                            continue
-                        
-                        provider_data = df[df['PROVNUM'] == provnum]
-                        if not provider_data.empty:
-                            value = provider_data.iloc[0][info_col]
-                            # Apply proper title case to name and city
-                            if info_type in ['name', 'city']:
-                                value = proper_title_case(value)
-                            # Cache the result
-                            provider_info_cache[cache_key] = value
-                            return value
-                        
-                    except UnicodeDecodeError:
-                        continue
-                    except Exception as e:
-                        st.error(f"Error processing {pbj_file}: {str(e)}")
-                        continue
+        except Exception as e:
+            st.error(f"Error getting provider info from facility_metrics: {str(e)}")
         
         return 'N/A'
     except Exception as e:
