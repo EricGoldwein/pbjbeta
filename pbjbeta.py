@@ -74,19 +74,33 @@ def create_facility_db():
     """Create an optimized DuckDB database for facility data."""
     try:
         # Load facility metrics into DuckDB
+        print("Loading facility metrics from CSV...")
         facility_metrics = pd.read_csv('facility_quarterly_metrics.csv', dtype={'PROVNUM': str})
         
-        if not facility_metrics.empty:
-            facility_db.execute("""
-                CREATE TABLE IF NOT EXISTS facility_metrics AS 
-                SELECT * FROM facility_metrics
-            """)
+        if facility_metrics.empty:
+            print("Warning: facility_metrics DataFrame is empty")
+            return
             
-            # Create indexes for faster lookups
-            facility_db.execute("CREATE INDEX IF NOT EXISTS idx_provnum ON facility_metrics(PROVNUM)")
-            facility_db.execute("CREATE INDEX IF NOT EXISTS idx_date ON facility_metrics(date)")
-            facility_db.execute("CREATE INDEX IF NOT EXISTS idx_quarter ON facility_metrics(CY_QTR)")
+        print(f"Loaded {len(facility_metrics)} facility records")
+        print("Sample of facility data:")
+        print(facility_metrics.head())
+        
+        facility_db.execute("""
+            CREATE TABLE IF NOT EXISTS facility_metrics AS 
+            SELECT * FROM facility_metrics
+        """)
+        
+        # Create indexes for faster lookups
+        facility_db.execute("CREATE INDEX IF NOT EXISTS idx_provnum ON facility_metrics(PROVNUM)")
+        facility_db.execute("CREATE INDEX IF NOT EXISTS idx_date ON facility_metrics(date)")
+        facility_db.execute("CREATE INDEX IF NOT EXISTS idx_quarter ON facility_metrics(CY_QTR)")
+        
+        # Verify data was loaded
+        result = facility_db.execute("SELECT COUNT(*) FROM facility_metrics").fetchone()
+        print(f"Total records in facility_metrics table: {result[0]}")
+        
     except Exception as e:
+        print(f"Error creating facility database: {str(e)}")
         st.error(f"Error creating facility database: {str(e)}")
 
 # Initialize data at startup
@@ -1038,22 +1052,33 @@ def search_facilities(search_term: str) -> List[Dict[str, str]]:
         # Sanitize search term to prevent SQL injection
         search_term = search_term.replace("'", "''")
         
+        print(f"Searching for facilities matching: {search_term}")
+        
         # Get matching facilities using DuckDB with parameterized query
         query = """
             SELECT DISTINCT PROVNUM, PROVNAME, STATE, COUNTY_NAME, CITY
             FROM facility_metrics 
-            WHERE PROVNUM LIKE ?
+            WHERE PROVNUM LIKE ? OR PROVNAME LIKE ?
             LIMIT 50
         """
-        matching_facilities = facility_db.execute(query, (f"%{search_term}%",)).fetchdf()
+        matching_facilities = facility_db.execute(
+            query, 
+            (f"%{search_term}%", f"%{search_term}%")
+        ).fetchdf()
+        
+        print(f"Found {len(matching_facilities)} matching facilities")
         
         if not matching_facilities.empty:
             # Apply proper title case to PROVNAME and CITY
             matching_facilities['PROVNAME'] = matching_facilities['PROVNAME'].apply(proper_title_case)
             matching_facilities['CITY'] = matching_facilities['CITY'].apply(proper_title_case)
             return matching_facilities.to_dict('records')
+            
+        print("No matching facilities found")
         return []
+        
     except Exception as e:
+        print(f"Error searching facilities: {str(e)}")
         st.error(f"Error searching facilities: {str(e)}")
         return []
 
