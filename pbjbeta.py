@@ -1588,6 +1588,7 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
 
 def main() -> None:
     """Main app layout and data flow."""
+    st.markdown("**Live version: updated May 16 @ 3:41 PM**")  # Add this line
     try:
         # Initialize subscription database
         create_subscription_db()

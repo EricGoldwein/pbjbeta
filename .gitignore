@@ -50,4 +50,7 @@ ENV/
 # Keep documentation
 !README.md
 !LICENSE
-!pbj_staffing_dashboard.md 
+!pbj_staffing_dashboard.md
+
+# TEMP: Allow CSVs for initial push
+#*.csv 
