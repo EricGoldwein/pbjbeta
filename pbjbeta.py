@@ -28,7 +28,7 @@ from typing import Dict, Optional, List, Tuple, Any
 
 # Set page configuration with a more professional theme
 st.set_page_config(
-    page_title="Nursing Home Staffing Dashboard (Beta)",
+    page_title="Nursing Home Staffing Dashboard (Beta 2.0)",
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
