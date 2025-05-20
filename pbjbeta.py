@@ -31,8 +31,25 @@ st.set_page_config(
     page_title="Nursing Home Staffing Dashboard (Beta 2.0)",
     page_icon="🏥",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
 )
+
+# Add custom CSS to reduce sidebar width and style the page name
+st.markdown("""
+    <style>
+        [data-testid="stSidebar"][aria-expanded="true"]{
+            width: 250px !important;
+        }
+        [data-testid="stSidebar"][aria-expanded="false"]{
+            width: 250px !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # Load environment variables
 load_dotenv()
@@ -695,7 +712,7 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
             # Add footer annotations for mobile view
             fig.add_annotation(
                 text="320 Consulting | Source: CMS PBJ Data",
-                x=0.95,
+                x=0.98,
                 y=-0.33,
                 xref="x domain",
                 yref="y domain",
@@ -707,8 +724,8 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
             )
             
             fig.add_annotation(
-                text="320 Consulting | Source: CMS PBJ Data",
-                x=0.95,
+                text="320 Consulting | CMS PBJ Data",
+                x=0.98,
                 y=-0.33,
                 xref="x domain",
                 yref="y domain",
@@ -793,7 +810,7 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, r
                 for col in range(1, 3):
                     fig.add_annotation(
                         text="320 Consulting | Source: CMS PBJ Data",
-                        x=0.95,
+                        x=0.99,
                         y=-0.25,  # Move footer up
                         xref="x domain",
                         yref="y domain",
@@ -984,6 +1001,11 @@ st.markdown("""
         .mobile-only {
             display: none !important;
         }
+    }
+    
+    /* Reduce width of main content quarter selector */
+    div[data-testid="stSelectbox"] {
+        width: 150px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1531,7 +1553,6 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
 
 def main() -> None:
     """Main app layout and data flow."""
-    st.markdown("**Live version: updated May 16 @ 3:41 PM**")  # Add this line
     try:
         # Initialize subscription database
         create_subscription_db()
@@ -1539,6 +1560,10 @@ def main() -> None:
         # Initialize session state variables at the very start
         if 'view_mode' not in st.session_state:
             st.session_state.view_mode = "Desktop"
+
+        # Get URL parameters using the new API
+        initial_level = st.query_params.get('level', 'National')
+        initial_facility = st.query_params.get('facility', None)
 
         # Title with custom styling
         st.markdown("""
@@ -1548,6 +1573,9 @@ def main() -> None:
                     By 320 Consulting | 
                     <a href="/Premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
                         ⭐ Premium
+                    </a> |
+                    <a href="/Facility_Search" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
+                        🔍 Search Facility
                     </a>
                 </p>
             </div>
@@ -1573,12 +1601,32 @@ def main() -> None:
             .sidebar h3 {
                 margin-bottom: 0.5rem;
             }
+            /* Add styles for quarter selectors */
+            .sidebar .stSelectbox {
+                width: 150px !important;
+            }
+            /* Match width of provider name box to CCN box */
+            .sidebar div[data-testid="stSelectbox"] {
+                width: 100% !important;
+            }
+            /* Remove top margin from first element in sidebar */
+            .sidebar > div:first-child {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+            /* Reduce spacing between elements */
+            .sidebar .stRadio {
+                margin-top: 0 !important;
+                margin-bottom: 1rem !important;
+            }
+            .sidebar .stSelectbox {
+                margin-top: 0 !important;
+                margin-bottom: 1rem !important;
+            }
             </style>
         """, unsafe_allow_html=True)
-        
-        st.sidebar.title("Filters")
 
-        # Add view mode selection at the top of filters
+        # Add view mode selection at the very top
         view_mode = st.sidebar.radio(
             "",
             ["Desktop", "Mobile"],
@@ -1586,47 +1634,14 @@ def main() -> None:
             key="view_mode"
         )
 
-        # Add level selection
+        # Add level selection with initial value from URL
         level = st.sidebar.radio(
             "Select Level",
-            ["National", "State", "Region", "Facility"],
+            ["National", "State", "Facility"],
+            index=["National", "State", "Facility"].index(initial_level),
             key="level_selector"
         )
 
-        # Date range selection with all available quarters
-        try:
-            all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
-            all_quarters_reversed = sort_quarters(all_quarters, reverse=True)  # Newest to oldest
-            
-            # Create two columns for quarter selection
-            st.sidebar.markdown('<div class="quarter-selectors">', unsafe_allow_html=True)
-            col1, col2 = st.sidebar.columns(2)
-            
-            with col1:
-                start_quarter = st.selectbox(
-                    "From",
-                    all_quarters,  # Oldest to newest
-                    index=0,
-                    key="start_quarter",
-                    format_func=format_quarter_display
-                )
-                start_quarter = normalize_quarter(start_quarter)
-            
-            with col2:
-                end_quarter = st.selectbox(
-                    "To",
-                    all_quarters_reversed,  # Newest to oldest
-                    index=0,
-                    key="end_quarter",
-                    format_func=format_quarter_display
-                )
-                end_quarter = normalize_quarter(end_quarter)
-            st.sidebar.markdown('</div>', unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.error(f"Error loading quarters: {str(e)}")
-            return
-        
         # Get selected value based on level
         selected_value = None
         try:
@@ -1640,20 +1655,33 @@ def main() -> None:
                     index=0
                 )
                 selected_value = selected_state
-            elif level == "Region":
-                # Get unique regions in sorted order
-                regions = sorted(region_metrics['Region'].unique(), 
-                            key=lambda x: int(x.split()[-1]))
-                # Default to first region
-                selected_region = st.sidebar.selectbox(
-                    "Select Region",
-                    regions,
-                    index=0
-                )
-                selected_value = selected_region
             elif level == "Facility":
                 search_container = st.sidebar.container()
-                search_term = search_container.text_input("Enter Provider CCN or Name", key="facility_search")
+                
+                # If we have a facility from URL, use it
+                if initial_facility:
+                    # Set the selected value directly from the CCN
+                    selected_value = initial_facility
+                    # Use the CCN as the search term
+                    search_term = initial_facility
+                else:
+                    search_term = ""
+
+                # Create the search input without using session state for the value
+                search_term = search_container.text_input(
+                    "Enter Provider CCN or Name",
+                    value=search_term,
+                    key="facility_search"
+                )
+                
+                # Add help text with hyperlink
+                st.sidebar.markdown(
+                    '<div style="margin-top: -15px; margin-bottom: 15px;">'
+                    '<a href="/Facility_Search" target="_self" style="color: #1E88E5; text-decoration: none; font-size: 0.9em;">'
+                    'Help finding facility data</a></div>',
+                    unsafe_allow_html=True
+                )
+                
                 matching_facilities = []
                 search_triggered = False
 
@@ -1671,7 +1699,7 @@ def main() -> None:
                 if search_term:
                     if matching_facilities:
                         facility_options = [
-                            f"{fac['PROVNUM']} - {fac['PROVNAME']}"
+                            f"{fac['PROVNAME']}"
                             for fac in matching_facilities
                         ]
                         selected_facility_display = search_container.selectbox(
@@ -1681,9 +1709,34 @@ def main() -> None:
                             label_visibility="collapsed"
                         )
                         if selected_facility_display:
-                            selected_value = selected_facility_display.split(" - ")[0]
+                            # Find the matching facility to get the CCN
+                            selected_facility = next(
+                                (fac for fac in matching_facilities if fac['PROVNAME'] == selected_facility_display),
+                                None
+                            )
+                            if selected_facility:
+                                selected_value = selected_facility['PROVNUM']
                     else:
                         search_container.info("No matching facilities found")
+
+            # Add back button if on facility page - now both level and selected_value are defined
+            if level == "Facility" and selected_value:
+                st.markdown("""
+                    <div style="margin-bottom: 10px;">
+                        <a href="/" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
+                            ← Back to PBJ Dashboard
+                        </a>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # Get all available quarters
+            try:
+                all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
+                start_quarter = all_quarters[0]  # First quarter
+                end_quarter = all_quarters[-1]   # Last quarter
+            except Exception as e:
+                st.error(f"Error loading quarters: {str(e)}")
+                return
         except Exception as e:
             st.error(f"Error processing selection: {str(e)}")
             return
