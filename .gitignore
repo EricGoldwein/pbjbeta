@@ -54,3 +54,7 @@ ENV/
 
 # TEMP: Allow CSVs for initial push
 #*.csv 
+
+# Ignore CSV files and PBJ_Nurse directory
+*.csv
+PBJ_Nurse/ 
