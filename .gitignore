@@ -41,6 +41,11 @@ ENV/
 *.gif
 *.ico
 
+# Ignore all CSV files except specific ones
+*.csv
+!state_region_mapping.csv
+!header_comparison.csv
+
 # Other
 *.log
 .DS_Store
@@ -52,9 +57,7 @@ ENV/
 !LICENSE
 !pbj_staffing_dashboard.md
 
-# TEMP: Allow CSVs for initial push
-#*.csv 
-
-# Ignore CSV files and PBJ_Nurse directory
-*.csv
-PBJ_Nurse/ 
+# Ignore PBJ_Nurse directory and all its contents
+PBJ_Nurse/
+data/
+outputs/ 
