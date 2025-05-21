@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+# Ignore large data files that should be downloaded separately
+*.db
+*.sqlite3
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+
+# Other
+*.log
+.DS_Store
+.env
+.cursorrules
+
+# Keep documentation
+!README.md
+!LICENSE
+!pbj_staffing_dashboard.md
+
+# TEMP: Allow CSVs for initial push
+*.csv 

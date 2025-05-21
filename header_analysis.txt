@@ -1,0 +1,173 @@
+DETAILED HEADER ANALYSIS
+==================================================
+
+Column Name Standardization Mapping:
+--------------------------------------------------
+
+PROVNUM:
+  - PROVNUM
+  - provnum
+
+PROVNAME:
+  - PROVNAME
+  - provname
+
+CITY:
+  - CITY
+  - city
+
+STATE:
+  - STATE
+  - state
+
+COUNTY_NAME:
+  - COUNTY_NAME
+  - county_name
+
+COUNTY_FIPS:
+  - COUNTY_FIPS
+  - county_fips
+
+CY_QTR:
+  - CY_Qtr
+  - CY_QTR
+  - cy_qtr
+
+WORKDATE:
+  - WorkDate
+  - workdate
+
+MDSCENSUS:
+  - MDScensus
+  - mdscensus
+
+HRS_RN:
+  - Hrs_RN
+  - hrs_rn
+
+HRS_RN_EMP:
+  - Hrs_RN_emp
+  - hrs_rn_emp
+
+HRS_RN_CTR:
+  - Hrs_RN_ctr
+  - hrs_rn_ctr
+
+HRS_RNADMIN:
+  - Hrs_RNadmin
+  - hrs_rnadmin
+
+HRS_RNADMIN_EMP:
+  - Hrs_RNadmin_emp
+  - hrs_rnadmin_emp
+
+HRS_RNADMIN_CTR:
+  - Hrs_RNadmin_ctr
+  - hrs_rnadmin_ctr
+
+HRS_RNDON:
+  - Hrs_RNDON
+  - hrs_rndon
+  - hrs_rn_donadmin
+
+HRS_RNDON_EMP:
+  - Hrs_RNDON_emp
+  - hrs_rndon_emp
+
+HRS_RNDON_CTR:
+  - Hrs_RNDON_ctr
+  - hrs_rndon_ctr
+
+HRS_LPN:
+  - Hrs_LPN
+  - hrs_lpn
+
+HRS_LPN_EMP:
+  - Hrs_LPN_emp
+  - hrs_lpn_emp
+
+HRS_LPN_CTR:
+  - Hrs_LPN_ctr
+  - hrs_lpn_ctr
+
+HRS_LPNADMIN:
+  - Hrs_LPNadmin
+  - hrs_lpnadmin
+  - hrs_lpn_admin
+
+HRS_LPNADMIN_EMP:
+  - Hrs_LPNadmin_emp
+  - hrs_lpnadmin_emp
+
+HRS_LPNADMIN_CTR:
+  - Hrs_LPNadmin_ctr
+  - hrs_lpnadmin_ctr
+
+HRS_CNA:
+  - Hrs_CNA
+  - hrs_cna
+
+HRS_CNA_EMP:
+  - Hrs_CNA_emp
+  - hrs_cna_emp
+
+HRS_CNA_CTR:
+  - Hrs_CNA_ctr
+  - hrs_cna_ctr
+
+HRS_NATRN:
+  - Hrs_NAtrn
+  - hrs_natrn
+  - hrs_na_trn
+
+HRS_NATRN_EMP:
+  - Hrs_NAtrn_emp
+  - hrs_natrn_emp
+
+HRS_NATRN_CTR:
+  - Hrs_NAtrn_ctr
+  - hrs_natrn_ctr
+
+HRS_MEDAIDE:
+  - Hrs_MedAide
+  - hrs_medaide
+
+HRS_MEDAIDE_EMP:
+  - Hrs_MedAide_emp
+  - hrs_medaide_emp
+
+HRS_MEDAIDE_CTR:
+  - Hrs_MedAide_ctr
+  - hrs_medaide_ctr
+
+INCOMPLETE:
+  - incomplete
+
+
+Pattern Analysis:
+--------------------------------------------------
+
+Case Patterns:
+Mixed: 2018Q1, 2018Q2, 2018Q3, 2020Q1, 2020Q4, 2021Q1, 2021Q2, 2021Q3, 2021Q4, 2022Q1, 2022Q2, 2022Q3, 2022Q4, 2023Q1, 2023Q2, 2023Q3, 2023Q4, 2024Q1, 2024Q2, 2024Q3
+UPPER: 2018Q1, 2018Q2, 2018Q3, 2020Q1, 2020Q4, 2021Q1, 2021Q2, 2021Q3, 2021Q4, 2022Q1, 2022Q2, 2022Q3, 2022Q4, 2023Q1, 2023Q2, 2023Q3, 2023Q4, 2024Q1, 2024Q2, 2024Q3
+lower: 2017Q1, 2017Q2, 2017Q3, 2017Q4, 2018Q4, 2019Q1, 2019Q2, 2019Q3, 2019Q4, 2020Q3, 2021Q4
+
+Separator Patterns:
+underscore: 2017Q1, 2017Q2, 2017Q3, 2017Q4, 2018Q1, 2018Q2, 2018Q3, 2018Q4, 2019Q1, 2019Q2, 2019Q3, 2019Q4, 2020Q1, 2020Q3, 2020Q4, 2021Q1, 2021Q2, 2021Q3, 2021Q4, 2022Q1, 2022Q2, 2022Q3, 2022Q4, 2023Q1, 2023Q2, 2023Q3, 2023Q4, 2024Q1, 2024Q2, 2024Q3
+none: 2017Q1, 2017Q2, 2017Q3, 2017Q4, 2018Q1, 2018Q2, 2018Q3, 2018Q4, 2019Q1, 2019Q2, 2019Q3, 2019Q4, 2020Q1, 2020Q3, 2020Q4, 2021Q1, 2021Q2, 2021Q3, 2021Q4, 2022Q1, 2022Q2, 2022Q3, 2022Q4, 2023Q1, 2023Q2, 2023Q3, 2023Q4, 2024Q1, 2024Q2, 2024Q3
+
+Prefix Patterns:
+hrs: 2017Q1, 2017Q2, 2017Q3, 2017Q4, 2018Q1, 2018Q2, 2018Q3, 2018Q4, 2019Q1, 2019Q2, 2019Q3, 2019Q4, 2020Q1, 2020Q3, 2020Q4, 2021Q1, 2021Q2, 2021Q3, 2021Q4, 2022Q1, 2022Q2, 2022Q3, 2022Q4, 2023Q1, 2023Q2, 2023Q3, 2023Q4, 2024Q1, 2024Q2, 2024Q3
+
+Suffix Patterns:
+_ctr: 2017Q1, 2017Q2, 2017Q3, 2017Q4, 2018Q1, 2018Q2, 2018Q3, 2018Q4, 2019Q1, 2019Q2, 2019Q3, 2019Q4, 2020Q1, 2020Q3, 2020Q4, 2021Q1, 2021Q2, 2021Q3, 2021Q4, 2022Q1, 2022Q2, 2022Q3, 2022Q4, 2023Q1, 2023Q2, 2023Q3, 2023Q4, 2024Q1, 2024Q2, 2024Q3
+_emp: 2017Q1, 2017Q2, 2017Q3, 2017Q4, 2018Q1, 2018Q2, 2018Q3, 2018Q4, 2019Q1, 2019Q2, 2019Q3, 2019Q4, 2020Q1, 2020Q3, 2020Q4, 2021Q1, 2021Q2, 2021Q3, 2021Q4, 2022Q1, 2022Q2, 2022Q3, 2022Q4, 2023Q1, 2023Q2, 2023Q3, 2023Q4, 2024Q1, 2024Q2, 2024Q3
+
+
+Standardization Recommendations:
+--------------------------------------------------
+1. Use lowercase for all column names
+2. Use underscores as separators
+3. Use consistent prefixes (e.g., 'hrs_' for all hours columns)
+4. Use consistent suffixes (e.g., '_emp' for employee hours, '_ctr' for contractor hours)
+5. Standardize abbreviations (e.g., 'rn' for Registered Nurse, 'lpn' for Licensed Practical Nurse)

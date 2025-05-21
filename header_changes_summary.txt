@@ -1,0 +1,176 @@
+HEADER CHANGES SUMMARY
+==================================================
+
+Header Variations:
+--------------------------------------------------
+city:
+  - CITY
+  - city
+
+countyfips:
+  - COUNTY_FIPS
+  - county_fips
+
+countyname:
+  - COUNTY_NAME
+  - county_name
+
+cyqtr:
+  - CY_Qtr
+  - cy_qtr
+
+hrscna:
+  - Hrs_CNA
+  - hrs_cna
+
+hrscnactr:
+  - Hrs_CNA_ctr
+  - hrs_cna_ctr
+
+hrscnaemp:
+  - Hrs_CNA_emp
+  - hrs_cna_emp
+
+hrslpn:
+  - Hrs_LPN
+  - hrs_lpn
+
+hrslpnctr:
+  - Hrs_LPN_ctr
+  - hrs_lpn_ctr
+
+hrslpnemp:
+  - Hrs_LPN_emp
+  - hrs_lpn_emp
+
+hrslpnadmin:
+  - Hrs_LPNadmin
+  - hrs_lpn_admin
+  - hrs_lpnadmin
+
+hrslpnadminctr:
+  - Hrs_LPNadmin_ctr
+  - hrs_lpnadmin_ctr
+
+hrslpnadminemp:
+  - Hrs_LPNadmin_emp
+  - hrs_lpnadmin_emp
+
+hrsmedaide:
+  - Hrs_MedAide
+  - hrs_medaide
+
+hrsmedaidectr:
+  - Hrs_MedAide_ctr
+  - hrs_medaide_ctr
+
+hrsmedaideemp:
+  - Hrs_MedAide_emp
+  - hrs_medaide_emp
+
+hrsnatrn:
+  - Hrs_NAtrn
+  - hrs_na_trn
+  - hrs_natrn
+
+hrsnatrnctr:
+  - Hrs_NAtrn_ctr
+  - hrs_natrn_ctr
+
+hrsnatrnemp:
+  - Hrs_NAtrn_emp
+  - hrs_natrn_emp
+
+hrsrn:
+  - Hrs_RN
+  - hrs_rn
+
+hrsrndon:
+  - Hrs_RNDON
+  - hrs_rndon
+
+hrsrndonctr:
+  - Hrs_RNDON_ctr
+  - hrs_rndon_ctr
+
+hrsrndonemp:
+  - Hrs_RNDON_emp
+  - hrs_rndon_emp
+
+hrsrnctr:
+  - Hrs_RN_ctr
+  - hrs_rn_ctr
+
+hrsrnemp:
+  - Hrs_RN_emp
+  - hrs_rn_emp
+
+hrsrnadmin:
+  - Hrs_RNadmin
+  - hrs_rnadmin
+
+hrsrnadminctr:
+  - Hrs_RNadmin_ctr
+  - hrs_rnadmin_ctr
+
+hrsrnadminemp:
+  - Hrs_RNadmin_emp
+  - hrs_rnadmin_emp
+
+mdscensus:
+  - MDScensus
+  - mdscensus
+
+provname:
+  - PROVNAME
+  - provname
+
+provnum:
+  - PROVNUM
+  - provnum
+
+state:
+  - STATE
+  - state
+
+workdate:
+  - WorkDate
+  - workdate
+
+
+Quarter-by-Quarter Changes:
+--------------------------------------------------
+
+Changes from 2017Q1 to 2017Q2:
+  Added: hrs_rndon
+  Removed: hrs_medaide_ctr
+
+Changes from 2017Q2 to 2017Q3:
+  Added: hrs_medaide_ctr
+  Removed: hrs_rn_donadmin
+
+Changes from 2017Q4 to 2018Q1:
+  Added: CITY, COUNTY_FIPS, COUNTY_NAME, CY_Qtr, Hrs_CNA, Hrs_CNA_ctr, Hrs_CNA_emp, Hrs_LPN, Hrs_LPN_ctr, Hrs_LPN_emp, Hrs_LPNadmin, Hrs_LPNadmin_ctr, Hrs_LPNadmin_emp, Hrs_MedAide, Hrs_MedAide_ctr, Hrs_MedAide_emp, Hrs_NAtrn, Hrs_NAtrn_ctr, Hrs_NAtrn_emp, Hrs_RN, Hrs_RNDON, Hrs_RNDON_ctr, Hrs_RNDON_emp, Hrs_RN_ctr, Hrs_RN_emp, Hrs_RNadmin, Hrs_RNadmin_ctr, Hrs_RNadmin_emp, MDScensus, PROVNAME, PROVNUM, STATE, WorkDate
+  Removed: city, county_fips, county_name, cy_qtr, hrs_cna, hrs_cna_ctr, hrs_cna_emp, hrs_lpn, hrs_lpn_admin, hrs_lpn_ctr, hrs_lpn_emp, hrs_lpnadmin_ctr, hrs_lpnadmin_emp, hrs_medaide, hrs_medaide_ctr, hrs_medaide_emp, hrs_na_trn, hrs_natrn_ctr, hrs_natrn_emp, hrs_rn, hrs_rn_ctr, hrs_rn_emp, hrs_rnadmin, hrs_rnadmin_ctr, hrs_rnadmin_emp, hrs_rndon, hrs_rndon_ctr, hrs_rndon_emp, mdscensus, provname, provnum, state, workdate
+
+Changes from 2018Q3 to 2018Q4:
+  Added: city, county_fips, county_name, cy_qtr, hrs_cna, hrs_cna_ctr, hrs_cna_emp, hrs_lpn, hrs_lpn_ctr, hrs_lpn_emp, hrs_lpnadmin, hrs_lpnadmin_ctr, hrs_lpnadmin_emp, hrs_medaide, hrs_medaide_ctr, hrs_medaide_emp, hrs_natrn, hrs_natrn_ctr, hrs_natrn_emp, hrs_rn, hrs_rn_ctr, hrs_rn_emp, hrs_rnadmin, hrs_rnadmin_ctr, hrs_rnadmin_emp, hrs_rndon, hrs_rndon_ctr, hrs_rndon_emp, mdscensus, provname, provnum, state, workdate
+  Removed: CITY, COUNTY_FIPS, COUNTY_NAME, CY_Qtr, Hrs_CNA, Hrs_CNA_ctr, Hrs_CNA_emp, Hrs_LPN, Hrs_LPN_ctr, Hrs_LPN_emp, Hrs_LPNadmin, Hrs_LPNadmin_ctr, Hrs_LPNadmin_emp, Hrs_MedAide, Hrs_MedAide_ctr, Hrs_MedAide_emp, Hrs_NAtrn, Hrs_NAtrn_ctr, Hrs_NAtrn_emp, Hrs_RN, Hrs_RNDON, Hrs_RNDON_ctr, Hrs_RNDON_emp, Hrs_RN_ctr, Hrs_RN_emp, Hrs_RNadmin, Hrs_RNadmin_ctr, Hrs_RNadmin_emp, MDScensus, PROVNAME, PROVNUM, STATE, WorkDate
+
+Changes from 2019Q4 to 2020Q1:
+  Added: CITY, COUNTY_FIPS, COUNTY_NAME, CY_Qtr, Hrs_CNA, Hrs_CNA_ctr, Hrs_CNA_emp, Hrs_LPN, Hrs_LPN_ctr, Hrs_LPN_emp, Hrs_LPNadmin, Hrs_LPNadmin_ctr, Hrs_LPNadmin_emp, Hrs_MedAide, Hrs_MedAide_ctr, Hrs_MedAide_emp, Hrs_NAtrn, Hrs_NAtrn_ctr, Hrs_NAtrn_emp, Hrs_RN, Hrs_RNDON, Hrs_RNDON_ctr, Hrs_RNDON_emp, Hrs_RN_ctr, Hrs_RN_emp, Hrs_RNadmin, Hrs_RNadmin_ctr, Hrs_RNadmin_emp, MDScensus, PROVNAME, PROVNUM, STATE, WorkDate
+  Removed: city, county_fips, county_name, cy_qtr, hrs_cna, hrs_cna_ctr, hrs_cna_emp, hrs_lpn, hrs_lpn_ctr, hrs_lpn_emp, hrs_lpnadmin, hrs_lpnadmin_ctr, hrs_lpnadmin_emp, hrs_medaide, hrs_medaide_ctr, hrs_medaide_emp, hrs_natrn, hrs_natrn_ctr, hrs_natrn_emp, hrs_rn, hrs_rn_ctr, hrs_rn_emp, hrs_rnadmin, hrs_rnadmin_ctr, hrs_rnadmin_emp, hrs_rndon, hrs_rndon_ctr, hrs_rndon_emp, mdscensus, provname, provnum, state, workdate
+
+Changes from 2020Q1 to 2020Q3:
+  Added: city, county_fips, county_name, cy_qtr, hrs_cna, hrs_cna_ctr, hrs_cna_emp, hrs_lpn, hrs_lpn_ctr, hrs_lpn_emp, hrs_lpnadmin, hrs_lpnadmin_ctr, hrs_lpnadmin_emp, hrs_medaide, hrs_medaide_ctr, hrs_medaide_emp, hrs_natrn, hrs_natrn_ctr, hrs_natrn_emp, hrs_rn, hrs_rn_ctr, hrs_rn_emp, hrs_rnadmin, hrs_rnadmin_ctr, hrs_rnadmin_emp, hrs_rndon, hrs_rndon_ctr, hrs_rndon_emp, mdscensus, provname, provnum, state, workdate
+  Removed: CITY, COUNTY_FIPS, COUNTY_NAME, CY_Qtr, Hrs_CNA, Hrs_CNA_ctr, Hrs_CNA_emp, Hrs_LPN, Hrs_LPN_ctr, Hrs_LPN_emp, Hrs_LPNadmin, Hrs_LPNadmin_ctr, Hrs_LPNadmin_emp, Hrs_MedAide, Hrs_MedAide_ctr, Hrs_MedAide_emp, Hrs_NAtrn, Hrs_NAtrn_ctr, Hrs_NAtrn_emp, Hrs_RN, Hrs_RNDON, Hrs_RNDON_ctr, Hrs_RNDON_emp, Hrs_RN_ctr, Hrs_RN_emp, Hrs_RNadmin, Hrs_RNadmin_ctr, Hrs_RNadmin_emp, MDScensus, PROVNAME, PROVNUM, STATE, WorkDate
+
+Changes from 2020Q3 to 2020Q4:
+  Added: CITY, COUNTY_FIPS, COUNTY_NAME, CY_Qtr, Hrs_CNA, Hrs_CNA_ctr, Hrs_CNA_emp, Hrs_LPN, Hrs_LPN_ctr, Hrs_LPN_emp, Hrs_LPNadmin, Hrs_LPNadmin_ctr, Hrs_LPNadmin_emp, Hrs_MedAide, Hrs_MedAide_ctr, Hrs_MedAide_emp, Hrs_NAtrn, Hrs_NAtrn_ctr, Hrs_NAtrn_emp, Hrs_RN, Hrs_RNDON, Hrs_RNDON_ctr, Hrs_RNDON_emp, Hrs_RN_ctr, Hrs_RN_emp, Hrs_RNadmin, Hrs_RNadmin_ctr, Hrs_RNadmin_emp, MDScensus, PROVNAME, PROVNUM, STATE, WorkDate
+  Removed: city, county_fips, county_name, cy_qtr, hrs_cna, hrs_cna_ctr, hrs_cna_emp, hrs_lpn, hrs_lpn_ctr, hrs_lpn_emp, hrs_lpnadmin, hrs_lpnadmin_ctr, hrs_lpnadmin_emp, hrs_medaide, hrs_medaide_ctr, hrs_medaide_emp, hrs_natrn, hrs_natrn_ctr, hrs_natrn_emp, hrs_rn, hrs_rn_ctr, hrs_rn_emp, hrs_rnadmin, hrs_rnadmin_ctr, hrs_rnadmin_emp, hrs_rndon, hrs_rndon_ctr, hrs_rndon_emp, mdscensus, provname, provnum, state, workdate
+
+Changes from 2021Q3 to 2021Q4:
+  Added: incomplete
+
+Changes from 2021Q4 to 2022Q1:
+  Removed: incomplete
