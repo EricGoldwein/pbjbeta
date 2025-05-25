@@ -2,4 +2,7 @@ streamlit==1.32.0
 pandas==2.2.1
 plotly==5.19.0
 numpy==1.26.4
+dash==3.0.4
+Flask==3.0.2
+Werkzeug==3.0.6
 duckdb==0.10.0 
