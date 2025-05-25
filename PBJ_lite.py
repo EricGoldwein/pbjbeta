@@ -1025,23 +1025,9 @@ def main() -> None:
 
         # Handle different pages
         if current_page == 'premium':
-            try:
-                with open('pages/1_Premium.py', 'r', encoding='utf-8') as f:
-                    # Create a new namespace for the premium page
-                    premium_namespace = {}
-                    exec(f.read(), premium_namespace)
-            except Exception as e:
-                st.error(f"Error loading premium page: {str(e)}")
-            return
+            st.switch_page("pages/1_Premium.py")
         elif current_page == 'facility_search':
-            try:
-                with open('pages/2_Facility_Search.py', 'r', encoding='utf-8') as f:
-                    # Create a new namespace for the facility search page
-                    facility_search_namespace = {}
-                    exec(f.read(), facility_search_namespace)
-            except Exception as e:
-                st.error(f"Error loading facility search page: {str(e)}")
-            return
+            st.switch_page("pages/2_Facility_Search.py")
 
         # Get URL parameters using the new API
         initial_level = st.query_params.get('level', 'National')
