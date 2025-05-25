@@ -67,13 +67,13 @@ col1, col2 = st.columns(2)
 with col1:
     state = st.selectbox(
         "Select State",
-        [""] + sorted(pd.read_csv('state_quarterly_metrics.csv')['STATE'].unique().tolist())
+        [""] + sorted(pd.read_csv('state_lite_metrics.csv')['STATE'].unique().tolist())
     )
 
 # Load facility data once
 @st.cache_data
 def load_facility_data():
-    return pd.read_csv('facility_quarterly_metrics.csv', dtype={'PROVNUM': str})
+    return pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
 
 facilities_df = load_facility_data()
 
@@ -152,14 +152,8 @@ st.markdown('</div>', unsafe_allow_html=True)
 # Help section
 st.markdown("""
     <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
-        <h2 style="color: #2c3338; margin-bottom: 20px;">Need Help?</h2>
-        <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
-            If you need assistance finding a facility or have any questions, please contact us:
-        </p>
-        <p style="text-align: center; margin-top: 20px;">
-            <a href="mailto:eric@320insight.com" style="background-color: #1E88E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: 500;">
-                📧 Contact Us
-            </a>
+        <p style="color: #555; line-height: 1.6; text-align: center;">
+            Contact <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: none; font-weight: 500;">eric@320insight.com</a> to request a custom report or talk through what you need.
         </p>
     </div>
 """, unsafe_allow_html=True) 

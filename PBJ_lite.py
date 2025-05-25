@@ -794,6 +794,11 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                 col1, col2, col3, col4 = st.columns(4)
             else:
                 col1, col2, col3 = st.columns(3)
+        else:
+            if level in ["National", "State"]:
+                col1, col2, col3, col4 = st.columns(4)
+            else:
+                col1, col2, col3 = st.columns(3)
         
         # For National and State, add facility count metric
         if level in ["National", "State"]:
