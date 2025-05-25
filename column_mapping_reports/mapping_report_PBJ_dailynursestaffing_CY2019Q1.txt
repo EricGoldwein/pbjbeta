@@ -1,0 +1,36 @@
+Column Mapping Report for PBJ_dailynursestaffing_CY2019Q1.csv
+==================================================
+
+Original: PROVNUM -> Standard: PROVNUM
+Original: PROVNAME -> Standard: PROVNAME
+Original: CITY -> Standard: CITY
+Original: STATE -> Standard: STATE
+Original: COUNTY_NAME -> Standard: COUNTY_NAME
+Original: COUNTY_FIPS -> Standard: COUNTY_FIPS
+Original: CY_Qtr -> Standard: CY_Qtr
+Original: WorkDate -> Standard: WorkDate
+Original: MDScensus -> Standard: MDScensus
+Original: Hrs_RNDON -> Standard: Hrs_RNDON
+Original: Hrs_RNDON_emp -> Standard: Hrs_RNDON_emp
+Original: Hrs_RNDON_ctr -> Standard: Hrs_RNDON_ctr
+Original: Hrs_RNadmin -> Standard: Hrs_RNadmin
+Original: Hrs_RNadmin_emp -> Standard: Hrs_RNadmin_emp
+Original: Hrs_RNadmin_ctr -> Standard: Hrs_RNadmin_ctr
+Original: Hrs_RN -> Standard: Hrs_RN
+Original: Hrs_RN_emp -> Standard: Hrs_RN_emp
+Original: Hrs_RN_ctr -> Standard: Hrs_RN_ctr
+Original: Hrs_LPNadmin -> Standard: Hrs_LPNadmin
+Original: Hrs_LPNadmin_emp -> Standard: Hrs_LPNadmin_emp
+Original: Hrs_LPNadmin_ctr -> Standard: Hrs_LPNadmin_ctr
+Original: Hrs_LPN -> Standard: Hrs_LPN
+Original: Hrs_LPN_emp -> Standard: Hrs_LPN_emp
+Original: Hrs_LPN_ctr -> Standard: Hrs_LPN_ctr
+Original: Hrs_CNA -> Standard: Hrs_CNA
+Original: Hrs_CNA_emp -> Standard: Hrs_CNA_emp
+Original: Hrs_CNA_ctr -> Standard: Hrs_CNA_ctr
+Original: Hrs_NAtrn -> Standard: Hrs_NAtrn
+Original: Hrs_NAtrn_emp -> Standard: Hrs_NAtrn_emp
+Original: Hrs_NAtrn_ctr -> Standard: Hrs_NAtrn_ctr
+Original: Hrs_MedAide -> Standard: Hrs_MedAide
+Original: Hrs_MedAide_emp -> Standard: Hrs_MedAide_emp
+Original: Hrs_MedAide_ctr -> Standard: Hrs_MedAide_ctr

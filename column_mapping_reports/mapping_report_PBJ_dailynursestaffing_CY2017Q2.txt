@@ -1,0 +1,37 @@
+Column Mapping Report for PBJ_dailynursestaffing_CY2017Q2.csv
+==================================================
+
+Original: PROVNUM -> Standard: PROVNUM
+Original: PROVNAME -> Standard: PROVNAME
+Original: CITY -> Standard: CITY
+Original: STATE -> Standard: STATE
+Original: COUNTY_NAME -> Standard: COUNTY_NAME
+Original: COUNTY_FIPS -> Standard: COUNTY_FIPS
+Original: CY_QTR -> Standard: CY_Qtr
+Original: WORKDATE -> Standard: WorkDate
+Original: MDSCENSUS -> Standard: MDScensus
+Original: HRS_RNDON -> Standard: Hrs_RNDON
+Original: HRS_RNDON_EMP -> Standard: Hrs_RNDON_emp
+Original: HRS_RNDON_CTR -> Standard: Hrs_RNDON_ctr
+Original: HRS_RNADMIN -> Standard: Hrs_RNadmin
+Original: HRS_RNADMIN_EMP -> Standard: Hrs_RNadmin_emp
+Original: HRS_RNADMIN_CTR -> Standard: Hrs_RNadmin_ctr
+Original: HRS_RN -> Standard: Hrs_RN
+Original: HRS_RN_EMP -> Standard: Hrs_RN_emp
+Original: HRS_RN_CTR -> Standard: Hrs_RN_ctr
+Original: HRS_LPN_ADMIN -> No standard mapping found
+Original: HRS_LPNADMIN_EMP -> Standard: Hrs_LPNadmin_emp
+Original: HRS_LPNADMIN_CTR -> Standard: Hrs_LPNadmin_ctr
+Original: HRS_LPN -> Standard: Hrs_LPN
+Original: HRS_LPN_EMP -> Standard: Hrs_LPN_emp
+Original: HRS_LPN_CTR -> Standard: Hrs_LPN_ctr
+Original: HRS_CNA -> Standard: Hrs_CNA
+Original: HRS_CNA_EMP -> Standard: Hrs_CNA_emp
+Original: HRS_CNA_CTR -> Standard: Hrs_CNA_ctr
+Original: HRS_MEDAIDE -> Standard: Hrs_MedAide
+Original: HRS_MEDAIDE_EMP -> Standard: Hrs_MedAide_emp
+Original: HRS_RN_DONADMIN -> No standard mapping found
+Original: HRS_NA_TRN -> No standard mapping found
+Original: HRS_NATRN_EMP -> Standard: Hrs_NAtrn_emp
+Original: HRS_NATRN_CTR -> Standard: Hrs_NAtrn_ctr
+Original: HRS_MEDAIDE_CTR -> Standard: Hrs_MedAide_ctr

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.env
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+*.csv
+*.db
+*.duckdb
+*.log
+*.pdf
+pbj_data.*
+subscriptions.db
+
+# Keep specific CSV files that are needed for the app
+!national_lite_metrics.csv
+!state_lite_metrics.csv
+!facility_lite_metrics.csv
+
+# Keep specific Python files
+!requirements.txt
+!setup_database.py
+!PBJ_lite.py
+!generate_metrics.py
+!lite_report.py 
