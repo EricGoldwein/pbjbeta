@@ -759,6 +759,10 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             .stMetric [data-testid="stMetricDelta"] {
                 font-size: 0.9em !important;
             }
+            /* Add styles for quarter selector */
+            div[data-testid="stSelectbox"] {
+                width: 120px !important;
+            }
             @media (max-width: 768px) {
                 .mobile-metrics {
                     display: grid;
@@ -786,11 +790,6 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         # Display metrics in columns with mobile optimization
         if st.session_state.get('view_mode') == "Mobile":
             st.markdown('<div class="mobile-metrics">', unsafe_allow_html=True)
-            if level in ["National", "State"]:
-                col1, col2, col3, col4 = st.columns(4)
-            else:
-                col1, col2, col3 = st.columns(3)
-        else:
             if level in ["National", "State"]:
                 col1, col2, col3, col4 = st.columns(4)
             else:
@@ -889,7 +888,8 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, f
             
             # Update mobile layout
             fig.update_layout(
-                height=800,
+                height=900,
+                width=800,
                 title_text=f"{title_prefix} Staffing Trends",
                 showlegend=False,
                 margin=dict(l=50, r=50, t=80, b=200),
@@ -961,7 +961,8 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, f
 
             # Update desktop layout
             fig.update_layout(
-                height=1200,
+                height=1400,
+                width=1000,
                 title_text=f"{title_prefix} Staffing Trends",
                 showlegend=False,
                 margin=dict(l=50, r=50, t=100, b=100),
@@ -1028,58 +1029,7 @@ def main() -> None:
                 st.error(f"Error loading premium page: {str(e)}")
             return
         elif current_page == 'facility_search':
-            try:
-                # Display facility search content directly
-                st.markdown("""
-                    <div>
-                        <h1 class="main-header" style="margin-bottom: 0;">Facility Search</h1>
-                        <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
-                            By 320 Consulting | 
-                            <a href="/" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
-                                ← Back to Dashboard
-                            </a>
-                        </p>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown("""
-                    <div style="max-width: 800px; margin: 20px auto;">
-                        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
-                            <h2 style="color: #2c3338; margin-bottom: 20px;">Find Your Facility</h2>
-                            <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
-                                You can search for a facility using either:
-                            </p>
-                            <ul style="color: #555; line-height: 1.6; margin-bottom: 20px;">
-                                <li>The facility's CMS Certification Number (CCN)</li>
-                                <li>The facility's name</li>
-                            </ul>
-                        </div>
-
-                        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
-                            <h2 style="color: #2c3338; margin-bottom: 20px;">How to Find Your CCN</h2>
-                            <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
-                                1. Visit <a href="https://www.medicare.gov/care-compare/" target="_blank" style="color: #1E88E5;">Medicare Care Compare</a><br>
-                                2. Search for your facility<br>
-                                3. The CCN will be listed in the facility's profile
-                            </p>
-                        </div>
-
-                        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
-                            <h2 style="color: #2c3338; margin-bottom: 20px;">Contact Eric</h2>
-                            <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
-                                To request a custom report or talk through your project:
-                            </p>
-                            <p style="text-align: center; margin-top: 30px;">
-                                <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: none; font-weight: 500; font-size: 1.1em;">
-                                    📧 eric@320insight.com
-                                </a>
-                            </p>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Error loading facility search page: {str(e)}")
-            return
+            return  # Let the pages directory handle this
 
         # Get URL parameters using the new API
         initial_level = st.query_params.get('level', 'National')
