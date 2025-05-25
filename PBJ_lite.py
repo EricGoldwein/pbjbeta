@@ -1034,7 +1034,14 @@ def main() -> None:
                 st.error(f"Error loading premium page: {str(e)}")
             return
         elif current_page == 'facility_search':
-            return  # Let the pages directory handle this
+            try:
+                with open('pages/2_Facility_Search.py', 'r', encoding='utf-8') as f:
+                    # Create a new namespace for the facility search page
+                    facility_search_namespace = {}
+                    exec(f.read(), facility_search_namespace)
+            except Exception as e:
+                st.error(f"Error loading facility search page: {str(e)}")
+            return
 
         # Get URL parameters using the new API
         initial_level = st.query_params.get('level', 'National')
