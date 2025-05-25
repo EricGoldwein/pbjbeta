@@ -44,4 +44,5 @@ subscriptions.db
 !lite_report.py
 !pages/1_Premium.py
 !pages/2_Facility_Search.py
-!setup_database.py 
+!setup_database.py
+!PBJ_lite.py 
