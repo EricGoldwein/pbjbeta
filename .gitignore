@@ -38,9 +38,10 @@ subscriptions.db
 !state_lite_metrics.csv
 !facility_lite_metrics.csv
 
-# Keep specific Python files
+# Python files - ignore all except specified ones
+*.py
 !requirements.txt
-!setup_database.py
-!PBJ_lite.py
-!generate_metrics.py
-!lite_report.py 
+!lite_report.py
+!pages/1_Premium.py
+!pages/2_Facility_Search.py
+!setup_database.py 
