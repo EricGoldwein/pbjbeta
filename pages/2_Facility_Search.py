@@ -199,15 +199,13 @@ if search_term:
             st.dataframe(
                 df,
                 column_config={
-                    "View Details": st.column_config.Column(
+                    "View Details": st.column_config.LinkColumn(
                         "View Details",
-                        help="View detailed facility information",
-                        display_text="View Details"
+                        help="View detailed facility information"
                     ),
-                    "Care Compare": st.column_config.Column(
+                    "Care Compare": st.column_config.LinkColumn(
                         "Care Compare",
-                        help="View facility on Medicare Care Compare",
-                        display_text="Care Compare"
+                        help="View facility on Medicare Care Compare"
                     )
                 },
                 hide_index=True,
