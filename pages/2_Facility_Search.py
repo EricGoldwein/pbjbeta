@@ -181,38 +181,38 @@ if search_term:
         st.markdown('<div class="search-results">', unsafe_allow_html=True)
         st.markdown("### Search Results")
         
-        # Create HTML table for results
-        html_table = """
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>State</th>
-                    <th>Prov Num</th>
-                    <th>Prov Name (County)</th>
-                    <th>Report</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-        
+        # Create a DataFrame for the results
+        display_data = []
         for facility in results:
             care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{facility['PROVNUM']}/view-all?state={facility['STATE']}"
-            html_table += f"""
-                <tr>
-                    <td>{facility['STATE']}</td>
-                    <td>{facility['PROVNUM']}</td>
-                    <td>{facility['PROVNAME']} ({facility['COUNTY_NAME']})</td>
-                    <td><a href="/?level=Facility&facility={facility['PROVNUM']}" class="facility-link">View Details</a> | <a href="{care_compare_url}" target="_blank" class="facility-link">Care Compare</a></td>
-                </tr>
-            """
+            display_data.append({
+                'State': facility['STATE'],
+                'Prov Num': facility['PROVNUM'],
+                'Prov Name (County)': f"{facility['PROVNAME']} ({facility['COUNTY_NAME']})",
+                'View Details': f"[View Details](/?level=Facility&facility={facility['PROVNUM']})",
+                'Care Compare': f"[Care Compare]({care_compare_url})"
+            })
         
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Convert to DataFrame and display
+        if display_data:
+            df = pd.DataFrame(display_data)
+            st.dataframe(
+                df,
+                column_config={
+                    "View Details": st.column_config.Column(
+                        "View Details",
+                        help="View detailed facility information",
+                        display_text="View Details"
+                    ),
+                    "Care Compare": st.column_config.Column(
+                        "Care Compare",
+                        help="View facility on Medicare Care Compare",
+                        display_text="Care Compare"
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
+            )
     else:
         st.info("No facilities found matching your search criteria.")
 
