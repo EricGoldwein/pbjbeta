@@ -604,27 +604,8 @@ def on_mobile_change():
     else:
         st.session_state['view_mode'] = "Desktop View"
 
-def create_subscription_db():
-    """Create a database table for storing email subscriptions."""
-    try:
-        conn = duckdb.connect('subscriptions.db')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS subscriptions (
-                id INTEGER PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                entity_type TEXT NOT NULL,
-                entity_id TEXT NOT NULL,
-                entity_name TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        st.error(f"Error creating subscription database: {str(e)}")
-
 def display_subscription_button(entity_type: str, entity_id: str, entity_name: str):
-    """Display the subscription button with a direct email link."""
+    """Display the premium services section with email link."""
     st.markdown("""
         <style>
         .premium-services {
@@ -1013,9 +994,6 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, f
 def main() -> None:
     """Main app layout and data flow."""
     try:
-        # Initialize subscription database
-        create_subscription_db()
-        
         # Initialize session state variables at the very start
         if 'view_mode' not in st.session_state:
             st.session_state.view_mode = "Desktop"

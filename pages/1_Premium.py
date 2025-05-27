@@ -12,7 +12,7 @@ st.set_page_config(
 with st.sidebar:
     st.title("Premium Services")
     st.markdown("""
-        Access our premium features to get deeper insights into nursing home staffing data.
+        Access premium features to get deeper insights into nursing home data.
     """)
 
 # Custom CSS for premium styling
@@ -71,7 +71,7 @@ st.markdown("""
 
 # Introduction
 st.markdown("""
-<b>320 Consulting</b> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.<br><br>
+<a href="https://320insight.com" target="_blank" style="text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.<br><br>
 To request a report or talk through what you need: eric@320insight.com
 """, unsafe_allow_html=True)
 
@@ -151,7 +151,7 @@ st.markdown("""
 # Data Source
 st.markdown("""
     <div class="data-source">
-        <p><strong>Data Source:</strong> Our analysis is primarily based on CMS Payroll-Based Journal (PBJ) data, 
+        <p><strong>Data Source:</strong> Analysis primarily based on CMS Payroll-Based Journal (PBJ) data, 
         supplemented with additional CMS datasets and proprietary analysis tools.</p>
     </div>
 """, unsafe_allow_html=True) 
