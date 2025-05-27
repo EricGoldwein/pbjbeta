@@ -187,7 +187,6 @@ if search_term:
             <thead>
                 <tr>
                     <th>State</th>
-                    <th>State</th>
                     <th>Prov Num</th>
                     <th>Prov Name (County)</th>
                     <th>Report</th>
@@ -200,7 +199,6 @@ if search_term:
             care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{facility['PROVNUM']}/view-all?state={facility['STATE']}"
             html_table += f"""
                 <tr>
-                    <td>{facility['STATE']}</td>
                     <td>{facility['STATE']}</td>
                     <td>{facility['PROVNUM']}</td>
                     <td>{facility['PROVNAME']} ({facility['COUNTY_NAME']})</td>
