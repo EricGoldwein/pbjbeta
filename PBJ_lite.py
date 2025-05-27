@@ -768,18 +768,11 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             </style>
         """, unsafe_allow_html=True)
         
-        # Display metrics in columns with mobile optimization
-        if st.session_state.get('view_mode') == "Mobile":
-            st.markdown('<div class="mobile-metrics">', unsafe_allow_html=True)
-            if level in ["National", "State"]:
-                col1, col2, col3, col4 = st.columns(4)
-            else:
-                col1, col2, col3 = st.columns(3)
+        # Display metrics in columns
+        if level in ["National", "State"]:
+            col1, col2, col3, col4 = st.columns(4)
         else:
-            if level in ["National", "State"]:
-                col1, col2, col3, col4 = st.columns(4)
-            else:
-                col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = st.columns(3)
         
         # For National and State, add facility count metric
         if level in ["National", "State"]:
@@ -804,9 +797,6 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             st.metric("Contract Staff %", 
                      format_metric(current_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True),
                      format_metric(current_metrics['Contract_Percentage'].iloc[0] - prev_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True) if not prev_metrics.empty else None)
-        
-        if st.session_state.get('view_mode') == "Mobile":
-            st.markdown('</div>', unsafe_allow_html=True)
             
     except Exception as e:
         st.error(f"Error displaying metrics: {str(e)}")
@@ -821,7 +811,7 @@ def format_metric(value, decimal_places=1, percentage=False, thousands=False):
         return f"{value:,.{decimal_places}f}"
     return f"{value:.{decimal_places}f}"
 
-def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, facility: str = None):
+def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
         if state:
@@ -855,135 +845,66 @@ def plot_quarterly_trends(df: pd.DataFrame, view_mode: str, state: str = None, f
         # Define hover template
         hover_template = "<b>%{customdata}</b><br>Value: %{y:.2f}<extra></extra>"
         
-        if view_mode == "Mobile":
-            # Mobile figure (2 charts)
-            fig = make_subplots(rows=2, cols=1,
-                             subplot_titles=('Total Nurse HPRD', 'Census'),
-                             vertical_spacing=0.2)
-            
-            # Add traces for mobile view
-            fig.add_trace(go.Scatter(x=data['date'], y=data['Total_Nurse_HPRD'],
-                                  mode='lines+markers', name='Total HPRD',
-                                  customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                  hovertemplate=hover_template), row=1, col=1)
-            
-            fig.add_trace(go.Scatter(x=data['date'], y=data['Census'],
-                                  mode='lines+markers', name='Census',
-                                  customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                                  hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
-            
-            # Update mobile layout
-            fig.update_layout(
-                height=900,
-                width=800,
-                title_text=f"{title_prefix} Staffing Trends",
-                showlegend=False,
-                margin=dict(l=50, r=50, t=80, b=200),
-                hovermode='x unified'
-            )
-            
-            # Add footer annotations for mobile view
+        # Desktop figure (3 charts)
+        fig = make_subplots(rows=3, cols=1,
+                  subplot_titles=('Total Nurse HPRD', 'Census', 'Contract Staff Percentage'),
+                          vertical_spacing=0.15)
+
+        # Add all traces for desktop view
+        fig.add_trace(go.Scatter(x=data['date'], y=data['Total_Nurse_HPRD'],
+                       mode='lines+markers', name='Total HPRD',
+                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                       hovertemplate=hover_template), row=1, col=1)
+
+        fig.add_trace(go.Scatter(x=data['date'], y=data['Census'],
+                       mode='lines+markers', name='Census',
+                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                       hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
+
+        fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Percentage'],
+                       mode='lines+markers', name='Contract %',
+                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                       hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=3, col=1)
+
+        # Update desktop layout
+        fig.update_layout(
+            height=1400,
+            width=1000,
+            title_text=f"{title_prefix} Staffing Trends",
+            showlegend=False,
+            margin=dict(l=50, r=50, t=100, b=100),
+            hovermode='x unified'
+        )
+        
+        # Add footer annotations for desktop view
+        for row in range(1, 4):
             fig.add_annotation(
                 text="320 Consulting | Source: CMS PBJ Data",
-                x=0.98,
-                y=-0.33,
+                x=0.99,
+                y=-0.25,
                 xref="x domain",
                 yref="y domain",
                 showarrow=False,
                 font=dict(size=10, color="gray"),
                 align="right",
-                row=1,
+                row=row,
                 col=1
             )
-            
-            fig.add_annotation(
-                text="320 Consulting | CMS PBJ Data",
-                x=0.98,
-                y=-0.33,
-                xref="x domain",
-                yref="y domain",
-                showarrow=False,
-                font=dict(size=10, color="gray"),
-                align="right",
-                row=2,
-                col=1
+        
+        # Update desktop x-axes
+        for row in range(1, 4):
+            fig.update_xaxes(
+                tickvals=tick_values,
+                tickangle=45,
+                row=row,
+                col=1,
+                showline=True,
+                linewidth=1,
+                linecolor="rgba(200, 200, 200, 0.1)",
+                range=date_range,
+                nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
+                tickmode='auto'
             )
-            
-            # Update mobile x-axes
-            for i in range(1, 3):
-                fig.update_xaxes(
-                    tickvals=tick_values,
-                    tickangle=45,
-                    row=i,
-                    col=1,
-                    showline=True,
-                    linewidth=1,
-                    linecolor="rgba(200, 200, 200, 0.1)",
-                    range=date_range,
-                    nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
-                    tickmode='auto'
-                )
-        else:
-            # Desktop figure (3 charts)
-            fig = make_subplots(rows=3, cols=1,
-                      subplot_titles=('Total Nurse HPRD', 'Census', 'Contract Staff Percentage'),
-                              vertical_spacing=0.15)
-
-            # Add all traces for desktop view
-            fig.add_trace(go.Scatter(x=data['date'], y=data['Total_Nurse_HPRD'],
-                           mode='lines+markers', name='Total HPRD',
-                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                           hovertemplate=hover_template), row=1, col=1)
-
-            fig.add_trace(go.Scatter(x=data['date'], y=data['Census'],
-                           mode='lines+markers', name='Census',
-                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                           hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
-
-            fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Percentage'],
-                           mode='lines+markers', name='Contract %',
-                           customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                           hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=3, col=1)
-
-            # Update desktop layout
-            fig.update_layout(
-                height=1400,
-                width=1000,
-                title_text=f"{title_prefix} Staffing Trends",
-                showlegend=False,
-                margin=dict(l=50, r=50, t=100, b=100),
-                hovermode='x unified'
-            )
-            
-            # Add footer annotations for desktop view
-            for row in range(1, 4):
-                fig.add_annotation(
-                    text="320 Consulting | Source: CMS PBJ Data",
-                    x=0.99,
-                    y=-0.25,
-                    xref="x domain",
-                    yref="y domain",
-                    showarrow=False,
-                    font=dict(size=10, color="gray"),
-                    align="right",
-                    row=row,
-                    col=1
-                )
-            
-            # Update desktop x-axes
-            for row in range(1, 4):
-                fig.update_xaxes(
-                    tickvals=tick_values,
-                    tickangle=45,
-                    row=row,
-                    col=1,
-                    showline=True,
-                    linewidth=1,
-                    linecolor="rgba(200, 200, 200, 0.1)",
-                    range=date_range,
-                    nticks=len(tick_values) // 2 if len(tick_values) > 4 else len(tick_values),
-                    tickmode='auto'
-                )
         
         return fig
         
@@ -1071,14 +992,6 @@ def main() -> None:
             }
             </style>
         """, unsafe_allow_html=True)
-
-        # Add view mode selection at the very top
-        view_mode = st.sidebar.radio(
-            "",
-            ["Desktop", "Mobile"],
-            index=0 if st.session_state.view_mode == "Desktop" else 1,
-            key="view_mode"
-        )
 
         # Add level selection with initial value from URL
         level = st.sidebar.radio(
@@ -1204,8 +1117,7 @@ def main() -> None:
                     
                     # 3. Display trends
                     fig = plot_quarterly_trends(filtered_data, 
-                                          view_mode=view_mode,
-                                        state=selected_value if level == "State" else None,
+                                          state=selected_value if level == "State" else None,
                                         facility=selected_value if level == "Facility" else None)
                     if fig:
                         st.plotly_chart(fig, use_container_width=True)
@@ -1218,8 +1130,7 @@ def main() -> None:
                 if not filtered_data.empty:
                     display_metrics(filtered_data, level)
                     fig = plot_quarterly_trends(filtered_data, 
-                                              view_mode=view_mode,
-                                        state=selected_value if level == "State" else None,
+                                              state=selected_value if level == "State" else None,
                                         facility=selected_value if level == "Facility" else None)
                     if fig:
                         st.plotly_chart(fig, use_container_width=True)
