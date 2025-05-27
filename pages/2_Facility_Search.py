@@ -2,14 +2,6 @@ import streamlit as st
 import pandas as pd
 from typing import List, Dict
 
-# Set page configuration
-st.set_page_config(
-    page_title="Facility Search",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # Add custom CSS
 st.markdown("""
     <style>
@@ -47,27 +39,6 @@ st.markdown("""
     }
     .stSelectbox {
         margin-bottom: 0;
-    }
-    /* Add styles for the results table */
-    .results-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    .results-table th {
-        background-color: #f8f9fa;
-        padding: 12px;
-        text-align: left;
-        border-bottom: 2px solid #e0e0e0;
-        color: #2c3338;
-        font-weight: 500;
-    }
-    .results-table td {
-        padding: 12px;
-        border-bottom: 1px solid #e0e0e0;
-        color: #555;
-    }
-    .results-table tr:hover {
-        background-color: #f8f9fa;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -116,28 +87,6 @@ with col2:
         help="Type to search facilities"
     )
 
-def proper_title_case(text: str) -> str:
-    """Convert text to proper title case, keeping words like 'and', 'of', etc. lowercase."""
-    if not text:
-        return text
-        
-    # Words that should remain lowercase unless they're the first word
-    lowercase_words = {'and', 'at', 'of', 'the', 'in', 'on', 'for', 'to', 'with', 'by'}
-    
-    # Split the text and capitalize first letter of each word
-    words = text.lower().split()
-    
-    # Always capitalize the first word
-    if words:
-        words[0] = words[0].capitalize()
-    
-    # Process remaining words
-    for i in range(1, len(words)):
-        if words[i] not in lowercase_words:
-            words[i] = words[i].capitalize()
-            
-    return ' '.join(words)
-
 # Function to search facilities
 @st.cache_data
 def search_facilities(state: str, search_term: str) -> List[Dict[str, str]]:
@@ -161,12 +110,8 @@ def search_facilities(state: str, search_term: str) -> List[Dict[str, str]]:
                     facilities['PROVNAME'].str.lower().str.contains(search_term)
                 ]
         
-        # Get unique facilities with county information
-        unique_facilities = facilities[['PROVNUM', 'PROVNAME', 'STATE', 'COUNTY_NAME']].drop_duplicates()
-        
-        # Apply proper title case to names
-        unique_facilities['PROVNAME'] = unique_facilities['PROVNAME'].apply(proper_title_case)
-        unique_facilities['COUNTY_NAME'] = unique_facilities['COUNTY_NAME'].apply(proper_title_case)
+        # Get unique facilities
+        unique_facilities = facilities[['PROVNUM', 'PROVNAME', 'STATE']].drop_duplicates()
         
         return unique_facilities.to_dict('records')
     except Exception as e:
@@ -181,39 +126,15 @@ if search_term:
         st.markdown('<div class="search-results">', unsafe_allow_html=True)
         st.markdown("### Search Results")
         
-        # Create HTML table for results
-        html_table = """
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>State</th>
-                    <th>State</th>
-                    <th>Prov Num</th>
-                    <th>Prov Name (County)</th>
-                    <th>Report</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        # Create a DataFrame for better display
+        df = pd.DataFrame(results)
+        df['Link'] = df.apply(
+            lambda row: f'<a href="/?level=Facility&facility={row["PROVNUM"]}" class="facility-link">View Details</a>',
+            axis=1
+        )
         
-        for facility in results:
-            care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{facility['PROVNUM']}/view-all?state={facility['STATE']}"
-            html_table += f"""
-                <tr>
-                    <td>{facility['STATE']}</td>
-                    <td>{facility['STATE']}</td>
-                    <td>{facility['PROVNUM']}</td>
-                    <td>{facility['PROVNAME']} ({facility['COUNTY_NAME']})</td>
-                    <td><a href="/?level=Facility&facility={facility['PROVNUM']}" class="facility-link">View Details</a> | <a href="{care_compare_url}" target="_blank" class="facility-link">Care Compare</a></td>
-                </tr>
-            """
-        
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
+        # Display the results
+        st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No facilities found matching your search criteria.")
