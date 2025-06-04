@@ -10,8 +10,8 @@ from typing import Dict, Optional, List, Tuple, Any
 
 # Set page configuration with a more professional theme
 st.set_page_config(
-    page_title="PBJ Dashboard (Beta)",
-    page_icon="🏥",
+    page_title="PBJ Nursing Home Dashboard by 320 Consulting",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -29,6 +29,64 @@ st.markdown("""
         }
         [data-testid="stSidebar"][aria-expanded="false"]{
             width: 250px !important;
+        }
+        /* Desktop metrics styling */
+        div[data-testid="stMetric"] {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin: 0 2px;
+            max-width: 220px !important;
+        }
+        div[data-testid="stMetric"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-color: #1E88E5;
+        }
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+            font-size: 1.6em;
+            font-weight: 600;
+            color: #1E88E5;
+            margin-bottom: 4px;
+        }
+        div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+            font-size: 0.95em;
+            color: #666;
+            font-weight: 600;
+        }
+        div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        /* Center metrics container */
+        div[data-testid="stMetric"] {
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+        /* Mobile optimization */
+        @media (max-width: 768px) {
+            .mobile-metrics {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 8px !important;
+                margin: 0 -8px !important;
+            }
+            .mobile-metrics .stMetric {
+                margin: 0 !important;
+                padding: 12px !important;
+            }
+            .mobile-metrics .stMetric [data-testid="stMetricValue"] {
+                font-size: 18px !important;
+            }
+            .mobile-metrics .stMetric [data-testid="stMetricLabel"] {
+                font-size: 12px !important;
+            }
+            .mobile-metrics .stMetric [data-testid="stMetricDelta"] {
+                font-size: 12px !important;
+            }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -879,7 +937,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Add footer annotations for desktop view
         for row in range(1, 4):
             fig.add_annotation(
-                text="320 Consulting | Source: CMS PBJ Data",
+                text="320 Consulting LLC | Source: CMS PBJ Data (2017-2024)",
                 x=0.99,
                 y=-0.25,
                 xref="x domain",
@@ -912,6 +970,15 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         st.error(f"Error plotting trends: {str(e)}")
         return None
 
+def display_footer():
+    """Display a consistent footer across all pages."""
+    st.markdown("""
+        <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
+            <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
+            <p>By <a href="https://320insight.com" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
+        </div>
+    """, unsafe_allow_html=True)
+
 def main() -> None:
     """Main app layout and data flow."""
     try:
@@ -937,7 +1004,7 @@ def main() -> None:
             <div>
                 <h1 class="main-header" style="margin-bottom: 0;">PBJ Dashboard (Beta)</h1>
                 <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
-                    By 320 Consulting | 
+                    By <a href="https://320insight.com" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting</a> | 
                     <a href="?page=premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
                         ⭐ Premium
                     </a> |
@@ -989,6 +1056,19 @@ def main() -> None:
             .sidebar .stSelectbox {
                 margin-top: 0 !important;
                 margin-bottom: 1rem !important;
+            }
+            .sidebar-attribution {
+                font-size: 0.8em;
+                color: #666;
+                margin-top: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+            .sidebar-methodology {
+                font-size: 0.8em;
+                color: #666;
+                font-style: italic;
+                margin-top: 0.5rem;
+                margin-bottom: 1rem;
             }
             </style>
         """, unsafe_allow_html=True)
@@ -1099,7 +1179,7 @@ def main() -> None:
         except Exception as e:
             st.error(f"Error processing selection: {str(e)}")
             return
-        
+
         # Get filtered data
         try:
             filtered_data = get_filtered_data(level, selected_value, start_quarter, end_quarter)
@@ -1147,6 +1227,9 @@ def main() -> None:
             return
     except Exception as e:
         st.error(f"Error in main app: {str(e)}")
+
+    # Add footer at the end of the page
+    display_footer()
 
 def get_db_connection():
     """Get a connection to the DuckDB database."""
