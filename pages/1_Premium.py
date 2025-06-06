@@ -71,7 +71,7 @@ st.markdown("""
 
 # Introduction
 st.markdown("""
-<a href="https://320insight.com" target="_blank" style="text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.<br><br>
+<a href="https://www.320insight.com/" target="_blank" style="text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.<br><br>
 To request a report or talk through what you need: eric@320insight.com
 """, unsafe_allow_html=True)
 
@@ -153,7 +153,7 @@ def display_footer():
     st.markdown("""
         <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
             <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
-            <p>By <a href="https://320insight.com" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
+            <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
         </div>
     """, unsafe_allow_html=True)
 

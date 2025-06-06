@@ -937,7 +937,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Add footer annotations for desktop view
         for row in range(1, 4):
             fig.add_annotation(
-                text="320 Consulting LLC | Source: CMS PBJ Data (2017-2024)",
+                text="320 Consulting | Source: CMS PBJ Data (2017-2024)",
                 x=0.99,
                 y=-0.25,
                 xref="x domain",
@@ -975,7 +975,7 @@ def display_footer():
     st.markdown("""
         <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
             <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
-            <p>By <a href="https://320insight.com" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
+            <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -1004,7 +1004,7 @@ def main() -> None:
             <div>
                 <h1 class="main-header" style="margin-bottom: 0;">PBJ Dashboard (Beta)</h1>
                 <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
-                    By <a href="https://320insight.com" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting</a> | 
+                    By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting</a> | 
                     <a href="?page=premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
                         ⭐ Premium
                     </a> |
