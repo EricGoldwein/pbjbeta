@@ -3,17 +3,6 @@ import streamlit as st
 # Set page configuration
 st.set_page_config(page_title="About the Dashboard", page_icon="��", layout="wide")
 
-# Add a visually distinct, centered title and subtitle above the main info box
-st.markdown('''
-    <div style="text-align: center; margin-top: 10px; margin-bottom: 18px;">
-        <span style="font-size:2.3em; font-weight:800; color:#1769aa; letter-spacing:0.01em;">PBJ Nursing Home Staffing Dashboard</span><br>
-        <span style="font-size:1.15em; color:#7a869a; font-weight:400;">by 320 Consulting</span>
-    </div>
-''', unsafe_allow_html=True)
-
-# Title
-st.title("About")
-
 # Main intro block with soft background and padding (combine into one call)
 st.markdown("""
 <div style="background: #f5f8fd; border-radius: 10px; padding: 2.2rem 2.5rem 1.5rem 2.5rem; margin-bottom: 2.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
