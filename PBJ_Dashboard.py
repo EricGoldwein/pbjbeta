@@ -8,8 +8,12 @@ from plotly.subplots import make_subplots
 import duckdb
 from typing import Dict, Optional, List, Tuple, Any
 
-# Set page configuration with a more professional theme
-st.set_page_config(page_title="Nursing Home Staffing Data", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+# Set sidebar collapsed on mobile
+import streamlit as st
+if st.session_state.get('is_mobile', False):
+    st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+else:
+    st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
@@ -1242,7 +1246,9 @@ def main() -> None:
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
+                    <span title="Toggle the &gt;&gt; icon (top left) to navigate the dashboard." style="cursor: help; color: #1976d2; font-size: 1.1em; margin-left: 6px; vertical-align: middle;">&#9432;</span>
                 </div>
+                <div style="font-size:0.97em; color:#7a869a; font-style: italic; margin-bottom: 8px;">About the dashboard</div>
             </div>
         ''', unsafe_allow_html=True)
         # Sidebar
