@@ -1237,12 +1237,15 @@ def main() -> None:
         # Refined subhead: left-aligned, slightly wider
         st.markdown('''
             <div style="background: #f7fafd; border-radius: 6px; padding: 10px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
-                <div style="font-size: 1.08em; color: #234; font-weight: 600;">
+                <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 8px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
                 </div>
-                <div style="font-size:0.97em; color:#7a869a; margin-top:2px;">
-                    Looking deeper? Daily trends and custom reports for investigations, cases, and more <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: underline;">available upon request</a>.<br/>
-                    <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="color: #1976d2; text-decoration: underline; font-size:0.97em;">About the Dashboard</a>
+                <div style="font-size:0.97em; color:#7a869a; margin-bottom: 8px;">
+                    Looking deeper? Daily trends and custom reports for investigations, cases, and more <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: underline;">available upon request</a>.
+                </div>
+                <hr style="border: none; border-top: 1px solid #e3eaf3; margin: 8px 0 8px 0;" />
+                <div style="font-size:0.97em; color:#1976d2; font-weight: 500;">
+                    <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="color: #1976d2; text-decoration: underline;">About the Dashboard</a>
                 </div>
             </div>
         ''', unsafe_allow_html=True)
