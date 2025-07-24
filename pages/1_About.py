@@ -12,7 +12,7 @@ st.markdown("""
     </div>
 
 ### Context Matters
-Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time—and bring data-driven context to what’s happening inside facilities and chains.
+Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time, and bring data-driven context to what’s happening inside facilities and chains.
 
 ### Who it helps  
 * **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.
@@ -33,7 +33,7 @@ Most publicly available nursing home data shows only the latest quarter. This da
 * **CMS Citations (Premium)** - Citation data and inspection reports, categorized by date, type, severity, and more. 
 
 ### Quick tour  
-1. Pick **State**, **Facility**, or **Ownership**.  
+1. Head to the sidebar (>> icon on top left) and pick **State**, **Facility**, or **Ownership**.
 2. Hover charts for values; drag the date slider to focus on any span.  
 3. Click **Export** for a ready-to-use PNG.
 
