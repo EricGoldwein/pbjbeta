@@ -73,15 +73,14 @@ def smart_title(name: str) -> str:
         name = str(name) if name is not None else ""
     # Words to keep lowercase unless first word
     lowercase_words = {'and', 'of', 'at'}
-    # Words to always uppercase
-    uppercase_words = {'llc', 'ltc'}
-    # Split by space, preserve punctuation
+    # True abbreviations to always uppercase
+    uppercase_words = {'llc', 'ltc', 'lp', 'llp', 'pllc', 'pc', 'pa', 'plc', 'co', 'pl', 'corp', 'pllp', 'llc.', 'inc.', 'pllc.'}
     words = re.split(r'(\W+)', name)
     result = []
     for i, word in enumerate(words):
         w = word.lower()
-        # Uppercase if in set or is 2-3 letter nonword (not in lowercase_words)
-        if w in uppercase_words or (len(w) in (2,3) and w.isalpha() and w not in lowercase_words):
+        # Uppercase if in set
+        if w in uppercase_words:
             result.append(w.upper())
         elif i != 0 and w in lowercase_words:
             result.append(w)
@@ -147,11 +146,6 @@ if state or search_term:
         df = pd.DataFrame(results)
         # Apply smart capitalization to Nursing Home names
         df['Nursing Home'] = df['PROVNAME'].apply(smart_title) + ' (' + df['PROVNUM'] + ')'
-        # Add City column if available
-        if 'CITY' in df.columns:
-            df['City'] = df['CITY'].apply(smart_title)
-        else:
-            df['City'] = ''
         # Rename columns for display
         df = df.rename(columns={
             'STATE': 'State'
@@ -160,12 +154,12 @@ if state or search_term:
             lambda row: f'<a href="/?level=Facility&facility={row["PROVNUM"]}" class="facility-link">View Staffing</a>',
             axis=1
         )
-        # Reorder columns
-        display_cols = ['State', 'Nursing Home', 'City', 'Dashboard']
+        # Reorder columns, remove City
+        display_cols = ['State', 'Nursing Home', 'Dashboard']
         df = df[display_cols]
-        
-        # Display the results
-        st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+        # Use st.dataframe for filterable, modern table (Dashboard column will not be clickable, but can be shown as text)
+        st.dataframe(df, use_container_width=True)
+        # If you want to keep the Dashboard column as clickable HTML, keep the old st.markdown(df.to_html(...)) line below this.
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No facilities found matching your search criteria.")
