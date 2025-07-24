@@ -463,24 +463,30 @@ def main():
 
         # High Risk Facilities
         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">🚨 High Risk Facilities - {entity_name}</h3></div>', unsafe_allow_html=True)
-        risk_col1, risk_col2, risk_col3 = st.columns(3)
+        risk_col1, risk_col2, risk_col3, risk_col4 = st.columns(4)
         with risk_col1:
             st.markdown(create_custom_metric(
                 '<b>SFF</b>',
                 entity_row['Number of Special Focus Facilities (SFF)'],
-                help_text='<span class="help-icon" title="Special Focus Facilities with serious problems over time.">❓</span>'
+                help_text='<span class="help-icon" title="Special Focus Facilities (SFF) are nursing homes with a history of serious quality issues that have been identified by CMS for increased oversight and enforcement actions.">❓</span>'
             ), unsafe_allow_html=True)
         with risk_col2:
             st.markdown(create_custom_metric(
                 '<b>SFF Candidate</b>',
                 entity_row['Number of SFF candidates'],
-                help_text='<span class="help-icon" title="Facilities monitored for potential SFF designation.">❓</span>'
+                help_text='<span class="help-icon" title="SFF Candidates are facilities that are being monitored for potential designation as Special Focus Facilities due to quality concerns.">❓</span>'
             ), unsafe_allow_html=True)
         with risk_col3:
             st.markdown(create_custom_metric(
                 '<b>Abuse Icon</b>',
-                f"{entity_row['Number of facilities with an abuse icon']}<span style='font-size:0.9em; color:#b71c1c; margin-left:8px;'>(1★: {num_1star})</span>",
-                help_text='<span class="help-icon" title="Cited for abuse with actual or potential harm.">❓</span>'
+                entity_row['Number of facilities with an abuse icon'],
+                help_text='<span class="help-icon" title="Facilities with abuse icons have been cited for abuse, neglect, or exploitation with actual or potential harm to residents.">❓</span>'
+            ), unsafe_allow_html=True)
+        with risk_col4:
+            st.markdown(create_custom_metric(
+                '<b>Overall Rating</b>',
+                f"1★: {num_1star}",
+                help_text='<span class="help-icon" title="Number of facilities with the lowest CMS 5-star overall rating (1 star).">❓</span>'
             ), unsafe_allow_html=True)
         
 
