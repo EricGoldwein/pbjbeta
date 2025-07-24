@@ -9,17 +9,7 @@ import duckdb
 from typing import Dict, Optional, List, Tuple, Any
 
 # Set page configuration with a more professional theme
-st.set_page_config(
-    page_title="PBJ Nursing Home Dashboard by 320 Consulting",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': None,
-        'Report a bug': None,
-        'About': None
-    }
-)
+st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 # Add custom CSS to reduce sidebar width and style the page name
 st.markdown("""
@@ -65,6 +55,7 @@ st.markdown("""
         div[data-testid="stMetric"] {
             margin-left: auto !important;
             margin-right: auto !important;
+            min-height: 120px !important;
         }
         /* Mobile optimization */
         @media (max-width: 768px) {
@@ -129,6 +120,137 @@ def load_metrics_data():
     except Exception as e:
         st.error(f"Error loading metrics data: {str(e)}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+@st.cache_data
+def load_affiliated_entity_data():
+    """Load and cache affiliated entity performance measures data."""
+    try:
+        df = pd.read_csv('Nursing_Home_Affiliated_Entity_Performance_Measures_Jun_2025.csv')
+        
+        # Clean and standardize the data
+        # Convert percentage columns to numeric, handling empty strings
+        percentage_columns = [
+            'Percentage of facilities with an abuse icon',
+            'Percent of facilities classified as for-profit',
+            'Percent of facilities classified as non-profit',
+            'Percent of facilities classified as government-owned',
+            'Average total nursing staff turnover percentage',
+            'Average Registered Nurse turnover percentage',
+            'Average percentage of short-stay residents who were re-hospitalized after a nursing home admission',
+            'Average percentage of short-stay residents who have had an outpatient emergency department visit',
+            'Average percentage of short-stay residents who newly received an antipsychotic medication',
+            'Average percentage of short-stay residents with pressure ulcers or pressure injuries that are new or worsened',
+            'Average percentage of short-stay residents who are at or above an expected ability to care for themselves and move around at discharge',
+            'Average percentage of short-stay residents who were assessed and appropriately given the seasonal influenza vaccine',
+            'Average percentage of short-stay residents who were assessed and appropriately given the  pneumococcal vaccine',
+            'Average percentage of long-stay residents who received an antipsychotic medication',
+            'Average percentage of long-stay residents experiencing one or more falls with major injury',
+            'Average percentage of long-stay residents with pressure ulcers',
+            'Average percentage of long-stay residents with a urinary tract infection',
+            'Average percentage of long-stay residents who have or had a catheter inserted and left in their bladder',
+            'Average percentage of long-stay residents whose ability to move independently worsened',
+            'Average percentage of long-stay residents whose need for help with activities of daily living has increased',
+            'Average percentage of long-stay residents who were assessed and appropriately given the seasonal influenza vaccine',
+            'Average percentage of long-stay residents who were assessed and appropriately given the  pneumococcal vaccine',
+            'Average percentage of long-stay residents who were physically restrained',
+            'Average percentage of long-stay residents with new or worsened bowel or bladder incontinence',
+            'Average percentage of long-stay residents who lose too much weight',
+            'Average percentage of long-stay residents who have symptoms of depression',
+            'Average percentage of long-stay residents who used antianxiety or hypnotic medication',
+            'Average rate of potentially preventable hospital readmissions 30 days after discharge from a SNF',
+            'Average percentage of current residents up to date with COVID-19 vaccines',
+            'Average percentage of healthcare personnel up to date with COVID-19 vaccines'
+        ]
+        
+        for col in percentage_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Convert numeric columns
+        numeric_columns = [
+            'Number of facilities',
+            'Number of states and territories with operations',
+            'Number of Special Focus Facilities (SFF)',
+            'Number of SFF candidates',
+            'Number of facilities with an abuse icon',
+            'Average overall 5-star rating',
+            'Average health inspection rating',
+            'Average staffing rating',
+            'Average quality rating',
+            'Average total nurse hours per resident day',
+            'Average total weekend nurse hours per resident day',
+            'Average total Registered Nurse hours per resident day',
+            'Average number of administrators who have left the nursing home',
+            'Total number of fines',
+            'Average number of fines',
+            'Total amount of fines in dollars',
+            'Average amount of fines in dollars',
+            'Total number of payment denials',
+            'Average number of payment denials',
+            'Average number of hospitalizations per 1,000 long-stay resident days',
+            'Average number of outpatient emergency department visits per 1,000 long-stay resident days'
+        ]
+        
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df
+    except Exception as e:
+        st.error(f"Error loading affiliated entity data: {str(e)}")
+        return pd.DataFrame()
+
+@st.cache_data
+def load_provider_info_data():
+    """Load and cache provider information data."""
+    try:
+        df = pd.read_csv('NH_ProviderInfo_Jun2025.csv', dtype={'CMS Certification Number (CCN)': str})
+        
+        # Clean and standardize the data
+        # Convert numeric columns
+        numeric_columns = [
+            'Number of Certified Beds',
+            'Average Number of Residents per Day',
+            'Overall Rating',
+            'Health Inspection Rating',
+            'Staffing Rating',
+            'QM Rating'
+        ]
+        
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df
+    except Exception as e:
+        st.error(f"Error loading provider info data: {str(e)}")
+        return pd.DataFrame()
+
+@st.cache_data
+def load_march_provider_info_data():
+    """Load and cache March 2025 provider information data for comparison."""
+    try:
+        df = pd.read_csv('NH_ProviderInfo_Mar2025.csv', dtype={'CMS Certification Number (CCN)': str})
+        
+        # Clean and standardize the data
+        # Convert numeric columns
+        numeric_columns = [
+            'Number of Certified Beds',
+            'Average Number of Residents per Day',
+            'Overall Rating',
+            'Health Inspection Rating',
+            'Staffing Rating',
+            'QM Rating'
+        ]
+        
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df
+    except Exception as e:
+        st.error(f"Error loading March provider info data: {str(e)}")
+        return pd.DataFrame()
 
 @st.cache_data
 def create_facility_db():
@@ -286,6 +408,162 @@ def get_provider_state(provnum):
 def get_provider_county(provnum):
     """Get provider county from PBJ files."""
     return get_provider_info(provnum, 'county')
+
+@st.cache_data
+def get_facility_staffing_rating(provnum: str) -> float:
+    """Get the staffing rating for a specific facility from provider info data."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return None
+            
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if facility_data.empty:
+            return None
+            
+        # Get the staffing rating
+        staffing_rating = facility_data.iloc[0]['Staffing Rating']
+        
+        # Return None if it's NaN, otherwise return the rating
+        return float(staffing_rating) if pd.notna(staffing_rating) else None
+        
+    except Exception as e:
+        print(f"Error getting staffing rating for {provnum}: {str(e)}")
+        return None
+
+@st.cache_data
+def get_facility_affiliated_entity(provnum: str) -> str:
+    """Get the affiliated entity for a specific facility from provider info data."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return None
+            
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if facility_data.empty:
+            return None
+            
+        # Get the affiliated entity
+        affiliated_entity = facility_data.iloc[0]['Affiliated Entity Name']
+        
+        # Return None if it's NaN, otherwise return the entity name with proper title case
+        if pd.notna(affiliated_entity):
+            return proper_title_case(str(affiliated_entity))
+        return None
+        
+    except Exception as e:
+        print(f"Error getting affiliated entity for {provnum}: {str(e)}")
+        return None
+
+@st.cache_data
+def get_facility_overall_rating(provnum: str) -> float:
+    """Get the overall rating for a specific facility from provider info data."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return None
+            
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if facility_data.empty:
+            return None
+            
+        # Get the overall rating
+        overall_rating = facility_data.iloc[0]['Overall Rating']
+        
+        # Return None if it's NaN, otherwise return the rating
+        if pd.notna(overall_rating):
+            return int(overall_rating)
+        else:
+            return None
+    except Exception as e:
+        st.error(f"Error getting overall rating: {str(e)}")
+        return None
+
+@st.cache_data
+def get_facility_staffing_rating_trend(provnum: str) -> str:
+    """Get the staffing rating trend by comparing current vs March 2025 data."""
+    try:
+        current_data = load_provider_info_data()
+        march_data = load_march_provider_info_data()
+        
+        if current_data.empty or march_data.empty:
+            return None
+        
+        # Find the facility in current data
+        current_facility = current_data[current_data['CMS Certification Number (CCN)'] == provnum]
+        march_facility = march_data[march_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if current_facility.empty or march_facility.empty:
+            return None
+        
+        current_rating = current_facility['Staffing Rating'].iloc[0]
+        march_rating = march_facility['Staffing Rating'].iloc[0]
+        
+        if pd.isna(current_rating) or pd.isna(march_rating):
+            return None
+        
+        # Convert to integers for star ratings
+        current_rating = int(current_rating) if pd.notna(current_rating) else None
+        march_rating = int(march_rating) if pd.notna(march_rating) else None
+        
+        if current_rating is None or march_rating is None:
+            return None
+        
+        if current_rating > march_rating:
+            return current_rating - march_rating
+        elif current_rating < march_rating:
+            return -(march_rating - current_rating)
+        else:
+            return None
+        
+    except Exception as e:
+        return None
+
+@st.cache_data
+def get_facility_overall_rating_trend(provnum: str) -> str:
+    """Get the overall rating trend by comparing current vs March 2025 data."""
+    try:
+        current_data = load_provider_info_data()
+        march_data = load_march_provider_info_data()
+        
+        if current_data.empty or march_data.empty:
+            return None
+        
+        # Find the facility in current data
+        current_facility = current_data[current_data['CMS Certification Number (CCN)'] == provnum]
+        march_facility = march_data[march_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if current_facility.empty or march_facility.empty:
+            return None
+        
+        current_rating = current_facility['Overall Rating'].iloc[0]
+        march_rating = march_facility['Overall Rating'].iloc[0]
+        
+        if pd.isna(current_rating) or pd.isna(march_rating):
+            return None
+        
+        # Convert to integers for star ratings
+        current_rating = int(current_rating) if pd.notna(current_rating) else None
+        march_rating = int(march_rating) if pd.notna(march_rating) else None
+        
+        if current_rating is None or march_rating is None:
+            return None
+        
+        if current_rating > march_rating:
+            return current_rating - march_rating
+        elif current_rating < march_rating:
+            return -(march_rating - current_rating)
+        else:
+            return None
+        
+    except Exception as e:
+        return None
 
 @st.cache_data
 def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_quarter: str):
@@ -712,28 +990,17 @@ def display_metrics(metrics: pd.DataFrame, level: str):
 
         # Get all available quarters for this dataset
         available_quarters = sort_quarters(metrics['CY_QTR'].unique(), reverse=True)
-        
-        # Create a row with two columns for the header and quarter selector
-        header_col1, header_col2 = st.columns([3, 1])
-        
-        # Get the selected quarter (default to most recent)
-        with header_col2:
-            current_quarter = st.selectbox(
-                "Select Quarter",
-                available_quarters,
-                index=0,
-                label_visibility="collapsed",
-                format_func=format_quarter_display
-            )
-            current_quarter = normalize_quarter(current_quarter)
-        
+
+        # Always use the most recent quarter (first in sorted list)
+        current_quarter = available_quarters[0]
+        current_quarter = normalize_quarter(current_quarter)
         year = current_quarter[:4]
         quarter_num = current_quarter[-1]
         quarter_name = f"Q{quarter_num} {year}"
 
         # Filter metrics for the current quarter
         current_metrics = metrics[metrics['CY_QTR'] == current_quarter]
-        
+
         if current_metrics.empty:
             st.warning(f"No data available for {quarter_name}.")
             return
@@ -752,17 +1019,25 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         elif level == "National":
             facility_count = current_metrics['Facility_Count'].iloc[0] if 'Facility_Count' in current_metrics else len(current_metrics['PROVNUM'].unique())
             prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics else None
-            header_text = f"Key Metrics ({quarter_name})"
+            header_text = f"US Key Metrics ({quarter_name})"
         else:  # Facility level
             provnum = current_metrics['PROVNUM'].iloc[0]
             provname = proper_title_case(current_metrics['PROVNAME'].iloc[0])
             state = current_metrics['STATE'].iloc[0]
             county = proper_title_case(current_metrics['COUNTY_NAME'].iloc[0])
             care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{provnum}/view-all?state={state}"
-            header_text = f"{provname} ({county}) | {quarter_name} | <a href='{care_compare_url}' target='_blank' style='color: #1E88E5; text-decoration: none; font-weight: 500;'>View on Care Compare</a>"
             
-        with header_col1:
-            st.markdown(f'<div class="section-header" style="margin-top: 8px;">{header_text}</div>', unsafe_allow_html=True)
+            # Get affiliated entity for header
+            affiliated_entity = get_facility_affiliated_entity(provnum)
+            if affiliated_entity:
+                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name} | {affiliated_entity}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>View on Care Compare</a></div>"
+            else:
+                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>View on Care Compare</a></div>"
+        st.markdown(f'''
+            <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                {header_text}
+            </div>
+        ''', unsafe_allow_html=True)
             
         # Add custom CSS for metrics containers
         st.markdown("""
@@ -779,9 +1054,13 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                 background-color: white !important;
                 border: 1px solid #e0e0e0 !important;
                 border-radius: 6px !important;
-                padding: 15px !important;
+                padding: 12px !important;
                 transition: all 0.2s ease-in-out !important;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+                height: 100px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
             }
             .stMetric:hover {
                 transform: translateY(-2px) !important;
@@ -790,13 +1069,65 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             .stMetric [data-testid="stMetricValue"] {
                 font-size: 1.2em !important;
                 font-weight: 500 !important;
+                margin-bottom: 4px !important;
             }
             .stMetric [data-testid="stMetricLabel"] {
-                font-size: 0.9em !important;
+                font-size: 0.85em !important;
                 color: #666 !important;
+                margin-bottom: 8px !important;
             }
             .stMetric [data-testid="stMetricDelta"] {
-                font-size: 0.9em !important;
+                font-size: 0.85em !important;
+                margin-top: auto !important;
+            }
+            /* Ensure consistent spacing and alignment */
+            .stMetric [data-testid="stMetricContainer"] {
+                height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+            }
+            /* Force metric value and delta to be on same row - more specific targeting */
+            .stMetric [data-testid="stMetricContainer"] {
+                display: flex !important;
+                flex-direction: column !important;
+            }
+            .stMetric [data-testid="stMetricContainer"] > div:first-child {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                gap: 8px !important;
+            }
+            /* Target the specific div that contains value and delta */
+            .stMetric [data-testid="stMetricContainer"] > div:first-child > div {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+            /* Ensure the value and delta are inline */
+            .stMetric [data-testid="stMetricValue"] {
+                display: inline-block !important;
+                margin-right: 0 !important;
+            }
+            .stMetric [data-testid="stMetricDelta"] {
+                display: inline-block !important;
+                vertical-align: middle !important;
+                margin-left: 8px !important;
+            }
+            /* Much smaller font for affiliated entity to fit in box */
+            .affiliated-entity-metric .stMetric [data-testid="stMetricValue"] {
+                font-size: 0.7em !important;
+                font-weight: 400 !important;
+                line-height: 1.2 !important;
+            }
+            .affiliated-entity-metric .stMetric [data-testid="stMetricLabel"] {
+                font-size: 0.7em !important;
+            }
+            /* Force metric value and delta to be on same row */
+            .stMetric [data-testid="stMetricContainer"] > div:first-child {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
             }
             /* Add styles for quarter selector */
             div[data-testid="stSelectbox"] {
@@ -826,11 +1157,11 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             </style>
         """, unsafe_allow_html=True)
         
-        # Display metrics in columns
-        if level in ["National", "State"]:
-            col1, col2, col3, col4 = st.columns(4)
+        # Display metrics in columns - now use 5 columns for facility level, 4 for others
+        if level == "Facility":
+            col1, col2, col3, col4, col5 = st.columns(5)
         else:
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
         
         # For National and State, add facility count metric
         if level in ["National", "State"]:
@@ -840,21 +1171,58 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                          format_metric(facility_count - prev_facility_count, decimal_places=0, thousands=True) if prev_facility_count is not None else None)
         
         # Adjust column indices for other metrics
-        metric_cols = [col2, col3, col4] if level in ["National", "State"] else [col1, col2, col3]
+        if level == "Facility":
+            metric_cols = [col1, col2, col3, col4, col5]
+        else:
+            metric_cols = [col2, col3, col4]
         
         with metric_cols[0]:
             st.metric("Census", 
                      format_metric(current_metrics['Census'].iloc[0], decimal_places=0, thousands=True),
                      format_metric(current_metrics['Census'].iloc[0] - prev_metrics['Census'].iloc[0], decimal_places=0, thousands=True) if not prev_metrics.empty else None)
+        
         with metric_cols[1]:
             st.metric("Total Nurse HPRD", 
                      format_metric(current_metrics['Total_Nurse_HPRD'].iloc[0], decimal_places=2),
                      format_metric(current_metrics['Total_Nurse_HPRD'].iloc[0] - prev_metrics['Total_Nurse_HPRD'].iloc[0], decimal_places=2) if not prev_metrics.empty else None,
                      help="Hours Per Resident Day")
+        
         with metric_cols[2]:
             st.metric("Contract Staff %", 
                      format_metric(current_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True),
                      format_metric(current_metrics['Contract_Percentage'].iloc[0] - prev_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True) if not prev_metrics.empty else None)
+        
+        # Add staffing rating and overall rating for facility level
+        if level == "Facility":
+            provnum = current_metrics['PROVNUM'].iloc[0]
+            staffing_rating = get_facility_staffing_rating(provnum)
+            overall_rating = get_facility_overall_rating(provnum)
+            staffing_trend = get_facility_staffing_rating_trend(provnum)
+            overall_trend = get_facility_overall_rating_trend(provnum)
+            
+            with metric_cols[3]:
+                if staffing_rating is not None:
+                    st.metric("CMS Staffing Rating", 
+                             f"{int(staffing_rating)} \u2b50",
+                             staffing_trend,
+                             help="CMS 5-star rating (June 2025 vs. March 2025).")
+                else:
+                    st.metric("CMS Staffing Rating", 
+                             "N/A",
+                             staffing_trend,
+                             help="CMS 5-star rating (June 2025 vs. March 2025).")
+            
+            with metric_cols[4]:
+                if overall_rating is not None:
+                    st.metric("CMS Overall Rating", 
+                             f"{overall_rating} \u2b50",
+                             overall_trend,
+                             help="CMS 5-star rating (June 2025 vs. March 2025).")
+                else:
+                    st.metric("CMS Overall Rating", 
+                             "N/A",
+                             overall_trend,
+                             help="CMS 5-star rating (June 2025 vs. March 2025).")
             
     except Exception as e:
         st.error(f"Error displaying metrics: {str(e)}")
@@ -872,19 +1240,32 @@ def format_metric(value, decimal_places=1, percentage=False, thousands=False):
 def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
+        state_name_map = {
+            'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona', 'CA': 'California', 'CO': 'Colorado',
+            'CT': 'Connecticut', 'DC': 'District of Columbia', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+            'HI': 'Hawaii', 'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
+            'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland', 'ME': 'Maine',
+            'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana',
+            'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+            'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
+            'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
+            'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
+            'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
+        }
         if state:
-            title_prefix = f"{state}"
+            state_name = state_name_map.get(state, state)
+            title_prefix = f"{state_name} Staffing Trends (2017-2024)"
             data = df[df['STATE'] == state].copy()
         elif facility:
             facility_name = get_provider_info(facility, 'name')
             facility_state = get_provider_info(facility, 'state')
             if facility_name and facility_state:
-                title_prefix = f"{facility_name} ({facility_state})"
+                title_prefix = f"{facility_name}, {facility_state} (2017-2024)"
             else:
-                title_prefix = f"Facility {facility}"
+                title_prefix = f"Facility {facility} (2017-2024)"
             data = df[df['PROVNUM'] == facility].copy()
         else:
-            title_prefix = "National"
+            title_prefix = "National Staffing Trends (2017-2024)"
             data = df.copy()
         
         # Sort data by date
@@ -900,8 +1281,10 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Get the actual date range from the data
         date_range = [data['date'].min(), data['date'].max()]
         
-        # Define hover template
-        hover_template = "<b>%{customdata}</b><br>Value: %{y:.2f}<extra></extra>"
+        # Define custom hover templates
+        hover_hprd = "<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>"
+        hover_census = "<b>%{customdata}</b><br>%{y:,.0f}<extra></extra>"
+        hover_contract = "<b>%{customdata}</b><br>%{y:.2f}%<extra></extra>"
         
         # Desktop figure (3 charts)
         fig = make_subplots(rows=3, cols=1,
@@ -912,23 +1295,23 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         fig.add_trace(go.Scatter(x=data['date'], y=data['Total_Nurse_HPRD'],
                        mode='lines+markers', name='Total HPRD',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                       hovertemplate=hover_template), row=1, col=1)
+                       hovertemplate=hover_hprd), row=1, col=1)
 
         fig.add_trace(go.Scatter(x=data['date'], y=data['Census'],
                        mode='lines+markers', name='Census',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                       hovertemplate=hover_template.replace(':.2f', ':,.0f')), row=2, col=1)
+                       hovertemplate=hover_census), row=2, col=1)
 
         fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Percentage'],
                        mode='lines+markers', name='Contract %',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                       hovertemplate=hover_template.replace(':.2f', ':.1f%')), row=3, col=1)
+                       hovertemplate=hover_contract), row=3, col=1)
 
         # Update desktop layout
         fig.update_layout(
             height=1400,
             width=1000,
-            title_text=f"{title_prefix} Staffing Trends",
+            title_text=title_prefix,
             showlegend=False,
             margin=dict(l=50, r=50, t=100, b=100),
             hovermode='x unified'
@@ -993,7 +1376,9 @@ def main() -> None:
         if current_page == 'premium':
             st.switch_page("pages/1_Premium.py")
         elif current_page == 'facility_search':
-            st.switch_page("pages/2_Facility_Search.py")
+            st.switch_page("pages/1_Facility_Search.py")
+        elif current_page == 'affiliated_entities':
+            st.switch_page("pages/2_Affiliated_Entities.py")
 
         # Get URL parameters using the new API
         initial_level = st.query_params.get('level', 'National')
@@ -1002,18 +1387,21 @@ def main() -> None:
         # Title with custom styling
         st.markdown("""
             <div>
-                <h1 class="main-header" style="margin-bottom: 0;">PBJ Dashboard (Beta)</h1>
-                <p style="color: #666; font-size: 0.9em; margin-top: 2px;">
-                    By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting</a> | 
-                    <a href="?page=premium" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
-                        ⭐ Premium
-                    </a> |
-                    <a href="?page=facility_search" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
-                        🔍 Search Facility
-                    </a>
-                </p>
+                <h1 class="main-header" style="margin-bottom: 0;">Nursing Home Staffing Dashboard</h1>
             </div>
         """, unsafe_allow_html=True)
+
+        # Refined subhead: left-aligned, slightly wider
+        st.markdown('''
+            <div style="background: #f7fafd; border-radius: 6px; padding: 10px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
+                <div style="font-size: 1.08em; color: #234; font-weight: 600;">
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring staffing data (2017–2024) across every U.S. facility.
+                </div>
+                <div style="font-size:0.97em; color:#7a869a; margin-top:2px;">
+                    Looking deeper? Daily trends and custom reports for investigations, cases, and more <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: underline;">available upon request</a>.
+                </div>
+            </div>
+        ''', unsafe_allow_html=True)
 
         # Sidebar
         st.sidebar.markdown("""
@@ -1073,13 +1461,19 @@ def main() -> None:
             </style>
         """, unsafe_allow_html=True)
 
-        # Add level selection with initial value from URL
+        # Sidebar: Only one radio button group for level selection, always present
         level = st.sidebar.radio(
             "Select Level",
-            ["National", "State", "Facility"],
-            index=["National", "State", "Facility"].index(initial_level),
+            ["National", "State", "Facility", "Affiliated Entities"],
+            index=["National", "State", "Facility", "Affiliated Entities"].index(initial_level) if initial_level in ["National", "State", "Facility", "Affiliated Entities"] else 0,
             key="level_selector"
         )
+
+        # A & B: Fix radio button navigation
+        if level == "Affiliated Entities":
+            st.switch_page("pages/2_Affiliated_Entities.py")
+        elif level == "Facility Search":
+            st.switch_page("pages/1_Facility_Search.py")
 
         # Get selected value based on level
         selected_value = None
@@ -1243,6 +1637,88 @@ def get_db_connection():
         print(f"Error connecting to database: {str(e)}")
         return None
 
+def query_nurse_staffing(provnum: str, start_date: str, end_date: str, staff_category: str) -> pd.DataFrame:
+    """Query nurse staffing data for a specific facility and date range."""
+    try:
+        # Convert dates to datetime
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        
+        # Get the quarters we need to check
+        quarters = []
+        current = start_dt
+        while current <= end_dt:
+            quarter = f"{current.year}Q{(current.month-1)//3 + 1}"
+            if quarter not in quarters:
+                quarters.append(quarter)
+            current += pd.DateOffset(months=1)
+        
+        # Load data from each quarter file
+        dfs = []
+        for quarter in quarters:
+            file_path = f'standardized_PBJ/PBJ_dailynursestaffing_CY{quarter}.csv'
+            if os.path.exists(file_path):
+                df = pd.read_csv(file_path)
+                dfs.append(df)
+        
+        if not dfs:
+            return pd.DataFrame()
+            
+        # Combine all quarters
+        combined_df = pd.concat(dfs, ignore_index=True)
+        
+        # Filter for the specific facility and date range
+        mask = (
+            (combined_df['PROVNUM'] == provnum) &
+            (pd.to_datetime(combined_df['WorkDate']) >= start_dt) &
+            (pd.to_datetime(combined_df['WorkDate']) <= end_dt)
+        )
+        filtered_df = combined_df[mask].copy()
+        
+        if filtered_df.empty:
+            return pd.DataFrame()
+            
+        # Convert WorkDate to datetime and add day of week
+        filtered_df['WorkDate'] = pd.to_datetime(filtered_df['WorkDate'])
+        filtered_df['DayOfWeek'] = filtered_df['WorkDate'].dt.day_name()
+        
+        # Select relevant columns based on staff category
+        if staff_category == 'RN':
+            hours_cols = ['Hrs_RN', 'Hrs_RN_emp', 'Hrs_RN_ctr']
+        elif staff_category == 'LPN':
+            hours_cols = ['Hrs_LPN', 'Hrs_LPN_emp', 'Hrs_LPN_ctr']
+        elif staff_category == 'CNA':
+            hours_cols = ['Hrs_CNA', 'Hrs_CNA_emp', 'Hrs_CNA_ctr']
+        elif staff_category == 'Nurse Aide Trainee':
+            hours_cols = ['Hrs_NAtrn', 'Hrs_NAtrn_emp', 'Hrs_NAtrn_ctr']
+        elif staff_category == 'Medical Aide':
+            hours_cols = ['Hrs_MedAide', 'Hrs_MedAide_emp', 'Hrs_MedAide_ctr']
+        elif staff_category == 'RN Administrator':
+            hours_cols = ['Hrs_RNadmin', 'Hrs_RNadmin_emp', 'Hrs_RNadmin_ctr']
+        elif staff_category == 'LPN Administrator':
+            hours_cols = ['Hrs_LPNadmin', 'Hrs_LPNadmin_emp', 'Hrs_LPNadmin_ctr']
+        elif staff_category == 'RN Director of Nursing':
+            hours_cols = ['Hrs_RNDON', 'Hrs_RNDON_emp', 'Hrs_RNDON_ctr']
+        else:
+            return pd.DataFrame()
+            
+        # Select only the columns we need
+        result_df = filtered_df[['WorkDate', 'DayOfWeek', 'MDScensus'] + hours_cols].copy()
+        
+        # Rename columns for clarity
+        result_df.rename(columns={
+            'WorkDate': 'Date',
+            'MDScensus': 'Census',
+            hours_cols[0]: 'Total Hours',
+            hours_cols[1]: 'Employee Hours',
+            hours_cols[2]: 'Contract Hours'
+        }, inplace=True)
+        
+        return result_df
+        
+    except Exception as e:
+        print(f"Error querying nurse staffing data: {str(e)}")
+        return pd.DataFrame()
 
 if __name__ == "__main__":
     main()

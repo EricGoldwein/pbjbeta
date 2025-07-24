@@ -71,6 +71,7 @@ Generate three main CSV files:
 2. **Pages**
    - Facility Search
    - Premium Reports
+   - Affiliated Entities Dashboard
    - Help Documentation
 
 ### Features
@@ -89,6 +90,13 @@ Generate three main CSV files:
   - Individual facility metrics
   - Historical trends
   - Care Compare integration
+
+- **Affiliated Entities View**
+  - Entity-level performance metrics
+  - Ownership analysis (For-Profit, Non-Profit, Government)
+  - Quality ratings and compliance data
+  - Facility listings with links to PBJ data
+  - Risk indicators (SFF, abuse icons, fines)
 
 ### Mobile Optimization
 - Responsive design
@@ -109,7 +117,11 @@ pip install -r requirements.txt
 python generate_metrics.py
 ```
 
-4. Launch the dashboard:
+4. Place additional data files (optional):
+   - `Nursing_Home_Affiliated_Entity_Performance_Measures_Jun_2025.csv` - For affiliated entities dashboard
+   - `NH_ProviderInfo_Jun2025.csv` - For facility details and entity linking
+
+5. Launch the dashboard:
 ```bash
 streamlit run PBJ_lite.py
 ```

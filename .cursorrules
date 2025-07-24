@@ -4,16 +4,19 @@
 
 ### File Structure
 ```
-NewPBJ/
+PBJapp/
 ├── PBJ_lite.py              # Main dashboard application
-├── generate_metrics.py      # Data processing script
+├── lite_report.py           # Data processing script
 ├── pages/                   # Streamlit pages
 │   ├── 1_Premium.py        # Premium reports page
-│   └── 2_Facility_Search.py # Facility search page
-├── data/                    # Data directory
-│   ├── raw/                # Raw PBJ CSV files
-│   └── processed/          # Processed metrics files
-└── requirements.txt         # Project dependencies
+│   ├── 2_Facility_Search.py # Facility search page
+│   └── 3_Methodology.py    # Methodology documentation
+├── PBJcsv/                  # Raw PBJ CSV files
+├── standardized_PBJ/        # Standardized data files
+├── column_mapping_reports/  # Data mapping documentation
+├── requirements.txt         # Production dependencies
+├── dev-requirements.txt     # Development dependencies
+└── pyrightconfig.json      # Type checking configuration
 ```
 
 ### Naming Conventions
@@ -53,6 +56,17 @@ NewPBJ/
 - Handle variations in naming
 - Example: `"Total_Nurse_HPRD"` not `"total nurse hprd"`
 
+### DuckDB Integration
+- Use in-memory database for analytics
+- Create indexes on frequently queried columns
+- Use parameterized queries for security
+- Example:
+  ```python
+  facility_db.execute("""
+      CREATE INDEX IF NOT EXISTS idx_provnum ON facility_metrics(PROVNUM)
+  """)
+  ```
+
 ### Calculations
 
 1. **HPRD Calculations**
@@ -67,11 +81,52 @@ NewPBJ/
        return (contract_hours / total_hours * 100) if total_hours > 0 else 0
    ```
 
+3. **Weighted Averages**
+   ```python
+   def calculate_weighted_hprd(hours, census):
+       return (hours * census).sum() / census.sum() if census.sum() > 0 else 0
+   ```
+
 ### Data Validation
 - Check for missing values
 - Validate numeric ranges
 - Handle division by zero
 - Log warnings for data issues
+
+## Streamlit-Specific Patterns
+
+### Page Configuration
+```python
+st.set_page_config(
+    page_title="PBJ Nursing Home Dashboard by 320 Consulting",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+```
+
+### Caching Strategy
+- Use `@st.cache_data` for data loading
+- Use `@st.cache_resource` for database connections
+- Clear cache when data updates
+- Example:
+  ```python
+  @st.cache_data
+  def load_metrics_data():
+      # Load and cache metrics data
+      pass
+  ```
+
+### Mobile Responsiveness
+- Check screen width with `st.get_option("browser.gatherUsageStats")`
+- Use CSS media queries for mobile optimization
+- Adjust layout for small screens
+- Example:
+  ```python
+  if st.session_state.get('is_mobile', False):
+      # Mobile-specific layout
+      pass
+  ```
 
 ## UI/UX Guidelines
 
