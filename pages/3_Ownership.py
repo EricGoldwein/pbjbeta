@@ -416,8 +416,7 @@ def main():
         "Enter entity name to search:",
         options=[""] + entity_options,
         index=0,
-        help="Start typing to search for an entity. Results will show entity name and facility count.",
-        label_visibility="visible"
+        help="Start typing to search for an entity. Results will show entity name and facility count."
     )
     
     # If no entity is selected, show placeholder
@@ -441,9 +440,7 @@ def main():
         # Main entity dashboard with entity ID
         st.markdown(f'''
                 <div class="entity-header" style="background: linear-gradient(90deg, #e3ecfa 80%, #dbeafe 100%); color: #1a2233; padding: 1.7rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #d3dbe8;">
-                    <h2 style="margin-bottom: 0.15em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233;">{entity_name} <span style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>
-                    <div style="font-size: 1.13em; color: #234; font-weight: 600; margin-top: 0.1em; text-shadow: 0 1px 4px rgba(255,255,255,0.12);">Nursing Home Affiliated Entity Dashboard</div>
-                </div>
+                    <h2 style="margin-bottom: 0.15em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233;">{entity_name} <span style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>                </div>
             ''', unsafe_allow_html=True)
         # Key metrics overview using custom metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -455,38 +452,43 @@ def main():
             st.markdown(create_custom_metric("Overall Rating", f"{entity_row['Average overall 5-star rating']:.1f}"), unsafe_allow_html=True)
         with col4:
             st.markdown(create_custom_metric("Total Fines", f"${entity_row['Total amount of fines in dollars']:,.0f}"), unsafe_allow_html=True)
+        # Calculate number of 1-star facilities for this entity
+        num_1star = 0
+        if entity_id and entity_id != "":
+            entity_facilities = provider_data[
+                provider_data['Affiliated Entity ID'] == entity_id
+            ].copy()
+            if not entity_facilities.empty:
+                num_1star = (entity_facilities['Overall Rating'] == 1).sum()
+
         # High Risk Facilities
-        st.markdown(f'<div class="section-header"><h3>🚨 High Risk Facilities - {entity_name}</h3></div>', unsafe_allow_html=True)
-        
-        # Add native Streamlit tooltip
-        st.caption("", help="SFF: Special Focus Facilities with serious problems over time.\n\nSFF Candidate: Facilities monitored for potential SFF designation.\n\nAbuse Icon: Cited for abuse with actual or potential harm.")
-        
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">🚨 High Risk Facilities - {entity_name}</h3></div>', unsafe_allow_html=True)
         risk_col1, risk_col2, risk_col3 = st.columns(3)
-        
         with risk_col1:
-            if entity_row['Number of Special Focus Facilities (SFF)'] > 0:
-                st.markdown(create_custom_metric("SFF Facilities", entity_row['Number of Special Focus Facilities (SFF)']), unsafe_allow_html=True)
-            else:
-                st.markdown(create_custom_metric("SFF Facilities", "0"), unsafe_allow_html=True)
-        
+            st.markdown(create_custom_metric(
+                '<b>SFF</b>',
+                entity_row['Number of Special Focus Facilities (SFF)'],
+                help_text='<span class="help-icon" title="Special Focus Facilities with serious problems over time.">❓</span>'
+            ), unsafe_allow_html=True)
         with risk_col2:
-            if entity_row['Number of SFF candidates'] > 0:
-                st.markdown(create_custom_metric("SFF Candidates", entity_row['Number of SFF candidates']), unsafe_allow_html=True)
-            else:
-                st.markdown(create_custom_metric("SFF Candidates", "0"), unsafe_allow_html=True)
-        
+            st.markdown(create_custom_metric(
+                '<b>SFF Candidate</b>',
+                entity_row['Number of SFF candidates'],
+                help_text='<span class="help-icon" title="Facilities monitored for potential SFF designation.">❓</span>'
+            ), unsafe_allow_html=True)
         with risk_col3:
-            if entity_row['Number of facilities with an abuse icon'] > 0:
-                st.markdown(create_custom_metric("Abuse Icons", entity_row['Number of facilities with an abuse icon']), unsafe_allow_html=True)
-            else:
-                st.markdown(create_custom_metric("Abuse Icons", "0"), unsafe_allow_html=True)
+            st.markdown(create_custom_metric(
+                '<b>Abuse Icon</b>',
+                f"{entity_row['Number of facilities with an abuse icon']}<span style='font-size:0.9em; color:#b71c1c; margin-left:8px;'>(1★: {num_1star})</span>",
+                help_text='<span class="help-icon" title="Cited for abuse with actual or potential harm.">❓</span>'
+            ), unsafe_allow_html=True)
         
 
         
         # Single column layout for detailed metrics
         
         # Ownership breakdown with pie chart
-        st.markdown(f'<div class="section-header"><h3>📊 Ownership Structure - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">📊 Ownership Structure - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         own_col1, own_col2 = st.columns([1, 1])
         
@@ -518,7 +520,7 @@ def main():
             st.markdown(create_narrow_metric("Government", f"{entity_row['Percent of facilities classified as government-owned']:.1f}%"), unsafe_allow_html=True)
         
         # CMS 5-Star Ratings
-        st.markdown(f'<div class="section-header"><h3>⭐ CMS 5-Star Ratings - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">⭐ CMS 5-Star Ratings - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         # Quality metrics with decimals for entity averages
         qual_col1, qual_col2, qual_col3, qual_col4 = st.columns(4)
@@ -597,7 +599,7 @@ def main():
                 st.plotly_chart(fig_ratings, use_container_width=True)
         
         # Staffing metrics
-        st.markdown(f'<div class="section-header"><h3>👥 Staffing Performance - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">👥 Staffing - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         staff_col1, staff_col2, staff_col3, staff_col4 = st.columns(4)
         with staff_col1:
@@ -617,7 +619,7 @@ def main():
             st.markdown(create_custom_metric("RN Turnover", f"{entity_row['Average Registered Nurse turnover percentage']:.1f}%"), unsafe_allow_html=True)
         
         # Compliance metrics
-        st.markdown(f'<div class="section-header"><h3>⚠️ Compliance & Financial - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">⚠️ Compliance - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         comp_col1, comp_col2, comp_col3, comp_col4 = st.columns(4)
         with comp_col1:
@@ -630,7 +632,7 @@ def main():
             st.markdown(create_custom_metric("Avg Payment Denials", f"{entity_row['Average number of payment denials']:.1f}"), unsafe_allow_html=True)
         
         # Antipsychotic usage
-        st.markdown(f'<div class="section-header"><h3>💊 Antipsychotic Usage - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">💊 Antipsychotics - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         anti_col1, anti_col2 = st.columns(2)
         with anti_col1:
@@ -639,7 +641,7 @@ def main():
             st.markdown(create_custom_metric("Long-Stay Antipsychotic", f"{entity_row['Average percentage of long-stay residents who received an antipsychotic medication']:.1f}%"), unsafe_allow_html=True)
         
         # Facilities list
-        st.markdown(f'<div class="section-header"><h3>🏥 {entity_name} Facilities</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">🏥 {entity_name} Facilities</h3></div>', unsafe_allow_html=True)
         
         # Get facilities for this entity
         if entity_id and entity_id != "":
