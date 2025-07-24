@@ -29,6 +29,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Add CSS to hide the toggle tip on desktop
+st.markdown("""
+<style>
+.toggle-tip-mobile {
+    display: block;
+}
+@media (min-width: 900px) {
+    .toggle-tip-mobile {
+        display: none !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Initialize DuckDB connection for facility data
 facility_db = duckdb.connect(':memory:')
 
@@ -1245,7 +1259,7 @@ def main() -> None:
         st.markdown('''
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
-                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle &gt;&gt; icon on top left to navigate dashboard.</div>
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div class="toggle-tip-mobile" style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle &gt;&gt; icon on top left to navigate dashboard.</div>
             </div>
         ''', unsafe_allow_html=True)
         # Sidebar
