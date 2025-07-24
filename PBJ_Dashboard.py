@@ -1236,8 +1236,8 @@ def main() -> None:
 
         # Refined subhead: left-aligned, slightly wider
         st.markdown('''
-            <div style="background: #f7fafd; border-radius: 6px; padding: 10px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0; position: relative;">
-                <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="position: absolute; top: 12px; right: 16px; background: #1976d2; color: #fff; text-decoration: none; font-size: 0.93em; padding: 4px 14px; border-radius: 16px; font-weight: 600; box-shadow: 0 1px 3px rgba(30,136,229,0.07); transition: background 0.2s;">About the Dashboard</a>
+            <div style="background: #f7fafd; border-radius: 6px; padding: 28px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0; position: relative;">
+                <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="position: absolute; top: 10px; right: 18px; background: #1976d2; color: #fff; text-decoration: none; font-size: 0.93em; padding: 4px 14px; border-radius: 16px; font-weight: 600; box-shadow: 0 1px 3px rgba(30,136,229,0.07); transition: background 0.2s;">About the Dashboard</a>
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 8px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
                 </div>
