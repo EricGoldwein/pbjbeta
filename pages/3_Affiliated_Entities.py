@@ -7,7 +7,7 @@ import os
 
 st.set_page_config(page_title="Affiliated Entities", page_icon="🏢", layout="wide")
 
-# Add the parent directory to the path to import from PBJ_lite
+# Add the parent directory to the path to import from PBJ_Dashboard
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pandas as pd
@@ -357,28 +357,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def create_custom_metric(label, value, help_text=None):
-    """Create a custom metric with optional help tooltip"""
+def create_custom_metric(label, value, help_text=None, trend=None):
+    """Create a custom metric with optional help tooltip and trend arrow (cross-platform safe)"""
+    arrow = ''
+    if trend == 'up':
+        arrow = '<span style="color:green; font-size:1.2em;">↑</span>'
+    elif trend == 'down':
+        arrow = '<span style="color:red; font-size:1.2em;">↓</span>'
+    metric_html = f'''
+    <div class="custom-metric">
+        <div class="custom-metric-label">{label}</div>
+        <div class="custom-metric-value">{value} {arrow}</div>
+    '''
     if help_text:
-        return f"""
-        <div class="custom-metric">
-            <div class="custom-metric-label">
-                {label} 
-                <span class="tooltip">
-                    <span class="help-icon">ℹ</span>
-                    <span class="tooltiptext">{help_text}</span>
-                </span>
-            </div>
-            <div class="custom-metric-value">{value}</div>
-        </div>
-        """
-    else:
-        return f"""
-        <div class="custom-metric">
-            <div class="custom-metric-label">{label}</div>
-            <div class="custom-metric-value">{value}</div>
-        </div>
-        """
+        metric_html += f'<div class="custom-metric-help">{help_text}</div>'
+    metric_html += '</div>'
+    return metric_html
 
 def create_narrow_metric(label, value):
     """Create a narrower metric for ownership data"""
@@ -848,6 +842,13 @@ def main():
         '</div>',
         unsafe_allow_html=True
     )
+
+    st.markdown('''
+<div style="text-align:center; margin-top:2em; padding:1em; background:#f5f8fd; border-radius:8px; font-size:1.05em; color:#333;">
+  A free public resource from <b>320 Consulting</b>.<br>
+  <a href="/pages/2_About.py" style="color:#1E88E5; text-decoration:underline; font-weight:500;">About the PBJ Dashboard</a>
+</div>
+''', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main() 
