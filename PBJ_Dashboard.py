@@ -1008,7 +1008,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             if affiliated_entity:
                 header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name} | {affiliated_entity}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>View on Care Compare</a></div>"
             else:
-                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>View on Care Compare</a></div>"
+                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>Care Compare</a></div>"
         st.markdown(f'''
             <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
                 {header_text}
