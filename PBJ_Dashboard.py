@@ -1246,9 +1246,7 @@ def main() -> None:
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
-                    <span title="Toggle the &gt;&gt; icon (top left) to navigate the dashboard." style="cursor: help; color: #1976d2; font-size: 1.1em; margin-left: 6px; vertical-align: middle;">&#9432;</span>
-                </div>
-                <div style="font-size:0.97em; color:#7a869a; font-style: italic; margin-bottom: 8px;">About the dashboard</div>
+                <div style="font-size:0.97em; color:#7a869a; font-style: italic; margin-bottom: 8px;">Toggle the >> icon to navigate the dashboard</div>
             </div>
         ''', unsafe_allow_html=True)
         # Sidebar
