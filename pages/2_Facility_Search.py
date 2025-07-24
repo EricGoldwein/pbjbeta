@@ -65,6 +65,8 @@ with col1:
     )
 
 def smart_title(name: str) -> str:
+    if not isinstance(name, str):
+        name = str(name) if name is not None else ""
     # Words to keep lowercase unless first word
     lowercase_words = {'and', 'of', 'at'}
     # Words to always uppercase
