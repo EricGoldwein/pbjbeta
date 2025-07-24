@@ -1241,21 +1241,10 @@ def main() -> None:
         st.markdown('''
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
-                    A free public resource from <b>320 Consulting</b>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
                 </div>
-                <div style="font-size:0.97em; color:#7a869a; font-style: italic; margin-bottom: 8px;">About the dashboard</div>
             </div>
         ''', unsafe_allow_html=True)
-
-        # Add About the Dashboard and Premium links below the info box
-        st.markdown('''
-            <div style="text-align: center; margin-bottom: 18px;">
-                <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="color: #1976d2; text-decoration: underline; font-size:1em; font-weight:500;">About the Dashboard</a>
-                <span style="color: #b0b8c1; font-size:1em; margin: 0 10px;">|</span>
-                <a href="https://nursinghomedashboard.streamlit.app/Premium" target="_blank" style="color: #1976d2; text-decoration: underline; font-size:1em; font-weight:500;">Premium</a>
-            </div>
-        ''', unsafe_allow_html=True)
-
         # Sidebar
         st.sidebar.markdown("""
             <style>
@@ -1317,16 +1306,16 @@ def main() -> None:
         # Sidebar: Only one radio button group for level selection, always present
         level = st.sidebar.radio(
             "Select Level",
-            ["National", "State", "Facility", "Affiliated Entities"],
-            index=["National", "State", "Facility", "Affiliated Entities"].index(initial_level) if initial_level in ["National", "State", "Facility", "Affiliated Entities"] else 0,
+            ["National", "State", "Facility", "Ownership"],
+            index=["National", "State", "Facility", "Ownership"].index(initial_level) if initial_level in ["National", "State", "Facility", "Affiliated Entities"] else 0,
             key="level_selector"
         )
 
         # A & B: Fix radio button navigation
-        if level == "Affiliated Entities":
-            st.switch_page("pages/2_Affiliated_Entities.py")
+        if level == "Ownership":
+            st.switch_page("pages/3_Ownership.py")
         elif level == "Facility Search":
-            st.switch_page("pages/1_Facility_Search.py")
+            st.switch_page("pages/2_Facility_Search.py")
 
         # Get selected value based on level
         selected_value = None
