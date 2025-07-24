@@ -1246,7 +1246,7 @@ def main() -> None:
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
-                <div style="font-size:0.97em; color:#7a869a; font-style: italic; margin-bottom: 8px;">Toggle the >> icon to navigate the dashboard</div>
+                <div style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle &gt;&gt; icon on top left to navigate dashboard.</div>
             </div>
         ''', unsafe_allow_html=True)
         # Sidebar
@@ -1565,6 +1565,26 @@ def query_nurse_staffing(provnum: str, start_date: str, end_date: str, staff_cat
     except Exception as e:
         print(f"Error querying nurse staffing data: {str(e)}")
         return pd.DataFrame()
+
+# --- Add mobile detection using streamlit_javascript ---
+try:
+    from streamlit_javascript import st_javascript
+    is_mobile = st_javascript(
+        """
+        (() => {
+            if (window.innerWidth < 800 || /Mobi|Android/i.test(navigator.userAgent)) {
+                return true;
+            } else {
+                return false;
+            }
+        })()
+        """,
+        key="mobile_detect"
+    )
+    if is_mobile is not None:
+        st.session_state['is_mobile'] = is_mobile
+except ImportError:
+    pass
 
 if __name__ == "__main__":
     main()
