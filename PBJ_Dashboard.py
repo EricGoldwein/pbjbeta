@@ -9,7 +9,7 @@ import duckdb
 from typing import Dict, Optional, List, Tuple, Any
 
 # Set page configuration with a more professional theme
-st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Nursing Home Staffing Data", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
@@ -1031,9 +1031,12 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                      help="Hours Per Resident Day")
         
         with metric_cols[2]:
-            st.metric("Contract Staff %", 
-                     format_metric(current_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True),
-                     format_metric(current_metrics['Contract_Percentage'].iloc[0] - prev_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True) if not prev_metrics.empty else None)
+            st.metric(
+                "Contract Staff %",
+                format_metric(current_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True),
+                format_metric(current_metrics['Contract_Percentage'].iloc[0] - prev_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True) if not prev_metrics.empty else None,
+                help="Percent of nursing hours provided by contract staff"
+            )
         
         # Add staffing rating and overall rating for facility level
         if level == "Facility":
@@ -1238,10 +1241,10 @@ def main() -> None:
         st.markdown('''
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 8px;">
-                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility. <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="color: #1976d2; text-decoration: underline; font-size:0.97em;">Learn more about the Dashboard</a>
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
                 </div>
                 <div style="font-size:0.97em; color:#7a869a; margin-bottom: 8px;">
-                    Looking deeper? Daily trends and custom reports for investigations, cases, and more <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: underline;">available upon request</a>.
+                    <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="color: #1976d2; text-decoration: underline; font-size:0.97em;">About the Dashboard</a>
                 </div>
             </div>
         ''', unsafe_allow_html=True)
