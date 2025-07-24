@@ -417,8 +417,7 @@ def main():
         options=[""] + entity_options,
         index=0,
         help="Start typing to search for an entity. Results will show entity name and facility count.",
-        label_visibility="visible",
-        dropdown_direction="down"
+        label_visibility="visible"
     )
     
     # If no entity is selected, show placeholder

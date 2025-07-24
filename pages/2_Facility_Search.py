@@ -52,14 +52,8 @@ def load_facility_data():
 
 facilities_df = load_facility_data()
 
-# Filter facilities by state if selected
-if state:
-    state_facilities = facilities_df[facilities_df['STATE'] == state]
-else:
-    state_facilities = facilities_df
-
 # Create search options
-search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in state_facilities[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
+search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
 
 # Remove separate st.markdown for title and back link
 # Use a single container for the header and search UI
@@ -95,6 +89,12 @@ with col2:
         key="search_input",
         help="Type to search facilities"
     )
+
+# Now use 'state' safely below
+if state:
+    state_facilities = facilities_df[facilities_df['STATE'] == state]
+else:
+    state_facilities = facilities_df
 
 # Function to search facilities
 @st.cache_data
