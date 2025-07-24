@@ -15,13 +15,12 @@ st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initi
 st.markdown("""
     <style>
     div[data-testid="stMetric"] {
-        background: #f7fafd;
+        background: #fafdff;
         border: 1px solid #e3eaf3;
         border-radius: 10px;
         box-shadow: 0 1px 4px rgba(30,136,229,0.04);
-        padding: 18px 10px 14px 10px;
-        margin: 0 4px 10px 4px;
-        max-width: 240px;
+        padding: 12px 18px 10px 18px;
+        margin: 12px 4px 10px 4px;
     }
     </style>
 """, unsafe_allow_html=True)
