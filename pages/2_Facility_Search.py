@@ -141,8 +141,16 @@ if state or search_term:
         
         # Create a DataFrame for better display
         df = pd.DataFrame(results)
-        df['Link'] = df.apply(
-            lambda row: f'<a href="/?level=Facility&facility={row["PROVNUM"]}" class="facility-link">View Details</a>',
+        # Apply smart capitalization to Nursing Home names
+        df['PROVNAME'] = df['PROVNAME'].apply(smart_title)
+        # Rename columns for display
+        df = df.rename(columns={
+            'PROVNUM': 'CCN',
+            'PROVNAME': 'Nursing Home',
+            'STATE': 'State'
+        })
+        df['Dashboard'] = df.apply(
+            lambda row: f'<a href="/?level=Facility&facility={row["CCN"]}" class="facility-link">View Staffing</a>',
             axis=1
         )
         
