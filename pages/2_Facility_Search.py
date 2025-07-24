@@ -157,9 +157,8 @@ if state or search_term:
         # Reorder columns, remove City
         display_cols = ['State', 'Nursing Home', 'Dashboard']
         df = df[display_cols]
-        # Use st.dataframe for filterable, modern table (Dashboard column will not be clickable, but can be shown as text)
-        st.dataframe(df, use_container_width=True)
-        # If you want to keep the Dashboard column as clickable HTML, keep the old st.markdown(df.to_html(...)) line below this.
+        # Display the results as HTML for clickable links
+        st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No facilities found matching your search criteria.")
@@ -169,6 +168,9 @@ st.markdown('</div>', unsafe_allow_html=True)
 # Help section
 st.markdown("""
     <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
+        <p style="color: #555; line-height: 1.6; text-align: center;">
+            Need help finding a facility? <a href="https://nursinghomedashboard.streamlit.app/Facility_Search" style="color: #1E88E5; text-decoration: underline; font-weight: 500;">Try the Facility Search page</a>.
+        </p>
         <p style="color: #555; line-height: 1.6; text-align: center;">
             Contact <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: none; font-weight: 500;">eric@320insight.com</a> to request a custom report or talk through what you need.
         </p>
