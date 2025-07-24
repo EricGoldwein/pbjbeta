@@ -954,7 +954,6 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
             <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.</p>
             <p>To request a report or talk through what you need:</p>
             <p><a href="mailto:eric@320insight.com">📧 eric@320insight.com</a></p>
-
         </div>
     """, unsafe_allow_html=True)
 
@@ -1257,14 +1256,12 @@ def main() -> None:
         """, unsafe_allow_html=True)
 
         # Refined subhead: left-aligned, slightly wider
-        if level != "Facility":
-            st.markdown('''
-                <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
-                    <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
-                        A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div class="toggle-tip-mobile" style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle &gt;&gt; icon on top left to navigate dashboard.</div>
-                    </div>
-                </div>
-            ''', unsafe_allow_html=True)
+        st.markdown('''
+            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
+                <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div class="toggle-tip-mobile" style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle &gt;&gt; icon on top left to navigate dashboard.</div>
+            </div>
+        ''', unsafe_allow_html=True)
         # Sidebar
         st.sidebar.markdown("""
             <style>

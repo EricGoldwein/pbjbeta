@@ -12,7 +12,7 @@ st.markdown("""
     </div>
 
 ### Context Matters
-Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time, and bring data-driven context to what’s happening inside facilities and chains.
+Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of CMS staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time, and bring data-driven context to what’s happening inside facilities and chains.
 
 ### Who it helps  
 * **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.
