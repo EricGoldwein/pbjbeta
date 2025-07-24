@@ -146,17 +146,23 @@ if state or search_term:
         # Create a DataFrame for better display
         df = pd.DataFrame(results)
         # Apply smart capitalization to Nursing Home names
-        df['PROVNAME'] = df['PROVNAME'].apply(smart_title)
+        df['Nursing Home'] = df['PROVNAME'].apply(smart_title) + ' (' + df['PROVNUM'] + ')'
+        # Add City column if available
+        if 'CITY' in df.columns:
+            df['City'] = df['CITY'].apply(smart_title)
+        else:
+            df['City'] = ''
         # Rename columns for display
         df = df.rename(columns={
-            'PROVNUM': 'CCN',
-            'PROVNAME': 'Nursing Home',
             'STATE': 'State'
         })
         df['Dashboard'] = df.apply(
-            lambda row: f'<a href="/?level=Facility&facility={row["CCN"]}" class="facility-link">View Staffing</a>',
+            lambda row: f'<a href="/?level=Facility&facility={row["PROVNUM"]}" class="facility-link">View Staffing</a>',
             axis=1
         )
+        # Reorder columns
+        display_cols = ['State', 'Nursing Home', 'City', 'Dashboard']
+        df = df[display_cols]
         
         # Display the results
         st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
