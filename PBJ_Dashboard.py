@@ -1243,7 +1243,7 @@ def main() -> None:
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 8px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
                 </div>
-                <div style="font-size:0.97em; color:#7a869a; margin-bottom: 8px;">
+                <div style="font-size:0.95em; color:#7a869a; margin-top: 10px; text-align: center; font-style: italic;">
                     <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="color: #1976d2; text-decoration: underline; font-size:0.97em;">About the Dashboard</a>
                 </div>
             </div>
