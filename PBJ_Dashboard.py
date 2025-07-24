@@ -11,6 +11,21 @@ from typing import Dict, Optional, List, Tuple, Any
 # Set page configuration with a more professional theme
 st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
+# Add subtle modern styling for metric containers only (not delta or value)
+st.markdown("""
+    <style>
+    div[data-testid="stMetric"] {
+        background: #f7fafd;
+        border: 1px solid #e3eaf3;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(30,136,229,0.04);
+        padding: 18px 10px 14px 10px;
+        margin: 0 4px 10px 4px;
+        max-width: 240px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Initialize DuckDB connection for facility data
 facility_db = duckdb.connect(':memory:')
 
