@@ -19,7 +19,7 @@ st.markdown("""
         border: 1px solid #e3eaf3;
         border-radius: 10px;
         box-shadow: 0 1px 4px rgba(30,136,229,0.04);
-        padding: 12px 18px 10px 18px;
+        padding: 12px 18px 4px 18px;
         margin: 12px 4px 10px 4px;
     }
     </style>
@@ -864,7 +864,7 @@ def display_facility_info(provnum: str):
                 border: 1px solid #e3eaf3;
                 border-radius: 10px;
                 box-shadow: 0 1px 4px rgba(30,136,229,0.04);
-                padding: 18px 10px 14px 10px;
+                padding: 18px 10px 4px 10px;
                 margin: 0 4px 10px 4px;
                 max-width: 240px;
             }
@@ -1241,7 +1241,8 @@ def main() -> None:
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
                 </div>
                 <div style="font-size:0.97em; color:#7a869a; margin-top:2px;">
-                    Looking deeper? Daily trends and custom reports for investigations, cases, and more <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: underline;">available upon request</a>.
+                    Looking deeper? Daily trends and custom reports for investigations, cases, and more <a href="mailto:eric@320insight.com" style="color: #1E88E5; text-decoration: underline;">available upon request</a>.<br/>
+                    <a href="https://nursinghomedashboard.streamlit.app/About" target="_blank" style="color: #1976d2; text-decoration: underline; font-size:0.97em;">About the Dashboard</a>
                 </div>
             </div>
         ''', unsafe_allow_html=True)
