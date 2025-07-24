@@ -13,7 +13,7 @@ import streamlit as st
 if st.session_state.get('is_mobile', False):
     st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 else:
-    st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="auto")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
