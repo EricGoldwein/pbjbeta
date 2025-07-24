@@ -15,11 +15,10 @@ st.markdown("""
 Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time—and bring data-driven context to what’s happening inside facilities and chains.
 
 ### Who it helps  
-* **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.  
-* **Advocates & families** – see how a home stacks up over time for loved ones.
-* **Policymakers** – compare homes and trends to inform oversight or reform.
+* **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.   **Advocates & families** – see how a home stacks up over time for residents and loved ones.
 * **Attorneys** – spot staffing trends that may support a case.
     <span style='font-size:0.95em; color:#555;'>&nbsp;&nbsp;Premium option: daily, position-level hours tied to citations and inspection reports.</span>
+* **Advocates & families** – see how a home stacks up over time for residents and loved ones.
 
 ### What you can explore (public edition)  
 | View | Data you get |

@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 from typing import List, Dict
 
-st.set_page_config(page_title="Facility Search", page_icon="🔍", layout="wide")
+st.set_page_config(page_title="Facility Search", page_icon="��", layout="wide")
+
+st.title("Facility Search")
 
 # Add custom CSS
 st.markdown("""
@@ -50,26 +52,11 @@ st.markdown("""
 def load_facility_data():
     return pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
 
-facilities_df = load_facility_data()
 
+facilities_df = load_facility_data()
 # Create search options
 search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
 
-# Use a single container for the header and search UI, but only render the real selectboxes (no placeholder text)
-st.markdown('''
-    <div style="background: #f7fafd; border-radius: 10px; padding: 28px 32px 22px 32px; margin-bottom: 24px; border: 1px solid #e3eaf3; box-shadow: 0 1px 6px rgba(30,136,229,0.04); max-width: 700px; margin-left: auto; margin-right: auto;">
-        <a href="/" class="back-link" style="color: #1E88E5; text-decoration: none; font-weight: 500; display: inline-block; margin-bottom: 12px;">← Back to Dashboard</a>
-        <h1 class="main-header" style="color: #2c3338; font-size: 2.1em; margin-bottom: 10px; margin-top: 0;">Facility Search</h1>
-        <div style="display: flex; gap: 18px;">
-            <div style="flex: 1;">
-                <!-- State selectbox will be rendered here by Streamlit -->
-            </div>
-            <div style="flex: 2;">
-                <!-- Facility search selectbox will be rendered here by Streamlit -->
-            </div>
-        </div>
-    </div>
-''', unsafe_allow_html=True)
 
 # Render the selectboxes in the right places, just below the container
 col1, col2 = st.columns([1,2])
