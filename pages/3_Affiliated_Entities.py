@@ -410,35 +410,14 @@ def main():
         facility_count = entity['Number of facilities']
         entity_options.append(f"{entity_name} ({facility_count} facilities)")
 
-    # --- MOBILE: Info box first, then dropdown ---
-    if is_mobile():
-        st.markdown("""
-            <div class="entity-header" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                <h2 style="margin-bottom: 0.15em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233;">Affiliated Entities Dashboard</h2>
-                <div style="font-size: 1.13em; color: #234; font-weight: 600; margin-top: 0.1em; text-shadow: 0 1px 4px rgba(255,255,255,0.12);">Nursing Home Affiliated Entity Dashboard</div>
-            </div>
-        """, unsafe_allow_html=True)
-        st.subheader("🔍 Search for an Entity")
-        selected_entity_display = st.selectbox(
-            "Enter entity name to search:",
-            options=[""] + entity_options,
-            index=0,
-            help="Start typing to search for an entity. Results will show entity name and facility count."
-        )
-    else:
-        st.subheader("🔍 Search for an Entity")
-        selected_entity_display = st.selectbox(
-            "Enter entity name to search:",
-            options=[""] + entity_options,
-            index=0,
-            help="Start typing to search for an entity. Results will show entity name and facility count."
-        )
-        st.markdown("""
-            <div class="entity-header" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                <h2 style="margin-bottom: 0.15em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233;">Affiliated Entities Dashboard</h2>
-                <div style="font-size: 1.13em; color: #234; font-weight: 600; margin-top: 0.1em; text-shadow: 0 1px 4px rgba(255,255,255,0.12);">Nursing Home Affiliated Entity Dashboard</div>
-            </div>
-        """, unsafe_allow_html=True)
+    # --- MOBILE: No info box, just dropdown ---
+    st.subheader("🔍 Search for an Entity")
+    selected_entity_display = st.selectbox(
+        "Enter entity name to search:",
+        options=[""] + entity_options,
+        index=0,
+        help="Start typing to search for an entity. Results will show entity name and facility count."
+    )
     
     # If no entity is selected, show placeholder
     if not selected_entity_display:
