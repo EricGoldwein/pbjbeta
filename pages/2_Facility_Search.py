@@ -45,6 +45,10 @@ st.markdown("""
     .stSelectbox {
         margin-bottom: 0;
     }
+    /* Left-justify table headers */
+    table th {
+        text-align: left !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
