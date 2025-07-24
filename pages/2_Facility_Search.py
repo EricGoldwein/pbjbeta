@@ -54,9 +54,6 @@ def load_facility_data():
 
 
 facilities_df = load_facility_data()
-# Create search options
-search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
-
 
 # Render the selectboxes in the right places, just below the container
 col1, col2 = st.columns([1,2])
@@ -65,6 +62,14 @@ with col1:
         "Select State",
         [""] + sorted(pd.read_csv('state_lite_metrics.csv')['STATE'].unique().tolist())
     )
+
+# Create filtered search options based on selected state
+if state:
+    state_facilities = facilities_df[facilities_df['STATE'] == state]
+    search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in state_facilities[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
+else:
+    search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
+
 with col2:
     search_term = st.selectbox(
         "Enter Provider Name or CCN",
@@ -72,12 +77,6 @@ with col2:
         key="search_input",
         help="Type to search facilities"
     )
-
-# Now use 'state' safely below
-if state:
-    state_facilities = facilities_df[facilities_df['STATE'] == state]
-else:
-    state_facilities = facilities_df
 
 # Function to search facilities
 @st.cache_data
