@@ -842,6 +842,21 @@ def display_facility_info(provnum: str):
         formatted_provider_name = format_title_case(facility_info['provider_name'])
         formatted_county = format_title_case(facility_info['county'])
 
+        # Add subtle modern styling for metric containers only (not delta or value)
+        st.markdown("""
+            <style>
+            div[data-testid="stMetric"] {
+                background: #f7fafd;
+                border: 1px solid #e3eaf3;
+                border-radius: 10px;
+                box-shadow: 0 1px 4px rgba(30,136,229,0.04);
+                padding: 18px 10px 14px 10px;
+                margin: 0 4px 10px 4px;
+                max-width: 240px;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         # Add the facility information HTML
         st.markdown(f"""
             <div class="facility-info-box">
