@@ -17,8 +17,10 @@ st.title("About")
 # Main intro block with soft background and padding (combine into one call)
 st.markdown("""
 <div style="background: #f5f8fd; border-radius: 10px; padding: 2.2rem 2.5rem 1.5rem 2.5rem; margin-bottom: 2.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
-
-## PBJ Nursing Home Staffing Dashboard by 320 Consulting
+    <div style='text-align: center; margin-bottom: 1.2em;'>
+        <span style='font-size:2.3em; font-weight:800; color:#1769aa; letter-spacing:0.01em;'>PBJ Nursing Home Staffing Dashboard</span><br>
+        <span style='font-size:1.15em; color:#7a869a; font-weight:400;'>by 320 Consulting</span>
+    </div>
 
 ### Context Matters
 Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time—and bring data-driven context to what’s happening inside facilities and chains.
@@ -50,7 +52,7 @@ Most publicly available nursing home data shows only the latest quarter. This da
 
 ### Digging deeper?  
 Daily shift logs, role-specific hours, weekend vs. weekday splits, and citation-linked timelines live in the premium layer.  
-Email **eric@320insight.com** for a free demo. Journalists: If you're working on a story, email eric@320insight.com — happy to share data or walk you through it.
+Email **eric@320insight.com** for a free demo. Journalists: If you're working on a story, I'm happy to share data or walk you through it.
 
 *Built by 320 Consulting. Feedback welcome (tell me what's broken!).*
 </div>

@@ -417,7 +417,8 @@ def main():
         options=[""] + entity_options,
         index=0,
         help="Start typing to search for an entity. Results will show entity name and facility count.",
-        label_visibility="visible"
+        label_visibility="visible",
+        dropdown_direction="down"
     )
     
     # If no entity is selected, show placeholder
@@ -617,7 +618,7 @@ def main():
             st.markdown(create_custom_metric("RN Turnover", f"{entity_row['Average Registered Nurse turnover percentage']:.1f}%"), unsafe_allow_html=True)
         
         # Compliance metrics
-        st.markdown('<div class="section-header"><h3>⚠️ Compliance & Financial</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header"><h3>⚠️ Compliance & Financial - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         comp_col1, comp_col2, comp_col3, comp_col4 = st.columns(4)
         with comp_col1:
@@ -630,7 +631,7 @@ def main():
             st.markdown(create_custom_metric("Avg Payment Denials", f"{entity_row['Average number of payment denials']:.1f}"), unsafe_allow_html=True)
         
         # Antipsychotic usage
-        st.markdown('<div class="section-header"><h3>💊 Antipsychotic Usage</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header"><h3>💊 Antipsychotic Usage - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         anti_col1, anti_col2 = st.columns(2)
         with anti_col1:
