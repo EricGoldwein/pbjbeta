@@ -15,9 +15,8 @@ st.markdown("""
 Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time—and bring data-driven context to what’s happening inside facilities and chains.
 
 ### Who it helps  
-* **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.   **Advocates & families** – see how a home stacks up over time for residents and loved ones.
-* **Attorneys** – spot staffing trends that may support a case.
-    <span style='font-size:0.95em; color:#555;'>&nbsp;&nbsp;Premium option: daily, position-level hours tied to citations and inspection reports.</span>
+* **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.
+* **Attorneys** – spot staffing trends that may support a case. <b><a href="/Premium" style="color:#1769aa; text-decoration:underline;">Premium</a></b>: custom reports with daily, position-level analysis and data visualizations tied to citations and inspections.</span>
 * **Advocates & families** – see how a home stacks up over time for residents and loved ones.
 
 ### What you can explore (public edition)  
@@ -25,21 +24,21 @@ Most publicly available nursing home data shows only the latest quarter. This da
 |------|--------------|
 | **National / State** | Nurse staffing hours per resident day (HPRD), contract staff %, census — every quarter since 2017 |
 | **Facility** | A nursing home's quarterly staffing, contract, and census data; ratings and risk indicators |
-| **Ownership Group** | Roll-ups for any chain (e.g., **Genesis** → 218 facilities in 19 states, 2.2-star average) |
+| **Ownership Group** | Essential data on any chain and its facilities (e.g., **Genesis** → 218 facilities in 19 states, 2.2-star average) |
 
 ### Under the hood  
 * **PBJ Staffing** – 32 quarters of daily data, aggregated for clarity  
 * **CMS Provider Info** – 5-star ratings, enforcement data, and other key indicators (June 2025 & March 2025)  
-* **CMS Affiliated Entity** – Selected quality metrics for nursing homes with shared owners, officers, or operators.(June 2025)
+* **CMS Affiliated Entity** – Selected quality metrics for nursing homes with shared owners, officers, or operators (June 2025)
 * **CMS Citations (Premium)** - Citation data and inspection reports, categorized by date, type, severity, and more. 
 
 ### Quick tour  
-1. Pick **National**, **State**, **Facility**, or **Affiliated Entity**.  
+1. Pick **State**, **Facility**, or **Ownership**.  
 2. Hover charts for values; drag the date slider to focus on any span.  
-3. Click **Export** for a ready-to-use PNG or CSV.
+3. Click **Export** for a ready-to-use PNG.
 
 ### Digging deeper?  
-Daily shift logs, role-specific hours, weekend vs. weekday splits, and citation-linked timelines live in the premium layer.  
+Daily staffing logs, role-specific hours (Nurse and Non-Nurse), weekend vs. weekday splits, and citation-linked timelines live in the premium layer.  
 Email **eric@320insight.com** for a free demo. Journalists: If you're working on a story, I'm happy to share data or walk you through it.
 
 *Built by 320 Consulting. Feedback welcome (tell me what's broken!).*
