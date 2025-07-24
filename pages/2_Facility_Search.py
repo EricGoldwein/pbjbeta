@@ -111,7 +111,7 @@ def search_facilities(state: str, search_term: str) -> List[Dict[str, str]]:
         return []
 
 # Display search results
-if search_term:
+if state or search_term:
     results = search_facilities(state, search_term)
     
     if results:
