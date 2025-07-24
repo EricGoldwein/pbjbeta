@@ -1369,7 +1369,7 @@ def main() -> None:
                 # Add help text with hyperlink
                 st.sidebar.markdown(
                     '<div style="margin-top: -15px; margin-bottom: 15px;">'
-                    '<a href="?page=Facility_Search" target="_self" style="color: #1E88E5; text-decoration: none; font-size: 0.9em;">'
+                    '<a href="https://nursinghomedashboard.streamlit.app/Facility_Search" target="_blank" style="color: #1E88E5; text-decoration: none; font-size: 0.9em;">'
                     'Help finding facility data</a></div>',
                     unsafe_allow_html=True
                 )
