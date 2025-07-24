@@ -1566,25 +1566,5 @@ def query_nurse_staffing(provnum: str, start_date: str, end_date: str, staff_cat
         print(f"Error querying nurse staffing data: {str(e)}")
         return pd.DataFrame()
 
-# --- Add mobile detection using streamlit_javascript ---
-try:
-    from streamlit_javascript import st_javascript
-    is_mobile = st_javascript(
-        """
-        (() => {
-            if (window.innerWidth < 800 || /Mobi|Android/i.test(navigator.userAgent)) {
-                return true;
-            } else {
-                return false;
-            }
-        })()
-        """,
-        key="mobile_detect"
-    )
-    if is_mobile is not None:
-        st.session_state['is_mobile'] = is_mobile
-except ImportError:
-    pass
-
 if __name__ == "__main__":
     main()
