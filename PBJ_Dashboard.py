@@ -1240,9 +1240,10 @@ def main() -> None:
         # Refined subhead: left-aligned, slightly wider
         st.markdown('''
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
-                <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 8px;">
-                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
+                <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
+                    A free public resource from <b>320 Consulting</b>, featuring quarterly staffing data (2017–2024) across every U.S. facility.
                 </div>
+                <div style="font-size:0.97em; color:#7a869a; font-style: italic; margin-bottom: 8px;">About the dashboard</div>
             </div>
         ''', unsafe_allow_html=True)
 
