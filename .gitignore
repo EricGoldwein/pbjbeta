@@ -1,48 +1,37 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-ENV/
-env/
-.env
+# Ignore all Python files by default
+*.py
 
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
+# But keep these specific Python files
+!PBJ_Dashboard.py
+!lite_report.py
+!setup_database.py
 
-# Virtual Environment
-venv/
-ENV/
+# Keep only these Streamlit page files
+!pages/1_About.py
+!pages/2_Facility_Search.py
+!pages/3_Affiliated_Entities.py
+!pages/4_Premium.py
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Project specific
+# Ignore all CSV files by default
 *.csv
-*.db
-*.duckdb
-*.log
-*.pdf
-pbj_data.*
-subscriptions.db
 
-# Keep specific CSV files that are needed for the app
+# But keep these specific CSVs
 !national_lite_metrics.csv
 !state_lite_metrics.csv
 !facility_lite_metrics.csv
+!NH_ProviderInfo_Mar2025.csv
+!NH_ProviderInfo_Jun2025.csv
+!Nursing_Home_Affiliated_Entity_Performance_Measures_Jun_2025.csv
 
-# Python files - ignore all except specified ones
-*.py
-!requirements.txt
-!lite_report.py
-!pages/1_Premium.py
-!pages/2_Facility_Search.py
-!setup_database.py
-!PBJ_lite.py 
+# Ignore everything in data/mapping folders
+PBJcsv/
+NonNursecsv/
+standardized_PBJ/
+standardized_NonNurse/
+column_mapping_reports/
+
+# Ignore virtual environments and system files
+venv/
+__pycache__/
+.DS_Store
+*.pyc
