@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from typing import List, Dict
+import re
 
 st.set_page_config(page_title="Facility Search", page_icon="��", layout="wide")
 
@@ -63,12 +64,31 @@ with col1:
         [""] + sorted(pd.read_csv('state_lite_metrics.csv')['STATE'].unique().tolist())
     )
 
+def smart_title(name: str) -> str:
+    # Words to keep lowercase unless first word
+    lowercase_words = {'and', 'of', 'at'}
+    # Words to always uppercase
+    uppercase_words = {'llc', 'ltc'}
+    # Split by space, preserve punctuation
+    words = re.split(r'(\W+)', name)
+    result = []
+    for i, word in enumerate(words):
+        w = word.lower()
+        # Uppercase if in set or is 2-3 letter nonword (not in lowercase_words)
+        if w in uppercase_words or (len(w) in (2,3) and w.isalpha() and w not in lowercase_words):
+            result.append(w.upper())
+        elif i != 0 and w in lowercase_words:
+            result.append(w)
+        else:
+            result.append(w.capitalize())
+    return ''.join(result)
+
 # Create filtered search options based on selected state
 if state:
     state_facilities = facilities_df[facilities_df['STATE'] == state]
-    search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in state_facilities[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
+    search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in state_facilities[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
 else:
-    search_options = [f"{row['PROVNAME']} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
+    search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
 
 with col2:
     search_term = st.selectbox(
