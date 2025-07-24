@@ -1,5 +1,6 @@
 flask==2.0.1
-pandas>=2.0.0
-duckdb==0.7.1
+pandas==2.0.3
+duckdb==0.9.1
 plotly==5.3.1
-numpy>=1.24.0 
+numpy==1.24.4
+streamlit 
