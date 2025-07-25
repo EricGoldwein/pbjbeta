@@ -1260,18 +1260,23 @@ def main() -> None:
         if 'view_mode' not in st.session_state:
             st.session_state.view_mode = "Desktop"
         
-        # Simple mobile detection - for now, let's test with a manual override
+        # Mobile detection - check URL parameter first, then use default
         if 'is_mobile' not in st.session_state:
             st.session_state.is_mobile = False
             
-        # Debug: Show current mobile state and add manual toggle for testing
-        st.write(f"Debug - Mobile state: {st.session_state.get('is_mobile', False)}")
-        
-        # Manual toggle for testing mobile detection
-        if st.checkbox("Toggle Mobile Mode (for testing)", value=st.session_state.get('is_mobile', False)):
+        # Check URL parameter for mobile detection (for testing)
+        if st.query_params.get('mobile') == 'true':
             st.session_state.is_mobile = True
-        else:
+        elif st.query_params.get('mobile') == 'false':
             st.session_state.is_mobile = False
+            
+        # For now, let's add a simple way to test both modes
+        # You can add ?mobile=true or ?mobile=false to the URL to test
+        if st.query_params.get('debug') == 'true':
+            st.info(f"Debug: Mobile state is {st.session_state.is_mobile}")
+            if st.button("Toggle Mobile Mode"):
+                st.session_state.is_mobile = not st.session_state.is_mobile
+                st.rerun()
 
         # Get current page from URL
         current_page = st.query_params.get('page', 'dashboard')
