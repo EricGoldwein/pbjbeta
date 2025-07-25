@@ -1260,23 +1260,31 @@ def main() -> None:
         if 'view_mode' not in st.session_state:
             st.session_state.view_mode = "Desktop"
         
-        # Mobile detection - check URL parameter first, then use default
+        # Simple mobile detection for warning message only
+        # Check if we're on a mobile device using screen width
         if 'is_mobile' not in st.session_state:
+            # Default to desktop
             st.session_state.is_mobile = False
             
-        # Check URL parameter for mobile detection (for testing)
+        # Add JavaScript to detect mobile for warning message
+        st.markdown("""
+        <script>
+        (function() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile && !window.location.search.includes('mobile=true')) {
+                // Add mobile parameter to URL
+                const url = new URL(window.location);
+                url.searchParams.set('mobile', 'true');
+                window.history.replaceState({}, '', url);
+                window.location.reload();
+            }
+        })();
+        </script>
+        """, unsafe_allow_html=True)
+        
+        # Check URL parameter for mobile detection
         if st.query_params.get('mobile') == 'true':
             st.session_state.is_mobile = True
-        elif st.query_params.get('mobile') == 'false':
-            st.session_state.is_mobile = False
-            
-        # For now, let's add a simple way to test both modes
-        # You can add ?mobile=true or ?mobile=false to the URL to test
-        if st.query_params.get('debug') == 'true':
-            st.info(f"Debug: Mobile state is {st.session_state.is_mobile}")
-            if st.button("Toggle Mobile Mode"):
-                st.session_state.is_mobile = not st.session_state.is_mobile
-                st.rerun()
 
         # Get current page from URL
         current_page = st.query_params.get('page', 'dashboard')
