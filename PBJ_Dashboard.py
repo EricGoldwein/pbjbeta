@@ -1536,9 +1536,19 @@ def main() -> None:
                     elif level == "State":
                         display_subscription_button("state", selected_value, f"{selected_value} State Data")
                 else:
-                    # Hide warning on mobile, show on desktop only
-                    if not st.session_state.get('is_mobile', False):
-                        st.warning("Tip: Click the **>>** icon (top left) to open the sidebar and select a state or facility.")
+                    # Show warning with CSS to hide on mobile
+                    st.markdown("""
+                    <style>
+                    @media (max-width: 768px) {
+                        .warning-box {
+                            display: none !important;
+                        }
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    st.markdown('<div class="warning-box">', unsafe_allow_html=True)
+                    st.warning("Tip: Click the **>>** icon (top left) to open the sidebar and select a state or facility.")
+                    st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error filtering data: {str(e)}")
             return
