@@ -29,7 +29,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Add CSS to hide the toggle tip on desktop
+# Add CSS to hide the toggle tip on desktop and mobile-responsive title
 st.markdown("""
 <style>
 .toggle-tip-mobile {
@@ -38,6 +38,17 @@ st.markdown("""
 @media (min-width: 900px) {
     .toggle-tip-mobile {
         display: none !important;
+    }
+}
+
+/* Mobile-responsive title styling */
+@media (max-width: 768px) {
+    .dashboard-title {
+        font-size: 1.8em !important;
+        line-height: 1.2 !important;
+    }
+    .dashboard-subtitle {
+        font-size: 1.0em !important;
     }
 }
 </style>
@@ -1301,10 +1312,11 @@ def main() -> None:
         initial_level = st.query_params.get('level', 'National')
         initial_facility = st.query_params.get('facility', None)
 
-        # Title with custom styling
+        # Title with custom styling - matching About page dark blue color and mobile responsive
         st.markdown("""
-            <div>
-                <h1 class="main-header" style="margin-bottom: 0;">Nursing Home Staffing Dashboard</h1>
+            <div style='text-align: center; margin-bottom: 1.2em;'>
+                <span class="dashboard-title" style='font-size:2.3em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>Nursing Home Staffing Dashboard</span><br>
+                <span class="dashboard-subtitle" style='font-size:1.15em; color:#7a869a; font-weight:400;'>by 320 Consulting</span>
             </div>
         """, unsafe_allow_html=True)
 
