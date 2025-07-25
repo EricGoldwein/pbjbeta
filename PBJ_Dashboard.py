@@ -44,11 +44,8 @@ st.markdown("""
 /* Mobile-responsive title styling */
 @media (max-width: 768px) {
     .dashboard-title {
-        font-size: 1.8em !important;
+        font-size: 2.1em !important;
         line-height: 1.2 !important;
-    }
-    .dashboard-subtitle {
-        font-size: 1.0em !important;
     }
 }
 </style>
@@ -1315,8 +1312,7 @@ def main() -> None:
         # Title with custom styling - matching About page dark blue color and mobile responsive
         st.markdown("""
             <div style='text-align: center; margin-bottom: 1.2em;'>
-                <span class="dashboard-title" style='font-size:2.3em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>Nursing Home Staffing Dashboard</span><br>
-                <span class="dashboard-subtitle" style='font-size:1.15em; color:#7a869a; font-weight:400;'>by 320 Consulting</span>
+                <span class="dashboard-title" style='font-size:2.8em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>Nursing Home Staffing Dashboard</span>
             </div>
         """, unsafe_allow_html=True)
 
