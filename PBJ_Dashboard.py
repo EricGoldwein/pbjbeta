@@ -1312,7 +1312,7 @@ def main() -> None:
         st.markdown('''
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
-                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div class="toggle-tip-mobile" style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle <b>&gt;&gt;</b> icon on top left to navigate dashboard.</div>
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div class="toggle-tip-mobile" style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">💡 Toggle <b>&gt;&gt;</b> icon on top left to search facility, state, or ownership group.</div>
                 </div>
             </div>
         ''', unsafe_allow_html=True)
@@ -1392,7 +1392,7 @@ def main() -> None:
         selected_value = None
         try:
             if level == "State":
-                states = ["Select a state..."] + sorted(state_metrics['STATE'].unique().tolist())
+                states = ["---"] + sorted(state_metrics['STATE'].unique().tolist())
                 selected_state = st.sidebar.selectbox(
                     "Select State",
                     states,
@@ -1554,7 +1554,7 @@ def main() -> None:
                     }
                     </style>
                     """, unsafe_allow_html=True)
-                    st.warning("Tip: Click the **>>** icon (top left) to open the sidebar and select a state or facility.")
+                    st.warning("Tip: Click **>>** icon (top left) to open sidebar and select a state or facility.")
         except Exception as e:
             st.error(f"Error filtering data: {str(e)}")
             return
