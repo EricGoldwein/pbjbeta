@@ -15,11 +15,11 @@ st.markdown("""
 Most publicly available nursing home data focuses only on the latest quarter. This dashboard stitches together **eight years of CMS staffing files—billions of data points from payroll-based journal (PBJ) submissions—into interactive visualizations**, so you can see how staffing has changed over time and bring data-driven context to what’s happening inside the 15,000 nursing homes across the U.S.
 
 ### Who it helps  
-* **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.
+* **Journalists** – plug numbers and data visualizations into a nursing home investigation or ownership-focused report without wrangling raw CSVs.
 * **Attorneys** – spot staffing trends that may support a case. <b><a href="/Premium" style="color:#1769aa; text-decoration:underline;">Premium</a></b>: custom reports with daily, position-level analysis and data visualizations tied to citations and inspections.</span>
-* **Advocates & families** – see how a home stacks up over time for residents and loved ones.
+* **Advocates & families** – see how a nursing home stacks up over time for residents and loved ones.
 
-### What you can explore (public edition)  
+### What you can explore
 | View | Data you get |
 |------|--------------|
 | **National / State** | Nurse staffing hours per resident day (HPRD), contract staff %, census — every quarter since 2017 |
@@ -34,12 +34,12 @@ Most publicly available nursing home data focuses only on the latest quarter. Th
 
 ### Quick tour  
 1. Head to the sidebar (>> icon on top left) and pick **State**, **Facility**, or **Ownership**.
-2. Hover charts for values; drag the date slider to focus on any span.  
-3. Click **Export** for a ready-to-use PNG.
+2. Access state, facility, and ownership-level data and view data visualizations to spot trends over time.  
+3. Click **Export** for ready-to-use PNGs.
 
 ### Digging deeper?  
-Daily staffing logs, role-specific hours (Nurse and Non-Nurse), weekend vs. weekday splits, and citation-linked timelines live in the premium layer.  
-Email **eric@320insight.com** for a free demo. Journalists: If you're working on a story, I'm happy to share data or walk you through it.
+Daily staffing data and analysis, role-specific hours (Nurse and Non-Nurse), weekend vs. weekday splits, and citation-linked timelines live in the premium layer.  
+Email **eric@320insight.com** for requests. Journalists: If you're working on a story, I'm happy to share data or walk you through it.
 
 *Built by 320 Consulting. Feedback welcome (tell me what's broken!).*
 </div>
