@@ -388,7 +388,7 @@ def is_mobile():
     return st.session_state.get('is_mobile', False)
 
 def main():
-    st.title("🏢 Affiliated Entities Dashboard")
+    st.title("Ownership Dashboard")
     st.markdown("**Comprehensive performance metrics for nursing home ownership entities**")
     
     # Load data
@@ -416,7 +416,7 @@ def main():
         "Enter entity name to search:",
         options=[""] + entity_options,
         index=0,
-        help="Start typing to search for an entity. Results will show entity name and facility count."
+        help="Start typing to search for ownership entity. Results will show entity name and facility count."
     )
     
     # If no entity is selected, show placeholder
@@ -462,7 +462,7 @@ def main():
                 num_1star = (entity_facilities['Overall Rating'] == 1).sum()
 
         # High Risk Facilities
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">🚨 High Risk Facilities - {entity_name} <span class="help-icon" title="SFF: Special Focus Facilities with serious quality issues under CMS oversight. SFF Candidate: Facilities monitored for potential SFF designation. Abuse Icon: Facilities cited for abuse/neglect with actual or potential harm. 1-Star Rating: Facilities with the lowest CMS overall rating.">❓</span></h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">High-Risk Facilities - {entity_name} <span class="help-icon" title="SFF: Special Focus Facilities with serious quality issues under CMS oversight. SFF Candidate: Facilities monitored for potential SFF designation. Abuse Icon: Facilities cited for abuse. 1-Star Rating: Facilities with the lowest CMS overall rating.">ℹ️</span></h3></div>', unsafe_allow_html=True)
         risk_col1, risk_col2, risk_col3, risk_col4 = st.columns(4)
         with risk_col1:
             st.markdown(create_custom_metric(
@@ -490,29 +490,44 @@ def main():
         # Single column layout for detailed metrics
         
         # Ownership breakdown with pie chart
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">📊 Ownership Structure - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Ownership Type - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         own_col1, own_col2 = st.columns([1, 1])
         
         with own_col1:
             # Pie chart for ownership
+            def safe_pct(val):
+                try:
+                    v = float(val)
+                    return v if pd.notna(v) else 0.0
+                except Exception:
+                    return 0.0
+            for_profit = safe_pct(entity_row.get('Percent of facilities classified as for-profit', 0))
+            non_profit = safe_pct(entity_row.get('Percent of facilities classified as non-profit', 0))
+            government = safe_pct(entity_row.get('Percent of facilities classified as government-owned', 0))
+            pie_labels = ['For-Profit', 'Non-Profit', 'Government']
+            pie_values = [for_profit, non_profit, government]
+            # Custom tooltip text for each slice
+            pie_hovertext = [
+                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%',
+                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%',
+                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%'
+            ]
             fig_pie = go.Figure(data=[go.Pie(
-                labels=['For-Profit', 'Non-Profit', 'Government'],
-                values=[
-                    entity_row['Percent of facilities classified as for-profit'],
-                    entity_row['Percent of facilities classified as non-profit'],
-                    entity_row['Percent of facilities classified as government-owned']
-                ],
+                labels=pie_labels,
+                values=pie_values,
                 hole=0.3,
-                marker_colors=['#ff6b6b', '#4ecdc4', '#45b7d1']
+                marker_colors=['#ff6b6b', '#4ecdc4', '#45b7d1'],
+                text=pie_hovertext,
+                hoverinfo='text',
+                textinfo='none',
+                showlegend=True
             )])
-            
             fig_pie.update_layout(
-                height=300,
+                height=260,
                 showlegend=True,
-                margin=dict(l=20, r=20, t=40, b=20)
+                margin=dict(l=10, r=10, t=30, b=10)
             )
-            
             st.plotly_chart(fig_pie, use_container_width=True)
         
         with own_col2:
@@ -522,8 +537,7 @@ def main():
             st.markdown(create_narrow_metric("Government", f"{entity_row['Percent of facilities classified as government-owned']:.1f}%"), unsafe_allow_html=True)
         
         # CMS 5-Star Ratings
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">⭐ CMS 5-Star Ratings - {entity_name}</h3></div>', unsafe_allow_html=True)
-        
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">CMS 5-Star Ratings - {entity_name}</h3></div>', unsafe_allow_html=True)
         # Quality metrics with decimals for entity averages
         qual_col1, qual_col2, qual_col3, qual_col4 = st.columns(4)
         with qual_col1:
@@ -534,74 +548,111 @@ def main():
             st.markdown(create_custom_metric("Staffing Rating", f"{entity_row['Average staffing rating']:.1f}"), unsafe_allow_html=True)
         with qual_col4:
             st.markdown(create_custom_metric("Quality Rating", f"{entity_row['Average quality rating']:.1f}"), unsafe_allow_html=True)
-        
-        # Quality ratings chart
-        fig = go.Figure()
-        
-        metrics = ['Overall', 'Health Inspection', 'Staffing', 'Quality']
-        values = [
-            entity_row['Average overall 5-star rating'],
-            entity_row['Average health inspection rating'],
-            entity_row['Average staffing rating'],
-            entity_row['Average quality rating']
-        ]
-        
-        colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c']
-        
-        fig.add_trace(go.Bar(
-            x=metrics,
-            y=values,
-            marker_color=colors,
-            text=[f'{v:.1f}' for v in values],
-            textposition='auto'
-        ))
-        
-        fig.update_layout(
-            yaxis_title="Rating",
-            yaxis=dict(range=[0, 5]),
-            height=300,
-            showlegend=False,
-            margin=dict(l=20, r=20, t=40, b=20)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Facility ratings breakdown pie chart
-        if entity_id and entity_id != "":
-            entity_facilities = provider_data[
-                provider_data['Affiliated Entity ID'] == entity_id
-            ].copy()
-            
-            if not entity_facilities.empty:
-                # Count facilities by overall rating and ensure all ratings 1-5 are included
-                rating_counts = entity_facilities['Overall Rating'].value_counts()
-                
-                # Create a complete series with all ratings 1-5, filling missing ones with 0
-                complete_ratings = pd.Series(index=range(1, 6), data=0)
-                for rating, count in rating_counts.items():
-                    if pd.notna(rating) and rating in range(1, 6):
-                        complete_ratings[rating] = count
-                
-                # Create pie chart for facility ratings with red to blue scale, sorted 1-5
-                fig_ratings = go.Figure(data=[go.Pie(
-                    labels=[f"{rating}" for rating in complete_ratings.index],
-                    values=complete_ratings.values,
-                    hole=0.3,
-                    marker_colors=['#ff0000', '#ff6b6b', '#ffa726', '#4caf50', '#2196f3'],  # Red to blue scale
-                    sort=False  # Keep the order as specified
-                )])
-                
-                fig_ratings.update_layout(
-                    height=400,
-                    showlegend=True,
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    title="Distribution of Facility Overall Ratings"
-                )
-                
-                st.plotly_chart(fig_ratings, use_container_width=True)
+        # Quality ratings chart and distribution chart side by side
+        chart_col1, chart_col2 = st.columns(2)
+        with chart_col1:
+            metrics = ['Overall', 'Staffing', 'Health Inspection', 'Quality']
+            values = [
+                entity_row['Average overall 5-star rating'],
+                entity_row['Average staffing rating'],
+                entity_row['Average health inspection rating'],
+                entity_row['Average quality rating']
+            ]
+            colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c']
+            # Each bar gets its own hovertemplate
+            bar_hovertemplates = [
+                'Overall: %{y:.1f}<extra></extra>',
+                'Staffing: %{y:.1f}<extra></extra>',
+                'Health Inspection: %{y:.1f}<extra></extra>',
+                'Quality: %{y:.1f}<extra></extra>'
+            ]
+            fig = go.Figure()
+            for i, (metric, value, color, hovertemplate) in enumerate(zip(metrics, values, colors, bar_hovertemplates)):
+                fig.add_trace(go.Bar(
+                    x=[metric],
+                    y=[value],
+                    marker_color=color,
+                    # Remove text labels from bars
+                    text=None,
+                    textposition=None,
+                    hovertemplate=hovertemplate,
+                    width=[0.5]
+                ))
+            fig.update_layout(
+                yaxis_title="CMS 5-Star Rating",
+                yaxis=dict(range=[0, 5], tickfont=dict(size=13)),
+                height=260,
+                showlegend=False,
+                margin=dict(l=10, r=10, t=30, b=10),
+                bargap=0.35
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        with chart_col2:
+            # Facility ratings breakdown pie chart
+            if entity_id and entity_id != "":
+                entity_facilities = provider_data[
+                    provider_data['Affiliated Entity ID'] == entity_id
+                ].copy()
+                if not entity_facilities.empty:
+                    # Count facilities by overall rating and ensure all ratings 1-5 are included
+                    rating_counts = entity_facilities['Overall Rating'].value_counts()
+                    # Create a complete series with all ratings 1-5, filling missing ones with 0
+                    complete_ratings = pd.Series(index=range(1, 6), data=0)
+                    for rating, count in rating_counts.items():
+                        if pd.notna(rating) and rating in range(1, 6):
+                            complete_ratings[rating] = count
+                    total_facilities = complete_ratings.sum()
+                    # Calculate percentages and filter out 0% slices
+                    rating_percents = [((count / total_facilities) * 100 if total_facilities > 0 else 0) for count in complete_ratings.values]
+                    # Only include slices where count > 0 (not just percent > 0)
+                    dist_labels = []
+                    dist_values = []
+                    dist_hovertext = []
+                    for rating, count, pct in zip(complete_ratings.index, complete_ratings.values, rating_percents):
+                        if count > 0:
+                            dist_labels.append(f"{rating}")
+                            dist_values.append(count)
+                            dist_hovertext.append(f'{rating} star: {pct:.1f}% ({count} NHs)')
+                    # Logical color scheme: 1=red, 2=orange, 3=yellow, 4=light green, 5=blue
+                    star_colors = ['#e74c3c', '#e67e22', '#f7dc6f', '#58d68d', '#3498db']
+                    # Only use as many colors as there are slices (always in 1-5 order)
+                    used_colors = [star_colors[int(rating)-1] for rating in dist_labels]
+                    fig_ratings = go.Figure(data=[go.Pie(
+                        labels=dist_labels,
+                        values=dist_values,
+                        hole=0.3,
+                        marker_colors=used_colors,
+                        sort=False,
+                        text=dist_hovertext,
+                        hoverinfo='text',
+                        textinfo='none',
+                        showlegend=True
+                    )])
+                    fig_ratings.update_layout(
+                        height=260,
+                        showlegend=True,
+                        margin=dict(l=70, r=0, t=30, b=10),
+                        legend=dict(
+                            orientation='v',
+                            x=1.05,
+                            y=0.5,
+                            xanchor='left',
+                            yanchor='middle',
+                            bgcolor='#f8f9fa',
+                            bordercolor='#e0e0e0',
+                            borderwidth=1,
+                            font=dict(size=13),
+                            itemclick='toggleothers',
+                            itemdoubleclick='toggle'
+                        )
+                    )
+                    title_col1, title_col2, title_col3 = st.columns([0.15, 0.7, 0.15])
+                    with title_col2:
+                        st.markdown('<div style="text-align:center; font-size:1em; font-weight:400; color:#444; margin-bottom:0.2em;">CMS 5-Star Rating Distribution</div>', unsafe_allow_html=True)
+                    st.plotly_chart(fig_ratings, use_container_width=True)
         
         # Staffing metrics
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">👥 Staffing - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Staffing Levels - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         staff_col1, staff_col2, staff_col3, staff_col4 = st.columns(4)
         with staff_col1:
@@ -621,7 +672,7 @@ def main():
             st.markdown(create_custom_metric("RN Turnover", f"{entity_row['Average Registered Nurse turnover percentage']:.1f}%"), unsafe_allow_html=True)
         
         # Compliance metrics
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">⚠️ Compliance - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         comp_col1, comp_col2, comp_col3, comp_col4 = st.columns(4)
         with comp_col1:
@@ -634,7 +685,7 @@ def main():
             st.markdown(create_custom_metric("Avg Payment Denials", f"{entity_row['Average number of payment denials']:.1f}"), unsafe_allow_html=True)
         
         # Antipsychotic usage
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">💊 Antipsychotics - {entity_name}</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Antipsychotics - {entity_name}</h3></div>', unsafe_allow_html=True)
         
         anti_col1, anti_col2 = st.columns(2)
         with anti_col1:
@@ -643,7 +694,7 @@ def main():
             st.markdown(create_custom_metric("Long-Stay Antipsychotic", f"{entity_row['Average percentage of long-stay residents who received an antipsychotic medication']:.1f}%"), unsafe_allow_html=True)
         
         # Facilities list
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">🏥 {entity_name} Facilities</h3></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {entity_name}</h3></div>', unsafe_allow_html=True)
         
         # Get facilities for this entity
         if entity_id and entity_id != "":
@@ -701,7 +752,7 @@ def main():
                 
                 # Add filter for high-risk facilities
                 show_high_risk_only = st.checkbox(
-                    "Show High-Risk Facilities Only", 
+                    "Show high-risk facilities only", 
                     value=False,
                     help="Filter to show only facilities with Overall Rating '1', SFF status, SFF Candidate status, or Abuse Icon 'Y'"
                 )
@@ -722,7 +773,7 @@ def main():
                         st.markdown('</div>', unsafe_allow_html=True)
                         return
                     else:
-                        st.success(f"Showing {len(facilities_display)} high-risk facilities out of {total_facilities} total facilities.")
+                        st.success(f"Showing {len(facilities_display)} high-risk facilities out of {total_facilities} total.")
                 
                 # Create provider names as HTML links
                 facilities_display['Provider Name'] = facilities_display.apply(
@@ -817,27 +868,6 @@ def main():
         else:
             st.info("Entity ID not available for facility lookup.")
         
-        # Full data table (collapsible) - Fixed to show variable names in two columns
-        with st.expander("📋 View Complete Entity Data", expanded=False):
-            # Convert the series to a dataframe with proper column names
-            entity_df = pd.DataFrame({
-                'Variable': entity_row.index,
-                'Value': entity_row.values
-            })
-            
-            # Display in two columns
-            col1, col2 = st.columns(2)
-            
-            # Split the data into two halves
-            mid_point = len(entity_df) // 2
-            left_data = entity_df.iloc[:mid_point]
-            right_data = entity_df.iloc[mid_point:]
-            
-            with col1:
-                st.dataframe(left_data, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.dataframe(right_data, use_container_width=True, hide_index=True)
     else:
         st.warning(f"No data found for the selected entity: {entity_name}")
         return

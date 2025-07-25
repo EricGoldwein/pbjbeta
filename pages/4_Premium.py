@@ -52,8 +52,8 @@ st.markdown("""
 # Premium Header
 st.markdown("""
     <div class="premium-header">
-        <h1>320 Premium Services</h1>
-        <p style="font-size: 1.2em; margin-bottom: 0;">Digging deeper into nursing home data</p>
+        <h1>320 Premium</h1>
+        <p style="font-size: 1.2em; margin-bottom: 0;">Dig deeper into nursing home data</p>
     </div>
 """, unsafe_allow_html=True)
 

@@ -11,9 +11,9 @@ from typing import Dict, Optional, List, Tuple, Any
 # Set sidebar collapsed on mobile
 import streamlit as st
 if st.session_state.get('is_mobile', False):
-    st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(page_title="Nursing Home Staffing Data by 320", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 else:
-    st.set_page_config(page_title="PBJ Data", page_icon="📊", layout="wide", initial_sidebar_state="auto")
+    st.set_page_config(page_title="Nursing Home Staffing Data by 320", page_icon="📊", layout="wide", initial_sidebar_state="auto")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
@@ -48,6 +48,23 @@ facility_db = duckdb.connect(':memory:')
 
 # Initialize provider info cache
 provider_info_cache: Dict[str, Dict[str, str]] = {}
+
+state_name_map = {
+    'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona', 'CA': 'California', 'CO': 'Colorado',
+    'CT': 'Connecticut', 'DC': 'District of Columbia', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+    'HI': 'Hawaii', 'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
+    'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland', 'ME': 'Maine',
+    'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana',
+    'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+    'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
+    'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
+    'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
+    'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
+}
+
+def get_full_state_name(state_abbr: str) -> str:
+    """Return the full state name for a given abbreviation."""
+    return state_name_map.get(state_abbr, state_abbr)
 
 @st.cache_data
 def load_metrics_data():
@@ -950,9 +967,9 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
     
     st.markdown(f"""
         <div class="premium-services">
-            <h3>320 Premium Reports</h3>
-            <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.</p>
-            <p>To request a report or talk through what you need:</p>
+            <h3>Premium Services</h3>
+            <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy.</p>
+            <p>To request a report:</p>
             <p><a href="mailto:eric@320insight.com">📧 eric@320insight.com</a></p>
         </div>
     """, unsafe_allow_html=True)
@@ -991,11 +1008,12 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             state = metrics['STATE'].iloc[0]
             facility_count = current_metrics['Facility_Count'].iloc[0] if 'Facility_Count' in current_metrics else len(current_metrics['PROVNUM'].unique())
             prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics else None
-            header_text = f"{state} Key Metrics ({quarter_name})"
+            full_state_name = get_full_state_name(state)
+            header_text = f"{full_state_name} Key Metrics ({quarter_name})"
         elif level == "National":
             facility_count = current_metrics['Facility_Count'].iloc[0] if 'Facility_Count' in current_metrics else len(current_metrics['PROVNUM'].unique())
             prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics else None
-            header_text = f"US Key Metrics ({quarter_name})"
+            header_text = f"USA Key Metrics ({quarter_name})"
         else:  # Facility level
             provnum = current_metrics['PROVNUM'].iloc[0]
             provname = proper_title_case(current_metrics['PROVNAME'].iloc[0])
@@ -1067,7 +1085,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             with metric_cols[3]:
                 if staffing_rating is not None:
                     st.metric("CMS Staffing Rating", 
-                             f"{int(staffing_rating)} \u2b50",
+                             f"{int(staffing_rating)}",
                              staffing_trend,
                              help="CMS 5-star rating (June 2025 vs. March 2025).")
                 else:
@@ -1079,7 +1097,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             with metric_cols[4]:
                 if overall_rating is not None:
                     st.metric("CMS Overall Rating", 
-                             f"{overall_rating} \u2b50",
+                             f"{overall_rating}",
                              overall_trend,
                              help="CMS 5-star rating (June 2025 vs. March 2025).")
                 else:
@@ -1104,22 +1122,11 @@ def format_metric(value, decimal_places=1, percentage=False, thousands=False):
 def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
-        state_name_map = {
-            'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona', 'CA': 'California', 'CO': 'Colorado',
-            'CT': 'Connecticut', 'DC': 'District of Columbia', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
-            'HI': 'Hawaii', 'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
-            'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland', 'ME': 'Maine',
-            'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana',
-            'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
-            'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
-            'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
-            'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
-            'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
-        }
+        data = df.sort_values('date')
+        # Restore title_prefix logic
         if state:
-            state_name = state_name_map.get(state, state)
-            title_prefix = f"{state_name} Staffing Trends (2017-2024)"
-            data = df[df['STATE'] == state].copy()
+            full_state_name = get_full_state_name(state)
+            title_prefix = f"{full_state_name} Staffing Trends (2017-2024)"
         elif facility:
             facility_name = get_provider_info(facility, 'name')
             facility_state = get_provider_info(facility, 'state')
@@ -1127,10 +1134,8 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                 title_prefix = f"{facility_name}, {facility_state} (2017-2024)"
             else:
                 title_prefix = f"Facility {facility} (2017-2024)"
-            data = df[df['PROVNUM'] == facility].copy()
         else:
             title_prefix = "National Staffing Trends (2017-2024)"
-            data = df.copy()
         
         # Sort data by date
         data = data.sort_values('date')
@@ -1151,8 +1156,18 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         hover_contract = "<b>%{customdata}</b><br>%{y:.2f}%<extra></extra>"
         
         # Desktop figure (3 charts)
-        fig = make_subplots(rows=3, cols=1,
+        if state:
+            full_state_name = get_full_state_name(state)
+            fig = make_subplots(rows=3, cols=1,
+                  subplot_titles=(f'Total Nurse HPRD - {full_state_name}', f'Census - {full_state_name}', f'Contract Staff Percentage - {full_state_name}'),
+                          vertical_spacing=0.15)
+        elif facility:
+            fig = make_subplots(rows=3, cols=1,
                   subplot_titles=('Total Nurse HPRD', 'Census', 'Contract Staff Percentage'),
+                          vertical_spacing=0.15)
+        else:
+            fig = make_subplots(rows=3, cols=1,
+                  subplot_titles=('Total Nurse HPRD - National', 'Census - National', 'Contract Staff Percentage - National'),
                           vertical_spacing=0.15)
 
         # Add all traces for desktop view
@@ -1338,15 +1353,13 @@ def main() -> None:
         selected_value = None
         try:
             if level == "State":
-                # Get unique states and sort them
-                states = sorted(state_metrics['STATE'].unique().tolist())
-                # Set default to first state
+                states = ["Select a state..."] + sorted(state_metrics['STATE'].unique().tolist())
                 selected_state = st.sidebar.selectbox(
                     "Select State",
                     states,
                     index=0
                 )
-                selected_value = selected_state
+                selected_value = selected_state if selected_state != "Select a state..." else None
             elif level == "Facility":
                 search_container = st.sidebar.container()
                 
@@ -1369,7 +1382,7 @@ def main() -> None:
                 # Add help text with hyperlink
                 st.sidebar.markdown(
                     '<div style="margin-top: -15px; margin-bottom: 15px;">'
-                    '<a href="?page=Facility_Search" target="_self" style="color: #1E88E5; text-decoration: none; font-size: 0.9em;">'
+                    '<a href="/Facility_Search" target="_self" style="color: #1E88E5; text-decoration: none; font-size: 0.9em;">'
                     'Help finding facility data</a></div>',
                     unsafe_allow_html=True
                 )
