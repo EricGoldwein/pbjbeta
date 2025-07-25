@@ -785,15 +785,34 @@ def sort_quarters(quarters, reverse=False):
     normalized = [normalize_quarter(q) for q in quarters]
     return sorted(normalized, reverse=reverse)
 
-def display_facility_info(provnum: str):
-    """Display facility information in a formatted box."""
+def display_facility_info(provnum: str, quarter_name: str = None, affiliated_entity: str = None):
+    """Display facility information in a formatted box. On mobile, remove ownership entity and show quarter below provider name."""
     try:
-        # Get basic facility info
         facility_info = get_facility_info(provnum)
         if not facility_info:
             return
 
-        # Add CSS to the page
+        # Detect mobile
+        is_mobile = st.session_state.get('is_mobile', False)
+
+        def format_title_case(text):
+            if pd.isna(text):
+                return 'N/A'
+            words = text.split()
+            formatted_words = []
+            for i, word in enumerate(words):
+                if i == 0 or word.lower() not in ['and', 'at', 'of', 'the', 'in', 'on', 'for', 'to', 'with', 'by']:
+                    formatted_words.append(word.capitalize())
+                else:
+                    formatted_words.append(word.lower())
+            return ' '.join(formatted_words)
+
+        formatted_provider_name = format_title_case(facility_info['provider_name'])
+        formatted_county = format_title_case(facility_info['county'])
+        ccn = facility_info['ccn']
+        state = facility_info['state']
+        care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{ccn}?state={state}"
+
         st.markdown("""
             <style>
             div.facility-info-box {
@@ -836,8 +855,6 @@ def display_facility_info(provnum: str):
             div.facility-info-item a:hover {
                 text-decoration: underline;
             }
-            
-            /* Mobile-specific styles */
             @media (max-width: 768px) {
                 div.facility-info-box {
                     padding: 12px 16px;
@@ -859,70 +876,65 @@ def display_facility_info(provnum: str):
                     margin-top: 8px;
                     display: block;
                 }
-                /* Hide labels on mobile */
                 div.facility-info-item span.label {
                     display: none;
                 }
-                /* Adjust spacing for mobile */
                 div.facility-info-item {
                     margin-bottom: 4px;
                 }
-                /* Make text slightly larger on mobile */
                 div.facility-info-item strong {
                     font-size: 1.1em;
+                }
+                .facility-quarter-row {
+                    font-size: 1.08em;
+                    color: #1976d2;
+                    font-weight: 600;
+                    margin-top: 2px;
+                    margin-bottom: 2px;
                 }
             }
             </style>
         """, unsafe_allow_html=True)
 
-        # Format provider name and city with proper title case
-        def format_title_case(text):
-            if pd.isna(text):
-                return 'N/A'
-            words = text.split()
-            formatted_words = []
-            for i, word in enumerate(words):
-                if i == 0 or word.lower() not in ['and', 'at', 'of', 'the', 'in', 'on', 'for', 'to', 'with', 'by']:
-                    formatted_words.append(word.capitalize())
-                else:
-                    formatted_words.append(word.lower())
-            return ' '.join(formatted_words)
-
-        formatted_provider_name = format_title_case(facility_info['provider_name'])
-        formatted_county = format_title_case(facility_info['county'])
-
-        # Add subtle modern styling for metric containers only (not delta or value)
-        st.markdown("""
-            <style>
-            div[data-testid="stMetric"] {
-                background: #f7fafd;
-                border: 1px solid #e3eaf3;
-                border-radius: 10px;
-                box-shadow: 0 1px 4px rgba(30,136,229,0.04);
-                padding: 18px 10px 4px 10px;
-                margin: 0 4px 10px 4px;
-                max-width: 240px;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # Add the facility information HTML
-        st.markdown(f"""
-            <div class="facility-info-box">
-                <div class="facility-info-grid">
-                    <div class="facility-info-item">
-                        <span class="label">Provider:</span> <strong>{formatted_provider_name} ({facility_info['ccn']})</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        <span class="label">Location:</span> <strong>{formatted_county}, {facility_info['state']}</strong>
-                    </div>
-                    <div class="facility-info-item">
-                        <a href="https://www.medicare.gov/care-compare/details/nursing-home/{facility_info['ccn']}?state={facility_info['state']}" target="_blank">Care Compare</a>
+        # Mobile: no ownership entity, quarter on its own row
+        if is_mobile:
+            st.markdown(f"""
+                <div class="facility-info-box">
+                    <div class="facility-info-grid">
+                        <div class="facility-info-item">
+                            <span class="label">Provider:</span> <strong>{formatted_provider_name} ({ccn})</strong>
+                        </div>
+                        <div class="facility-info-item">
+                            <span class="label">Location:</span> <strong>{formatted_county}, {state}</strong>
+                        </div>
+                        <div class="facility-quarter-row">{quarter_name if quarter_name else ''}</div>
+                        <div class="facility-info-item">
+                            <a href="{care_compare_url}" target="_blank">Care Compare</a>
+                        </div>
                     </div>
                 </div>
-            </div>
-        """, unsafe_allow_html=True)
-
+            """, unsafe_allow_html=True)
+        else:
+            # Desktop: show ownership entity if present, quarter inline
+            st.markdown(f"""
+                <div class="facility-info-box">
+                    <div class="facility-info-grid">
+                        <div class="facility-info-item">
+                            <span class="label">Provider:</span> <strong>{formatted_provider_name} ({ccn})</strong>
+                        </div>
+                        <div class="facility-info-item">
+                            <span class="label">Location:</span> <strong>{formatted_county}, {state}</strong>
+                        </div>
+                        <div class="facility-info-item">
+                            <span class="label">Quarter:</span> <strong>{quarter_name if quarter_name else ''}</strong>
+                        </div>
+                        {f'<div class="facility-info-item"><span class="label">Ownership:</span> <strong>{affiliated_entity}</strong></div>' if affiliated_entity else ''}
+                        <div class="facility-info-item">
+                            <a href="{care_compare_url}" target="_blank">Care Compare</a>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Error displaying facility info: {str(e)}")
 
@@ -1024,7 +1036,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             # Get affiliated entity for header
             affiliated_entity = get_facility_affiliated_entity(provnum)
             if affiliated_entity:
-                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name} | {affiliated_entity}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>View on Care Compare</a></div>"
+                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name} | {affiliated_entity}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>Care Compare</a></div>"
             else:
                 header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>Care Compare</a></div>"
         st.markdown(f'''
@@ -1274,7 +1286,8 @@ def main() -> None:
         st.markdown('''
             <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: 0;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
-                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div class="toggle-tip-mobile" style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle &gt;&gt; icon on top left to navigate dashboard.</div>
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. facility.                 <div class="toggle-tip-mobile" style="font-size:0.89em; color:#5a6473; font-style: italic; margin-bottom: 8px; font-weight: 400;">Toggle <b>&gt;&gt;</b> icon on top left to navigate dashboard.</div>
+                </div>
             </div>
         ''', unsafe_allow_html=True)
         # Sidebar
@@ -1455,8 +1468,18 @@ def main() -> None:
                 # Get selected facility details
                 selected_facility = next((fac for fac in matching_facilities if fac['PROVNUM'] == selected_value), None)
                 if selected_facility:
+                    # Compute current quarter label for facility info box
+                    if not filtered_data.empty and 'CY_QTR' in filtered_data.columns:
+                        available_quarters = sort_quarters(filtered_data['CY_QTR'].unique(), reverse=True)
+                        current_quarter = available_quarters[0]
+                        current_quarter = normalize_quarter(current_quarter)
+                        year = current_quarter[:4]
+                        quarter_num = current_quarter[-1]
+                        quarter_label = f"Q{quarter_num} {year}"
+                    else:
+                        quarter_label = ""
                     # 1. Display facility info box
-                    display_facility_info(selected_value)
+                    display_facility_info(selected_value, quarter_name=quarter_label, affiliated_entity=get_facility_affiliated_entity(selected_value))
                     
                     # 2. Display metrics
                     display_metrics(filtered_data, level)

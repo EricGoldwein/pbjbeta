@@ -12,7 +12,7 @@ st.markdown("""
     </div>
 
 ### Context Matters
-Most publicly available nursing home data shows only the latest quarter. This dashboard stitches **eight years of CMS staffing files—billions of data points from payroll-based journals (PBJ)—into a single view**, so you can see how staffing has changed over time, and bring data-driven context to what’s happening inside facilities and chains.
+Most publicly available nursing home data focuses only on the latest quarter. This dashboard stitches together **eight years of CMS staffing files—billions of data points from payroll-based journal (PBJ) submissions—into interactive visualizations**, so you can see how staffing has changed over time and bring data-driven context to what’s happening inside the 15,000 nursing homes across the U.S.
 
 ### Who it helps  
 * **Journalists** – plug numbers and data visualizations into an investigation or ownership-focused report without wrangling raw CSVs.
@@ -48,41 +48,54 @@ Email **eric@320insight.com** for a free demo. Journalists: If you're working on
 # Section divider
 st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>", unsafe_allow_html=True)
 
-# Data Source Section
-st.header("Data Source")
+# --- Styled container for Data Source through Census explanation ---
 st.markdown("""
-This Nursing Home Staffing Dashboard uses [CMS Payroll-Based Journal (PBJ) data](https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing) from 2017 to 2024, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses [Provider Information](https://data.cms.gov/provider-data/dataset/4pq5-n9py) (June 2025, March 2025) and [Affiliated Entity](https://data.cms.gov/quality-of-care/nursing-home-affiliated-entity-performance-measures/data) (June 2025) datasets.
-""")
+<div style="background: #f5f8fd; border-radius: 10px; padding: 2.2rem 2.5rem 1.5rem 2.5rem; margin-bottom: 2.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+    <div>
+        <h2 style='font-size:1.5em; font-weight:700; color:#1769aa; margin-bottom:0.7em;'>Methodology</h2>
+        <div style='font-size:1.08em; color:#222; font-weight:400;'>
+            This Nursing Home Staffing Dashboard uses <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">CMS Payroll-Based Journal (PBJ) data</a> from 2017 to 2024, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses <a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">Provider Information</a> (June 2025, March 2025) and <a href="https://data.cms.gov/quality-of-care/nursing-home-affiliated-entity-performance-measures/data" target="_blank">Affiliated Entity</a> (June 2025) datasets.
+        </div>
+        <hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>
+        <h2 style='font-size:1.3em; font-weight:700; color:#1769aa; margin-bottom:0.5em;'>Staffing Categories</h2>
+        <div style='font-size:1.08em; color:#222; font-weight:400;'>
+            Total nurse staff includes:
+            <ul style='margin-top:0.5em; margin-bottom:0.5em;'>
+                <li>Registered Nurse (RN)</li>
+                <li>RN Director of Nursing (DON)</li>
+                <li>RN Admin</li>
+                <li>Licensed Practical Nurse (LPN)</li>
+                <li>LPN Admin</li>
+                <li>Certified Nursing Assistant (CNA)</li>
+                <li>Nurse Aide in Training</li>
+                <li>Medication Aide/Technician</li>
+            </ul>
+        </div>
+        <hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>
+        <div style='font-size:1.13em; font-weight:700; color:#1769aa; margin-bottom:0.5em; margin-top:1.2em;'>Metrics Explained</div>
+        <div style='font-size:1.08em; color:#222; font-weight:400; line-height:1.45;'>
+            <b>Total Nurse HPRD:</b> Hours Per Resident Day - Total nurse staff hours per resident per day.<br>
+            <b>Contract Staff Percentage:</b> Percentage of nurse staff hours provided by contract staff.<br>
+            <b>Census:</b> Average number of residents in facility during the reporting period.
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# About 320 Consulting Section
+st.markdown("""
+<div style="background: #f5f8fd; border-radius: 10px; padding: 2.2rem 2.5rem 1.5rem 2.5rem; margin-bottom: 2.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+    <div>
+        <h2 style='font-size:1.5em; font-weight:700; color:#1769aa; margin-bottom:0.7em;'>About 320 Consulting</h2>
+        <div style='font-size:1.08em; color:#222; font-weight:400;'>
+            320 Consulting is led by Eric Goldwein, MPH, a data consultant with expertise in nursing home staffing. His work has been published in the Journal of the American Geriatrics Society, and he has presented at national conferences hosted by the National Association of Medicaid Fraud Control Units, Consumer Voice, the American Society on Aging, and the NYS Long Term Care Ombudsman Program. He previously led data and policy work at the Long Term Care Community Coalition.
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Section divider
 st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>", unsafe_allow_html=True)
-
-# Staffing Categories Section
-st.header("Staffing Categories")
-st.write("Total nurse staff includes:")
-st.markdown("""
-- Registered Nurse (RN)
-- Director of Nursing (DON)
-- RN with administrative duties
-- Licensed Practical Nurse (LPN) with administrative duties
-- LPN
-- Certified Nursing Assistant (CNA)
-- Medication Aide/Technician
-- Nurse Aide in Training
-""")
-
-# Section divider
-st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>", unsafe_allow_html=True)
-
-# Metrics Section
-st.header("Metrics Explained")
-st.markdown("""
-**Total Nurse HPRD:** Hours Per Resident Day - The total number of nursing hours provided per resident per day.
-
-**Contract Staff Percentage:** The percentage of nursing hours provided by contract staff.
-
-**Census:** The average number of residents in the facility during the reporting period.
-""")
 
 # Footer
 st.markdown("""

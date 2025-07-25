@@ -57,82 +57,77 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Introduction
-st.markdown("""
-<a href="https://www.320insight.com/" target="_blank" style="text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work.<br><br>
-To request a report or talk through what you need: eric@320insight.com
-""", unsafe_allow_html=True)
+# Replace the introduction paragraph at the top of the Premium page
+st.markdown('''
+<a href="https://www.320insight.com/" target="_blank" style="font-weight: bold; text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work. Reports include tailored data visualizations, interactive tables, and in-depth analyses to help you uncover patterns and build evidence.
+
+<a href="mailto:eric@320insight.com" style="text-decoration: none; font-size: 1.08em;">📧 eric@320insight.com</a>
+''', unsafe_allow_html=True)
+
+st.markdown(
+    '<p><i>Journalists: Working on a story? Happy to help (no charge).</i></p>',
+    unsafe_allow_html=True
+)
 
 # Premium Features
-st.markdown("### Premium Services")
+st.markdown('''
 
-# Feature 1: Daily Staffing Lookup
-st.markdown("""
-    <div class="premium-feature">
-        <h3>📊 Daily Staffing Analysis</h3>
-        <p>Access detailed daily staffing data for any facility since 2017, including:</p>
-        <ul>
-            <li>Daily staffing levels for all positions</li>
-            <li>Anomaly detection for unusual staffing patterns</li>
-            <li>Historical trend analysis</li>
-            <li>Custom date range comparisons</li>
-            <li>Shareable data visualizations and tables</li>
-        </ul>
-    </div>
-""", unsafe_allow_html=True)
+<div style="margin-bottom: 32px; padding-bottom: 8px; border-bottom: 1.5px solid #e3eaf3;"></div>
 
-# Feature 2: Custom Staffing Reports
-st.markdown("""
-    <div class="premium-feature">
-        <h3>👥 Comprehensive Staffing Reports</h3>
-        <p>Get detailed reports on every position, including:</p>
-        <ul>
-            <li>Administrators and DONs</li>
-            <li>RNs, LPNs, and CNAs</li>
-            <li>Physical, Occupational, and Speech Therapists</li>
-            <li>Social Workers and Activities Staff</li>
-            <li>Contract staff utilization</li>
-            <li>Custom shareable data visualizations</li>
-        </ul>
-    </div>
-""", unsafe_allow_html=True)
+<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 32px;">
+<h3 style="margin-top: 0;">Daily Staffing Analysis</h3>
+Access detailed daily staffing data for any facility since 2017.
+<ul>
+<li>Daily staffing levels for all positions</li>
+<li>Anomaly detection for unusual patterns</li>
+<li>Historical trend analysis</li>
+<li>Custom date range comparisons</li>
+</ul>
+<b><i>Example: Spot weekend staffing dips or compare RN levels before and after a major inspection.</i></b>
+</div>
 
-# Feature 3: Ownership Analysis
-st.markdown("""
-    <div class="premium-feature">
-        <h3>🏢 Ownership Group Analysis</h3>
-        <p>Understand facility ownership patterns and trends:</p>
-        <ul>
-            <li>Affiliated entity identification</li>
-            <li>Cross-facility staffing patterns</li>
-            <li>Ownership group performance metrics</li>
-            <li>Historical ownership changes</li>
-            <li>Custom shareable ownership reports</li>
-        </ul>
-    </div>
-""", unsafe_allow_html=True)
+<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 32px;">
+<h3 style="margin-top: 0;">Comprehensive Staffing Reports</h3>
+Break down staffing by role, from RNs to social workers.
+<ul>
+<li>Administrators and DONs</li>
+<li>RNs, LPNs, CNAs</li>
+<li>Physical, Occupational, and Speech Therapists</li>
+<li>Social Workers and Activities Staff</li>
+<li>Contract staff utilization</li>
+</ul>
+<b><i>Example: Build a full staffing profile of a facility cited for resident neglect.</i></b>
+</div>
 
-# Feature 4: Citations Analysis
-st.markdown("""
-    <div class="premium-feature">
-        <h3>📋 Citations Analysis</h3>
-        <p>Comprehensive analysis of facility citations:</p>
-        <ul>
-            <li>Form CMS-2567 data integration</li>
-            <li>Citation summaries and trends</li>
-            <li>Staffing correlation analysis</li>
-            <li>Historical citation patterns</li>
-            <li>Custom shareable citation reports</li>
-        </ul>
-    </div>
-""", unsafe_allow_html=True)
+<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 32px;">
+<h3 style="margin-top: 0;">Ownership Group Analysis</h3>
+Trace staffing and performance across affiliated facilities.
+<ul>
+<li>Affiliated entity identification</li>
+<li>Cross-facility staffing patterns</li>
+<li>Ownership group performance metrics</li>
+<li>Historical ownership changes</li>
+</ul>
+<b><i>Example: Investigate how a chain’s staffing changed in the months before bankruptcy.</i></b>
+</div>
+
+<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 16px;">
+<h3 style="margin-top: 0;">Citations Analysis</h3>
+Analyze inspection reports and link citations to staffing.
+<ul>
+<li>Form CMS-2567 data integration</li>
+<li>Citation summaries and trends</li>
+<li>Staffing correlation analysis</li>
+<li>Historical citation patterns</li>
+</ul>
+<b><i>Example: Identify whether facilities with repeated infection-control citations had chronic CNA shortages.</i></b>
+</div>
+''', unsafe_allow_html=True)
 
 # Contact Section
 st.markdown("""
     <div class="contact-section">
-        <h3>Ready to get started?</h3>
-        <p>Contact Eric to request a custom report or talk through your project:</p>
-        <p><a href="mailto:eric@320insight.com" class="contact-link">📧 eric@320insight.com</a></p>
+        <p>Reach out to request a custom report or talk through your project: <a href="mailto:eric@320insight.com" class="contact-link">eric@320insight.com</a></p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -144,14 +139,6 @@ def display_footer():
             <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
         </div>
     """, unsafe_allow_html=True)
-
-# Data Source
-st.markdown("""
-    <div class="data-source">
-        <p><strong>Data Source:</strong> Analysis primarily based on CMS Payroll-Based Journal (PBJ) data, 
-        supplemented with additional CMS datasets and proprietary analysis tools.</p>
-    </div>
-""", unsafe_allow_html=True)
 
 # Add footer at the end of the page
 display_footer() 
