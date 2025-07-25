@@ -462,7 +462,10 @@ def main():
                 num_1star = (entity_facilities['Overall Rating'] == 1).sum()
 
         # High Risk Facilities
-        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">High-Risk Facilities - {entity_name} <span class="help-icon" title="SFF: Special Focus Facilities with serious quality issues under CMS oversight. SFF Candidate: Facilities monitored for potential SFF designation. Abuse Icon: Facilities cited for abuse. 1-Star Rating: Facilities with the lowest CMS overall rating.">ℹ️</span></h3></div>', unsafe_allow_html=True)
+        if not is_mobile():
+            st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">High-Risk Facilities - {entity_name} <span class="help-icon" title="SFF: Special Focus Facilities with serious quality issues under CMS oversight. SFF Candidate: Facilities monitored for potential SFF designation. Abuse Icon: Facilities cited for abuse. 1-Star Rating: Facilities with the lowest CMS overall rating.">ℹ️</span></h3></div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">High-Risk Facilities - {entity_name}</h3></div>', unsafe_allow_html=True)
         risk_col1, risk_col2, risk_col3, risk_col4 = st.columns(4)
         with risk_col1:
             st.markdown(create_custom_metric(
@@ -631,7 +634,7 @@ def main():
                     fig_ratings.update_layout(
                         height=260,
                         showlegend=True,
-                        margin=dict(l=70, r=0, t=30, b=10),
+                        margin=dict(l=10, r=10, t=30, b=10),
                         legend=dict(
                             orientation='v',
                             x=1.05,
@@ -712,9 +715,7 @@ def main():
                     'CMS Certification Number (CCN)',
                     'Provider Name',
                     'Overall Rating',
-                    'Health Inspection Rating',
                     'Staffing Rating',
-                    'QM Rating',
                     'Special Focus Status',
                     'Abuse Icon'
                 ]].copy()
@@ -726,7 +727,7 @@ def main():
                 facilities_display = facilities_display.fillna('N/A')
                 
                 # Convert numeric ratings to integers where possible
-                rating_columns = ['Overall Rating', 'Health Inspection Rating', 'Staffing Rating', 'QM Rating']
+                rating_columns = ['Overall Rating', 'Staffing Rating']
                 for col in rating_columns:
                     facilities_display[col] = pd.to_numeric(facilities_display[col], errors='coerce')
                     facilities_display[col] = facilities_display[col].apply(lambda x: int(x) if pd.notna(x) and x == int(x) else 'N/A')
@@ -776,8 +777,13 @@ def main():
                         st.success(f"Showing {len(facilities_display)} high-risk facilities out of {total_facilities} total.")
                 
                 # Create provider names as HTML links
+                def format_provnum(provnum):
+                    provnum_str = str(provnum).strip().upper().zfill(6)
+                    if len(provnum_str) > 6:
+                        provnum_str = provnum_str[-6:]
+                    return provnum_str
                 facilities_display['Provider Name'] = facilities_display.apply(
-                    lambda row: f'<a href="https://pbjlite.streamlit.app/?level=Facility&facility={row["CMS Certification Number (CCN)"]}" target="_blank">{row["Provider Name"]}</a>',
+                    lambda row: f'<a href="https://nursinghomedashboard.streamlit.app/?level=Facility&facility={format_provnum(row["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider Name"]}</a>',
                     axis=1
                 )
                 
@@ -788,9 +794,7 @@ def main():
                     'CMS Certification Number (CCN)',
                     'City',
                     'Overall Rating',
-                    'Health Inspection Rating',
                     'Staffing Rating',
-                    'QM Rating',
                     'Special Focus Status',
                     'Abuse Icon'
                 ]
@@ -868,6 +872,27 @@ def main():
         else:
             st.info("Entity ID not available for facility lookup.")
         
+        # Full data table (collapsible) - Fixed to show variable names in two columns
+        with st.expander("📋 View Complete Entity Data", expanded=False):
+            # Convert the series to a dataframe with proper column names
+            entity_df = pd.DataFrame({
+                'Variable': entity_row.index,
+                'Value': entity_row.values
+            })
+            
+            # Display in two columns
+            col1, col2 = st.columns(2)
+            
+            # Split the data into two halves
+            mid_point = len(entity_df) // 2
+            left_data = entity_df.iloc[:mid_point]
+            right_data = entity_df.iloc[mid_point:]
+            
+            with col1:
+                st.dataframe(left_data, use_container_width=True, hide_index=True)
+            
+            with col2:
+                st.dataframe(right_data, use_container_width=True, hide_index=True)
     else:
         st.warning(f"No data found for the selected entity: {entity_name}")
         return
