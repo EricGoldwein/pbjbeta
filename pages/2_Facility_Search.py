@@ -95,6 +95,9 @@ if state:
 else:
     search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
 
+# Sort options alphabetically by facility name
+search_options.sort()
+
 with col2:
     search_term = st.selectbox(
         "Enter Provider Name or CCN",

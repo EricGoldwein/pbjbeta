@@ -446,6 +446,32 @@ def get_facility_affiliated_entity(provnum: str) -> str:
         return None
 
 @st.cache_data
+def get_facility_affiliated_entity_id(provnum: str) -> str:
+    """Get the affiliated entity ID for a specific facility from provider info data."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return None
+            
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if facility_data.empty:
+            return None
+            
+        # Get the affiliated entity ID
+        affiliated_entity_id = facility_data.iloc[0]['Affiliated Entity ID']
+        
+        # Return None if it's NaN, otherwise return the entity ID
+        if pd.notna(affiliated_entity_id):
+            return str(int(affiliated_entity_id))
+        return None
+        
+    except Exception as e:
+        print(f"Error getting affiliated entity ID for {provnum}: {str(e)}")
+        return None
+
+@st.cache_data
 def get_facility_overall_rating(provnum: str) -> float:
     """Get the overall rating for a specific facility from provider info data."""
     try:
@@ -917,7 +943,7 @@ def display_facility_info(provnum: str, quarter_name: str = None, affiliated_ent
                         </div>
                         <div class="facility-quarter-row">{quarter_name if quarter_name else ''}</div>
                         <div class="facility-info-item">
-                            <a href="{care_compare_url}" target="_blank">Care Compare</a>
+                            <a href="{care_compare_url}" target="_blank">CMS Care Compare</a> <span title="CMS Care Compare is a federal resource providing comprehensive information on U.S. nursing homes, including quality ratings, staffing data, and inspection results." style="cursor: help; color: #666; font-size: 0.8em; font-weight: bold;">?</span>
                         </div>
                     </div>
                 </div>
@@ -938,7 +964,7 @@ def display_facility_info(provnum: str, quarter_name: str = None, affiliated_ent
                         </div>
                         {f'<div class="facility-info-item"><span class="label">Ownership:</span> <strong>{affiliated_entity}</strong></div>' if affiliated_entity else ''}
                         <div class="facility-info-item">
-                            <a href="{care_compare_url}" target="_blank">Care Compare</a>
+                            <a href="{care_compare_url}" target="_blank">CMS Care Compare</a> <span title="CMS Care Compare is a federal resource providing comprehensive information on U.S. nursing homes, including quality ratings, staffing data, and inspection results." style="cursor: help; color: #666; font-size: 0.8em; font-weight: bold;">?</span>
                         </div>
                     </div>
                 </div>
@@ -1041,17 +1067,36 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             county = proper_title_case(current_metrics['COUNTY_NAME'].iloc[0])
             care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{provnum}/view-all?state={state}"
             
-            # Get affiliated entity for header
+            # Get affiliated entity and entity ID for header
             affiliated_entity = get_facility_affiliated_entity(provnum)
-            if affiliated_entity:
-                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name} | {affiliated_entity}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>Care Compare</a></div>"
+            affiliated_entity_id = get_facility_affiliated_entity_id(provnum)
+            full_state_name = get_full_state_name(state)
+            
+            if affiliated_entity and affiliated_entity_id:
+                st.markdown(f'''
+                    <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                        <div style='color:#222; font-weight:400;'>
+                            <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
+                            <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
+                                <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{county}, {full_state_name}</a>
+                            </div>
+                            <div style='font-size: 0.9em; color: #666; margin-top: 2px;'>
+                                <a href='?level=Entity&entity={affiliated_entity_id}' style='color: #1976d2; text-decoration: none;'>{affiliated_entity}</a>
+                            </div>
+                        </div>
+                    </div>
+                ''', unsafe_allow_html=True)
             else:
-                header_text = f"<div style='display: flex; justify-content: space-between; align-items: center;'><span style='color:#222; font-weight:400;'>{provname} ({county}, {state}) | {quarter_name}</span> <a href='{care_compare_url}' target='_blank' style='background:#e8f4fd; color:#1976d2; border-radius:6px; padding:2px 10px; font-size:0.97em; text-decoration:none; font-weight:500;'>Care Compare</a></div>"
-        st.markdown(f'''
-            <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
-                {header_text}
-            </div>
-        ''', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                        <div style='color:#222; font-weight:400;'>
+                            <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
+                            <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
+                                <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{county}, {full_state_name}</a>
+                            </div>
+                        </div>
+                    </div>
+                ''', unsafe_allow_html=True)
             
         # Add custom CSS for metrics containers
         # (Removed custom CSS for stMetric, stMetricDelta, stMetricContainer to restore Streamlit defaults)
@@ -1067,8 +1112,8 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             with col1:
                 st.metric("Nursing Homes", 
                          format_metric(facility_count, decimal_places=0, thousands=True),
-                         format_metric(facility_count - prev_facility_count, decimal_places=0, thousands=True) if prev_facility_count is not None else None)
-        
+                         format_metric(facility_count - prev_facility_count, decimal_places=0, thousands=True) if prev_facility_count is not None else None,
+                        help="Total number of nursing homes during the reporting period. Arrow compares to previous quarter.")
         # Adjust column indices for other metrics
         if level == "Facility":
             metric_cols = [col1, col2, col3, col4, col5]
@@ -1076,22 +1121,23 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             metric_cols = [col2, col3, col4]
         
         with metric_cols[0]:
-            st.metric("Census", 
+            st.metric("Resident Census", 
                      format_metric(current_metrics['Census'].iloc[0], decimal_places=0, thousands=True),
-                     format_metric(current_metrics['Census'].iloc[0] - prev_metrics['Census'].iloc[0], decimal_places=0, thousands=True) if not prev_metrics.empty else None)
+                     format_metric(current_metrics['Census'].iloc[0] - prev_metrics['Census'].iloc[0], decimal_places=0, thousands=True) if not prev_metrics.empty else None,
+                     help="Average number of residents in facility or state during the reporting period. Arrow compares to previous quarter.")
         
         with metric_cols[1]:
-            st.metric("Total Nurse HPRD", 
+            st.metric("Nurse Staffing (HPRD)", 
                      format_metric(current_metrics['Total_Nurse_HPRD'].iloc[0], decimal_places=2),
                      format_metric(current_metrics['Total_Nurse_HPRD'].iloc[0] - prev_metrics['Total_Nurse_HPRD'].iloc[0], decimal_places=2) if not prev_metrics.empty else None,
-                     help="Hours Per Resident Day")
+                     help="Total nurse staff hours per resident per day. Example: A nursing home with 100 residents providing 350 staffing hours per day has 3.5 nurse staff HPRD (350 ÷ 100). Arrow compares to previous quarter.")
         
         with metric_cols[2]:
             st.metric(
                 "Contract Staff %",
                 format_metric(current_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True),
                 format_metric(current_metrics['Contract_Percentage'].iloc[0] - prev_metrics['Contract_Percentage'].iloc[0], decimal_places=1, percentage=True) if not prev_metrics.empty else None,
-                help="Percent of nursing hours provided by contract staff"
+                help="Percent of nursing hours provided by contract staff. Arrow compares to previous quarter."
             )
         
         # Add staffing rating and overall rating for facility level
@@ -1107,24 +1153,26 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     st.metric("CMS Staffing Rating", 
                              f"{int(staffing_rating)}",
                              staffing_trend,
-                             help="CMS 5-star rating (June 2025 vs. March 2025).")
+                             help="CMS 5-star rating (June 2025 vs. March 2025). Arrow compares to previous quarter.")
                 else:
                     st.metric("CMS Staffing Rating", 
                              "N/A",
                              staffing_trend,
-                             help="CMS 5-star rating (June 2025 vs. March 2025).")
+                             help="CMS 5-star rating (June 2025 vs. March 2025). Arrow compares to previous quarter.")
             
             with metric_cols[4]:
                 if overall_rating is not None:
                     st.metric("CMS Overall Rating", 
                              f"{overall_rating}",
                              overall_trend,
-                             help="CMS 5-star rating (June 2025 vs. March 2025).")
+                             help="CMS 5-star rating (June 2025 vs. March 2025). Arrow compares to previous quarter.")
                 else:
                     st.metric("CMS Overall Rating", 
                              "N/A",
                              overall_trend,
-                             help="CMS 5-star rating (June 2025 vs. March 2025).")
+                             help="CMS 5-star rating (June 2025 vs. March 2025). Arrow compares to previous quarter.")
+            
+
             
     except Exception as e:
         st.error(f"Error displaying metrics: {str(e)}")
@@ -1308,6 +1356,22 @@ def main() -> None:
         # Get URL parameters using the new API
         initial_level = st.query_params.get('level', 'National')
         initial_facility = st.query_params.get('facility', None)
+        initial_state = st.query_params.get('state', None)
+        initial_entity = st.query_params.get('entity', None)
+        
+        # Handle direct URL navigation for state and entity levels
+        if initial_level == "State" and initial_state:
+            # Set the level and selected_value for state navigation
+            level = "State"
+            selected_value = initial_state
+            # Hide the radio button since we're pre-setting the level
+            st.session_state.level_pre_set = True
+        elif initial_level == "Entity" and initial_entity:
+            # Redirect to ownership page with entity ID
+            st.switch_page(f"pages/3_Ownership.py?entity_id={initial_entity}")
+        else:
+            level = None  # Will be set by radio button
+            st.session_state.level_pre_set = False
 
         # Title with custom styling - matching About page dark blue color and mobile responsive
         st.markdown("""
@@ -1383,12 +1447,16 @@ def main() -> None:
         """, unsafe_allow_html=True)
 
         # Sidebar: Only one radio button group for level selection, always present
-        level = st.sidebar.radio(
-            "Select Level",
-            ["National", "State", "Facility", "Ownership"],
-            index=["National", "State", "Facility", "Ownership"].index(initial_level) if initial_level in ["National", "State", "Facility", "Affiliated Entities"] else 0,
-            key="level_selector"
-        )
+        if level is None:  # Only show radio button if level not pre-set by URL
+            level = st.sidebar.radio(
+                "Select Level",
+                ["National", "State", "Facility", "Ownership"],
+                index=["National", "State", "Facility", "Ownership"].index(initial_level) if initial_level in ["National", "State", "Facility", "Ownership"] else 0,
+                key="level_selector"
+            )
+        elif st.session_state.get('level_pre_set', False):
+            # If level is pre-set by URL, don't show radio button but still need to handle navigation
+            pass
 
         # A & B: Fix radio button navigation
         if level == "Ownership":
@@ -1401,12 +1469,18 @@ def main() -> None:
         try:
             if level == "State":
                 states = ["---"] + sorted(state_metrics['STATE'].unique().tolist())
-                selected_state = st.sidebar.selectbox(
-                    "Select State",
-                    states,
-                    index=0
-                )
-                selected_value = selected_state if selected_state != "Select a state..." else None
+                
+                # If we have a selected_value from URL or pre-set, use it
+                if selected_value and selected_value in state_metrics['STATE'].unique():
+                    selected_state = selected_value
+                    # Don't show selectbox if value is pre-set from URL
+                else:
+                    selected_state = st.sidebar.selectbox(
+                        "Select State",
+                        states,
+                        index=0
+                    )
+                    selected_value = selected_state if selected_state != "---" else None
             elif level == "Facility":
                 search_container = st.sidebar.container()
                 
@@ -1524,6 +1598,11 @@ def main() -> None:
                                         facility=selected_value if level == "Facility" else None)
                     if fig:
                         st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Add CMS Care Compare link below the chart for facility level
+                        if level == "Facility":
+                            care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{selected_value}/view-all?state={selected_facility['STATE']}"
+                            st.markdown(f"<div style='text-align: center; margin-top: 15px;'><a href='{care_compare_url}' target='_blank' style='background: #e8f4fd; color: #1976d2; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; border: 1px solid #1976d2; display: inline-block;'>View Details on CMS Care Compare</a></div>", unsafe_allow_html=True)
 
                     # 4. Add subscription button
                     display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
