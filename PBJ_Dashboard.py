@@ -1126,7 +1126,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                         <div style='color:#222; font-weight:400;'>
                             <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
                             <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
-                                {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{state}</a>. Ownership: <a href='?level=Entity&entity={affiliated_entity_id}' style='color: #1976d2; text-decoration: none;'>{affiliated_entity}</a>
+                                {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;' target='_self'>{state}</a>. Ownership: <a href='?level=Entity&entity={affiliated_entity_id}' style='color: #1976d2; text-decoration: none;' target='_self'>{affiliated_entity}</a>
                             </div>
                         </div>
                     </div>
@@ -1137,7 +1137,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                         <div style='color:#222; font-weight:400;'>
                             <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
                             <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
-                                {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{state}</a>. Ownership: N/A
+                                {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;' target='_self'>{state}</a>. Ownership: N/A
                             </div>
                         </div>
                     </div>
