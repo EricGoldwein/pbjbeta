@@ -1404,7 +1404,7 @@ def main() -> None:
             selected_value = initial_state
             # Hide the radio button since we're pre-setting the level
             st.session_state.level_pre_set = True
-        elif initial_level == "Entity" and initial_entity:
+        elif (initial_level == "Entity" or initial_level == "Ownership") and initial_entity:
             # Set the level and selected_value for entity navigation
             level = "Entity"
             selected_value = initial_entity
@@ -1488,7 +1488,7 @@ def main() -> None:
         """, unsafe_allow_html=True)
 
         # Sidebar: Only show radio button if level not pre-set by URL
-        if level is None:  # Only show radio button if level not pre-set by URL
+        if not st.session_state.get('level_pre_set', False):  # Only show radio button if level not pre-set by URL
             level = st.sidebar.radio(
                 "Select Level",
                 ["National", "State", "Facility", "Ownership"],
@@ -1498,9 +1498,7 @@ def main() -> None:
         # If level is pre-set by URL, don't show radio button
 
         # A & B: Fix radio button navigation
-        if level == "Ownership":
-            st.switch_page("pages/3_Ownership.py")
-        elif level == "Facility Search":
+        if level == "Facility Search":
             st.switch_page("pages/2_Facility_Search.py")
 
         # Get selected value based on level
