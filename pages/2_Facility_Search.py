@@ -57,6 +57,73 @@ st.markdown("""
 def load_facility_data():
     return pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
 
+@st.cache_data
+def load_provider_info_data():
+    """Load and cache provider info data for ownership entity lookup."""
+    try:
+        return pd.read_csv('NH_ProviderInfo_Jun2025.csv', dtype={'CMS Certification Number (CCN)': str, 'Affiliated Entity ID': str})
+    except Exception as e:
+        st.error(f"Error loading provider info data: {str(e)}")
+        return pd.DataFrame()
+
+def proper_title_case(text):
+    """Convert text to proper title case (first letter capitalized, articles/prepositions lowercase)."""
+    if pd.isna(text) or not isinstance(text, str):
+        return '---'
+
+    # Words to keep lowercase unless first word
+    lowercase_words = {'and', 'of', 'at', 'the', 'in', 'on', 'for', 'to', 'with', 'by', 'a', 'an'}
+
+    # True abbreviations to always uppercase
+    uppercase_words = {'llc', 'ltc', 'lp', 'llp', 'pllc', 'pc', 'pa', 'plc', 'co', 'pl', 'corp', 'pllp', 'llc.', 'inc.', 'pllc.'}
+
+    words = re.split(r'(\W+)', text)
+    result = []
+    for i, word in enumerate(words):
+        w = word.lower()
+        # Uppercase if in set
+        if w in uppercase_words:
+            result.append(w.upper())
+        elif i != 0 and w in lowercase_words:
+            result.append(w)
+        else:
+            result.append(w.capitalize())
+    return ''.join(result)
+
+def get_facility_affiliated_entity(provnum: str) -> tuple:
+    """Get the affiliated entity name and ID for a specific facility."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return None, None
+
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+
+        if facility_data.empty:
+            return None, None
+
+        # Get the affiliated entity name and ID
+        affiliated_entity_name = facility_data.iloc[0]['Affiliated Entity Name']
+        affiliated_entity_id = facility_data.iloc[0]['Affiliated Entity ID']
+
+        # Return None if it's NaN, otherwise return the entity name and ID
+        if pd.notna(affiliated_entity_name) and pd.notna(affiliated_entity_id):
+            return proper_title_case(str(affiliated_entity_name)), str(int(affiliated_entity_id))
+        return None, None
+
+    except Exception as e:
+        print(f"Error getting affiliated entity for {provnum}: {str(e)}")
+        return None, None
+
+def get_ownership_entity_link(provnum: str) -> str:
+    """Get the ownership entity link HTML for a facility."""
+    entity_name, entity_id = get_facility_affiliated_entity(provnum)
+
+    if entity_name and entity_id:
+        return f'<a href="/?level=Entity&entity={entity_id}" style="color: #1976d2; text-decoration: none;" target="_self">{entity_name}</a>'
+    else:
+        return '---'
 
 facilities_df = load_facility_data()
 
@@ -115,7 +182,7 @@ def search_facilities(state: str, search_term: str) -> List[Dict[str, str]]:
             facilities = facilities_df[facilities_df['STATE'] == state]
         else:
             facilities = facilities_df
-        
+
         # Filter by search term if provided
         if search_term:
             # Extract CCN from search term if it's in the format "Name (CCN)"
@@ -128,10 +195,10 @@ def search_facilities(state: str, search_term: str) -> List[Dict[str, str]]:
                     facilities['PROVNUM'].str.lower().str.contains(search_term) |
                     facilities['PROVNAME'].str.lower().str.contains(search_term)
                 ]
-        
+
         # Get unique facilities
         unique_facilities = facilities[['PROVNUM', 'PROVNAME', 'STATE']].drop_duplicates()
-        
+
         return unique_facilities.to_dict('records')
     except Exception as e:
         st.error(f"Error searching facilities: {str(e)}")
@@ -158,11 +225,9 @@ if state:
 
 if state or search_term:
     results = search_facilities(state, search_term)
-    
+
     if results:
         st.markdown('<div class="search-results">', unsafe_allow_html=True)
-        st.markdown("### Search Results")
-        
         # Create a DataFrame for better display
         df = pd.DataFrame(results)
         # Apply smart capitalization to Nursing Home names
@@ -175,8 +240,13 @@ if state or search_term:
             lambda row: f'<a href="/?level=Facility&facility={row["PROVNUM"]}" class="facility-link">View Staffing</a>',
             axis=1
         )
-        # Reorder columns, remove City
-        display_cols = ['State', 'Nursing Home', 'Dashboard']
+        # Add ownership entity column
+        df['Ownership Entity'] = df.apply(
+            lambda row: get_ownership_entity_link(row["PROVNUM"]),
+            axis=1
+        )
+        # Reorder columns to include Ownership Entity
+        display_cols = ['State', 'Nursing Home', 'Ownership Entity', 'Dashboard']
         df = df[display_cols]
         # Sort alphabetically by Nursing Home name
         df = df.sort_values('Nursing Home')
