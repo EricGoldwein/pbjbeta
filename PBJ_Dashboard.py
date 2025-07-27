@@ -1386,10 +1386,7 @@ def main() -> None:
         # Handle different pages
         if current_page == 'premium':
             st.switch_page("pages/1_Premium.py")
-        elif current_page == 'facility_search':
-            st.switch_page("pages/1_Facility_Search.py")
-        elif current_page == 'affiliated_entities':
-            st.switch_page("pages/2_Affiliated_Entities.py")
+        # Only allow switch_page for static pages, not for entity/ownership
 
         # Get URL parameters using the new API
         initial_level = st.query_params.get('level', 'National')
