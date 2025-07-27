@@ -39,6 +39,25 @@ def generate_lite_metrics():
         'Total_Nurse_HPRD', 'Contract_Percentage'
     ]].copy()
     
+    # Calculate statewide census (total census across all facilities in state)
+    state_census_data = []
+    for quarter in facility_lite['CY_Qtr'].unique():
+        quarter_facilities = facility_lite[facility_lite['CY_Qtr'] == quarter]
+        for state in quarter_facilities['STATE'].unique():
+            state_facilities = quarter_facilities[quarter_facilities['STATE'] == state]
+            # Sum all facility census values for the state
+            total_state_census = state_facilities['avg_daily_census'].sum()
+            state_census_data.append({
+                'CY_Qtr': quarter,
+                'STATE': state,
+                'avg_state_census': total_state_census
+            })
+    
+    state_census_df = pd.DataFrame(state_census_data)
+    
+    # Merge the statewide census data with state_lite
+    state_lite = state_lite.merge(state_census_df, on=['CY_Qtr', 'STATE'], how='left')
+    
     # Sort by state first, then quarter (AK 2017Q1, AK 2017Q2, etc.)
     state_lite = state_lite.sort_values(['STATE', 'CY_Qtr'])
     
@@ -79,7 +98,7 @@ def generate_lite_metrics():
     
     state_lite.columns = [
         'CY_Qtr', 'STATE', 'Facility_Count', 'Census',
-        'Total_Nurse_HPRD', 'Contract_Percentage'
+        'Total_Nurse_HPRD', 'Contract_Percentage', 'State_Census'
     ]
     
     national_lite.columns = [
@@ -103,7 +122,7 @@ def generate_lite_metrics():
     latest_quarter = state_lite['CY_Qtr'].max()
     print(f"\nLatest quarter ({latest_quarter}) state summary:")
     latest_state = state_lite[state_lite['CY_Qtr'] == latest_quarter].sort_values('STATE')
-    print(latest_state[['STATE', 'Facility_Count', 'Census', 'Total_Nurse_HPRD', 'Contract_Percentage']].to_string())
+    print(latest_state[['STATE', 'Facility_Count', 'Census', 'State_Census', 'Total_Nurse_HPRD', 'Contract_Percentage']].to_string())
     
     # Print latest quarter's national summary
     print(f"\nLatest quarter ({latest_quarter}) national summary:")

@@ -403,6 +403,9 @@ def main():
     # Filter out the "National" row (aggregate data)
     entity_data = entity_data[entity_data['Affiliated entity'] != 'National'].copy()
     
+    # Check for entity ID in URL parameters
+    initial_entity_id = st.query_params.get("entity_id", None)
+    
     # Search section
     entity_options = []
     for idx, entity in entity_data.iterrows():
@@ -411,13 +414,39 @@ def main():
         entity_options.append(f"{entity_name} ({facility_count} facilities)")
 
     # --- MOBILE: No info box, just dropdown ---
-    st.subheader("🔍 Search for an Entity")
-    selected_entity_display = st.selectbox(
-        "Enter entity name to search:",
-        options=[""] + entity_options,
-        index=0,
-        help="Start typing to search for ownership entity. Results will show entity name and facility count."
-    )
+    st.subheader("🔍 Search for ownership entity")
+    
+    # If we have an entity ID from URL, find the corresponding entity
+    if initial_entity_id:
+        try:
+            entity_id = int(initial_entity_id)
+            matching_entity = entity_data[entity_data['Affiliated entity ID'] == entity_id]
+            if not matching_entity.empty:
+                entity_name = matching_entity.iloc[0]['Affiliated entity']
+                entity_display_name = capitalize_entity_name(entity_name)
+                facility_count = matching_entity.iloc[0]['Number of facilities']
+                selected_entity_display = f"{entity_display_name} ({facility_count} facilities)"
+            else:
+                selected_entity_display = st.selectbox(
+                    "Enter entity name to search:",
+                    options=[""] + entity_options,
+                    index=0,
+                    help="Start typing to search for ownership entity. Results will show entity name and facility count."
+                )
+        except (ValueError, TypeError):
+            selected_entity_display = st.selectbox(
+                "Enter entity name to search:",
+                options=[""] + entity_options,
+                index=0,
+                help="Start typing to search for ownership entity. Results will show entity name and facility count."
+            )
+    else:
+        selected_entity_display = st.selectbox(
+            "Enter entity name to search:",
+            options=[""] + entity_options,
+            index=0,
+            help="Start typing to search for ownership entity. Results will show entity name and facility count."
+        )
     
     # If no entity is selected, show placeholder
     if not selected_entity_display:
@@ -544,13 +573,13 @@ def main():
         # Quality metrics with decimals for entity averages
         qual_col1, qual_col2, qual_col3, qual_col4 = st.columns(4)
         with qual_col1:
-            st.markdown(create_custom_metric("Overall Rating", f"{entity_row['Average overall 5-star rating']:.1f}"), unsafe_allow_html=True)
+            st.markdown(create_custom_metric("Overall", f"{entity_row['Average overall 5-star rating']:.1f}"), unsafe_allow_html=True)
         with qual_col2:
             st.markdown(create_custom_metric("Health Inspection", f"{entity_row['Average health inspection rating']:.1f}"), unsafe_allow_html=True)
         with qual_col3:
-            st.markdown(create_custom_metric("Staffing Rating", f"{entity_row['Average staffing rating']:.1f}"), unsafe_allow_html=True)
+            st.markdown(create_custom_metric("Staffing", f"{entity_row['Average staffing rating']:.1f}"), unsafe_allow_html=True)
         with qual_col4:
-            st.markdown(create_custom_metric("Quality Rating", f"{entity_row['Average quality rating']:.1f}"), unsafe_allow_html=True)
+            st.markdown(create_custom_metric("Quality", f"{entity_row['Average quality rating']:.1f}"), unsafe_allow_html=True)
         # Quality ratings chart and distribution chart side by side
         chart_col1, chart_col2 = st.columns(2)
         with chart_col1:
@@ -706,7 +735,7 @@ def main():
             ].copy()
             
             if not entity_facilities.empty:
-                st.markdown(f"**{len(entity_facilities)} facilities found for {entity_name}**")
+                st.markdown(f"**{len(entity_facilities)} facilities found**")
                 
                 # Prepare facilities data for display with City instead of County
                 facilities_display = entity_facilities[[
@@ -753,7 +782,7 @@ def main():
                 
                 # Add filter for high-risk facilities
                 show_high_risk_only = st.checkbox(
-                    "Show high-risk facilities only", 
+                    "High-risk facilities only", 
                     value=False,
                     help="Filter to show only facilities with Overall Rating '1', SFF status, SFF Candidate status, or Abuse Icon 'Y'"
                 )

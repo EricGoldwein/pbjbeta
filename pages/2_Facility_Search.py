@@ -160,6 +160,8 @@ if state or search_term:
         # Reorder columns, remove City
         display_cols = ['State', 'Nursing Home', 'Dashboard']
         df = df[display_cols]
+        # Sort alphabetically by Nursing Home name
+        df = df.sort_values('Nursing Home')
         # Display the results as HTML for clickable links
         st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)

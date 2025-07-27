@@ -83,18 +83,25 @@ def load_metrics_data():
         state_metrics = pd.read_csv('state_lite_metrics.csv')
         facility_metrics = pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
 
-        # Standardize column names
-        for df in [national_metrics, state_metrics, facility_metrics]:
-            # Rename columns to match expected format
-            column_mapping = {
-                'CY_Qtr': 'CY_QTR',
-                'Census': 'Census',
-                'Total_Nurse_HPRD': 'Total_Nurse_HPRD',
-                'Contract_Percentage': 'Contract_Percentage',
-                'Facility_Count': 'Facility_Count',
-                'MDS': 'Census'  # Map MDS to Census for national metrics
-            }
-            df.rename(columns=column_mapping, inplace=True)
+        # Standardize column names - apply specific mappings to each dataframe
+        # National metrics column mapping - only rename CY_Qtr to CY_QTR and MDS to Census
+        national_column_mapping = {
+            'CY_Qtr': 'CY_QTR',
+            'MDS': 'Census'  # Map MDS to Census for national metrics
+        }
+        national_metrics.rename(columns=national_column_mapping, inplace=True)
+        
+        # State metrics column mapping - only rename CY_Qtr to CY_QTR
+        state_column_mapping = {
+            'CY_Qtr': 'CY_QTR'
+        }
+        state_metrics.rename(columns=state_column_mapping, inplace=True)
+        
+        # Facility metrics column mapping - only rename CY_Qtr to CY_QTR
+        facility_column_mapping = {
+            'CY_Qtr': 'CY_QTR'
+        }
+        facility_metrics.rename(columns=facility_column_mapping, inplace=True)
 
         # Convert CY_QTR to datetime for all dataframes
         for df in [national_metrics, state_metrics, facility_metrics]:
@@ -612,6 +619,10 @@ def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_q
                     (state_metrics['CY_QTR'] >= start_quarter) & 
                     (state_metrics['CY_QTR'] <= end_quarter)
                 ]
+        elif level == "Entity":
+            # For entities, return empty DataFrame since we'll handle entity display separately
+            # Entity data is static, not time-series
+            return pd.DataFrame()
         
         return pd.DataFrame()  # Return empty DataFrame if no conditions match
         
@@ -979,6 +990,31 @@ def on_mobile_change():
     else:
         st.session_state['view_mode'] = "Desktop View"
 
+def create_custom_metric(label, value, help_text=None, trend=None):
+    """Create a custom metric display with consistent styling."""
+    metric_html = f'''
+    <div style="background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="font-size: 0.9em; color: #666; margin-bottom: 0.5rem; font-weight: 500;">{label}</div>
+        <div style="font-size: 1.8em; font-weight: 700; color: #1a2233; margin-bottom: 0.2rem;">{value}</div>
+    </div>
+    '''
+    return metric_html
+
+def create_narrow_metric(label, value):
+    """Create a narrower metric display for side-by-side layouts."""
+    metric_html = f'''
+    <div style="background: white; border: 1px solid #e0e0e0; border-radius: 6px; padding: 0.8rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 0.5rem;">
+        <div style="font-size: 0.85em; color: #666; margin-bottom: 0.3rem; font-weight: 500;">{label}</div>
+        <div style="font-size: 1.4em; font-weight: 700; color: #1a2233;">{value}</div>
+    </div>
+    '''
+    return metric_html
+
+def is_mobile():
+    """Check if the current viewport is mobile-sized."""
+    # This is a simplified check - in a real app you'd use JavaScript
+    return False
+
 def display_subscription_button(entity_type: str, entity_id: str, entity_name: str):
     """Display the premium services section with email link."""
     st.markdown("""
@@ -1056,10 +1092,22 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics else None
             full_state_name = get_full_state_name(state)
             header_text = f"{full_state_name} Key Metrics ({quarter_name})"
+            # Display state header
+            st.markdown(f'''
+                <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                    <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{header_text}</div>
+                </div>
+            ''', unsafe_allow_html=True)
         elif level == "National":
             facility_count = current_metrics['Facility_Count'].iloc[0] if 'Facility_Count' in current_metrics else len(current_metrics['PROVNUM'].unique())
             prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics else None
             header_text = f"USA Key Metrics ({quarter_name})"
+            # Display national header
+            st.markdown(f'''
+                <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                    <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{header_text}</div>
+                </div>
+            ''', unsafe_allow_html=True)
         else:  # Facility level
             provnum = current_metrics['PROVNUM'].iloc[0]
             provname = proper_title_case(current_metrics['PROVNAME'].iloc[0])
@@ -1078,10 +1126,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                         <div style='color:#222; font-weight:400;'>
                             <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
                             <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
-                                <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{county}, {full_state_name}</a>
-                            </div>
-                            <div style='font-size: 0.9em; color: #666; margin-top: 2px;'>
-                                <a href='?level=Entity&entity={affiliated_entity_id}' style='color: #1976d2; text-decoration: none;'>{affiliated_entity}</a>
+                                {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{state}</a>. Ownership: <a href='?level=Entity&entity={affiliated_entity_id}' style='color: #1976d2; text-decoration: none;'>{affiliated_entity}</a>
                             </div>
                         </div>
                     </div>
@@ -1092,7 +1137,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                         <div style='color:#222; font-weight:400;'>
                             <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
                             <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
-                                <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{county}, {full_state_name}</a>
+                                {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;'>{state}</a>. Ownership: N/A
                             </div>
                         </div>
                     </div>
@@ -1101,11 +1146,8 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         # Add custom CSS for metrics containers
         # (Removed custom CSS for stMetric, stMetricDelta, stMetricContainer to restore Streamlit defaults)
         
-        # Display metrics in columns - now use 5 columns for facility level, 4 for others
-        if level == "Facility":
-            col1, col2, col3, col4, col5 = st.columns(5)
-        else:
-            col1, col2, col3, col4 = st.columns(4)
+        # Display metrics in columns - use 4 columns for all levels
+        col1, col2, col3, col4 = st.columns(4)
         
         # For National and State, add facility count metric
         if level in ["National", "State"]:
@@ -1114,17 +1156,27 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                          format_metric(facility_count, decimal_places=0, thousands=True),
                          format_metric(facility_count - prev_facility_count, decimal_places=0, thousands=True) if prev_facility_count is not None else None,
                         help="Total number of nursing homes during the reporting period. Arrow compares to previous quarter.")
-        # Adjust column indices for other metrics
-        if level == "Facility":
-            metric_cols = [col1, col2, col3, col4, col5]
-        else:
+            # Adjust column indices for other metrics
             metric_cols = [col2, col3, col4]
+        else:
+            # For facility level, use all 4 columns
+            metric_cols = [col1, col2, col3, col4]
         
         with metric_cols[0]:
+            # Use State_Census for state level, Census for facility level
+            if level == "State":
+                census_value = current_metrics['State_Census'].iloc[0]
+                prev_census_value = prev_metrics['State_Census'].iloc[0] if not prev_metrics.empty else None
+                help_text = "Total number of residents across all facilities in the state during the reporting period. Arrow compares to previous quarter."
+            else:
+                census_value = current_metrics['Census'].iloc[0]
+                prev_census_value = prev_metrics['Census'].iloc[0] if not prev_metrics.empty else None
+                help_text = "Average number of residents in facility during the reporting period. Arrow compares to previous quarter."
+            
             st.metric("Resident Census", 
-                     format_metric(current_metrics['Census'].iloc[0], decimal_places=0, thousands=True),
-                     format_metric(current_metrics['Census'].iloc[0] - prev_metrics['Census'].iloc[0], decimal_places=0, thousands=True) if not prev_metrics.empty else None,
-                     help="Average number of residents in facility or state during the reporting period. Arrow compares to previous quarter.")
+                     format_metric(census_value, decimal_places=0, thousands=True),
+                     format_metric(census_value - prev_census_value, decimal_places=0, thousands=True) if prev_census_value is not None else None,
+                     help=help_text)
         
         with metric_cols[1]:
             st.metric("Nurse Staffing (HPRD)", 
@@ -1140,13 +1192,11 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                 help="Percent of nursing hours provided by contract staff. Arrow compares to previous quarter."
             )
         
-        # Add staffing rating and overall rating for facility level
+        # Add staffing rating for facility level
         if level == "Facility":
             provnum = current_metrics['PROVNUM'].iloc[0]
             staffing_rating = get_facility_staffing_rating(provnum)
-            overall_rating = get_facility_overall_rating(provnum)
             staffing_trend = get_facility_staffing_rating_trend(provnum)
-            overall_trend = get_facility_overall_rating_trend(provnum)
             
             with metric_cols[3]:
                 if staffing_rating is not None:
@@ -1158,18 +1208,6 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     st.metric("CMS Staffing Rating", 
                              "N/A",
                              staffing_trend,
-                             help="CMS 5-star rating (June 2025 vs. March 2025). Arrow compares to previous quarter.")
-            
-            with metric_cols[4]:
-                if overall_rating is not None:
-                    st.metric("CMS Overall Rating", 
-                             f"{overall_rating}",
-                             overall_trend,
-                             help="CMS 5-star rating (June 2025 vs. March 2025). Arrow compares to previous quarter.")
-                else:
-                    st.metric("CMS Overall Rating", 
-                             "N/A",
-                             overall_trend,
                              help="CMS 5-star rating (June 2025 vs. March 2025). Arrow compares to previous quarter.")
             
 
@@ -1367,8 +1405,11 @@ def main() -> None:
             # Hide the radio button since we're pre-setting the level
             st.session_state.level_pre_set = True
         elif initial_level == "Entity" and initial_entity:
-            # Redirect to ownership page with entity ID
-            st.switch_page(f"pages/3_Ownership.py?entity_id={initial_entity}")
+            # Set the level and selected_value for entity navigation
+            level = "Entity"
+            selected_value = initial_entity
+            # Hide the radio button since we're pre-setting the level
+            st.session_state.level_pre_set = True
         else:
             level = None  # Will be set by radio button
             st.session_state.level_pre_set = False
@@ -1446,7 +1487,7 @@ def main() -> None:
             </style>
         """, unsafe_allow_html=True)
 
-        # Sidebar: Only one radio button group for level selection, always present
+        # Sidebar: Only show radio button if level not pre-set by URL
         if level is None:  # Only show radio button if level not pre-set by URL
             level = st.sidebar.radio(
                 "Select Level",
@@ -1454,9 +1495,7 @@ def main() -> None:
                 index=["National", "State", "Facility", "Ownership"].index(initial_level) if initial_level in ["National", "State", "Facility", "Ownership"] else 0,
                 key="level_selector"
             )
-        elif st.session_state.get('level_pre_set', False):
-            # If level is pre-set by URL, don't show radio button but still need to handle navigation
-            pass
+        # If level is pre-set by URL, don't show radio button
 
         # A & B: Fix radio button navigation
         if level == "Ownership":
@@ -1470,9 +1509,10 @@ def main() -> None:
             if level == "State":
                 states = ["---"] + sorted(state_metrics['STATE'].unique().tolist())
                 
-                # If we have a selected_value from URL or pre-set, use it
-                if selected_value and selected_value in state_metrics['STATE'].unique():
-                    selected_state = selected_value
+                # If we have a state from URL parameter, use it
+                if initial_state and initial_state in state_metrics['STATE'].unique():
+                    selected_state = initial_state
+                    selected_value = initial_state
                     # Don't show selectbox if value is pre-set from URL
                 else:
                     selected_state = st.sidebar.selectbox(
@@ -1481,6 +1521,68 @@ def main() -> None:
                         index=0
                     )
                     selected_value = selected_state if selected_state != "---" else None
+            elif level == "Entity":
+                # Load affiliated entity data
+                entity_data = load_affiliated_entity_data()
+                if not entity_data.empty:
+                    # Filter out the "National" row (aggregate data)
+                    entity_data = entity_data[entity_data['Affiliated entity'] != 'National'].copy()
+                    
+                    # Create entity options
+                    entity_options = []
+                    for idx, entity in entity_data.iterrows():
+                        entity_name = entity['Affiliated entity']
+                        facility_count = entity['Number of facilities']
+                        entity_options.append(f"{entity_name} ({facility_count} facilities)")
+                    
+                    # If we have an entity from URL parameter, use it
+                    if initial_entity:
+                        # First try to find the entity by ID (convert to int for comparison)
+                        try:
+                            entity_id_int = int(initial_entity)
+                            matching_entity = entity_data[entity_data['Affiliated entity ID'] == entity_id_int]
+                            if not matching_entity.empty:
+                                selected_entity = matching_entity.iloc[0]['Affiliated entity']
+                                selected_value = selected_entity
+                                # Don't show selectbox if value is pre-set from URL
+                            else:
+                                # If not found by ID, try by name
+                                matching_entity = entity_data[entity_data['Affiliated entity'] == initial_entity]
+                                if not matching_entity.empty:
+                                    selected_entity = initial_entity
+                                    selected_value = initial_entity
+                                    # Don't show selectbox if value is pre-set from URL
+                                else:
+                                    selected_entity = st.sidebar.selectbox(
+                                        "Select Entity",
+                                        ["---"] + entity_options,
+                                        index=0
+                                    )
+                                    selected_value = selected_entity.split(" (")[0] if selected_entity != "---" else None
+                        except ValueError:
+                            # If initial_entity is not a number, try by name
+                            matching_entity = entity_data[entity_data['Affiliated entity'] == initial_entity]
+                            if not matching_entity.empty:
+                                selected_entity = initial_entity
+                                selected_value = initial_entity
+                                # Don't show selectbox if value is pre-set from URL
+                            else:
+                                selected_entity = st.sidebar.selectbox(
+                                    "Select Entity",
+                                    ["---"] + entity_options,
+                                    index=0
+                                )
+                                selected_value = selected_entity.split(" (")[0] if selected_entity != "---" else None
+                    else:
+                        selected_entity = st.sidebar.selectbox(
+                            "Select Entity",
+                            ["---"] + entity_options,
+                            index=0
+                        )
+                        selected_value = selected_entity.split(" (")[0] if selected_entity != "---" else None
+                else:
+                    st.error("Unable to load entity data.")
+                    selected_value = None
             elif level == "Facility":
                 search_container = st.sidebar.container()
                 
@@ -1545,8 +1647,8 @@ def main() -> None:
                     else:
                         search_container.info("No matching facilities found")
 
-            # Add back button if on facility page - now both level and selected_value are defined
-            if level == "Facility" and selected_value:
+            # Add back button if on facility, state, or entity page - now both level and selected_value are defined
+            if (level == "Facility" or level == "State" or level == "Entity") and selected_value:
                 st.markdown("""
                     <div style="margin-bottom: 10px;">
                         <a href="/" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500;">
@@ -1606,6 +1708,463 @@ def main() -> None:
 
                     # 4. Add subscription button
                     display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
+
+            # For entity level, display full entity content (verbatim from ownership page)
+            elif level == "Entity" and selected_value:
+                # Load data
+                entity_data = load_affiliated_entity_data()
+                provider_data = load_provider_info_data()
+                
+                if not entity_data.empty and not provider_data.empty:
+                    # Find the selected entity by name
+                    selected_entity_data = entity_data[entity_data['Affiliated entity'] == selected_value]
+                    if not selected_entity_data.empty:
+                        entity_row = selected_entity_data.iloc[0]
+                        entity_id = int(entity_row['Affiliated entity ID'])
+                        
+                        # Main entity dashboard with entity ID
+                        entity_name_title_case = proper_title_case(selected_value)
+                        st.markdown(f'''
+                                <div class="entity-header" style="background: linear-gradient(90deg, #e3ecfa 80%, #dbeafe 100%); color: #1a2233; padding: 1.7rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #d3dbe8;">
+                                    <h2 style="margin-bottom: 0.15em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233;">{entity_name_title_case} <span style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>                </div>
+                            ''', unsafe_allow_html=True)
+                        # Key metrics overview using standard Streamlit metrics
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Total Facilities", 
+                                     format_metric(entity_row['Number of facilities'], decimal_places=0, thousands=True),
+                                     help="Total number of nursing homes owned by this entity")
+                        with col2:
+                            st.metric("States of Operation", 
+                                     format_metric(entity_row['Number of states and territories with operations'], decimal_places=0),
+                                     help="Number of states where this entity operates nursing homes")
+                        with col3:
+                            st.metric("Overall Rating", 
+                                     format_metric(entity_row['Average overall 5-star rating'], decimal_places=1),
+                                     help="Average CMS 5-star overall rating across all facilities")
+                        with col4:
+                            st.metric("Total Fines", 
+                                     f"${format_metric(entity_row['Total amount of fines in dollars'], decimal_places=0, thousands=True)}",
+                                     help="Total amount of fines in dollars across all facilities")
+                        # Calculate number of 1-star facilities for this entity
+                        num_1star = 0
+                        if entity_id and entity_id != "":
+                            entity_facilities = provider_data[
+                                provider_data['Affiliated Entity ID'] == entity_id
+                            ].copy()
+                            if not entity_facilities.empty:
+                                num_1star = (entity_facilities['Overall Rating'] == 1).sum()
+
+                        # High Risk Facilities
+                        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em; margin-bottom:0.2em;">High-Risk Facilities - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
+                        risk_col1, risk_col2, risk_col3, risk_col4 = st.columns(4)
+                        with risk_col1:
+                            st.metric("SFF", 
+                                     format_metric(entity_row['Number of Special Focus Facilities (SFF)'], decimal_places=0),
+                                     help="Special Focus Facilities with serious quality issues under CMS oversight")
+                        with risk_col2:
+                            st.metric("SFF Candidate", 
+                                     format_metric(entity_row['Number of SFF candidates'], decimal_places=0),
+                                     help="Facilities monitored for potential SFF designation")
+                        with risk_col3:
+                            st.metric("Abuse Icon", 
+                                     format_metric(entity_row['Number of facilities with an abuse icon'], decimal_places=0),
+                                     help="Facilities cited for abuse")
+                        with risk_col4:
+                            st.metric("1-Star Rating", 
+                                     format_metric(num_1star, decimal_places=0),
+                                     help="Facilities with the lowest CMS overall rating")
+                        
+
+                        
+                        # Single column layout for detailed metrics
+                        
+                        # Ownership breakdown with pie chart
+                        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Ownership Type - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
+                        
+                        own_col1, own_col2 = st.columns([1, 1])
+                        
+                        with own_col1:
+                            # Pie chart for ownership
+                            def safe_pct(val):
+                                try:
+                                    v = float(val)
+                                    return v if pd.notna(v) else 0.0
+                                except Exception:
+                                    return 0.0
+                            for_profit = safe_pct(entity_row.get('Percent of facilities classified as for-profit', 0))
+                            non_profit = safe_pct(entity_row.get('Percent of facilities classified as non-profit', 0))
+                            government = safe_pct(entity_row.get('Percent of facilities classified as government-owned', 0))
+                            pie_labels = ['For-Profit', 'Non-Profit', 'Government']
+                            pie_values = [for_profit, non_profit, government]
+                            # Custom tooltip text for each slice
+                            pie_hovertext = [
+                                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%',
+                                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%',
+                                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%'
+                            ]
+                            fig_pie = go.Figure(data=[go.Pie(
+                                labels=pie_labels,
+                                values=pie_values,
+                                hole=0.3,
+                                marker_colors=['#ff6b6b', '#4ecdc4', '#45b7d1'],
+                                text=pie_hovertext,
+                                hoverinfo='text',
+                                textinfo='none',
+                                showlegend=True
+                            )])
+                            fig_pie.update_layout(
+                                height=260,
+                                showlegend=True,
+                                margin=dict(l=10, r=10, t=30, b=10)
+                            )
+                            st.plotly_chart(fig_pie, use_container_width=True)
+                        
+                        with own_col2:
+                            # Ownership metrics
+                            st.metric("For-Profit", f"{entity_row['Percent of facilities classified as for-profit']:.1f}%")
+                            st.metric("Non-Profit", f"{entity_row['Percent of facilities classified as non-profit']:.1f}%")
+                            st.metric("Government", f"{entity_row['Percent of facilities classified as government-owned']:.1f}%")
+                        
+                        # CMS 5-Star Ratings
+                        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">CMS 5-Star Ratings - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
+                        # Quality metrics with decimals for entity averages
+                        qual_col1, qual_col2, qual_col3, qual_col4 = st.columns(4)
+                        with qual_col1:
+                            st.metric("Overall", f"{entity_row['Average overall 5-star rating']:.1f}")
+                        with qual_col2:
+                            st.metric("Health Inspection", f"{entity_row['Average health inspection rating']:.1f}")
+                        with qual_col3:
+                            st.metric("Staffing", f"{entity_row['Average staffing rating']:.1f}")
+                        with qual_col4:
+                            st.metric("Quality", f"{entity_row['Average quality rating']:.1f}")
+                        # Quality ratings chart and distribution chart side by side
+                        chart_col1, chart_col2 = st.columns(2)
+                        with chart_col1:
+                            metrics = ['Overall', 'Staffing', 'Health Inspection', 'Quality']
+                            values = [
+                                entity_row['Average overall 5-star rating'],
+                                entity_row['Average staffing rating'],
+                                entity_row['Average health inspection rating'],
+                                entity_row['Average quality rating']
+                            ]
+                            colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c']
+                            # Each bar gets its own hovertemplate
+                            bar_hovertemplates = [
+                                'Overall: %{y:.1f}<extra></extra>',
+                                'Staffing: %{y:.1f}<extra></extra>',
+                                'Health Inspection: %{y:.1f}<extra></extra>',
+                                'Quality: %{y:.1f}<extra></extra>'
+                            ]
+                            fig = go.Figure()
+                            for i, (metric, value, color, hovertemplate) in enumerate(zip(metrics, values, colors, bar_hovertemplates)):
+                                fig.add_trace(go.Bar(
+                                    x=[metric],
+                                    y=[value],
+                                    marker_color=color,
+                                    # Remove text labels from bars
+                                    text=None,
+                                    textposition=None,
+                                    hovertemplate=hovertemplate,
+                                    width=[0.5]
+                                ))
+                            fig.update_layout(
+                                yaxis_title="CMS 5-Star Rating",
+                                yaxis=dict(range=[0, 5], tickfont=dict(size=13)),
+                                height=260,
+                                showlegend=False,
+                                margin=dict(l=10, r=10, t=30, b=10),
+                                bargap=0.35
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        with chart_col2:
+                            # Facility ratings breakdown pie chart
+                            if entity_id and entity_id != "":
+                                entity_facilities = provider_data[
+                                    provider_data['Affiliated Entity ID'] == entity_id
+                                ].copy()
+                                if not entity_facilities.empty:
+                                    # Count facilities by overall rating and ensure all ratings 1-5 are included
+                                    rating_counts = entity_facilities['Overall Rating'].value_counts()
+                                    # Create a complete series with all ratings 1-5, filling missing ones with 0
+                                    complete_ratings = pd.Series(index=range(1, 6), data=0)
+                                    for rating, count in rating_counts.items():
+                                        if pd.notna(rating) and rating in range(1, 6):
+                                            complete_ratings[rating] = count
+                                    total_facilities = complete_ratings.sum()
+                                    # Calculate percentages and filter out 0% slices
+                                    rating_percents = [((count / total_facilities) * 100 if total_facilities > 0 else 0) for count in complete_ratings.values]
+                                    # Only include slices where count > 0 (not just percent > 0)
+                                    dist_labels = []
+                                    dist_values = []
+                                    dist_hovertext = []
+                                    for rating, count, pct in zip(complete_ratings.index, complete_ratings.values, rating_percents):
+                                        if count > 0:
+                                            dist_labels.append(f"{rating}")
+                                            dist_values.append(count)
+                                            dist_hovertext.append(f'{rating} star: {pct:.1f}% ({count} NHs)')
+                                    # Logical color scheme: 1=red, 2=orange, 3=yellow, 4=light green, 5=blue
+                                    star_colors = ['#e74c3c', '#e67e22', '#f7dc6f', '#58d68d', '#3498db']
+                                    # Only use as many colors as there are slices (always in 1-5 order)
+                                    used_colors = [star_colors[int(rating)-1] for rating in dist_labels]
+                                    fig_ratings = go.Figure(data=[go.Pie(
+                                        labels=dist_labels,
+                                        values=dist_values,
+                                        hole=0.3,
+                                        marker_colors=used_colors,
+                                        sort=False,
+                                        text=dist_hovertext,
+                                        hoverinfo='text',
+                                        textinfo='none',
+                                        showlegend=True
+                                    )])
+                                    fig_ratings.update_layout(
+                                        height=260,
+                                        showlegend=True,
+                                        margin=dict(l=10, r=10, t=30, b=10),
+                                        legend=dict(
+                                            orientation='v',
+                                            x=1.05,
+                                            y=0.5,
+                                            xanchor='left',
+                                            yanchor='middle',
+                                            bgcolor='#f8f9fa',
+                                            bordercolor='#e0e0e0',
+                                            borderwidth=1,
+                                            font=dict(size=13),
+                                            itemclick='toggleothers',
+                                            itemdoubleclick='toggle'
+                                        )
+                                    )
+                                    title_col1, title_col2, title_col3 = st.columns([0.15, 0.7, 0.15])
+                                    with title_col2:
+                                        st.markdown('<div style="text-align:center; font-size:1em; font-weight:400; color:#444; margin-bottom:0.2em;">CMS 5-Star Rating Distribution</div>', unsafe_allow_html=True)
+                                    st.plotly_chart(fig_ratings, use_container_width=True)
+                        
+                        # Staffing metrics
+                        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Staffing Levels - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
+                        
+                        staff_col1, staff_col2, staff_col3, staff_col4 = st.columns(4)
+                        with staff_col1:
+                            st.metric("Total Nurse HPRD", f"{entity_row['Average total nurse hours per resident day']:.1f}")
+                        with staff_col2:
+                            st.metric("RN HPRD", f"{entity_row['Average total Registered Nurse hours per resident day']:.1f}")
+                        with staff_col3:
+                            st.metric("Weekend HPRD", f"{entity_row['Average total weekend nurse hours per resident day']:.1f}")
+                        with staff_col4:
+                            st.metric("Admin Turnover", f"{entity_row['Average number of administrators who have left the nursing home']:.1f}")
+                        
+                        # Turnover metrics
+                        turn_col1, turn_col2 = st.columns(2)
+                        with turn_col1:
+                            st.metric("Nursing Staff Turnover", f"{entity_row['Average total nursing staff turnover percentage']:.1f}%")
+                        with turn_col2:
+                            st.metric("RN Turnover", f"{entity_row['Average Registered Nurse turnover percentage']:.1f}%")
+                        
+                        # Compliance metrics
+                        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
+                        
+                        comp_col1, comp_col2, comp_col3, comp_col4 = st.columns(4)
+                        with comp_col1:
+                            st.metric("Total Fines", f"${entity_row['Total amount of fines in dollars']:,.0f}")
+                        with comp_col2:
+                            st.metric("Avg Fines per Facility", f"${entity_row['Average amount of fines in dollars']:,.0f}")
+                        with comp_col3:
+                            st.metric("Total Payment Denials", entity_row['Total number of payment denials'])
+                        with comp_col4:
+                            st.metric("Avg Payment Denials", f"{entity_row['Average number of payment denials']:.1f}")
+                        
+                        # Antipsychotic usage
+                        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Antipsychotics - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
+                        
+                        anti_col1, anti_col2 = st.columns(2)
+                        with anti_col1:
+                            st.metric("Short-Stay Antipsychotic", f"{entity_row['Average percentage of short-stay residents who newly received an antipsychotic medication']:.1f}%")
+                        with anti_col2:
+                            st.metric("Long-Stay Antipsychotic", f"{entity_row['Average percentage of long-stay residents who received an antipsychotic medication']:.1f}%")
+                        
+                        # Facilities list
+                        st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
+                        
+                        # Get facilities for this entity
+                        if entity_id and entity_id != "":
+                            entity_facilities = provider_data[
+                                provider_data['Affiliated Entity ID'] == entity_id
+                            ].copy()
+                            
+                            if not entity_facilities.empty:
+                                st.markdown(f"**{len(entity_facilities)} facilities found**")
+                                
+                                # Prepare facilities data for display with City instead of County
+                                facilities_display = entity_facilities[[
+                                    'State',
+                                    'City/Town',
+                                    'CMS Certification Number (CCN)',
+                                    'Provider Name',
+                                    'Overall Rating',
+                                    'Staffing Rating',
+                                    'Special Focus Status',
+                                    'Abuse Icon'
+                                ]].copy()
+                                
+                                # Rename City/Town to City
+                                facilities_display = facilities_display.rename(columns={'City/Town': 'City'})
+                                
+                                # Clean up the data and convert ratings to integers
+                                facilities_display = facilities_display.fillna('N/A')
+                                
+                                # Convert numeric ratings to integers where possible
+                                rating_columns = ['Overall Rating', 'Staffing Rating']
+                                for col in rating_columns:
+                                    facilities_display[col] = pd.to_numeric(facilities_display[col], errors='coerce')
+                                    facilities_display[col] = facilities_display[col].apply(lambda x: int(x) if pd.notna(x) and x == int(x) else 'N/A')
+                                
+                                # Apply proper capitalization to provider names and city
+                                def capitalize_name(name):
+                                    if pd.isna(name):
+                                        return name
+                                    # Common words to keep lowercase
+                                    lowercase_words = {'and', 'or', 'of', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
+                                    words = name.lower().split()
+                                    capitalized_words = []
+                                    for i, word in enumerate(words):
+                                        if i == 0 or word not in lowercase_words:
+                                            capitalized_words.append(word.capitalize())
+                                        else:
+                                            capitalized_words.append(word)
+                                    return ' '.join(capitalized_words)
+                                
+                                # Apply capitalization
+                                facilities_display['Provider Name'] = facilities_display['Provider Name'].apply(capitalize_name)
+                                facilities_display['City'] = facilities_display['City'].apply(capitalize_name)
+                                
+                                # Add filter for high-risk facilities
+                                show_high_risk_only = st.checkbox(
+                                    "High-risk facilities only", 
+                                    value=False,
+                                    help="Filter to show only facilities with Overall Rating '1', SFF status, SFF Candidate status, or Abuse Icon 'Y'"
+                                )
+                                
+                                # Apply high-risk filter if selected
+                                if show_high_risk_only:
+                                    total_facilities = len(facilities_display)
+                                    high_risk_mask = (
+                                        (facilities_display['Overall Rating'] == 1) |
+                                        (facilities_display['Special Focus Status'].str.contains('SFF', case=False, na=False)) |
+                                        (facilities_display['Special Focus Status'].str.contains('Candidate', case=False, na=False)) |
+                                        (facilities_display['Abuse Icon'] == 'Y')
+                                    )
+                                    facilities_display = facilities_display[high_risk_mask]
+                                    
+                                    if len(facilities_display) == 0:
+                                        st.info("No high-risk facilities found for this entity.")
+                                        st.markdown('</div>', unsafe_allow_html=True)
+                                        return
+                                    else:
+                                        st.success(f"Showing {len(facilities_display)} high-risk facilities out of {total_facilities} total.")
+                                
+                                # Create provider names as HTML links
+                                def format_provnum(provnum):
+                                    provnum_str = str(provnum).strip().upper().zfill(6)
+                                    if len(provnum_str) > 6:
+                                        provnum_str = provnum_str[-6:]
+                                    return provnum_str
+                                facilities_display['Provider Name'] = facilities_display.apply(
+                                    lambda row: f'<a href="https://nursinghomedashboard.streamlit.app/?level=Facility&facility={format_provnum(row["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider Name"]}</a>',
+                                    axis=1
+                                )
+                                
+                                # Reorder columns to: State, Provider Name, CMS CCN, City, etc.
+                                column_order = [
+                                    'State',
+                                    'Provider Name',
+                                    'CMS Certification Number (CCN)',
+                                    'City',
+                                    'Overall Rating',
+                                    'Staffing Rating',
+                                    'Special Focus Status',
+                                    'Abuse Icon'
+                                ]
+                                facilities_display = facilities_display[column_order]
+                                
+                                # Render as HTML table for clickable links
+                                html_table = facilities_display.to_html(
+                                    index=False,
+                                    escape=False,
+                                    classes=['dataframe', 'table', 'table-striped'],
+                                    table_id='facilities-table'
+                                )
+                                
+                                # Add CSS and JavaScript for table styling and sorting
+                                st.markdown("""
+                                <style>
+                                .dataframe {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    margin: 0.3rem 0;
+                                    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                                    font-size: 0.8em;
+                                    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+                                    border-radius: 6px;
+                                    overflow: hidden;
+                                }
+                                .dataframe th {
+                                    background: #f8f9fa;
+                                    padding: 6px 4px;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    border: none;
+                                    border-bottom: 2px solid #e9ecef;
+                                    color: #495057;
+                                    font-size: 0.75em;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.3px;
+                                }
+                                .dataframe td {
+                                    padding: 4px 6px;
+                                    border-bottom: 1px solid #f0f0f0;
+                                    vertical-align: middle;
+                                    font-size: 0.8em;
+                                }
+                                .dataframe tr:hover {
+                                    background-color: #f8f9fa;
+                                    transform: translateY(-1px);
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                                }
+                                .dataframe tr:nth-child(even) {
+                                    background-color: #fafbfc;
+                                }
+                                .dataframe tr:nth-child(even):hover {
+                                    background-color: #f0f2f5;
+                                }
+                                .dataframe a {
+                                    color: #007bff;
+                                    text-decoration: none;
+                                    font-weight: 500;
+                                    transition: color 0.2s ease;
+                                }
+                                .dataframe a:hover {
+                                    color: #0056b3;
+                                    text-decoration: underline;
+                                }
+                                </style>
+                                """, unsafe_allow_html=True)
+                                
+                                st.markdown(html_table, unsafe_allow_html=True)
+                                
+                                st.markdown('</div>', unsafe_allow_html=True)
+                                
+                            else:
+                                st.info("No facility data available for this entity.")
+                        else:
+                            st.info("Entity ID not available for facility lookup.")
+                        
+                        # Add subscription button for entity
+                        display_subscription_button("entity", selected_value, f"{selected_value} Entity Data")
+                    else:
+                        st.error(f"Entity '{selected_value}' not found in the data.")
+                else:
+                    st.error("Unable to load entity data.")
 
             # For other levels (National, State)
             else:
