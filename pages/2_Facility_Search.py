@@ -141,6 +141,24 @@ def search_facilities(state: str, search_term: str) -> List[Dict[str, str]]:
 if state or search_term:
     results = search_facilities(state, search_term)
     
+    # Show selected state above the table if a state is selected
+    if state:
+        # Map state abbreviation to full name (copy from PBJ_Dashboard.py or define here)
+        state_name_map = {
+            'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona', 'CA': 'California', 'CO': 'Colorado',
+            'CT': 'Connecticut', 'DC': 'District of Columbia', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+            'HI': 'Hawaii', 'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
+            'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland', 'ME': 'Maine',
+            'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana',
+            'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+            'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
+            'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
+            'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
+            'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
+        }
+        full_state_name = state_name_map.get(state, state)
+        st.markdown(f"<div style='font-size: 1em; color: #1976d2; margin-bottom: 8px;'>Showing results for <a href='/?level=State&state={state}' style='color: #1976d2; text-decoration: underline;' target='_self'>{full_state_name}</a></div>", unsafe_allow_html=True)
+
     if results:
         st.markdown('<div class="search-results">', unsafe_allow_html=True)
         st.markdown("### Search Results")
