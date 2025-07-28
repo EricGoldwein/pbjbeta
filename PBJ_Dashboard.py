@@ -1383,10 +1383,7 @@ def main() -> None:
         # Get current page from URL
         current_page = st.query_params.get('page', 'dashboard')
 
-        # Handle different pages
-        if current_page == 'premium':
-            st.switch_page("pages/1_Premium.py")
-        # Only allow switch_page for static pages, not for entity/ownership
+        # Handle different pages - removed problematic navigation
 
         # Get URL parameters using the new API
         initial_level = st.query_params.get('level', 'National')
@@ -1494,9 +1491,7 @@ def main() -> None:
             )
         # If level is pre-set by URL, don't show radio button
 
-        # A & B: Fix radio button navigation
-        if level == "Facility Search":
-            st.switch_page("pages/2_Facility_Search.py")
+        # A & B: Fix radio button navigation - removed problematic navigation
 
         # Get selected value based on level
         selected_value = None
