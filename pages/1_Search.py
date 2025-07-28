@@ -218,7 +218,7 @@ ownership_df = load_ownership_data()
 tab1, tab2, tab3 = st.tabs(["🔍 Facility", "🏢 Ownership", "🗺️ State"])
 
 with tab1:
-    st.markdown("### Search by Facility Name or CCN")
+    st.markdown("### Search Provider Name/CCN")
     
     col1, col2 = st.columns([1, 2])
     
