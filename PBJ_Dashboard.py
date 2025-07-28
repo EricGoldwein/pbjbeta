@@ -1431,8 +1431,8 @@ def main() -> None:
         
         # Add About link below search box
         st.markdown('''
-            <div style="text-align: center; margin-bottom: 20px;">
-                <a href="/About" target="_self" style="color: #1E88E5; text-decoration: none; font-style: italic; font-size: 0.9em; font-weight: 500;">
+            <div style="text-align: center; margin-bottom: 5px;">
+                <a href="/About" target="_self" style="color: #1976d2; text-decoration: none; font-size: 0.85em; font-weight: 400; background: #f5f5f5; padding: 4px 8px; border-radius: 4px; border: 1px solid #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
                     About the PBJ Dashboard
                 </a>
             </div>
