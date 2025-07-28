@@ -3,7 +3,7 @@ import pandas as pd
 from typing import List, Dict
 import re
 
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard", page_icon="🔍", layout="wide")
+st.set_page_config(page_title="Search | PBJ Nursing Home Staffing Dashboard by 320", page_icon="🔍", layout="wide")
 
 # Add custom CSS
 st.markdown("""
