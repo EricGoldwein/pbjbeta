@@ -7,8 +7,8 @@
 !setup_database.py
 
 # Keep only these Streamlit page files
-!pages/1_About.py
-!pages/2_Facility_Search.py
+!pages/1_Search.py
+!pages/2_About.py
 !pages/3_Ownership.py
 !pages/4_Premium.py
 

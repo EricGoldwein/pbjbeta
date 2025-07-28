@@ -937,7 +937,7 @@ def main():
     st.markdown('''
 <div style="text-align:center; margin-top:2em; padding:1em; background:#f5f8fd; border-radius:8px; font-size:1.05em; color:#333;">
   A free public resource from <b>320 Consulting</b>.<br>
-  <a href="/pages/2_About.py" style="color:#1E88E5; text-decoration:underline; font-weight:500;">About the PBJ Dashboard</a>
+  <a href="/About" style="color:#1E88E5; text-decoration:underline; font-weight:500;">About the PBJ Dashboard</a>
 </div>
 ''', unsafe_allow_html=True)
 
