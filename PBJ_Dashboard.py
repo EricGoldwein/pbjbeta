@@ -1417,17 +1417,27 @@ def main() -> None:
 
         # Refined subhead: centered text and box with search link
         st.markdown('''
-            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 850px; margin-left: auto; margin-right: auto; text-align: center;">
+            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
                 </div>
                 <div style="margin-top: 8px;">
                     <a href="/Search" target="_self" style="color: #1E88E5; text-decoration: none; font-weight: 500; font-size: 1.1em;">
-                        🔍 Search by facility, state, or ownership group
+                        🔍 Search by facility, state, or ownership
                     </a>
                 </div>
             </div>
         ''', unsafe_allow_html=True)
+        
+        # Add About link below search box
+        st.markdown('''
+            <div style="text-align: center; margin-bottom: 20px;">
+                <a href="/About" target="_self" style="color: #1E88E5; text-decoration: none; font-style: italic; font-size: 0.9em; font-weight: 500;">
+                    About the PBJ Dashboard
+                </a>
+            </div>
+        ''', unsafe_allow_html=True)
+        
         # Sidebar
         st.sidebar.markdown("""
             <style>
