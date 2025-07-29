@@ -23,6 +23,10 @@
 # Keep these pngs
 !pbj_favicon.png
 
+# Keep requirements files
+!requirements.txt
+!dev-requirements.txt
+
 # Ignore everything in data/mapping folders
 PBJcsv/
 NonNursecsv/
