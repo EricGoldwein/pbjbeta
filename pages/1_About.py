@@ -1,7 +1,44 @@
 import streamlit as st
+from st_clickable_images import clickable_images
+import base64
 
 # Set page configuration
-st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="��", layout="wide")
+st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide")
+
+# Custom CSS for Home button styling
+st.markdown("""
+<style>
+.home-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.home-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.home-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Add Home button to top left
+col1, col2, col3 = st.columns([1, 8, 1])
+with col1:
+    st.markdown('<button class="home-button" onclick="window.location.href=\'/\'">🏠 Home</button>', unsafe_allow_html=True)
 
 # Main intro block with soft background and padding (combine into one call)
 st.markdown("""
@@ -11,8 +48,8 @@ st.markdown("""
         <span style='font-size:1.15em; color:#7a869a; font-weight:400;'>by 320 Consulting</span>
     </div>
 
-### Why this dashboard matters
-Staffing data is a key indicator of nursing home quality, revealing how much care residents receive and what resources facilities commit. Yet most public data shows only the latest quarter, offering a narrow and incomplete view. This dashboard stitches together **eight years of CMS staffing files—billions of data points from payroll-based journal (PBJ) submissions—into interactive visualizations**, so you can see how staffing has changed over time and bring data-driven context to what’s happening inside the 15,000 nursing homes across the U.S.
+### Why this matters
+Staffing data is a key indicator of nursing home quality, revealing how much care residents receive and what resources facilities commit. Yet most public data shows only the latest quarter, offering a narrow and incomplete view. This dashboard stitches together **eight years of federal CMS staffing files—billions of data points from payroll-based journal (PBJ) submissions—into interactive visualizations**, so you can see how staffing has changed over time and bring data-driven context to what’s happening inside the 15,000 nursing homes across the U.S.
 
 ### Who it helps  
 * **Attorneys** – identify staffing patterns and trends that may support negligence cases, regulatory violations, or quality of care claims. Access historical data to demonstrate chronic understaffing, seasonal variations, or ownership-related staffing deficiencies.
