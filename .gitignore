@@ -27,6 +27,9 @@
 !requirements.txt
 !dev-requirements.txt
 
+# keep this
+config.toml
+
 # Ignore everything in data/mapping folders
 PBJcsv/
 NonNursecsv/

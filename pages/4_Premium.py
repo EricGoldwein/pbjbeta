@@ -1,4 +1,6 @@
 import streamlit as st
+from st_clickable_images import clickable_images
+import base64
 
 # Set page config - this must be the first Streamlit command
 st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="pbj_favicon.png", layout="wide")
@@ -38,16 +40,16 @@ col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
     st.markdown('<button class="home-button" onclick="window.location.href=\'/\'">🏠 Home</button>', unsafe_allow_html=True)
 
+
 # Custom CSS for premium styling
 st.markdown("""
     <style>
     .premium-header {
         background: linear-gradient(135deg, #1E88E5 0%, #1565C0 100%);
         color: white;
-        padding: 0.5rem 2rem;
+        padding: 1rem 2rem;
         border-radius: 10px;
         margin-bottom: 1rem;
-        margin-top: -0.5rem;
     }
     .premium-feature {
         background-color: #f8f9fa;
@@ -175,13 +177,9 @@ def display_footer():
         <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
             <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
             <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
-            <p><a href="/1_About" target="_self">About the Dashboard</a> | <a href="/4_Premium" target="_self">Premium</a></p>
+            <p><a href="/About" target="_self">About the Dashboard</a> | <a href="/Premium" target="_self">Premium</a></p>
         </div>
     """, unsafe_allow_html=True)
-
-# Add back to dashboard button
-if st.button("← Back to Dashboard", key="back_to_dashboard_premium"):
-    st.switch_page("PBJ_Dashboard.py")
 
 # Add footer at the end of the page
 display_footer() 

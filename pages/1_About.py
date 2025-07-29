@@ -1,4 +1,6 @@
 import streamlit as st
+from st_clickable_images import clickable_images
+import base64
 
 # Set page configuration
 st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide")
@@ -140,15 +142,11 @@ st.markdown("""
 # Section divider
 st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>", unsafe_allow_html=True)
 
-# Add back to dashboard button
-if st.button("← Back to Dashboard", key="back_to_dashboard_about"):
-    st.switch_page("PBJ_Dashboard.py")
-
 # Footer
 st.markdown("""
     <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
         <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
         <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
-        <p><a href="/1_About" target="_self">About the Dashboard</a> | <a href="/4_Premium" target="_self">Premium</a></p>
+        <p><a href="/About" target="_self">About the Dashboard</a> | <a href="/Premium" target="_self">Premium</a></p>
     </div>
 """, unsafe_allow_html=True) 
