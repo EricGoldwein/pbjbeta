@@ -1438,27 +1438,44 @@ def main() -> None:
             </div>
         """, unsafe_allow_html=True)
 
-        # Refined subhead: centered text and box with search link
-        st.markdown('''
-            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
-                <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
-                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
-                </div>
-                <div style="margin-top: 8px;">
-                </div>
-            </div>
-        ''', unsafe_allow_html=True)
-        
         # Check if we should hide search based on URL parameters
         hide_search = False
         if initial_level and (initial_facility or initial_state or initial_entity):
             hide_search = True
+
+        # Refined subhead: centered text and box with search link
+        st.markdown(f'''
+            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
+                <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
+                </div>
+                {"<div style=\"margin-top: 8px;\" class=\"mobile-about-link\"><a href=\"/About\" target=\"_self\" style=\"color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400;\">About the PBJ Dashboard</a></div>" if not hide_search else ""}
+            </div>
+        ''', unsafe_allow_html=True)
         
-        # Add About link only on homepage
+        # Add About link only on homepage and only on desktop
         if not hide_search:
             st.markdown('''
-                <div style="text-align: center; margin-bottom: 14px;">
-                    <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 600; background: #e8f4fd; padding: 6px 12px; border-radius: 6px; border: 1px solid #1976d2; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: all 0.2s ease;">
+                <style>
+                .mobile-about-link {
+                    display: block;
+                }
+                @media (min-width: 768px) {
+                    .mobile-about-link {
+                        display: none;
+                    }
+                }
+                .desktop-about-link {
+                    display: none;
+                }
+                @media (min-width: 768px) {
+                    .desktop-about-link {
+                        display: block;
+                    }
+                }
+                </style>
+                <div class="desktop-about-link" style="text-align: center; margin-bottom: 2px;">
+                    <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 600; background: #e8f4fd; padding: 3px 12px; border-radius: 6px; border: 1px solid #1976d2; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: all 0.2s ease;">
                         About the PBJ Dashboard
                     </a>
                 </div>
@@ -1522,6 +1539,7 @@ def main() -> None:
             name = name.replace(" On ", " on ").replace(" To ", " to ").replace(" For ", " for ")
             
             return name
+
         # Add search functionality
         if not hide_search:
             st.markdown("""
@@ -1532,6 +1550,15 @@ def main() -> None:
                 }
                 .stTabs [data-baseweb="tab-list"] {
                     margin-top: -5px;
+                }
+                @media (max-width: 768px) {
+                    .search-header {
+                        margin-top: -30px;
+                        margin-bottom: 0px;
+                    }
+                    div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
+                        margin-bottom: 4px !important;
+                    }
                 }
                 </style>
             """, unsafe_allow_html=True)
