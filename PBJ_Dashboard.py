@@ -76,6 +76,21 @@ def load_metrics_data():
         # Debug: Check column names after renaming
         print(f"State_metrics columns after renaming: {list(state_metrics.columns)}")
         
+        # Ensure STATE column exists and is properly named
+        if 'STATE' not in state_metrics.columns:
+            print(f"ERROR: STATE column missing from state_metrics. Available columns: {list(state_metrics.columns)}")
+            # Try to find a similar column
+            state_cols = [col for col in state_metrics.columns if 'state' in col.lower()]
+            if state_cols:
+                print(f"Found potential state columns: {state_cols}")
+                # Rename the first matching column to STATE
+                state_metrics.rename(columns={state_cols[0]: 'STATE'}, inplace=True)
+                print(f"Renamed {state_cols[0]} to STATE")
+            else:
+                print("No state-like column found!")
+        else:
+            print("STATE column found successfully")
+        
         # Facility metrics column mapping - only rename CY_Qtr to CY_QTR
         facility_column_mapping = {
             'CY_Qtr': 'CY_QTR'
@@ -178,6 +193,15 @@ def load_provider_info_data():
     try:
         df = pd.read_csv('NH_ProviderInfo_Jun2025.csv', dtype={'CMS Certification Number (CCN)': str})
         
+        # Rename columns to match expected format
+        column_mapping = {
+            'CMS Certification Number (CCN)': 'PROVNUM',
+            'Provider Name': 'PROVNAME',
+            'State': 'STATE',
+            'County/Parish': 'COUNTY_NAME'
+        }
+        df.rename(columns=column_mapping, inplace=True)
+        
         # Clean and standardize the data
         # Convert numeric columns
         numeric_columns = [
@@ -203,6 +227,15 @@ def load_march_provider_info_data():
     """Load and cache March 2025 provider information data for comparison."""
     try:
         df = pd.read_csv('NH_ProviderInfo_Mar2025.csv', dtype={'CMS Certification Number (CCN)': str})
+        
+        # Rename columns to match expected format
+        column_mapping = {
+            'CMS Certification Number (CCN)': 'PROVNUM',
+            'Provider Name': 'PROVNAME',
+            'State': 'STATE',
+            'County/Parish': 'COUNTY_NAME'
+        }
+        df.rename(columns=column_mapping, inplace=True)
         
         # Clean and standardize the data
         # Convert numeric columns
@@ -596,7 +629,18 @@ def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_q
                 # Debug: Check available columns
                 if 'STATE' not in state_metrics.columns:
                     st.error(f"STATE column not found. Available columns: {list(state_metrics.columns)}")
-                    return pd.DataFrame()
+                    # Try to find and rename state column
+                    state_cols = [col for col in state_metrics.columns if 'state' in col.lower()]
+                    if state_cols:
+                        state_metrics.rename(columns={state_cols[0]: 'STATE'}, inplace=True)
+                        st.success(f"Renamed {state_cols[0]} to STATE")
+                    else:
+                        return pd.DataFrame()
+                
+                # Additional debug info
+                print(f"Filtering state data for: {selected_value}")
+                print(f"Available states: {sorted(state_metrics['STATE'].unique())}")
+                
                 return state_metrics[
                     (state_metrics['STATE'] == selected_value) & 
                     (state_metrics['CY_QTR'] >= start_quarter) & 
@@ -1479,7 +1523,18 @@ def main() -> None:
         def load_provider_info_data():
             """Load provider info data."""
             try:
-                return pd.read_csv('NH_ProviderInfo_Jun2025.csv', dtype={'PROVNUM': str})
+                df = pd.read_csv('NH_ProviderInfo_Jun2025.csv', dtype={'CMS Certification Number (CCN)': str})
+                
+                # Rename columns to match expected format
+                column_mapping = {
+                    'CMS Certification Number (CCN)': 'PROVNUM',
+                    'Provider Name': 'PROVNAME',
+                    'State': 'STATE',
+                    'County/Parish': 'COUNTY_NAME'
+                }
+                df.rename(columns=column_mapping, inplace=True)
+                
+                return df
             except Exception as e:
                 st.error(f"Error loading provider info: {str(e)}")
                 return pd.DataFrame()
