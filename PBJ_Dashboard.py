@@ -1,11 +1,17 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+
+# Fix for NumPy compatibility with Plotly
+# np.bool8 was deprecated and removed in NumPy 1.26+
+if not hasattr(np, 'bool8'):
+    np.bool8 = np.bool_
+
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import duckdb
 import os
-import numpy as np
 import re
 from plotly.subplots import make_subplots
 from typing import Dict, Optional, List, Tuple, Any
