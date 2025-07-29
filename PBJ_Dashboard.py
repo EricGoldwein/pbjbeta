@@ -1506,7 +1506,8 @@ def main() -> None:
             with tab1:
                 st.markdown("### Search by Provider")
                 
-                col1, col2 = st.columns([1, 2])
+                # Use equal columns for better mobile experience
+                col1, col2 = st.columns([1, 1])
                 
                 with col1:
                     state_filter = st.selectbox(
