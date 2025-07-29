@@ -1445,7 +1445,7 @@ def main() -> None:
 
         # Refined subhead: centered text and box with search link
         st.markdown(f'''
-            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 14px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
+            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 10px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
                 </div>
@@ -1811,7 +1811,9 @@ def main() -> None:
                     </div>
                     """, unsafe_allow_html=True)
         
-        st.markdown("---")
+        # st.markdown("""
+        #     <hr style="margin: 8px 0; border: none; border-top: 1px solid #e0e0e0; height: 1px;">
+        # """, unsafe_allow_html=True)
         
         # Sidebar
         st.sidebar.markdown("""
@@ -1880,8 +1882,6 @@ def main() -> None:
                 key="level_selector"
             )
         # If level is pre-set by URL, don't show radio button
-
-        # A & B: Fix radio button navigation - removed problematic navigation
 
         # Get selected value based on level
         selected_value = None
