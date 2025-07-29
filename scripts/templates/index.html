@@ -1,0 +1,1930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nursing Home Staffing Query Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .main-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            margin: 20px auto;
+            padding: 30px;
+        }
+        .chart-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .table-container {
+            margin: 20px 0;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background-color: white;
+        }
+        .threshold-results {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .form-card {
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            padding: 10px 20px;
+            font-weight: 500;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+            border-color: #0b5ed7;
+        }
+        .table th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+        }
+        .table th:hover {
+            background-color: #e9ecef;
+        }
+        .table th.sortable::after {
+            content: ' ↕';
+            color: #6c757d;
+        }
+        .table th.sort-asc::after {
+            content: ' ↑';
+            color: #0d6efd;
+        }
+        .table th.sort-desc::after {
+            content: ' ↓';
+            color: #0d6efd;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .stat-item {
+            padding: 15px 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            margin: 0 5px;
+            backdrop-filter: blur(10px);
+        }
+        .stat-item h4 {
+            margin-bottom: 5px;
+            font-weight: 700;
+            font-size: 1.8rem;
+        }
+        .stat-label {
+            margin: 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        /* Make all form controls and selects tighter and more compact */
+        .form-control, .form-select {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+            min-width: 0 !important;
+            width: auto !important;
+            display: inline-block !important;
+            font-size: 1em !important;
+            border-radius: 6px !important;
+            box-sizing: border-box;
+            margin-right: 4px !important;
+        }
+        /* Remove extra width from selects and inputs in the query form */
+        #queryForm .form-control, #queryForm .form-select {
+            width: auto !important;
+            min-width: 80px !important;
+            max-width: 180px !important;
+        }
+        /* Make threshold and day filter controls compact */
+        #threshold, #thresholdDayFilter, #chartDayFilter, #dataPageSize {
+            width: auto !important;
+            min-width: 60px !important;
+            max-width: 120px !important;
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+        }
+        /* Remove extra margin from form groups */
+        .mb-3 {
+            margin-bottom: 8px !important;
+        }
+        /* Make button row more compact */
+        .row .col-md-12 .mb-3 {
+            margin-bottom: 4px !important;
+        }
+        /* Make the form itself more compact */
+        #queryForm {
+            gap: 4px !important;
+            padding: 0 !important;
+        }
+        /* Compact the table filter controls */
+        #dataPageSize, #dayFilter {
+            width: auto !important;
+            min-width: 60px !important;
+            max-width: 120px !important;
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+        }
+        /* Compact the chart date range controls */
+        #chartStartDate, #chartEndDate, #contractChartStartDate, #contractChartEndDate {
+            width: auto !important;
+            min-width: 90px !important;
+            max-width: 130px !important;
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+        }
+        /* Stack form fields vertically and tighten spacing */
+        #queryForm .row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem !important;
+            margin-bottom: 0 !important;
+        }
+        #queryForm .col-md-3, #queryForm .col-md-12 {
+            width: 100% !important;
+            max-width: 400px;
+            margin: 0 auto 0.25rem auto !important;
+            padding: 0 !important;
+        }
+        #queryForm label {
+            margin-bottom: 2px !important;
+            font-size: 1em !important;
+            font-weight: 500;
+        }
+        #queryForm .form-control, #queryForm .form-select {
+            margin-bottom: 0.25rem !important;
+        }
+        /* Make the form card tighter */
+        .form-card {
+            padding: 18px 18px 10px 18px !important;
+            margin-bottom: 18px !important;
+        }
+        /* Tighter button spacing */
+        #queryForm button[type="submit"] {
+            margin-top: 0.5rem !important;
+            margin-bottom: 0.25rem !important;
+            padding: 8px 16px !important;
+            font-size: 1em !important;
+            border-radius: 6px !important;
+        }
+        /* Responsive: keep stacked on mobile */
+        @media (max-width: 600px) {
+            #queryForm .col-md-3, #queryForm .col-md-12 {
+                max-width: 100% !important;
+            }
+            .form-card {
+                padding: 10px 6px 6px 6px !important;
+            }
+        }
+        /* Tighter threshold and day filter controls */
+        #threshold, #thresholdDayFilter, #chartDayFilter, #dataPageSize, #dayFilter {
+            margin-bottom: 0.25rem !important;
+        }
+        /* Make the main query button tight and centered */
+        #queryForm button[type="submit"] {
+            width: auto !important;
+            display: block !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            min-width: 180px !important;
+            max-width: 260px !important;
+            padding-left: 18px !important;
+            padding-right: 18px !important;
+        }
+        /* Make day of week dropdowns wider for long options */
+        #dayFilter, #thresholdDayFilter, #chartDayFilter {
+            max-width: 260px !important;
+            min-width: 140px !important;
+        }
+        /* Two-column layout for form area */
+        .form-flex-container {
+            display: flex;
+            flex-direction: row;
+            gap: 24px;
+            margin-bottom: 18px;
+        }
+        .form-main-col {
+            flex: 2 1 0%;
+            background: linear-gradient(120deg, #f8fafc 60%, #e3f0fa 100%);
+            border-radius: 14px;
+            box-shadow: 0 4px 24px 0 rgba(30,136,229,0.07), 0 1.5px 6px 0 rgba(33,150,243,0.04);
+            border: 1.5px solid #e3eaf3;
+            padding: 28px 28px 12px 28px;
+            min-width: 0;
+            transition: box-shadow 0.18s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            max-width: 540px;
+        }
+        .form-main-col:hover {
+            box-shadow: 0 8px 32px 0 rgba(30,136,229,0.13), 0 2px 8px 0 rgba(33,150,243,0.08);
+            border-color: #b3d1f7;
+        }
+        .form-side-col {
+            flex: 1 1 0%;
+            background: #f8f9fa;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            padding: 18px 14px 10px 14px;
+            min-width: 0;
+            max-width: 370px;
+        }
+        .form-main-col h5, .form-side-col h5 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        /* Responsive: stack on mobile */
+        @media (max-width: 900px) {
+            .form-flex-container {
+                flex-direction: column;
+                gap: 12px;
+            }
+            .form-main-col, .form-side-col {
+                width: 100%;
+                min-width: 0;
+            }
+            .form-main-col {
+                padding: 18px 8px 8px 8px;
+            }
+        }
+        .dashboard-title {
+            font-size: 1.25em;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            color: #2c3338;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 6px;
+            margin-bottom: 18px;
+            background: none;
+        }
+        .query-fields-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-width: 340px;
+            margin: 0;
+            align-items: flex-start;
+        }
+        .query-fields-stack .form-label {
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 2px;
+            color: #333;
+        }
+        .query-fields-stack .form-control, .query-fields-stack .form-select {
+            font-size: 1em;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 0.25rem;
+        }
+        .query-fields-stack button {
+            margin-top: 0.5rem;
+            font-size: 1em;
+            border-radius: 6px;
+            padding: 8px 18px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            box-shadow: 0 2px 6px rgba(30,136,229,0.07);
+            align-self: flex-start;
+        }
+        /* Modern, tight threshold button */
+        #checkThreshold.btn.btn-warning {
+            width: auto !important;
+            min-width: 120px;
+            max-width: 220px;
+            padding: 7px 16px !important;
+            font-size: 1em !important;
+            font-weight: 600;
+            border-radius: 6px !important;
+            box-shadow: 0 2px 6px rgba(255,193,7,0.08);
+            letter-spacing: 0.01em;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            display: block !important;
+        }
+        .query-fields-grid {
+            display: flex;
+            flex-direction: row;
+            gap: 6px;
+            margin-bottom: 0.1rem;
+            align-items: center;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+        }
+        .query-fields-col {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-width: 0;
+            flex: 1 1 0%;
+        }
+        .query-fields-grid .form-label {
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 2px;
+            color: #333;
+        }
+        .query-fields-grid .form-control, .query-fields-grid .form-select {
+            font-size: 1em;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 0.25rem;
+        }
+        .query-fields-btn-row {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .query-fields-btn-row button {
+            font-size: 1em;
+            border-radius: 6px;
+            padding: 8px 18px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            box-shadow: 0 2px 6px rgba(30,136,229,0.07);
+            min-width: 140px;
+            max-width: 200px;
+            margin-top: 0;
+        }
+        .query-fields-btn-col {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-width: 110px;
+            max-width: 160px;
+            margin-left: 6px;
+            padding: 0;
+            background: transparent;
+            border-left: none;
+        }
+        .query-fields-btn-col button {
+            font-size: 1em;
+            border-radius: 6px;
+            padding: 7px 16px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            box-shadow: 0 2px 6px rgba(30,136,229,0.07);
+            min-width: 110px;
+            max-width: 160px;
+            margin: 0;
+            background: linear-gradient(90deg, #1976d2 0%, #2196f3 100%);
+            color: #fff;
+            border: none;
+            transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+            align-self: center;
+        }
+        .query-fields-btn-col button:hover, .query-fields-btn-col button:focus {
+            background: linear-gradient(90deg, #1565c0 0%, #1976d2 100%);
+            box-shadow: 0 4px 12px rgba(33,150,243,0.13);
+            transform: translateY(-1px) scale(1.03);
+            color: #fff;
+        }
+        @media (max-width: 900px) {
+            .query-fields-grid {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: stretch;
+                max-width: 100%;
+            }
+            .query-fields-btn-col {
+                margin-left: 0;
+                align-items: center;
+                margin-top: 0.5rem;
+                width: 100%;
+            }
+        }
+        @media (max-width: 700px) {
+            .query-fields-grid {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .query-fields-btn-row {
+                margin-top: 0.5rem;
+            }
+        }
+        .query-fields-col .mb-3 {
+            margin-bottom: 0.2rem !important;
+        }
+        .query-fields-col .mb-3:last-child {
+            margin-bottom: 0 !important;
+        }
+        .table, table {
+            font-size: 0.97em;
+            border-collapse: collapse !important;
+            width: 100%;
+            background: #fff;
+        }
+        .table th, .table td, table th, table td {
+            padding: 6px 10px !important;
+            border: 1px solid #e3eaf3 !important;
+            vertical-align: middle !important;
+            background: none;
+        }
+        .table th, table th {
+            background: #f6fafd !important;
+            font-weight: 700;
+            font-size: 1em;
+            color: #2c3338;
+            border-bottom: 2px solid #dbe7f3 !important;
+            padding-top: 7px !important;
+            padding-bottom: 7px !important;
+        }
+        .table tbody tr, table tbody tr {
+            transition: background 0.13s;
+        }
+        .table tbody tr:hover, table tbody tr:hover {
+            background: #eaf4fb !important;
+        }
+        .table-striped tbody tr:nth-of-type(odd), table tbody tr:nth-of-type(odd) {
+            background: #f9fbfd !important;
+        }
+        .table-striped tbody tr:nth-of-type(even), table tbody tr:nth-of-type(even) {
+            background: #fff !important;
+        }
+        .table-container, .threshold-results {
+            padding: 10px 10px 6px 10px !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(30,136,229,0.04);
+            background: #f8fafc !important;
+            margin-bottom: 18px !important;
+        }
+        /* Remove extra whitespace in table controls */
+        .dataTables_length, .dataTables_filter, .dataTables_info, .dataTables_paginate {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .compact-query-form {
+            font-size: 0.97em;
+            padding: 14px 14px 8px 14px !important;
+            margin-top: 10px !important;
+            margin-bottom: 10px !important;
+            box-shadow: 0 1.5px 6px 0 rgba(33,150,243,0.04);
+            border-radius: 10px;
+            background: linear-gradient(120deg, #fafdff 70%, #eaf4fb 100%);
+            border: 1px solid #e3eaf3;
+        }
+        .compact-query-form .dashboard-title {
+            font-size: 1.08em !important;
+            margin-bottom: 10px !important;
+            padding-bottom: 2px !important;
+        }
+        .compact-query-form .query-fields-grid {
+            gap: 6px;
+            margin-bottom: 0.1rem;
+        }
+        .compact-query-form .query-fields-col .mb-2 {
+            margin-bottom: 0.12rem !important;
+        }
+        .compact-query-form .query-fields-btn-col button {
+            min-width: 110px;
+            max-width: 160px;
+            font-size: 0.97em;
+            padding: 6px 12px;
+        }
+        .stats-query-card {
+            background: linear-gradient(120deg, #f8fafc 60%, #e3f0fa 100%);
+            border-radius: 14px;
+            box-shadow: 0 4px 24px 0 rgba(30,136,229,0.07), 0 1.5px 6px 0 rgba(33,150,243,0.04);
+            border: 1.5px solid #e3eaf3;
+            padding: 24px 24px 10px 24px;
+            margin-bottom: 18px;
+            margin-top: 0;
+            position: relative;
+            font-size: 0.97em;
+        }
+        .stats-query-card .dashboard-title {
+            font-size: 1.08em !important;
+            margin-bottom: 10px !important;
+            padding-bottom: 2px !important;
+        }
+        .stats-query-card .compact-query-form {
+            background: none;
+            border: none;
+            box-shadow: none;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .stats-query-card .query-fields-grid {
+            gap: 6px;
+            margin-bottom: 0.1rem;
+        }
+        .stats-query-card .query-fields-col .mb-2 {
+            margin-bottom: 0.12rem !important;
+        }
+        .stats-query-card .query-fields-btn-col button {
+            min-width: 110px;
+            max-width: 160px;
+            font-size: 0.97em;
+            padding: 6px 12px;
+        }
+        .unified-query-box {
+            background: linear-gradient(120deg, #f8fafc 60%, #e3f0fa 100%);
+            border-radius: 14px;
+            box-shadow: 0 4px 24px 0 rgba(30,136,229,0.07), 0 1.5px 6px 0 rgba(33,150,243,0.04);
+            border: 1.5px solid #e3eaf3;
+            padding: 24px 24px 10px 24px;
+            margin-bottom: 18px;
+            margin-top: 0;
+            position: relative;
+            font-size: 0.97em;
+        }
+        .unified-query-box .dashboard-title {
+            font-size: 1.08em !important;
+            margin-bottom: 10px !important;
+            padding-bottom: 2px !important;
+        }
+        .unified-query-box .query-fields-grid {
+            gap: 6px;
+            margin-bottom: 0.1rem;
+        }
+        .unified-query-box .query-fields-col .mb-2 {
+            margin-bottom: 0.12rem !important;
+        }
+        .unified-query-box .query-fields-btn-col button {
+            min-width: 110px;
+            max-width: 160px;
+            font-size: 0.97em;
+            padding: 6px 12px;
+        }
+        /* B: Left-justify query fields and button */
+        .query-fields-grid {
+            justify-content: flex-start !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+        .query-fields-col, .query-fields-btn-col {
+            align-items: flex-start !important;
+        }
+        .query-fields-btn-col {
+            margin-left: 8px;
+        }
+        /* C: Stylize stats */
+        .stat-item {
+            background: #f6fafd;
+            border-radius: 10px;
+            box-shadow: 0 1.5px 6px 0 rgba(33,150,243,0.04);
+            padding: 10px 8px 6px 8px;
+            margin: 0 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 90px;
+        }
+        .stat-item h4 {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #1976d2;
+            margin-bottom: 2px;
+            margin-top: 0;
+            letter-spacing: 0.01em;
+        }
+        .stat-item .stat-label {
+            font-size: 0.95em;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+        /* D: Reduce vertical space under threshold button */
+        #thresholdResults .mb-3 {
+            margin-bottom: 6px !important;
+        }
+        #thresholdResults {
+            padding-bottom: 10px !important;
+        }
+        /* D: Make thresholdResults container less tall and tighter */
+        #thresholdResults .mb-3 {
+            margin-bottom: 2px !important;
+        }
+        #thresholdResults .table-container {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        #thresholdResults {
+            padding-bottom: 2px !important;
+            padding-top: 10px !important;
+            margin-bottom: 0 !important;
+        }
+        #thresholdResults h4 {
+            margin-bottom: 8px !important;
+            margin-top: 8px !important;
+        }
+        #thresholdResults .alert-warning {
+            margin-bottom: 6px !important;
+        }
+        /* B: Make thresholdResults container even tighter at the bottom */
+        #thresholdResults {
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        #thresholdResults .table-container {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        #thresholdResults .mb-3 {
+            margin-bottom: 2px !important;
+        }
+        #thresholdResults .btn {
+            margin-bottom: 0 !important;
+        }
+        /* Modern, tight thresholdResults summary/alert */
+        #thresholdResults .alert-warning {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: #fffbe6 !important;
+            border: 1.5px solid #ffe082 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 1.5px 6px 0 rgba(255,193,7,0.04);
+            padding: 10px 18px 10px 14px !important;
+            margin-bottom: 4px !important;
+            max-width: 700px;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        #thresholdResults .alert-warning h5 {
+            font-size: 1.1em;
+            color: #b28704;
+            margin-bottom: 0;
+            margin-right: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        #thresholdResults .alert-warning p {
+            margin-bottom: 0;
+            font-size: 1em;
+            color: #444;
+            font-weight: 500;
+            flex: 1 1 auto;
+        }
+        #thresholdResults .alert-warning small {
+            color: #888;
+            font-size: 0.95em;
+            margin-left: 8px;
+        }
+        #thresholdResults .table-container {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        #thresholdResults {
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
+            padding-top: 10px !important;
+            max-width: 800px;
+        }
+        #complianceThresholdForm .mb-3:last-child,
+        #complianceThresholdForm .form-group:last-child {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        #checkThreshold.btn {
+            margin-bottom: 0 !important;
+            padding-bottom: 0.25rem !important;
+        }
+        #complianceThresholdForm {
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        /* Reduce space below Compliance Threshold Check box */
+        #complianceThresholdBox, #complianceThresholdForm, .compliance-threshold-section {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        #checkThreshold.btn {
+            margin-bottom: 0 !important;
+            padding-bottom: 0.25rem !important;
+        }
+        /* Reduce space above Days Under Threshold section */
+        #thresholdResults {
+            margin-top: 0.5rem !important;
+            padding-top: 0 !important;
+        }
+        #thresholdPageSize {
+            min-width: 90px !important;
+            width: 90px !important;
+            max-width: 120px;
+        }
+        #thresholdResults {
+            max-width: 1050px;
+            width: 100%;
+        }
+        .form-side-col .mb-3:last-child {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        .form-side-col #checkThreshold.btn {
+            margin-bottom: 0 !important;
+            padding-bottom: 0.1rem !important;
+        }
+        .form-side-col {
+            padding-bottom: 6px !important;
+        }
+        .form-side-col {
+            background: linear-gradient(120deg, #f9fafb 60%, #f1f6fa 100%);
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(30,136,229,0.06);
+            border: 1.5px solid #e3eaf3;
+            padding: 16px 14px 10px 14px !important;
+            margin: 0 !important;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-width: 0;
+            max-width: 320px;
+        }
+        .form-side-col h5 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 1.08em;
+            font-weight: 700;
+            color: #b28704;
+            letter-spacing: 0.01em;
+        }
+        .form-side-col p.text-muted {
+            margin-bottom: 8px !important;
+            font-size: 0.97em;
+            color: #888 !important;
+        }
+        .form-side-col .mb-3 {
+            margin-bottom: 6px !important;
+            padding-bottom: 0 !important;
+        }
+        .form-side-col .form-label {
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 2px !important;
+            color: #333;
+        }
+        .form-side-col .form-control, .form-side-col .form-select {
+            font-size: 1em;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 0.15rem !important;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .form-side-col #checkThreshold.btn {
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+            margin: 0 !important;
+            padding: 8px 0 !important;
+            font-size: 1em !important;
+            font-weight: 600;
+            border-radius: 6px !important;
+            box-shadow: 0 2px 6px rgba(255,193,7,0.08);
+            letter-spacing: 0.01em;
+            background: linear-gradient(90deg, #ffd600 0%, #ffe082 100%);
+            color: #6d4c00;
+            border: none;
+            transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+        }
+        .form-side-col #checkThreshold.btn:hover, .form-side-col #checkThreshold.btn:focus {
+            background: linear-gradient(90deg, #ffe082 0%, #ffd600 100%);
+            color: #4e3400;
+            box-shadow: 0 4px 12px rgba(255,193,7,0.13);
+            transform: translateY(-1px) scale(1.02);
+        }
+        .form-side-col {
+            max-width: 340px;
+        }
+        .form-main-col {
+            max-width: 580px;
+        }
+        .form-side-col #checkThreshold.btn {
+            min-width: 140px;
+            max-width: 200px;
+        }
+        .form-side-col {
+            padding-top: 14px !important;
+            padding-bottom: 10px !important;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        .threshold-flex-row {
+            display: flex;
+            flex-direction: row;
+            gap: 18px;
+            align-items: flex-start;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        @media (max-width: 1100px) {
+            .threshold-flex-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+        #thresholdResults {
+            max-width: 420px;
+            min-width: 0;
+            width: 100%;
+            padding: 10px 10px 8px 10px !important;
+            margin: 0 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 2px 8px rgba(255,193,7,0.06);
+            background: #fffbe6 !important;
+            border: 1.5px solid #ffe082 !important;
+            font-size: 0.97em;
+        }
+        #thresholdResults .alert-warning {
+            padding: 7px 10px 7px 10px !important;
+            font-size: 0.97em;
+            margin-bottom: 4px !important;
+            border-radius: 8px !important;
+        }
+        #thresholdResults .table-container {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: none;
+            border: none;
+            box-shadow: none;
+        }
+        #thresholdResults h4 {
+            font-size: 1.05em;
+            margin: 6px 0 6px 0 !important;
+        }
+        #thresholdResults table {
+            font-size: 0.96em;
+        }
+        #thresholdResults th, #thresholdResults td {
+            padding: 4px 6px !important;
+        }
+        #thresholdResults .form-select, #thresholdResults .form-control {
+            font-size: 0.97em;
+            padding: 4px 8px !important;
+            min-width: 0;
+            width: 100%;
+        }
+        .threshold-flex-row {
+            display: flex;
+            flex-direction: row;
+            gap: 14px;
+            align-items: flex-start;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        @media (max-width: 900px) {
+            .threshold-flex-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+        #thresholdResults {
+            max-width: 340px;
+            min-width: 0;
+            width: 100%;
+            padding: 7px 7px 6px 7px !important;
+            margin: 0 !important;
+            border-radius: 9px !important;
+            box-shadow: 0 2px 6px rgba(255,193,7,0.05);
+            background: #fffbe6 !important;
+            border: 1.2px solid #ffe082 !important;
+            font-size: 0.93em;
+        }
+        #thresholdResults .alert-warning {
+            padding: 5px 8px 5px 8px !important;
+            font-size: 0.95em;
+            margin-bottom: 3px !important;
+            border-radius: 7px !important;
+        }
+        #thresholdResults .table-container {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: none;
+            border: none;
+            box-shadow: none;
+        }
+        #thresholdResults h4 {
+            font-size: 1em;
+            margin: 4px 0 4px 0 !important;
+        }
+        #thresholdResults table {
+            font-size: 0.94em;
+        }
+        #thresholdResults th, #thresholdResults td {
+            padding: 3px 5px !important;
+        }
+        #thresholdResults .form-select, #thresholdResults .form-control {
+            font-size: 0.95em;
+            padding: 3px 6px !important;
+            min-width: 0;
+            width: 100%;
+        }
+        .query-fields-btn-col button, .query-btn.btn-primary {
+            width: fit-content !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+            font-size: 1em !important;
+        }
+        .threshold-flex-row {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            align-items: flex-start;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        @media (max-width: 900px) {
+            .threshold-flex-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+        #thresholdResults {
+            max-width: 320px;
+            min-width: 0;
+            width: 100%;
+            padding: 6px 6px 5px 6px !important;
+            margin: 0 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 6px rgba(255,193,7,0.05);
+            background: #fffbe6 !important;
+            border: 1.2px solid #ffe082 !important;
+            font-size: 0.91em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="text-center mb-4">
+                <h1 class="display-5 fw-bold text-primary">
+                    <i class="fas fa-hospital-user me-2"></i>
+                    Nursing Home Staffing Query Tool
+                </h1>
+                <p class="lead text-muted">Analyze staffing patterns and compliance across time periods</p>
+            </div>
+        
+        <!-- Query Form -->
+            <div class="form-flex-container">
+                <!-- Left: Query Parameters (2/3) -->
+                <div class="form-main-col unified-query-box">
+                    <h5 class="dashboard-title mb-2" style="font-size:1.08em;"><i class="fas fa-filter me-2"></i>Staffing Query</h5>
+                <form id="queryForm">
+                        <div class="query-fields-grid">
+                            <div class="query-fields-col">
+                                <div class="mb-2">
+                                    <label for="provnum" class="form-label fw-bold">Provider Number</label>
+                                    <input type="text" class="form-control" id="provnum" placeholder="e.g., 015009" required>
+                            </div>
+                                <div class="mb-2">
+                                    <label for="staffCategory" class="form-label fw-bold">Position</label>
+                                <select class="form-select" id="staffCategory" required>
+                                    <optgroup label="Nurse Staff">
+                                        {% for category in staff_categories.nurse %}
+                                            <option value="{{ category }}" {% if category == 'Total_RN' %}selected{% endif %}>{{ category }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+                            <div class="query-fields-col">
+                                <div class="mb-2">
+                                    <label for="startDate" class="form-label fw-bold">Start Date</label>
+                                    <input type="date" class="form-control" id="startDate" value="" required>
+                    </div>
+                                <div class="mb-2">
+                                    <label for="endDate" class="form-label fw-bold">End Date</label>
+                                    <input type="date" class="form-control" id="endDate" value="" required>
+                                </div>
+                            </div>
+                            <div class="query-fields-btn-col">
+                                <button type="submit" class="btn btn-primary query-btn">
+                                    Query Data
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <hr class="my-2" style="border-color:#e3eaf3; margin: 0 0 10px 0;">
+                    <div class="row text-center mb-2">
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h4 id="totalDays">-</h4>
+                                <p class="stat-label">Total Days</p>
+                </div>
+            </div>
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h4 id="avgHours">-</h4>
+                                <p class="stat-label">Avg Hours</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h4 id="avgHPRD">-</h4>
+                                <p class="stat-label">Avg HPRD</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h4 id="maxHours">-</h4>
+                                <p class="stat-label">Max Hours</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-12 text-center">
+                            <small class="text-white-50">
+                                <i class="fas fa-info-circle me-1"></i>Days with 0 MDS census are excluded from all analyses
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <!-- Right: Compliance Threshold (1/3) -->
+                <div class="form-side-col">
+                    <h5><i class="fas fa-exclamation-triangle me-2"></i>Compliance Threshold Check</h5>
+                    <p class="text-muted mb-3" style="font-size:0.95em;">
+                        <i class="fas fa-info-circle me-1"></i>Check for days when staffing fell below a specific threshold.
+                    </p>
+                            <div class="mb-3">
+                                <label for="threshold" class="form-label fw-bold">
+                            Hours Threshold
+                                </label>
+                                <input type="number" class="form-control" id="threshold" 
+                                       step="0.1" min="0" placeholder="e.g., 8.0" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="thresholdDayFilter" class="form-label fw-bold">
+                            Day of Week
+                                </label>
+                                <select class="form-select" id="thresholdDayFilter">
+                                    <option value="all">All Days</option>
+                                    <option value="weekend">Weekend (Saturday & Sunday)</option>
+                                    <option value="weekday">Weekday (Monday - Friday)</option>
+                                    <option value="Monday">Monday</option>
+                                    <option value="Tuesday">Tuesday</option>
+                                    <option value="Wednesday">Wednesday</option>
+                                    <option value="Thursday">Thursday</option>
+                                    <option value="Friday">Friday</option>
+                                    <option value="Saturday">Saturday</option>
+                                    <option value="Sunday">Sunday</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <button type="button" id="checkThreshold" class="btn btn-warning">
+                            <i class="fas fa-search me-1"></i>Search
+                                </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Processing your query...</p>
+        </div>
+
+        <!-- Threshold Results Section -->
+        <div id="thresholdResults" class="threshold-results" style="display: none;">
+            <div class="d-flex flex-column gap-1 mb-2">
+                <div class="d-flex flex-row gap-2 align-items-center mb-1" style="justify-content: flex-start;">
+                        <div>
+                        <label for="thresholdTableDayFilter" class="form-label fw-bold" style="font-size:0.95em; margin-bottom:2px;">Filter by Day</label>
+                        <select id="thresholdTableDayFilter" class="form-select" style="font-size:0.95em; min-width:90px; max-width:140px; display:inline-block;">
+                                <option value="all">All Days</option>
+                                <option value="weekend">Weekend (Saturday & Sunday)</option>
+                                <option value="weekday">Weekday (Monday - Friday)</option>
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                                <option value="Sunday">Sunday</option>
+                            </select>
+                        </div>
+                </div>
+                <div id="thresholdSummary" style="font-size:0.92em;"></div>
+            </div>
+            <div class="table-container mt-1">
+                <div class="d-flex justify-content-start align-items-center mb-2" style="gap: 0.5rem;">
+                    <select id="thresholdPageSize" class="form-select" style="font-size:0.95em; min-width:60px; max-width:90px; display:inline-block;">
+                                <option value="20" selected>20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="all">All</option>
+                            </select>
+                    <div id="thresholdPaginationInfo" class="text-muted" style="font-size:0.92em;"></div>
+                    </div>
+                    <table class="table table-striped table-hover" id="thresholdTable">
+                    <thead>
+                        <tr>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th class="sortable" data-sort="day">Day of Week</th>
+                                <th class="sortable" data-sort="census">Census</th>
+                                <th class="sortable" data-sort="hours">Hours</th>
+                        </tr>
+                    </thead>
+                        <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" style="display: none;">
+            <!-- Chart Containers (add these after the query form/stats) -->
+                <div class="row">
+                    <div class="col-md-6">
+            <div class="chart-container">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3><i class="fas fa-chart-line me-2"></i>Hours Over Time</h3>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="resetChartRange">
+                                    <i class="fas fa-undo me-1"></i>Reset Range
+                                </button>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="chartStartDate" class="form-label fw-bold">
+                                        <i class="fas fa-calendar me-1"></i>Chart Start Date
+                                    </label>
+                                    <input type="date" class="form-control" id="chartStartDate">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="chartEndDate" class="form-label fw-bold">
+                                        <i class="fas fa-calendar me-1"></i>Chart End Date
+                                    </label>
+                                    <input type="date" class="form-control" id="chartEndDate">
+                                </div>
+                            </div>
+                <div id="dailyChart"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3><i class="fas fa-chart-line me-2"></i>Contract Hours Over Time</h3>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="resetContractChartRange">
+                                    <i class="fas fa-undo me-1"></i>Reset Range
+                                </button>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="contractChartStartDate" class="form-label fw-bold">
+                                        <i class="fas fa-calendar me-1"></i>Chart Start Date
+                                    </label>
+                                    <input type="date" class="form-control" id="contractChartStartDate">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="contractChartEndDate" class="form-label fw-bold">
+                                        <i class="fas fa-calendar me-1"></i>Chart End Date
+                                    </label>
+                                    <input type="date" class="form-control" id="contractChartEndDate">
+                                </div>
+                            </div>
+                            <div id="contractChart"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-chart-bar me-2"></i>Hours Distribution</h3>
+                            <div id="hoursChart"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-chart-bar me-2"></i>Contract Hours Distribution</h3>
+                            <div id="contractHoursChart"></div>
+                        </div>
+                    </div>
+            </div>
+                <div class="row">
+                    <div class="col-md-12">
+            <div class="chart-container">
+                            <h3><i class="fas fa-chart-bar me-2"></i>HPRD Distribution</h3>
+                <div id="hprdChart"></div>
+                        </div>
+                    </div>
+            </div>
+            <!-- Data Table Container -->
+            <div class="table-container">
+                    <h3><i class="fas fa-table me-2"></i>Detailed Data</h3>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="dayFilter" class="form-label fw-bold">
+                                <i class="fas fa-filter me-1"></i>Filter by Day of Week
+                            </label>
+                            <select id="dayFilter" class="form-select">
+                                <option value="all">All Days</option>
+                                <option value="weekend">Weekend (Saturday & Sunday)</option>
+                                <option value="weekday">Weekday (Monday - Friday)</option>
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                                <option value="Sunday">Sunday</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-end">
+                                <div>
+                                    <label for="dataPageSize" class="form-label fw-bold">
+                                        <i class="fas fa-list me-1"></i>Show Records
+                                    </label>
+                                    <select id="dataPageSize" class="form-select">
+                                        <option value="20" selected>20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                        <option value="all">All</option>
+                                    </select>
+                                </div>
+                                <div id="dataPaginationInfo" class="text-muted"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <table class="table table-striped table-hover" id="dataTable">
+                    <thead>
+                        <tr>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th class="sortable" data-sort="day">Day of Week</th>
+                                <th class="sortable" data-sort="census">Census</th>
+                                <th class="sortable" data-sort="hours">Hours</th>
+                                <th class="sortable" data-sort="contract">Contract Hours</th>
+                                <th class="sortable" data-sort="hprd">HPRD</th>
+                        </tr>
+                    </thead>
+                        <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for sorting
+        let currentData = [];
+        let currentSortColumn = '';
+        let currentSortDirection = 'asc';
+        let thresholdData = [];
+        let currentThresholdPage = 1;
+        let thresholdPageSize = 20;
+        const thresholdRowsPerPage = 10;
+        let currentDataPage = 1;
+        let dataPageSize = 20;
+        let filteredData = [];
+        let currentDailyChart = null;
+        let currentContractChart = null;
+        let originalChartData = null;
+
+        // Function to format numbers with thousand separators
+        function formatNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return '-';
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        // Table sorting function
+        function sortTable(tableId, columnIndex, dataKey) {
+            const table = document.getElementById(tableId);
+            const header = table.querySelector(`th[data-sort="${dataKey}"]`);
+            
+            // Remove previous sort indicators
+            table.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            // Determine sort direction
+            if (currentSortColumn === dataKey) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortDirection = 'asc';
+                currentSortColumn = dataKey;
+            }
+            
+            // Add sort indicator
+            header.classList.add(currentSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            
+            // Sort the full dataset, not just the displayed rows
+            if (tableId === 'dataTable') {
+                sortFullDataset(dataKey, currentSortDirection);
+                renderDataTable();
+            } else if (tableId === 'thresholdTable') {
+                sortThresholdDataset(dataKey, currentSortDirection);
+                renderThresholdTable(thresholdData, currentThresholdPage);
+            }
+        }
+
+        // Function to sort the full dataset
+        function sortFullDataset(dataKey, direction) {
+            filteredData.sort((a, b) => {
+                let aVal, bVal;
+                
+                switch(dataKey) {
+                    case 'date':
+                        // Parse dates properly
+                        aVal = new Date(a.WorkDate);
+                        bVal = new Date(b.WorkDate);
+                        break;
+                    case 'day':
+                        // Sort by day of week (Monday = 1, Sunday = 7)
+                        const dayOrder = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+                        aVal = dayOrder[a.DayName] || 0;
+                        bVal = dayOrder[b.DayName] || 0;
+                        break;
+                    case 'census':
+                        aVal = parseFloat(a.MDScensus) || 0;
+                        bVal = parseFloat(b.MDScensus) || 0;
+                        break;
+                    case 'hours':
+                        aVal = parseFloat(a.Total_Hours || a.Hours) || 0;
+                        bVal = parseFloat(b.Total_Hours || b.Hours) || 0;
+                        break;
+                    case 'contract':
+                        aVal = parseFloat(a.Total_Contract_Hours || a.Contract_Hours) || 0;
+                        bVal = parseFloat(b.Total_Contract_Hours || b.Contract_Hours) || 0;
+                        break;
+                    case 'hprd':
+                        aVal = parseFloat(a.HPRD) || 0;
+                        bVal = parseFloat(b.HPRD) || 0;
+                        break;
+                    default:
+                        aVal = a[dataKey] || '';
+                        bVal = b[dataKey] || '';
+                }
+                
+                if (direction === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+        }
+
+        // Function to sort the threshold dataset
+        function sortThresholdDataset(dataKey, direction) {
+            thresholdData.sort((a, b) => {
+                let aVal, bVal;
+                
+                switch(dataKey) {
+                    case 'date':
+                        aVal = new Date(a.WorkDate);
+                        bVal = new Date(b.WorkDate);
+                        break;
+                    case 'day':
+                        const dayOrder = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+                        aVal = dayOrder[a.DayName] || 0;
+                        bVal = dayOrder[b.DayName] || 0;
+                        break;
+                    case 'census':
+                        aVal = parseFloat(a.MDScensus) || 0;
+                        bVal = parseFloat(b.MDScensus) || 0;
+                        break;
+                    case 'hours':
+                        aVal = parseFloat(a.Hours) || 0;
+                        bVal = parseFloat(b.Hours) || 0;
+                        break;
+                    default:
+                        aVal = a[dataKey] || '';
+                        bVal = b[dataKey] || '';
+                }
+                
+                if (direction === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+        }
+
+        // Function to filter data by day of week
+        function filterDataByDay() {
+            const dayFilter = document.getElementById('dayFilter').value;
+            
+            if (dayFilter === 'all') {
+                filteredData = [...currentData];
+            } else if (dayFilter === 'weekend') {
+                filteredData = currentData.filter(row => row.DayName === 'Saturday' || row.DayName === 'Sunday');
+            } else if (dayFilter === 'weekday') {
+                filteredData = currentData.filter(row => 
+                    row.DayName === 'Monday' || row.DayName === 'Tuesday' || 
+                    row.DayName === 'Wednesday' || row.DayName === 'Thursday' || 
+                    row.DayName === 'Friday'
+                );
+            } else {
+                filteredData = currentData.filter(row => row.DayName === dayFilter);
+            }
+            
+            currentDataPage = 1;
+            renderDataTable();
+        }
+
+        // Function to filter chart by date range
+        function filterChartByDateRange() {
+            const chartStartDate = document.getElementById('chartStartDate').value;
+            const chartEndDate = document.getElementById('chartEndDate').value;
+            
+            if (!chartStartDate || !chartEndDate || !originalChartData) {
+                return;
+            }
+            
+            const startDate = new Date(chartStartDate);
+            const endDate = new Date(chartEndDate);
+            
+            // Filter the original data for the chart
+            const filteredChartData = originalChartData.filter(row => {
+                const rowDate = new Date(row.WorkDate);
+                return rowDate >= startDate && rowDate <= endDate;
+            });
+            
+            // Update both charts with filtered data
+            if (filteredChartData.length > 0) {
+                const filteredRegularChart = createDailyChartFromData(filteredChartData, 'regular');
+                const filteredContractChart = createDailyChartFromData(filteredChartData, 'contract');
+                Plotly.newPlot('dailyChart', filteredRegularChart.data, filteredRegularChart.layout);
+                Plotly.newPlot('contractChart', filteredContractChart.data, filteredContractChart.layout);
+            }
+        }
+
+        // Function to reset chart date range
+        function resetChartRange() {
+            document.getElementById('chartStartDate').value = '';
+            document.getElementById('chartEndDate').value = '';
+            
+            if (originalChartData && currentDailyChart && currentContractChart) {
+                Plotly.newPlot('dailyChart', currentDailyChart.data, currentDailyChart.layout);
+                Plotly.newPlot('contractChart', currentContractChart.data, currentContractChart.layout);
+            }
+        }
+
+        // Function to create daily chart from data (simplified - x-axis handled by backend)
+        function createDailyChartFromData(data, chartType) {
+            if (chartType === 'regular') {
+                return {
+                    data: [
+                        {
+                            x: data.map(row => row.WorkDate),
+                            y: data.map(row => row.Hours),
+                            name: 'Hours',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: {color: '#1f77b4', width: 2},
+                            hovertemplate: '<b>%{x}</b><br>Hours: %{y:.1f}<extra></extra>'
+                        }
+                    ],
+                    layout: {
+                        title: 'Hours Over Time',
+                        xaxis: {title: 'Date', tickangle: -45, automargin: true},
+                        yaxis: {title: 'Hours'},
+                        hovermode: 'x unified',
+                        template: 'plotly_white',
+                        height: 400,
+                        margin: {l: 50, r: 50, t: 80, b: 50}
+                    }
+                };
+            } else if (chartType === 'contract') {
+                return {
+                    data: [
+                        {
+                            x: data.map(row => row.WorkDate),
+                            y: data.map(row => Math.max(0, row.Contract_Hours || 0)),
+                            name: 'Contract Hours',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: {color: '#ff7f0e', width: 2},
+                            hovertemplate: '<b>%{x}</b><br>Contract Hours: %{y:.1f}<extra></extra>'
+                        }
+                    ],
+                    layout: {
+                        title: 'Contract Hours Over Time',
+                        xaxis: {title: 'Date', tickangle: -45, automargin: true},
+                        yaxis: {title: 'Contract Hours', rangemode: 'tozero', autorange: true, zeroline: true, zerolinecolor: '#ccc', zerolinewidth: 2, min: 0},
+                        hovermode: 'x unified',
+                        template: 'plotly_white',
+                        height: 400,
+                        margin: {l: 50, r: 50, t: 80, b: 50}
+                    }
+                };
+            }
+        }
+
+        // Function to display threshold analysis
+        function displayThresholdAnalysis(analysis) {
+            document.getElementById('thresholdAnalysis').style.display = 'block';
+            
+            // Quarter Breakdown
+            if (analysis.quarter_breakdown && analysis.quarter_breakdown.length > 0) {
+                let quarterHtml = '<ul class="list-unstyled mb-0">';
+                analysis.quarter_breakdown.forEach(item => {
+                    quarterHtml += `<li><strong>${item.Year} ${item.Quarter}:</strong> ${item.count} day(s)</li>`;
+                });
+                quarterHtml += '</ul>';
+                document.getElementById('quarterBreakdown').innerHTML = quarterHtml;
+            } else {
+                document.getElementById('quarterBreakdown').innerHTML = '<p class="text-muted mb-0">No quarter data available</p>';
+            }
+            
+            // Day of Week Breakdown
+            if (analysis.day_of_week_breakdown && analysis.day_of_week_breakdown.length > 0) {
+                let dowHtml = '<ul class="list-unstyled mb-0">';
+                analysis.day_of_week_breakdown.forEach(item => {
+                    dowHtml += `<li><strong>${item.DayName}:</strong> ${item.count} day(s)</li>`;
+                });
+                dowHtml += '</ul>';
+                document.getElementById('dayOfWeekBreakdown').innerHTML = dowHtml;
+            } else {
+                document.getElementById('dayOfWeekBreakdown').innerHTML = '<p class="text-muted mb-0">No day of week data available</p>';
+            }
+            
+            // Weekend vs Weekday
+            if (analysis.weekend_weekday) {
+                const weekendHtml = `
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h5 class="text-primary mb-1">${analysis.weekend_weekday.weekend}</h5>
+                                <small class="text-muted">Weekend Days</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h5 class="text-success mb-1">${analysis.weekend_weekday.weekday}</h5>
+                            <small class="text-muted">Weekday Days</small>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('weekendWeekdayBreakdown').innerHTML = weekendHtml;
+            } else {
+                document.getElementById('weekendWeekdayBreakdown').innerHTML = '<p class="text-muted mb-0">No weekend/weekday data available</p>';
+            }
+            
+            // Severity Breakdown
+            if (analysis.hours_range_breakdown && analysis.hours_range_breakdown.length > 0) {
+                let severityHtml = '<ul class="list-unstyled mb-0">';
+                analysis.hours_range_breakdown.forEach(item => {
+                    let color = 'text-success';
+                    if (item.range.includes('Severe')) color = 'text-danger';
+                    else if (item.range.includes('Moderate')) color = 'text-warning';
+                    
+                    severityHtml += `<li class="${color}"><strong>${item.range}:</strong> ${item.count} day(s)</li>`;
+                });
+                severityHtml += '</ul>';
+                document.getElementById('severityBreakdown').innerHTML = severityHtml;
+            } else {
+                document.getElementById('severityBreakdown').innerHTML = '<p class="text-muted mb-0">No severity data available</p>';
+            }
+            
+            // Month Breakdown
+            if (analysis.month_breakdown && analysis.month_breakdown.length > 0) {
+                let monthHtml = '<ul class="list-unstyled mb-0">';
+                analysis.month_breakdown.forEach(item => {
+                    const monthName = new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    monthHtml += `<li><strong>${monthName}:</strong> ${item.count} day(s)</li>`;
+                });
+                monthHtml += '</ul>';
+                document.getElementById('monthBreakdown').innerHTML = monthHtml;
+            } else {
+                document.getElementById('monthBreakdown').innerHTML = '<p class="text-muted mb-0">No month data available</p>';
+            }
+        }
+
+        // Function to render data table with pagination
+        function renderDataTable() {
+            const tableBody = document.getElementById('dataTable').querySelector('tbody');
+            const startIndex = (currentDataPage - 1) * dataPageSize;
+            const endIndex = startIndex + dataPageSize;
+            const pageData = filteredData.slice(startIndex, endIndex);
+            
+            tableBody.innerHTML = '';
+            pageData.forEach(row => {
+                const tr = document.createElement('tr');
+                // Extract just the date part (MM/DD/YYYY) without day of week
+                let dateOnly = row.WorkDate;
+                if (dateOnly.includes(',')) {
+                    // If date contains comma, it has day of week - extract just the date part
+                    dateOnly = dateOnly.split(',')[1].trim();
+                }
+                
+                // Use combined metrics for RN if available
+                let hoursValue = row.Hours;
+                let contractValue = row.Contract_Hours;
+                let hprdValue = row.HPRD;
+                
+                if (row.Total_Hours !== undefined) {
+                    hoursValue = row.Total_Hours;
+                }
+                if (row.Total_Contract_Hours !== undefined) {
+                    contractValue = row.Total_Contract_Hours;
+                }
+                
+                tr.innerHTML = `
+                    <td>${dateOnly}</td>
+                    <td>${row.DayName}</td>
+                    <td>${row.MDScensus}</td>
+                    <td>${hoursValue.toFixed(1)}</td>
+                    <td>${contractValue.toFixed(1)}</td>
+                    <td>${hprdValue.toFixed(3)}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            
+            // Update pagination info
+            const info = document.getElementById('dataPaginationInfo');
+            if (dataPageSize === filteredData.length) {
+                info.textContent = `Showing all ${formatNumber(filteredData.length)} records`;
+            } else {
+                info.textContent = `Showing ${formatNumber(startIndex + 1)}-${formatNumber(Math.min(endIndex, filteredData.length))} of ${formatNumber(filteredData.length)} records`;
+            }
+        }
+
+        // A) Define renderThresholdTable globally so threshold table loads data
+        function renderThresholdTable(data = window.thresholdData, page = 1) {
+            if (!Array.isArray(data)) return;
+            const dayFilterEl = document.getElementById('thresholdTableDayFilter');
+            const dayFilter = dayFilterEl ? dayFilterEl.value : 'all';
+            let filteredData = data;
+            if (dayFilter !== 'all') {
+                filteredData = data.filter(row => {
+                    if (dayFilter === 'weekend') {
+                        return row.DayName === 'Saturday' || row.DayName === 'Sunday';
+                    } else if (dayFilter === 'weekday') {
+                        return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].includes(row.DayName);
+                    } else {
+                        return row.DayName === dayFilter;
+                    }
+                });
+            }
+            const tableBody = document.getElementById('thresholdTable') ? document.getElementById('thresholdTable').querySelector('tbody') : null;
+            if (!tableBody) return;
+            tableBody.innerHTML = '';
+            const pageSize = window.thresholdPageSize === 'all' ? filteredData.length : parseInt(window.thresholdPageSize || 20);
+            const startIndex = (page - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const paginatedData = filteredData.slice(startIndex, endIndex);
+            paginatedData.forEach(row => {
+                const tr = document.createElement('tr');
+                let dateOnly = row.WorkDate || '';
+                if (dateOnly.includes(',')) dateOnly = dateOnly.split(',')[1].trim();
+                tr.innerHTML = `
+                    <td>${dateOnly}</td>
+                    <td>${row.DayName || ''}</td>
+                    <td>${row.MDScensus || 0}</td>
+                    <td>${(row.Hours || 0).toFixed(1)}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            const info = document.getElementById('thresholdPaginationInfo');
+            if (info) {
+            if (pageSize >= filteredData.length) {
+                    info.textContent = `Showing all ${filteredData.length} records`;
+            } else {
+                    info.textContent = `Showing ${startIndex + 1}-${Math.min(endIndex, filteredData.length)} of ${filteredData.length} records`;
+                }
+            }
+        }
+
+        // Define filterContractChartByDateRange globally so the event listener works
+        function filterContractChartByDateRange() {
+            const startEl = document.getElementById('contractChartStartDate');
+            const endEl = document.getElementById('contractChartEndDate');
+            if (!startEl || !endEl || !window.originalChartData) return;
+            const start = startEl.value;
+            const end = endEl.value;
+            if (!start || !end) return;
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            const filtered = window.originalChartData.filter(row => {
+                const rowDate = new Date(row.WorkDate);
+                return rowDate >= startDate && rowDate <= endDate;
+            });
+            if (filtered.length > 0) {
+                const filteredContractChart = createDailyChartFromData(filtered, 'contract');
+                if (document.getElementById('contractChart'))
+                    Plotly.newPlot('contractChart', filteredContractChart.data, filteredContractChart.layout);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Utility: safely set value
+            function setValueById(id, value) {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            }
+            // Utility: safely add event listener
+            function addListenerById(id, event, handler) {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener(event, handler);
+            }
+            // Set default dates
+            setValueById('startDate', '2024-01-01');
+            setValueById('endDate', '2024-12-31');
+
+        // Main query form handler
+            const queryForm = document.getElementById('queryForm');
+            if (queryForm) {
+                queryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+                    const loading = document.getElementById('loading');
+                    const results = document.getElementById('results');
+                    if (loading) loading.style.display = 'block';
+                    if (results) results.style.display = 'none';
+            const formData = {
+                        provnum: document.getElementById('provnum') ? document.getElementById('provnum').value : '',
+                        start_date: document.getElementById('startDate') ? document.getElementById('startDate').value : '',
+                        end_date: document.getElementById('endDate') ? document.getElementById('endDate').value : '',
+                staff_category: document.getElementById('staffCategory').value
+            };
+            try {
+                const response = await fetch('/query', {
+                    method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                        if (loading) loading.style.display = 'none';
+                        if (results) results.style.display = 'block';
+                        // Update charts only if containers exist
+                        if (document.getElementById('dailyChart'))
+                Plotly.newPlot('dailyChart', data.daily_chart.data, data.daily_chart.layout);
+                        if (document.getElementById('contractChart'))
+                Plotly.newPlot('contractChart', data.contract_chart.data, data.contract_chart.layout);
+                        if (document.getElementById('hprdChart'))
+                Plotly.newPlot('hprdChart', data.hprd_chart.data, data.hprd_chart.layout);
+                        if (document.getElementById('hoursChart'))
+                Plotly.newPlot('hoursChart', data.hours_chart.data, data.hours_chart.layout);
+                        if (document.getElementById('contractHoursChart'))
+                Plotly.newPlot('contractHoursChart', data.contract_hours_chart.data, data.contract_hours_chart.layout);
+                // Update summary stats
+                const hours = data.data.map(row => row.Total_Hours || row.Hours);
+                const hprd = data.data.map(row => row.HPRD);
+                        if (document.getElementById('totalDays'))
+                document.getElementById('totalDays').textContent = formatNumber(data.data.length);
+                        if (document.getElementById('avgHours'))
+                document.getElementById('avgHours').textContent = (hours.reduce((a, b) => a + b, 0) / hours.length).toFixed(1);
+                        if (document.getElementById('avgHPRD'))
+                document.getElementById('avgHPRD').textContent = (hprd.reduce((a, b) => a + b, 0) / hprd.length).toFixed(3);
+                        if (document.getElementById('maxHours'))
+                document.getElementById('maxHours').textContent = Math.max(...hours).toFixed(1);
+                        // Set filteredData for threshold analysis
+                        filteredData = data.data;
+                currentDataPage = 1;
+                        dataPageSize = 20; // Default to 20 for data table
+                document.getElementById('dataPageSize').value = '20';
+                renderDataTable();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while fetching the data.');
+            } finally {
+                        if (loading) loading.style.display = 'none';
+                    }
+                });
+            }
+            // Add all other event listeners with null checks
+            addListenerById('thresholdPageSize', 'change', function() {
+                thresholdPageSize = this.value === 'all' ? thresholdData.length : parseInt(this.value);
+                currentThresholdPage = 1;
+                renderThresholdTable(thresholdData, currentThresholdPage);
+            });
+            addListenerById('thresholdTableDayFilter', 'change', function() {
+                currentThresholdPage = 1;
+                renderThresholdTable(thresholdData, currentThresholdPage);
+            });
+            addListenerById('dataPageSize', 'change', function() {
+                dataPageSize = this.value === 'all' ? filteredData.length : parseInt(this.value);
+                currentDataPage = 1;
+                renderDataTable();
+            });
+            addListenerById('dayFilter', 'change', filterDataByDay);
+            addListenerById('chartStartDate', 'change', filterChartByDateRange);
+            addListenerById('chartEndDate', 'change', filterChartByDateRange);
+            addListenerById('resetChartRange', 'click', resetChartRange);
+            addListenerById('contractChartStartDate', 'change', filterContractChartByDateRange);
+            addListenerById('contractChartEndDate', 'change', filterContractChartByDateRange);
+            addListenerById('resetContractChartRange', 'click', resetContractChartRange);
+        // Threshold check handler
+            const checkThresholdBtn = document.getElementById('checkThreshold');
+            if (checkThresholdBtn) {
+                checkThresholdBtn.addEventListener('click', async () => {
+                    const loading = document.getElementById('loading');
+                    if (loading) loading.style.display = 'block';
+            const threshold = document.getElementById('threshold').value;
+            if (!threshold) {
+                alert('Please enter a threshold value');
+                return;
+            }
+            const formData = {
+                provnum: document.getElementById('provnum').value,
+                start_date: document.getElementById('startDate').value,
+                end_date: document.getElementById('endDate').value,
+                staff_category: document.getElementById('staffCategory').value,
+                threshold: parseFloat(threshold),
+                day_filter: document.getElementById('thresholdDayFilter').value
+            };
+            try {
+                const response = await fetch('/query_under_threshold', {
+                    method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                        if (loading) loading.style.display = 'none';
+                document.getElementById('thresholdResults').style.display = 'block';
+                const summary = document.getElementById('thresholdSummary');
+                const percentage = ((data.days_under_threshold/data.total_days)*100).toFixed(1);
+                        const dayFilter = document.getElementById('thresholdTableDayFilter').value;
+                let dayText = 'days';
+                if (dayFilter === 'weekend') {
+                    dayText = 'weekend days (Saturday & Sunday)';
+                } else if (dayFilter === 'weekday') {
+                    dayText = 'weekday days (Monday - Friday)';
+                } else if (dayFilter !== 'all') {
+                    dayText = `${dayFilter}s`;
+                }
+                        // In the JS where the summary is rendered, format the date range as 'from M-D-YY to M-D-YY'
+                        function formatShortDate(dateStr) {
+                            if (!dateStr) return '';
+                            const d = new Date(dateStr);
+                            if (isNaN(d)) return dateStr;
+                            const m = d.getMonth() + 1;
+                            const day = d.getDate();
+                            const y = d.getFullYear() % 100;
+                            return `${m}-${day}-${y.toString().padStart(2, '0')}`;
+                        }
+                summary.innerHTML = `
+    <div class="alert alert-warning mb-2 d-flex align-items-center" style="gap: 0.5rem; padding: 0.5rem 0.7rem; font-size: 0.92em;">
+        <div style="flex:1;">
+            <span style="font-weight: 600; color: #333;">${formatNumber(data.days_under_threshold)}</span> of <span style="font-weight: 600; color: #333;">${formatNumber(data.total_days)}</span> ${dayText}
+            (<span style="font-weight: 600; color: #333;">${percentage}%</span>) had <span style="font-weight: 600; color: #333;">${data.staff_category}</span> hours under 
+            <span style="font-weight: 600; color: #333;">${data.threshold}</span> hours from ${formatShortDate(data.start_date)} to ${formatShortDate(data.end_date)}
+            <br><small class="text-muted" style="font-size:0.91em;"><i class="fas fa-info-circle me-1"></i>Excludes days with 0 MDS census.</small>
+        </div>
+                    </div>
+                `;
+                        // Set thresholdData and render table
+                        window.thresholdData = data.days_under || [];
+                        window.currentThresholdPage = 1;
+                        window.thresholdPageSize = 20;
+                document.getElementById('thresholdPageSize').value = '20';
+                        renderThresholdTable(window.thresholdData, 1);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while checking threshold data.');
+            } finally {
+                        if (loading) loading.style.display = 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
