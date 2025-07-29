@@ -915,9 +915,7 @@ def display_facility_info(provnum: str, quarter_name: str = None, affiliated_ent
         </style>
         """, unsafe_allow_html=True)
         
-        col1, col2, col3 = st.columns([1, 8, 1])
-        with col1:
-            st.markdown('<button class="back-button" onclick="window.location.href=\'/PBJ_Dashboard\'">← Back to Search</button>', unsafe_allow_html=True)
+        st.markdown('<button class="back-button" onclick="window.location.href=\'/PBJ_Dashboard\'">← Back to Search</button>', unsafe_allow_html=True)
         
         facility_info = get_facility_info(provnum)
         if not facility_info:
@@ -1208,7 +1206,31 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics else None
             full_state_name = get_full_state_name(state)
             header_text = f"{full_state_name} Key Metrics ({quarter_name})"
-            # Display state header
+            # Display state header with back button
+            st.markdown("""
+            <style>
+            .back-button-small {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+                transition: all 0.3s ease;
+                margin-bottom: 10px;
+            }
+            .back-button-small:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('<button class="back-button-small" onclick="window.location.href=\'/PBJ_Dashboard\'">← Back to Search</button>', unsafe_allow_html=True)
+            
             st.markdown(f'''
                 <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
                     <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{header_text}</div>
@@ -2041,6 +2063,13 @@ def main() -> None:
                         (entity_data['Affiliated entity'] == selected_value) | 
                         (entity_data['Affiliated entity ID'] == float(selected_value))
                     ]
+                    
+                    # Debug: Check if entity 237 exists
+                    if selected_value == '237':
+                        st.write(f"Debug: Looking for entity 237")
+                        st.write(f"Debug: Entity 237 in data: {237.0 in entity_data['Affiliated entity ID'].values}")
+                        st.write(f"Debug: Entity 237 as float: {float(237) in entity_data['Affiliated entity ID'].values}")
+                        st.write(f"Debug: Sample entity IDs: {entity_data['Affiliated entity ID'].head().tolist()}")
                     
                     # If not found by ID, try to find by name from facility data
                     if selected_entity_data.empty and selected_value.isdigit():
