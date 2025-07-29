@@ -1,7 +1,7 @@
 flask==2.0.1
 pandas>=2.1.0
 duckdb>=0.9.2
-plotly==5.3.1
+plotly==5.17.0
 numpy>=1.26.0
 streamlit>=1.47.0
 st-clickable-images>=0.1.0 
