@@ -1795,7 +1795,7 @@ def main() -> None:
                         display_df['State'] = unique_results['STATE']
                         display_df['Nursing Home (CCN)'] = unique_results['PROVNAME'].apply(smart_title) + ' (' + unique_results['PROVNUM'] + ')'
                         display_df['Dashboard'] = unique_results['PROVNUM'].apply(
-                            lambda x: f'<a href="/?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none; font-weight: bold;" target="_self">View</a>'
+                            lambda x: f'<a href="/PBJ_Dashboard?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none; font-weight: bold;" target="_self">View</a>'
                         )
                         
                         # Sort alphabetically
@@ -1837,7 +1837,7 @@ def main() -> None:
                         display_df['State'] = unique_facilities['STATE']
                         display_df['Nursing Home (CCN)'] = unique_facilities['PROVNAME'].apply(smart_title) + ' (' + unique_facilities['PROVNUM'] + ')'
                         display_df['Dashboard'] = unique_facilities['PROVNUM'].apply(
-                            lambda x: f'<a href="/?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none; font-weight: bold;" target="_self">View</a>'
+                            lambda x: f'<a href="/PBJ_Dashboard?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none; font-weight: bold;" target="_self">View</a>'
                         )
                         
                         # Sort alphabetically
