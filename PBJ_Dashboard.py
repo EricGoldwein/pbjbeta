@@ -587,6 +587,10 @@ def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_q
                     (state_metrics['CY_QTR'] <= end_quarter)
                 ]
             else:
+                # Debug: Check available columns
+                if 'STATE' not in state_metrics.columns:
+                    st.error(f"STATE column not found. Available columns: {list(state_metrics.columns)}")
+                    return pd.DataFrame()
                 return state_metrics[
                     (state_metrics['STATE'] == selected_value) & 
                     (state_metrics['CY_QTR'] >= start_quarter) & 
