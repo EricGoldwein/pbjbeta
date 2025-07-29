@@ -1517,18 +1517,18 @@ def main() -> None:
                         help="Enter two letter state abbreviation"
                     )
                 
-                # Create filtered search options based on selected state
-                if state_filter:
-                    state_facilities = facilities_df[facilities_df['STATE'] == state_filter]
-                    search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in state_facilities[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
-                else:
-                    state_facilities = facilities_df  # Use full dataset when no state filter
-                    search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
-
-                # Sort options alphabetically by facility name
-                search_options.sort()
-                
                 with col2:
+                    # Create filtered search options based on selected state
+                    if state_filter:
+                        state_facilities = facilities_df[facilities_df['STATE'] == state_filter]
+                        search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in state_facilities[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
+                    else:
+                        state_facilities = facilities_df  # Use full dataset when no state filter
+                        search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in facilities_df[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
+
+                    # Sort options alphabetically by facility name
+                    search_options.sort()
+                    
                     facility_search = st.selectbox(
                         "Enter Provider Name or CCN (6-digit ID).",
                         options=[""] + search_options,
