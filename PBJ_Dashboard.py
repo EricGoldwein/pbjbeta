@@ -205,6 +205,10 @@ def load_affiliated_entity_data():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
+        # Convert Affiliated entity ID to numeric
+        if 'Affiliated entity ID' in df.columns:
+            df['Affiliated entity ID'] = pd.to_numeric(df['Affiliated entity ID'], errors='coerce')
+        
         return df
     except Exception as e:
         st.error(f"Error loading affiliated entity data: {str(e)}")
@@ -1232,13 +1236,33 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             affiliated_entity_id = get_facility_affiliated_entity_id(provnum)
             full_state_name = get_full_state_name(state)
             
-            if affiliated_entity and affiliated_entity_id:
+            # Check if the affiliated entity exists in the current dataset
+            entity_data = load_affiliated_entity_data()
+            entity_exists = False
+            if entity_data is not None and not entity_data.empty:
+                entity_exists = entity_data[
+                    (entity_data['Affiliated entity'] == affiliated_entity) | 
+                    (entity_data['Affiliated entity ID'].astype(str) == str(affiliated_entity_id))
+                ].shape[0] > 0
+            
+            if affiliated_entity and affiliated_entity_id and entity_exists:
                 st.markdown(f'''
                     <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
                         <div style='color:#222; font-weight:400;'>
                             <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
                             <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
                                 {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;' target='_self'>{state}</a>. Ownership: <a href='?level=Entity&entity={affiliated_entity_id}' style='color: #1976d2; text-decoration: none;' target='_self'>{affiliated_entity}</a>
+                            </div>
+                        </div>
+                    </div>
+                ''', unsafe_allow_html=True)
+            elif affiliated_entity and affiliated_entity_id:
+                st.markdown(f'''
+                    <div class="section-header" style="margin-top: 8px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                        <div style='color:#222; font-weight:400;'>
+                            <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
+                            <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
+                                {county}, <a href='?level=State&state={state}' style='color: #1976d2; text-decoration: none;' target='_self'>{state}</a>. Ownership: {affiliated_entity} (not in current dataset)
                             </div>
                         </div>
                     </div>
@@ -2012,26 +2036,54 @@ def main() -> None:
                 
                 if not entity_data.empty and not provider_data.empty:
                     # Find the selected entity by name or ID
-                    st.write(f"Debug: Looking for entity '{selected_value}'")
-                    st.write(f"Debug: Available entity IDs: {entity_data['Affiliated entity ID'].unique()[:10]}")
-                    st.write(f"Debug: Available entity names: {entity_data['Affiliated entity'].unique()[:10]}")
-                    
-                    # Convert both to string for comparison
-                    entity_data['Affiliated entity ID_str'] = entity_data['Affiliated entity ID'].astype(str)
-                    selected_value_str = str(selected_value)
-                    
+                    # First try to find by name (more reliable since entity IDs may not match between datasets)
                     selected_entity_data = entity_data[
                         (entity_data['Affiliated entity'] == selected_value) | 
-                        (entity_data['Affiliated entity ID_str'] == selected_value_str)
+                        (entity_data['Affiliated entity ID'] == float(selected_value))
                     ]
                     
-                    st.write(f"Debug: Found {len(selected_entity_data)} matching records")
-                    if len(selected_entity_data) == 0:
-                        st.write(f"Debug: No matches found for '{selected_value}' (type: {type(selected_value)})")
-                        st.write(f"Debug: Entity ID column type: {entity_data['Affiliated entity ID'].dtype}")
-                        st.write(f"Debug: Sample entity IDs: {entity_data['Affiliated entity ID'].head().tolist()}")
-                        st.write(f"Debug: NaN values in entity ID column: {entity_data['Affiliated entity ID'].isna().sum()}")
-                        st.write(f"Debug: Looking for exact match in entity IDs: {selected_value_str in entity_data['Affiliated entity ID_str'].values}")
+                    # If not found by ID, try to find by name from facility data
+                    if selected_entity_data.empty and selected_value.isdigit():
+                        # Get the entity name from facility data
+                        provider_data = load_provider_info_data()
+                        if not provider_data.empty:
+                            # Find facilities with this entity ID
+                            matching_facilities = provider_data[provider_data['Affiliated Entity ID'] == int(selected_value)]
+                            if not matching_facilities.empty:
+                                entity_name = matching_facilities.iloc[0]['Affiliated Entity Name']
+                                if pd.notna(entity_name):
+                                    # Search by name in the performance dataset
+                                    selected_entity_data = entity_data[entity_data['Affiliated entity'] == entity_name]
+                                    
+                                    # If still not found, try partial name matching
+                                    if selected_entity_data.empty:
+                                        # Try to find by partial name match
+                                        for idx, row in entity_data.iterrows():
+                                            if entity_name.lower() in row['Affiliated entity'].lower() or row['Affiliated entity'].lower() in entity_name.lower():
+                                                selected_entity_data = entity_data.iloc[[idx]]
+                                                break
+                    
+                    if selected_entity_data.empty:
+                        st.error(f"Entity '{selected_value}' not found in the data.")
+                        
+                        # Debug: Show what we were looking for
+                        if selected_value.isdigit():
+                            provider_data = load_provider_info_data()
+                            if not provider_data.empty:
+                                matching_facilities = provider_data[provider_data['Affiliated Entity ID'] == int(selected_value)]
+                                if not matching_facilities.empty:
+                                    entity_name = matching_facilities.iloc[0]['Affiliated Entity Name']
+                                    st.info(f"Looking for entity ID {selected_value} which corresponds to '{entity_name}' in facility data")
+                        
+                        st.info("Available entities in performance dataset:")
+                        
+                        # Show first 20 available entities
+                        available_entities = entity_data[['Affiliated entity', 'Affiliated entity ID']].dropna(subset=['Affiliated entity ID']).head(20)
+                        for _, row in available_entities.iterrows():
+                            st.write(f"- {row['Affiliated entity']} (ID: {row['Affiliated entity ID']})")
+                        
+                        st.button("← Back to Search", key="back_to_search_entity_not_found", on_click=lambda: st.switch_page("PBJ_Dashboard.py"))
+                        return
                     if not selected_entity_data.empty:
                         entity_row = selected_entity_data.iloc[0]
                         entity_id = int(entity_row['Affiliated entity ID'])
