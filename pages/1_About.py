@@ -36,7 +36,7 @@ st.markdown("""
 # Add Home button to top left
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
-    st.markdown('<button class="home-button" onclick="window.location.href=\'/\'">🏠 Home</button>', unsafe_allow_html=True)
+    st.markdown('<button class="home-button" onclick="window.location.href=\'/PBJ_Dashboard\'">🏠 Home</button>', unsafe_allow_html=True)
 
 # Main intro block with soft background and padding (combine into one call)
 st.markdown("""

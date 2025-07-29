@@ -19,7 +19,7 @@ from typing import Dict, Optional, List, Tuple, Any
 # Set page config
 st.set_page_config(
     page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-    page_icon="📊", 
+    page_icon="pbj_favicon.png", 
     layout="wide", 
     initial_sidebar_state="collapsed"
 )
@@ -92,9 +92,6 @@ def load_metrics_data():
         state_metrics = pd.read_csv('state_lite_metrics.csv')
         facility_metrics = pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
 
-        # Debug: Check original column names
-        print(f"Original state_metrics columns: {list(state_metrics.columns)}")
-
         # Standardize column names - apply specific mappings to each dataframe
         # National metrics column mapping - only rename CY_Qtr to CY_QTR and MDS to Census
         national_column_mapping = {
@@ -109,23 +106,13 @@ def load_metrics_data():
         }
         state_metrics.rename(columns=state_column_mapping, inplace=True)
         
-        # Debug: Check column names after renaming
-        print(f"State_metrics columns after renaming: {list(state_metrics.columns)}")
-        
         # Ensure STATE column exists and is properly named
         if 'STATE' not in state_metrics.columns:
-            print(f"ERROR: STATE column missing from state_metrics. Available columns: {list(state_metrics.columns)}")
             # Try to find a similar column
             state_cols = [col for col in state_metrics.columns if 'state' in col.lower()]
             if state_cols:
-                print(f"Found potential state columns: {state_cols}")
                 # Rename the first matching column to STATE
                 state_metrics.rename(columns={state_cols[0]: 'STATE'}, inplace=True)
-                print(f"Renamed {state_cols[0]} to STATE")
-            else:
-                print("No state-like column found!")
-        else:
-            print("STATE column found successfully")
         
         # Facility metrics column mapping - only rename CY_Qtr to CY_QTR
         facility_column_mapping = {
@@ -896,11 +883,37 @@ def sort_quarters(quarters, reverse=False):
 def display_facility_info(provnum: str, quarter_name: str = None, affiliated_entity: str = None):
     """Display facility information in a formatted box. On mobile, remove ownership entity and show quarter below provider name."""
     try:
-        # Add back to search button
+        # Add back to search button with styling
+        st.markdown("""
+        <style>
+        .back-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        .back-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+        .back-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         col1, col2, col3 = st.columns([1, 8, 1])
         with col1:
-            if st.button("← Back to Search", key=f"back_to_search_{provnum}"):
-                st.switch_page("PBJ_Dashboard.py")
+            st.markdown('<button class="back-button" onclick="window.location.href=\'/PBJ_Dashboard\'">← Back to Search</button>', unsafe_allow_html=True)
         
         facility_info = get_facility_info(provnum)
         if not facility_info:
@@ -1999,6 +2012,10 @@ def main() -> None:
                 
                 if not entity_data.empty and not provider_data.empty:
                     # Find the selected entity by name or ID
+                    st.write(f"Debug: Looking for entity '{selected_value}'")
+                    st.write(f"Debug: Available entity IDs: {entity_data['Affiliated entity ID'].unique()[:10]}")
+                    st.write(f"Debug: Available entity names: {entity_data['Affiliated entity'].unique()[:10]}")
+                    
                     selected_entity_data = entity_data[
                         (entity_data['Affiliated entity'] == selected_value) | 
                         (entity_data['Affiliated entity ID'].astype(str) == str(selected_value))
