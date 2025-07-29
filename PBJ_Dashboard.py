@@ -13,7 +13,7 @@ from typing import Dict, Optional, List, Tuple, Any
 # Set page config
 st.set_page_config(
     page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-    page_icon="pbj_favicon.png", 
+    page_icon="📊", 
     layout="wide", 
     initial_sidebar_state="collapsed"
 )
