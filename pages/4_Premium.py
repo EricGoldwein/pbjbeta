@@ -1,11 +1,7 @@
 import streamlit as st
-from st_clickable_images import clickable_images
-import base64
 
 # Set page config - this must be the first Streamlit command
 st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="pbj_favicon.png", layout="wide")
-<<<<<<< HEAD
-=======
 
 # Custom CSS for Home button styling
 st.markdown("""
@@ -41,8 +37,6 @@ st.markdown("""
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
     st.markdown('<button class="home-button" onclick="window.location.href=\'/\'">🏠 Home</button>', unsafe_allow_html=True)
-
->>>>>>> 96a1bcf9cc7f5fca15624648c0b0a9e1d1bd3ca4
 
 # Custom CSS for premium styling
 st.markdown("""

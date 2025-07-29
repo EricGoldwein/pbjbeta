@@ -19,7 +19,7 @@ from typing import Dict, Optional, List, Tuple, Any
 # Set page config
 st.set_page_config(
     page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-    page_icon="pbj_favicon.png", 
+    page_icon="📊", 
     layout="wide", 
     initial_sidebar_state="collapsed"
 )
@@ -896,6 +896,12 @@ def sort_quarters(quarters, reverse=False):
 def display_facility_info(provnum: str, quarter_name: str = None, affiliated_entity: str = None):
     """Display facility information in a formatted box. On mobile, remove ownership entity and show quarter below provider name."""
     try:
+        # Add back to search button
+        col1, col2, col3 = st.columns([1, 8, 1])
+        with col1:
+            if st.button("← Back to Search", key=f"back_to_search_{provnum}"):
+                st.switch_page("PBJ_Dashboard.py")
+        
         facility_info = get_facility_info(provnum)
         if not facility_info:
             return
@@ -1992,8 +1998,11 @@ def main() -> None:
                 provider_data = load_provider_info_data()
                 
                 if not entity_data.empty and not provider_data.empty:
-                    # Find the selected entity by name
-                    selected_entity_data = entity_data[entity_data['Affiliated entity'] == selected_value]
+                    # Find the selected entity by name or ID
+                    selected_entity_data = entity_data[
+                        (entity_data['Affiliated entity'] == selected_value) | 
+                        (entity_data['Affiliated entity ID'].astype(str) == str(selected_value))
+                    ]
                     if not selected_entity_data.empty:
                         entity_row = selected_entity_data.iloc[0]
                         entity_id = int(entity_row['Affiliated entity ID'])
