@@ -20,6 +20,9 @@
 !NH_ProviderInfo_Jun2025.csv
 !Nursing_Home_Affiliated_Entity_Performance_Measures_Jun_2025.csv
 
+# Keep these pngs
+!pbj_favicon.png
+
 # Ignore everything in data/mapping folders
 PBJcsv/
 NonNursecsv/
