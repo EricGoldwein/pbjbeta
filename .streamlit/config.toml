@@ -3,6 +3,3 @@ primaryColor = "#1769aa"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f0f2f6"
 textColor = "#262730"
-
-[server]
-favicon = "pbj_favicon.png"
