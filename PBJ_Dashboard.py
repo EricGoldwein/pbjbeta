@@ -1506,14 +1506,15 @@ def main() -> None:
             with tab1:
                 st.markdown("### Search by Provider")
                 
-                # Use equal columns for better mobile experience
-                col1, col2 = st.columns([1, 1])
+                # Use responsive columns for mobile-friendly layout
+                col1, col2 = st.columns(2)
                 
                 with col1:
                     state_filter = st.selectbox(
                         "Filter by State (Optional)",
                         [""] + sorted(facilities_df['STATE'].unique().tolist()),
                         key="facility_state_filter"
+                        help="Enter two letter state abbreviation"
                     )
                 
                 # Create filtered search options based on selected state
@@ -1689,7 +1690,7 @@ def main() -> None:
                     "Select State",
                     ["", "USA"] + sorted(facilities_df['STATE'].unique().tolist()),
                     key="state_search_input",
-                    help="Choose a state to view its dashboard"
+                    help="Enter two letter state abbreviation"
                 )
                 
                 if state_search:
