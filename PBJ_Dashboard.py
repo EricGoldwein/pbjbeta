@@ -1558,9 +1558,10 @@ def main() -> None:
                     col1, col2 = st.columns(2)
                 
                 with col1:
+                    # Use provider info data for state filtering since facilities_df doesn't have STATE column
                     state_filter = st.selectbox(
                         "Filter by State (Optional)",
-                        [""] + sorted(facilities_df['STATE'].unique().tolist()),
+                        [""] + sorted(provider_info_df['STATE'].unique().tolist()),
                         key="facility_state_filter",
                         help="Enter two letter state abbreviation"
                     )
@@ -1568,7 +1569,9 @@ def main() -> None:
                 with col2:
                     # Create filtered search options based on selected state
                     if state_filter:
-                        state_facilities = facilities_df[facilities_df['STATE'] == state_filter]
+                        # Filter facilities by state using provider info
+                        state_providers = provider_info_df[provider_info_df['STATE'] == state_filter]['PROVNUM'].tolist()
+                        state_facilities = facilities_df[facilities_df['PROVNUM'].isin(state_providers)]
                         search_options = [f"{smart_title(row['PROVNAME'])} ({row['PROVNUM']})" for _, row in state_facilities[['PROVNAME', 'PROVNUM']].drop_duplicates().iterrows()]
                     else:
                         state_facilities = facilities_df  # Use full dataset when no state filter
@@ -1601,8 +1604,15 @@ def main() -> None:
                         ]
                     
                     if not results.empty:
-                        # Get unique facilities
-                        unique_results = results[['PROVNUM', 'PROVNAME', 'STATE']].drop_duplicates()
+                        # Get unique facilities with state info from provider_info_df
+                        unique_results = results[['PROVNUM', 'PROVNAME']].drop_duplicates()
+                        
+                        # Add state information from provider_info_df
+                        unique_results = unique_results.merge(
+                            provider_info_df[['PROVNUM', 'STATE']], 
+                            on='PROVNUM', 
+                            how='left'
+                        )
                         
                         # Create display DataFrame
                         display_df = pd.DataFrame()
@@ -1631,12 +1641,20 @@ def main() -> None:
                 
                 # Show all facilities for selected state (even without search)
                 elif state_filter:
-                    # Get all facilities for the selected state
-                    state_facilities_all = facilities_df[facilities_df['STATE'] == state_filter]
+                    # Get all facilities for the selected state using provider info
+                    state_providers = provider_info_df[provider_info_df['STATE'] == state_filter]['PROVNUM'].tolist()
+                    state_facilities_all = facilities_df[facilities_df['PROVNUM'].isin(state_providers)]
                     
                     if not state_facilities_all.empty:
-                        # Get unique facilities
-                        unique_facilities = state_facilities_all[['PROVNUM', 'PROVNAME', 'STATE']].drop_duplicates()
+                        # Get unique facilities with state info from provider_info_df
+                        unique_facilities = state_facilities_all[['PROVNUM', 'PROVNAME']].drop_duplicates()
+                        
+                        # Add state information from provider_info_df
+                        unique_facilities = unique_facilities.merge(
+                            provider_info_df[['PROVNUM', 'STATE']], 
+                            on='PROVNUM', 
+                            how='left'
+                        )
                         
                         # Create display DataFrame
                         display_df = pd.DataFrame()
@@ -1748,9 +1766,11 @@ def main() -> None:
                     st.info("Ownership data not available.")
             
             with tab3:
+                # Load state data for dropdown
+                state_metrics_df = pd.read_csv('state_lite_metrics.csv')
                 state_search = st.selectbox(
                     "Select State",
-                    ["", "USA"] + sorted(facilities_df['STATE'].unique().tolist()),
+                    ["", "USA"] + sorted(state_metrics_df['STATE'].unique().tolist()),
                     key="state_search_input",
                     help="Enter two letter state abbreviation"
                 )
