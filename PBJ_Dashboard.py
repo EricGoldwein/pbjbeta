@@ -1433,7 +1433,7 @@ def main() -> None:
 
         # Title with custom styling - matching About page dark blue color and mobile responsive
         st.markdown("""
-            <div style='text-align: center; margin-bottom: 1.2em;'>
+            <div style='text-align: center; margin-top: -20px; margin-bottom: 1.2em;'>
                 <span class="dashboard-title" style='font-size:2.8em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>PBJ Nursing Home Staffing Dashboard</span>
             </div>
         """, unsafe_allow_html=True)
@@ -1516,10 +1516,27 @@ def main() -> None:
             name = name.replace(" Center", " Center").replace(" Facility", " Facility")
             name = name.replace(" Nursing Home", " Nursing Home")
             
+            # Handle common words that should be lowercase
+            name = name.replace(" Of ", " of ").replace(" At ", " at ").replace(" The ", " the ")
+            name = name.replace(" And ", " and ").replace(" Or ", " or ").replace(" In ", " in ")
+            name = name.replace(" On ", " on ").replace(" To ", " to ").replace(" For ", " for ")
+            
             return name
         # Add search functionality
         if not hide_search:
-            st.markdown("### Search PBJ Data")
+            st.markdown("""
+                <style>
+                .search-header {
+                    margin-bottom: 5px;
+                    margin-top: -10px;
+                }
+                .stTabs [data-baseweb="tab-list"] {
+                    margin-top: -5px;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('<h3 class="search-header">Search PBJ Data</h3>', unsafe_allow_html=True)
             
             # Load data for search
             facilities_df = load_facility_data()
@@ -1582,16 +1599,25 @@ def main() -> None:
                         
                         # Create display DataFrame
                         display_df = pd.DataFrame()
-                        display_df['Nursing Home'] = unique_results['PROVNAME'].apply(smart_title) + ' (' + unique_results['PROVNUM'] + ')'
                         display_df['State'] = unique_results['STATE']
+                        display_df['Nursing Home (CCN)'] = unique_results['PROVNAME'].apply(smart_title) + ' (' + unique_results['PROVNUM'] + ')'
                         display_df['Dashboard'] = unique_results['PROVNUM'].apply(
-                            lambda x: f'<a href="/?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none;" target="_self">View</a>'
+                            lambda x: f'<a href="/?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none; font-weight: bold;" target="_self">View</a>'
                         )
                         
                         # Sort alphabetically
-                        display_df = display_df.sort_values('Nursing Home')
+                        display_df = display_df.sort_values('Nursing Home (CCN)')
                         
                         st.markdown("#### Search Results")
+                        st.markdown("""
+                            <style>
+                            /* Target the specific table structure */
+                            div[data-testid="stMarkdown"] table th:nth-child(2),
+                            div[data-testid="stMarkdown"] table td:nth-child(2) {
+                                text-align: left !important;
+                            }
+                            </style>
+                        """, unsafe_allow_html=True)
                         st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
                     else:
                         st.info("No facilities found matching your search criteria.")
@@ -1607,14 +1633,14 @@ def main() -> None:
                         
                         # Create display DataFrame
                         display_df = pd.DataFrame()
-                        display_df['Nursing Home'] = unique_facilities['PROVNAME'].apply(smart_title) + ' (' + unique_facilities['PROVNUM'] + ')'
                         display_df['State'] = unique_facilities['STATE']
+                        display_df['Nursing Home (CCN)'] = unique_facilities['PROVNAME'].apply(smart_title) + ' (' + unique_facilities['PROVNUM'] + ')'
                         display_df['Dashboard'] = unique_facilities['PROVNUM'].apply(
-                            lambda x: f'<a href="/?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none;" target="_self">View</a>'
+                            lambda x: f'<a href="/?level=Facility&facility={x}" style="color: #1976d2; text-decoration: none; font-weight: bold;" target="_self">View</a>'
                         )
                         
                         # Sort alphabetically
-                        display_df = display_df.sort_values('Nursing Home')
+                        display_df = display_df.sort_values('Nursing Home (CCN)')
                         
                         # Map state abbreviation to full name
                         state_name_map = {
@@ -1633,6 +1659,15 @@ def main() -> None:
                         
                         st.markdown(f"#### All Facilities in {full_state_name}")
                         st.markdown(f"*{len(display_df)} facilities found*")
+                        st.markdown("""
+                            <style>
+                            /* Target the specific table structure */
+                            div[data-testid="stMarkdown"] table th:nth-child(2),
+                            div[data-testid="stMarkdown"] table td:nth-child(2) {
+                                text-align: left !important;
+                            }
+                            </style>
+                        """, unsafe_allow_html=True)
                         st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
                     else:
                         st.info("No facilities found for this state.")
@@ -1679,7 +1714,7 @@ def main() -> None:
                         "Select Ownership Group",
                         options=ownership_options,
                         key="ownership_search_input",
-                        help="Choose an ownership group to view their dashboard"
+                        help="Choose ownership group to view their dashboard"
                     )
                     
                     if ownership_search_display:
@@ -1696,7 +1731,7 @@ def main() -> None:
                                           color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; 
                                           font-weight: 600; font-size: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); 
                                           transition: all 0.3s ease;">
-                                    🏢 View Dashboard for {smart_title(ownership_name)}
+                                    View {smart_title(ownership_name)} Dashboard
                                 </a>
                             </div>
                             """, unsafe_allow_html=True)
@@ -1732,10 +1767,10 @@ def main() -> None:
                     # Create styled button link - USA goes to main dashboard, others go to state dashboard
                     if state_search == "USA":
                         link_url = "/"
-                        button_text = "🏠 View USA Dashboard"
+                        button_text = "View USA Dashboard"
                     else:
                         link_url = f"/?level=State&state={state_search}"
-                        button_text = f"🗺️ View Dashboard for {full_state_name}"
+                        button_text = f"View {full_state_name} Dashboard"
                     
                     st.markdown(f"""
                     <div style="text-align: center; margin: 20px 0;">
@@ -1813,7 +1848,7 @@ def main() -> None:
         if not st.session_state.get('level_pre_set', False):  # Only show radio button if level not pre-set by URL
             level = st.sidebar.radio(
                 "Select Level",
-                ["National", "State", "Facility", "Ownership"],
+                ["National", "State", "Facility"],
                 index=["National", "State", "Facility", "Ownership"].index(initial_level) if initial_level in ["National", "State", "Facility", "Ownership"] else 0,
                 key="level_selector"
             )
@@ -2044,7 +2079,7 @@ def main() -> None:
                         # Main entity dashboard with entity ID
                         entity_name_title_case = proper_title_case(selected_value)
                         st.markdown(f'''
-                                <div class="entity-header" style="background: linear-gradient(90deg, #e3ecfa 80%, #dbeafe 100%); color: #1a2233; padding: 1.7rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #d3dbe8;">
+                                <div class="entity-header" style="background: linear-gradient(90deg, #e3ecfa 80%, #dbeafe 100%); color: #1a2233; padding: 0.5rem 2rem; border-radius: 12px; margin-bottom: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #d3dbe8;">
                                     <h2 style="margin-bottom: 0.15em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233;">{entity_name_title_case} <span style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>                </div>
                             ''', unsafe_allow_html=True)
                         # Key metrics overview using standard Streamlit metrics
@@ -2117,10 +2152,15 @@ def main() -> None:
                             pie_labels = ['For-Profit', 'Non-Profit', 'Government']
                             pie_values = [for_profit, non_profit, government]
                             # Custom tooltip text for each slice
+                            def format_hover_pct(value):
+                                if pd.isna(value) or value == 0.0:
+                                    return "N/A"
+                                return f"{value:.1f}%"
+                            
                             pie_hovertext = [
-                                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%',
-                                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%',
-                                f'For-profit: {for_profit:.1f}%<br>Non-profit: {non_profit:.1f}%<br>Government: {government:.1f}%'
+                                f'For-profit: {format_hover_pct(for_profit)}<br>Non-profit: {format_hover_pct(non_profit)}<br>Government: {format_hover_pct(government)}',
+                                f'For-profit: {format_hover_pct(for_profit)}<br>Non-profit: {format_hover_pct(non_profit)}<br>Government: {format_hover_pct(government)}',
+                                f'For-profit: {format_hover_pct(for_profit)}<br>Non-profit: {format_hover_pct(non_profit)}<br>Government: {format_hover_pct(government)}'
                             ]
                             fig_pie = go.Figure(data=[go.Pie(
                                 labels=pie_labels,
@@ -2141,9 +2181,14 @@ def main() -> None:
                         
                         with own_col2:
                             # Ownership metrics
-                            st.metric("For-Profit", f"{entity_row['Percent of facilities classified as for-profit']:.1f}%")
-                            st.metric("Non-Profit", f"{entity_row['Percent of facilities classified as non-profit']:.1f}%")
-                            st.metric("Government", f"{entity_row['Percent of facilities classified as government-owned']:.1f}%")
+                            def format_ownership_pct(value):
+                                if pd.isna(value) or value is None:
+                                    return "N/A"
+                                return f"{value:.1f}%"
+                            
+                            st.metric("For-Profit", format_ownership_pct(entity_row['Percent of facilities classified as for-profit']))
+                            st.metric("Non-Profit", format_ownership_pct(entity_row['Percent of facilities classified as non-profit']))
+                            st.metric("Government", format_ownership_pct(entity_row['Percent of facilities classified as government-owned']))
                         
                         # CMS 5-Star Ratings
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">CMS 5-Star Ratings - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -2276,9 +2321,13 @@ def main() -> None:
                         # Turnover metrics
                         turn_col1, turn_col2 = st.columns(2)
                         with turn_col1:
-                            st.metric("Nursing Staff Turnover", f"{entity_row['Average total nursing staff turnover percentage']:.1f}%")
+                            def format_turnover_pct(value):
+                                if pd.isna(value) or value is None:
+                                    return "N/A"
+                                return f"{value:.1f}%"
+                            st.metric("Nursing Staff Turnover", format_turnover_pct(entity_row['Average total nursing staff turnover percentage']))
                         with turn_col2:
-                            st.metric("RN Turnover", f"{entity_row['Average Registered Nurse turnover percentage']:.1f}%")
+                            st.metric("RN Turnover", format_turnover_pct(entity_row['Average Registered Nurse turnover percentage']))
                         
                         # Compliance metrics
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -2298,9 +2347,13 @@ def main() -> None:
                         
                         anti_col1, anti_col2 = st.columns(2)
                         with anti_col1:
-                            st.metric("Short-Stay Antipsychotic", f"{entity_row['Average percentage of short-stay residents who newly received an antipsychotic medication']:.1f}%")
+                            def format_antipsychotic_pct(value):
+                                if pd.isna(value) or value is None:
+                                    return "N/A"
+                                return f"{value:.1f}%"
+                            st.metric("Short-Stay Antipsychotic", format_antipsychotic_pct(entity_row['Average percentage of short-stay residents who newly received an antipsychotic medication']))
                         with anti_col2:
-                            st.metric("Long-Stay Antipsychotic", f"{entity_row['Average percentage of long-stay residents who received an antipsychotic medication']:.1f}%")
+                            st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(entity_row['Average percentage of long-stay residents who received an antipsychotic medication']))
                         
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
@@ -2328,6 +2381,9 @@ def main() -> None:
                                 
                                 # Rename City/Town to City
                                 facilities_display = facilities_display.rename(columns={'City/Town': 'City'})
+                                
+                                # Special handling for Special Focus Status - replace NaN with "N"
+                                facilities_display['Special Focus Status'] = facilities_display['Special Focus Status'].fillna('N')
                                 
                                 # Clean up the data and convert ratings to integers
                                 facilities_display = facilities_display.fillna('N/A')
@@ -2519,7 +2575,6 @@ def main() -> None:
                     }
                     </style>
                     """, unsafe_allow_html=True)
-                    st.warning("Tip: Click **>>** icon (top left) to open sidebar and select a state or facility.")
         except Exception as e:
             st.error(f"Error filtering data: {str(e)}")
             return
