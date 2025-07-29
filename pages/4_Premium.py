@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Set page config - this must be the first Streamlit command
-st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="⭐", layout="wide")
+st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="pbj_favicon.png", layout="wide")
 
 # Custom CSS for premium styling
 st.markdown("""
@@ -140,6 +140,10 @@ def display_footer():
             <p><a href="/About" target="_self">About the Dashboard</a> | <a href="/Premium" target="_self">Premium</a></p>
         </div>
     """, unsafe_allow_html=True)
+
+# Add back to dashboard button
+if st.button("← Back to Dashboard", key="back_to_dashboard_premium"):
+    st.switch_page("PBJ_Dashboard.py")
 
 # Add footer at the end of the page
 display_footer() 

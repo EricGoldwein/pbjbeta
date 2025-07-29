@@ -105,6 +105,10 @@ st.markdown("""
 # Section divider
 st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>", unsafe_allow_html=True)
 
+# Add back to dashboard button
+if st.button("← Back to Dashboard", key="back_to_dashboard_about"):
+    st.switch_page("PBJ_Dashboard.py")
+
 # Footer
 st.markdown("""
     <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
