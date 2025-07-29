@@ -2016,10 +2016,22 @@ def main() -> None:
                     st.write(f"Debug: Available entity IDs: {entity_data['Affiliated entity ID'].unique()[:10]}")
                     st.write(f"Debug: Available entity names: {entity_data['Affiliated entity'].unique()[:10]}")
                     
+                    # Convert both to string for comparison
+                    entity_data['Affiliated entity ID_str'] = entity_data['Affiliated entity ID'].astype(str)
+                    selected_value_str = str(selected_value)
+                    
                     selected_entity_data = entity_data[
                         (entity_data['Affiliated entity'] == selected_value) | 
-                        (entity_data['Affiliated entity ID'].astype(str) == str(selected_value))
+                        (entity_data['Affiliated entity ID_str'] == selected_value_str)
                     ]
+                    
+                    st.write(f"Debug: Found {len(selected_entity_data)} matching records")
+                    if len(selected_entity_data) == 0:
+                        st.write(f"Debug: No matches found for '{selected_value}' (type: {type(selected_value)})")
+                        st.write(f"Debug: Entity ID column type: {entity_data['Affiliated entity ID'].dtype}")
+                        st.write(f"Debug: Sample entity IDs: {entity_data['Affiliated entity ID'].head().tolist()}")
+                        st.write(f"Debug: NaN values in entity ID column: {entity_data['Affiliated entity ID'].isna().sum()}")
+                        st.write(f"Debug: Looking for exact match in entity IDs: {selected_value_str in entity_data['Affiliated entity ID_str'].values}")
                     if not selected_entity_data.empty:
                         entity_row = selected_entity_data.iloc[0]
                         entity_id = int(entity_row['Affiliated entity ID'])
