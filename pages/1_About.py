@@ -36,7 +36,7 @@ st.markdown("""
 # Add Home button to top left
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
-    st.markdown('<button class="home-button" onclick="window.location.href=\'/PBJ_Dashboard\'">🏠 Home</button>', unsafe_allow_html=True)
+    st.markdown('<button class="home-button" onclick="window.location.href=\'/\'">🏠 Home</button>', unsafe_allow_html=True)
 
 # Main intro block with soft background and padding (combine into one call)
 st.markdown("""
@@ -149,6 +149,6 @@ st.markdown("""
     <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
         <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
         <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
-        <p><a href="/About" target="_self">About the Dashboard</a> | <a href="/Premium" target="_self">Premium</a></p>
+        <p><a href="/1_About" target="_self">About the Dashboard</a> | <a href="/4_Premium" target="_self">Premium</a></p>
     </div>
 """, unsafe_allow_html=True) 
