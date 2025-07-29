@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Clean UTF-8 encoding - no BOM
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
