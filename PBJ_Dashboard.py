@@ -1,22 +1,52 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
-import duckdb
 import os
-import numpy as np
 import re
 from plotly.subplots import make_subplots
+import duckdb
 from typing import Dict, Optional, List, Tuple, Any
 
-# Set page config
-st.set_page_config(
-    page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-    page_icon="📊", 
-    layout="wide", 
-    initial_sidebar_state="collapsed"
-)
+# Set sidebar collapsed on mobile
+import streamlit as st
+st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="📊", layout="wide", initial_sidebar_state="auto")
+
+# Add subtle modern styling for metric containers only (not delta or value)
+st.markdown("""
+    <style>
+    div[data-testid="stMetric"] {
+        background: #fafdff;
+        border: 1px solid #e3eaf3;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(30,136,229,0.04);
+        padding: 12px 18px 4px 18px;
+        margin: 12px 4px 10px 4px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Add CSS to hide the toggle tip on desktop and mobile-responsive title
+st.markdown("""
+<style>
+.toggle-tip-mobile {
+    display: block;
+}
+@media (min-width: 900px) {
+    .toggle-tip-mobile {
+        display: none !important;
+    }
+}
+
+/* Mobile-responsive title styling */
+@media (max-width: 768px) {
+    .dashboard-title {
+        font-size: 2.1em !important;
+        line-height: 1.2 !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Initialize DuckDB connection for facility data
 facility_db = duckdb.connect(':memory:')
@@ -1347,10 +1377,6 @@ def main() -> None:
         if 'view_mode' not in st.session_state:
             st.session_state.view_mode = "Desktop"
         
-        # Theme detection using new Streamlit 1.46+ feature
-        theme = st.context.theme
-        is_dark_mode = theme == "dark"
-        
         # Simple mobile detection for warning message only
         # Check if we're on a mobile device using screen width
         if 'is_mobile' not in st.session_state:
@@ -1388,12 +1414,27 @@ def main() -> None:
         initial_state = st.query_params.get('state', None)
         initial_entity = st.query_params.get('entity', None)
         
-        # Title with theme-aware styling
-        title_color = "#1769aa" if not is_dark_mode else "#4fc3f7"
-        
-        st.markdown(f"""
-            <div style='text-align: center; margin-top: -40px; margin-bottom: 1.2em;'>
-                <span class="dashboard-title" style='font-size:2.8em; font-weight:800; color:{title_color}; letter-spacing:0.01em; line-height:1.1;'>PBJ Nursing Home Staffing Dashboard</span>
+        # Handle direct URL navigation for state and entity levels
+        if initial_level == "State" and initial_state:
+            # Set the level and selected_value for state navigation
+            level = "State"
+            selected_value = initial_state
+            # Hide the radio button since we're pre-setting the level
+            st.session_state.level_pre_set = True
+        elif (initial_level == "Entity" or initial_level == "Ownership") and initial_entity:
+            # Set the level and selected_value for entity navigation
+            level = "Entity"
+            selected_value = initial_entity
+            # Hide the radio button since we're pre-setting the level
+            st.session_state.level_pre_set = True
+        else:
+            level = None  # Will be set by radio button
+            st.session_state.level_pre_set = False
+
+        # Title with custom styling - matching About page dark blue color and mobile responsive
+        st.markdown("""
+            <div style='text-align: center; margin-top: -20px; margin-bottom: 1.2em;'>
+                <span class="dashboard-title" style='font-size:2.8em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>PBJ Nursing Home Staffing Dashboard</span>
             </div>
         """, unsafe_allow_html=True)
 
@@ -1402,18 +1443,13 @@ def main() -> None:
         if initial_level and (initial_facility or initial_state or initial_entity):
             hide_search = True
 
-        # Refined subhead with theme-aware styling and improved layout
-        subhead_bg = "#f7fafd" if not is_dark_mode else "#1e1e1e"
-        subhead_border = "#e3eaf3" if not is_dark_mode else "#404040"
-        subhead_text = "#234" if not is_dark_mode else "#e0e0e0"
-        link_color = "#1E88E5" if not is_dark_mode else "#4fc3f7"
-        
+        # Refined subhead: centered text and box with search link
         st.markdown(f'''
-            <div style="background: {subhead_bg}; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 10px; border: 1px solid {subhead_border}; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
-                <div style="font-size: 1.08em; color: {subhead_text}; font-weight: 600; margin-bottom: 2px;">
-                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: {link_color}; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
+            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 10px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
+                <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
+                    A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
                 </div>
-                {"<div style=\"margin-top: 8px;\" class=\"mobile-about-link\"><a href=\"/About\" target=\"_self\" style=\"color: {link_color}; text-decoration: none; font-size: 0.9em; font-weight: 400;\">About the PBJ Dashboard</a></div>" if not hide_search else ""}
+                {"<div style=\"margin-top: 8px;\" class=\"mobile-about-link\"><a href=\"/About\" target=\"_self\" style=\"color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400;\">About the PBJ Dashboard</a></div>" if not hide_search else ""}
             </div>
         ''', unsafe_allow_html=True)
         
@@ -1534,28 +1570,12 @@ def main() -> None:
             provider_info_df = load_provider_info_data()
             ownership_df = load_ownership_data()
             
-            # Create search tabs with improved width control
+            # Create search tabs
             tab1, tab2, tab3 = st.tabs(["🔍 Facility", "🏢 Ownership", "🗺️ State"])
             
-            # Set width for better mobile layout
-            if st.session_state.get('is_mobile', False):
-                st.markdown("""
-                    <style>
-                    .stTabs [data-baseweb="tab-list"] {
-                        width: 100% !important;
-                    }
-                    .stTabs [data-baseweb="tab"] {
-                        width: 33.33% !important;
-                    }
-                    </style>
-                """, unsafe_allow_html=True)
-            
             with tab1:
-                # Use responsive columns with width control for mobile-friendly layout
-                if st.session_state.get('is_mobile', False):
-                    col1, col2 = st.columns([1, 1], gap="small")
-                else:
-                    col1, col2 = st.columns(2)
+                # Use responsive columns for mobile-friendly layout
+                col1, col2 = st.columns(2)
                 
                 with col1:
                     state_filter = st.selectbox(
@@ -1718,10 +1738,10 @@ def main() -> None:
                             st.session_state[f"name_{display_name}"] = row['Affiliated entity']
                     
                     ownership_search_display = st.selectbox(
-                        "Select Ownership (Affiliated Entity)",
+                        "Select Ownership Group",
                         options=ownership_options,
                         key="ownership_search_input",
-                        help="Select ownership (affiliated entity) to view their dashboard"
+                        help="Choose ownership group to view their dashboard"
                     )
                     
                     if ownership_search_display:
@@ -1791,25 +1811,242 @@ def main() -> None:
                     </div>
                     """, unsafe_allow_html=True)
         
-        # Set default level and selected_value based on URL parameters
-        level = initial_level if initial_level else "National"
-        selected_value = None
+        # st.markdown("""
+        #     <hr style="margin: 8px 0; border: none; border-top: 1px solid #e0e0e0; height: 1px;">
+        # """, unsafe_allow_html=True)
         
-        # Set selected_value based on URL parameters
-        if initial_facility:
-            selected_value = initial_facility
-        elif initial_state:
-            selected_value = initial_state
-        elif initial_entity:
-            selected_value = initial_entity
+        # Sidebar
+        st.sidebar.markdown("""
+            <style>
+            .sidebar-filters {
+                margin-bottom: 20px;
+            }
+            .quarter-selectors {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 15px;
+            }
+            .quarter-selectors > div {
+                flex: 1;
+            }
+            .sidebar .stSelectbox {
+                margin-bottom: 0;
+            }
+            .sidebar h3 {
+                margin-bottom: 0.5rem;
+            }
+            /* Add styles for quarter selectors */
+            .sidebar .stSelectbox {
+                width: 150px !important;
+            }
+            /* Match width of provider name box to CCN box */
+            .sidebar div[data-testid="stSelectbox"] {
+                width: 100% !important;
+            }
+            /* Remove top margin from first element in sidebar */
+            .sidebar > div:first-child {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+            /* Reduce spacing between elements */
+            .sidebar .stRadio {
+                margin-top: 0 !important;
+                margin-bottom: 1rem !important;
+            }
+            .sidebar .stSelectbox {
+                margin-top: 0 !important;
+                margin-bottom: 1rem !important;
+            }
+            .sidebar-attribution {
+                font-size: 0.8em;
+                color: #666;
+                margin-top: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+            .sidebar-methodology {
+                font-size: 0.8em;
+                color: #666;
+                font-style: italic;
+                margin-top: 0.5rem;
+                margin-bottom: 1rem;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
-        # Get all available quarters
+        # Sidebar: Only show radio button if level not pre-set by URL
+        if not st.session_state.get('level_pre_set', False):  # Only show radio button if level not pre-set by URL
+            level = st.sidebar.radio(
+                "Select Level",
+                ["National", "State", "Facility"],
+                index=["National", "State", "Facility", "Ownership"].index(initial_level) if initial_level in ["National", "State", "Facility", "Ownership"] else 0,
+                key="level_selector"
+            )
+        # If level is pre-set by URL, don't show radio button
+
+        # Get selected value based on level
+        selected_value = None
         try:
-            all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
-            start_quarter = all_quarters[0]  # First quarter
-            end_quarter = all_quarters[-1]   # Last quarter
+            if level == "State":
+                states = ["---"] + sorted(state_metrics['STATE'].unique().tolist())
+                
+                # If we have a state from URL parameter, use it
+                if initial_state and initial_state in state_metrics['STATE'].unique():
+                    selected_state = initial_state
+                    selected_value = initial_state
+                    # Don't show selectbox if value is pre-set from URL
+                else:
+                    selected_state = st.sidebar.selectbox(
+                        "Select State",
+                        states,
+                        index=0
+                    )
+                    selected_value = selected_state if selected_state != "---" else None
+            elif level == "Entity":
+                # Load affiliated entity data
+                entity_data = load_affiliated_entity_data()
+                if not entity_data.empty:
+                    # Filter out the "National" row (aggregate data)
+                    entity_data = entity_data[entity_data['Affiliated entity'] != 'National'].copy()
+                    
+                    # Create entity options
+                    entity_options = []
+                    for idx, entity in entity_data.iterrows():
+                        entity_name = entity['Affiliated entity']
+                        facility_count = entity['Number of facilities']
+                        entity_options.append(f"{entity_name} ({facility_count} facilities)")
+                    
+                    # If we have an entity from URL parameter, use it
+                    if initial_entity:
+                        # First try to find the entity by ID (convert to int for comparison)
+                        try:
+                            entity_id_int = int(initial_entity)
+                            matching_entity = entity_data[entity_data['Affiliated entity ID'] == entity_id_int]
+                            if not matching_entity.empty:
+                                selected_entity = matching_entity.iloc[0]['Affiliated entity']
+                                selected_value = selected_entity
+                                # Don't show selectbox if value is pre-set from URL
+                            else:
+                                # If not found by ID, try by name
+                                matching_entity = entity_data[entity_data['Affiliated entity'] == initial_entity]
+                                if not matching_entity.empty:
+                                    selected_entity = initial_entity
+                                    selected_value = initial_entity
+                                    # Don't show selectbox if value is pre-set from URL
+                                else:
+                                    selected_entity = st.sidebar.selectbox(
+                                        "Select Entity",
+                                        ["---"] + entity_options,
+                                        index=0
+                                    )
+                                    selected_value = selected_entity.split(" (")[0] if selected_entity != "---" else None
+                        except ValueError:
+                            # If initial_entity is not a number, try by name
+                            matching_entity = entity_data[entity_data['Affiliated entity'] == initial_entity]
+                            if not matching_entity.empty:
+                                selected_entity = initial_entity
+                                selected_value = initial_entity
+                                # Don't show selectbox if value is pre-set from URL
+                            else:
+                                selected_entity = st.sidebar.selectbox(
+                                    "Select Entity",
+                                    ["---"] + entity_options,
+                                    index=0
+                                )
+                                selected_value = selected_entity.split(" (")[0] if selected_entity != "---" else None
+                    else:
+                        selected_entity = st.sidebar.selectbox(
+                            "Select Entity",
+                            ["---"] + entity_options,
+                            index=0
+                        )
+                        selected_value = selected_entity.split(" (")[0] if selected_entity != "---" else None
+                else:
+                    st.error("Unable to load entity data.")
+                    selected_value = None
+            elif level == "Facility":
+                search_container = st.sidebar.container()
+                
+                # If we have a facility from URL, use it
+                if initial_facility:
+                    # Set the selected value directly from the CCN
+                    selected_value = initial_facility
+                    # Use the CCN as the search term
+                    search_term = initial_facility
+                else:
+                    search_term = ""
+
+                # Create the search input without using session state for the value
+                search_term = search_container.text_input(
+                    "Enter Provider CCN or Name",
+                    value=search_term,
+                    key="facility_search"
+                )
+                
+                # Add help text with hyperlink
+                st.sidebar.markdown(
+                    '<div style="margin-top: -15px; margin-bottom: 15px;">'
+                    '<a href="/Facility_Search" target="_self" style="color: #1E88E5; text-decoration: none; font-size: 0.9em;">'
+                    'Help finding facility data</a></div>',
+                    unsafe_allow_html=True
+                )
+                
+                matching_facilities = []
+                search_triggered = False
+
+                if st.session_state.view_mode == "Mobile":
+                    # On mobile, add a search button
+                    if search_container.button("Search", key="facility_search_button"):
+                        search_triggered = True
+                    if search_triggered and search_term:
+                        matching_facilities = search_facilities(search_term)
+                else:
+                    # On desktop, search as you type
+                    if search_term:
+                        matching_facilities = search_facilities(search_term)
+
+                if search_term:
+                    if matching_facilities:
+                        facility_options = [
+                            f"{fac['PROVNAME']}"
+                            for fac in matching_facilities
+                        ]
+                        selected_facility_display = search_container.selectbox(
+                            "Select Facility",
+                            facility_options,
+                            key="facility_selector",
+                            label_visibility="collapsed"
+                        )
+                        if selected_facility_display:
+                            # Find the matching facility to get the CCN
+                            selected_facility = next(
+                                (fac for fac in matching_facilities if fac['PROVNAME'] == selected_facility_display),
+                                None
+                            )
+                            if selected_facility:
+                                selected_value = selected_facility['PROVNUM']
+                    else:
+                        search_container.info("No matching facilities found")
+
+            # Add back button if on facility, state, or entity page - now both level and selected_value are defined
+            if (level == "Facility" or level == "State" or level == "Entity") and selected_value:
+                st.markdown("""
+                    <div style="margin-bottom: 8px; padding: 4px 0;">
+                        <a href="/" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.95em; padding: 8px 16px; border-radius: 6px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 1.1em;">←</span> Back to Search
+                        </a>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # Get all available quarters
+            try:
+                all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
+                start_quarter = all_quarters[0]  # First quarter
+                end_quarter = all_quarters[-1]   # Last quarter
+            except Exception as e:
+                st.error(f"Error loading quarters: {str(e)}")
+                return
         except Exception as e:
-            st.error(f"Error loading quarters: {str(e)}")
+            st.error(f"Error processing selection: {str(e)}")
             return
 
         # Get filtered data
@@ -1818,8 +2055,7 @@ def main() -> None:
             
             # For facility level, add the info box and other elements in the new order
             if level == "Facility" and selected_value:
-                # Get selected facility details from search results
-                matching_facilities = search_facilities(selected_value) if selected_value else []
+                # Get selected facility details
                 selected_facility = next((fac for fac in matching_facilities if fac['PROVNUM'] == selected_value), None)
                 if selected_facility:
                     # Compute current quarter label for facility info box
