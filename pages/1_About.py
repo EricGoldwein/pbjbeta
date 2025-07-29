@@ -11,7 +11,7 @@ st.markdown("""
         <span style='font-size:1.15em; color:#7a869a; font-weight:400;'>by 320 Consulting</span>
     </div>
 
-### Why this dashboard matters
+### Why this matters
 Staffing data is a key indicator of nursing home quality, revealing how much care residents receive and what resources facilities commit. Yet most public data shows only the latest quarter, offering a narrow and incomplete view. This dashboard stitches together **eight years of CMS staffing files—billions of data points from payroll-based journal (PBJ) submissions—into interactive visualizations**, so you can see how staffing has changed over time and bring data-driven context to what’s happening inside the 15,000 nursing homes across the U.S.
 
 ### Who it helps  

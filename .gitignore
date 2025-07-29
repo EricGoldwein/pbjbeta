@@ -6,8 +6,8 @@
 !setup_database.py
 
 # Keep only these Streamlit page files
-!pages/2_Search.py
-!pages/2_About.py
+!pages/4_Premium.py
+!pages/1_About.py
 
 # Ignore all CSV files by default
 *.csv
