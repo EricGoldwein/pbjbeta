@@ -1096,7 +1096,11 @@ def display_metrics(metrics: pd.DataFrame, level: str):
 
         # Display Key Metrics header with level-specific title
         if level == "State":
-            state = metrics['STATE'].iloc[0]
+            if 'STATE' in metrics.columns and not metrics.empty:
+                state = metrics['STATE'].iloc[0]
+            else:
+                st.error("No data available for the selected state or 'STATE' column missing.")
+                return
             facility_count = current_metrics['Facility_Count'].iloc[0] if 'Facility_Count' in current_metrics else len(current_metrics['PROVNUM'].unique())
             prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics else None
             full_state_name = get_full_state_name(state)
