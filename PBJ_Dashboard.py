@@ -205,10 +205,6 @@ def load_affiliated_entity_data():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # Convert Affiliated entity ID to numeric
-        if 'Affiliated entity ID' in df.columns:
-            df['Affiliated entity ID'] = pd.to_numeric(df['Affiliated entity ID'], errors='coerce')
-        
         return df
     except Exception as e:
         st.error(f"Error loading affiliated entity data: {str(e)}")
@@ -2058,59 +2054,13 @@ def main() -> None:
                 
                 if not entity_data.empty and not provider_data.empty:
                     # Find the selected entity by name or ID
-                    # First try to find by name (more reliable since entity IDs may not match between datasets)
                     selected_entity_data = entity_data[
                         (entity_data['Affiliated entity'] == selected_value) | 
                         (entity_data['Affiliated entity ID'] == float(selected_value))
                     ]
                     
-                    # Debug: Check if entity 237 exists
-                    if selected_value == '237':
-                        st.write(f"Debug: Looking for entity 237")
-                        st.write(f"Debug: Entity 237 in data: {237.0 in entity_data['Affiliated entity ID'].values}")
-                        st.write(f"Debug: Entity 237 as float: {float(237) in entity_data['Affiliated entity ID'].values}")
-                        st.write(f"Debug: Sample entity IDs: {entity_data['Affiliated entity ID'].head().tolist()}")
-                    
-                    # If not found by ID, try to find by name from facility data
-                    if selected_entity_data.empty and selected_value.isdigit():
-                        # Get the entity name from facility data
-                        provider_data = load_provider_info_data()
-                        if not provider_data.empty:
-                            # Find facilities with this entity ID
-                            matching_facilities = provider_data[provider_data['Affiliated Entity ID'] == int(selected_value)]
-                            if not matching_facilities.empty:
-                                entity_name = matching_facilities.iloc[0]['Affiliated Entity Name']
-                                if pd.notna(entity_name):
-                                    # Search by name in the performance dataset
-                                    selected_entity_data = entity_data[entity_data['Affiliated entity'] == entity_name]
-                                    
-                                    # If still not found, try partial name matching
-                                    if selected_entity_data.empty:
-                                        # Try to find by partial name match
-                                        for idx, row in entity_data.iterrows():
-                                            if entity_name.lower() in row['Affiliated entity'].lower() or row['Affiliated entity'].lower() in entity_name.lower():
-                                                selected_entity_data = entity_data.iloc[[idx]]
-                                                break
-                    
                     if selected_entity_data.empty:
                         st.error(f"Entity '{selected_value}' not found in the data.")
-                        
-                        # Debug: Show what we were looking for
-                        if selected_value.isdigit():
-                            provider_data = load_provider_info_data()
-                            if not provider_data.empty:
-                                matching_facilities = provider_data[provider_data['Affiliated Entity ID'] == int(selected_value)]
-                                if not matching_facilities.empty:
-                                    entity_name = matching_facilities.iloc[0]['Affiliated Entity Name']
-                                    st.info(f"Looking for entity ID {selected_value} which corresponds to '{entity_name}' in facility data")
-                        
-                        st.info("Available entities in performance dataset:")
-                        
-                        # Show first 20 available entities
-                        available_entities = entity_data[['Affiliated entity', 'Affiliated entity ID']].dropna(subset=['Affiliated entity ID']).head(20)
-                        for _, row in available_entities.iterrows():
-                            st.write(f"- {row['Affiliated entity']} (ID: {row['Affiliated entity ID']})")
-                        
                         st.button("← Back to Search", key="back_to_search_entity_not_found", on_click=lambda: st.switch_page("PBJ_Dashboard.py"))
                         return
                     if not selected_entity_data.empty:
