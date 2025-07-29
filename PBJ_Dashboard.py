@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-# Clean UTF-8 encoding - no BOM
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -12,7 +10,7 @@ from typing import Dict, Optional, List, Tuple, Any
 
 # Set sidebar collapsed on mobile
 import streamlit as st
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="📊", layout="wide", initial_sidebar_state="auto")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
@@ -66,7 +64,7 @@ state_name_map = {
     'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
     'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
     'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
-    'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming'
+    'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
 }
 
 def get_full_state_name(state_abbr: str) -> str:
@@ -1076,8 +1074,8 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
     # Add navigation links below premium services
     st.markdown("""
         <div class="nav-links">
-            <a href="/1_About" target="_self">About the Dashboard</a> | 
-            <a href="/4_Premium" target="_self">Premium</a>
+            <a href="/About" target="_self">About the Dashboard</a> | 
+            <a href="/Premium" target="_self">Premium</a>
         </div>
     """, unsafe_allow_html=True)
 
@@ -1435,7 +1433,7 @@ def main() -> None:
 
         # Title with custom styling - matching About page dark blue color and mobile responsive
         st.markdown("""
-            <div style='text-align: center; margin-top: -20px; margin-bottom: 1.2em;' class="main-title-container">
+            <div style='text-align: center; margin-top: -20px; margin-bottom: 1.2em;'>
                 <span class="dashboard-title" style='font-size:2.8em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>PBJ Nursing Home Staffing Dashboard</span>
             </div>
         """, unsafe_allow_html=True)
@@ -1447,11 +1445,11 @@ def main() -> None:
 
         # Refined subhead: centered text and box with search link
         st.markdown(f'''
-            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 10px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;" class="subheader-box">
+            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 10px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
                 </div>
-                {"<div style=\"margin-top: 8px;\" class=\"mobile-about-link\"><a href=\"/1_About\" target=\"_self\" style=\"color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400;\">About the PBJ Dashboard</a></div>" if not hide_search else ""}
+                {"<div style=\"margin-top: 8px;\" class=\"mobile-about-link\"><a href=\"/About\" target=\"_self\" style=\"color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400;\">About the PBJ Dashboard</a></div>" if not hide_search else ""}
             </div>
         ''', unsafe_allow_html=True)
         
@@ -1555,88 +1553,11 @@ def main() -> None:
                 }
                 @media (max-width: 768px) {
                     .search-header {
-                        margin-top: -60px;
+                        margin-top: -30px;
                         margin-bottom: 0px;
-                        padding-top: 0px !important;
-                        padding-bottom: 0px !important;
                     }
                     div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
-                        margin-bottom: 1px !important;
-                        padding: 6px 14px 2px 14px !important;
-                    }
-                    .dashboard-title {
-                        margin-bottom: 0.3em !important;
-                        margin-top: -10px !important;
-                    }
-                    div[data-testid="stMarkdown"] > div:has(> span[style*="font-size:2.8em"]) {
-                        margin-bottom: 0.3em !important;
-                        margin-top: -10px !important;
-                    }
-                    .subheader-box {
-                        padding: 6px 14px 2px 14px !important;
-                        margin-bottom: 3px !important;
-                        margin-top: -5px !important;
-                    }
-                    /* Reduce spacing around tabs */
-                    .stTabs [data-baseweb="tab-list"] {
-                        margin-top: -10px !important;
-                        margin-bottom: 5px !important;
-                    }
-                    /* Reduce spacing in tab content */
-                    div[data-testid="stTabs"] {
-                        margin-top: -5px !important;
-                    }
-                    /* Reduce spacing around selectboxes */
-                    div[data-testid="stSelectbox"] {
-                        margin-bottom: 8px !important;
-                    }
-                    /* Reduce spacing around columns */
-                    div[data-testid="column"] {
-                        margin-bottom: 0px !important;
-                    }
-                    /* Reduce spacing around markdown elements */
-                    div[data-testid="stMarkdown"] {
-                        margin-bottom: 2px !important;
-                    }
-                    /* Reduce spacing around the main title */
-                    div[data-testid="stMarkdown"] > div:has(> div[style*="text-align: center"]) {
-                        margin-bottom: 0.3em !important;
-                    }
-                    .main-title-container {
-                        margin-top: -30px !important;
-                        margin-bottom: 0.3em !important;
-                    }
-                    /* Reduce spacing around all markdown containers */
-                    div[data-testid="stMarkdown"] > div {
-                        margin-bottom: 1px !important;
-                    }
-                    /* Reduce spacing around the page itself */
-                    .main .block-container {
-                        padding-top: 1rem !important;
-                        padding-bottom: 1rem !important;
-                    }
-                    /* Aggressively reduce space between subheader and search section */
-                    div[data-testid="stMarkdown"] > div:has(> div[class="subheader-box"]) {
-                        margin-bottom: 0px !important;
-                    }
-                    /* Reduce space after subheader box */
-                    .subheader-box + div {
-                        margin-top: 0px !important;
-                    }
-                    /* Target the specific gap between subheader and search header */
-                    div[data-testid="stMarkdown"] > div:has(> h3[class="search-header"]) {
-                        margin-top: -15px !important;
-                    }
-                    /* Reduce space around the search header itself */
-                    h3.search-header {
-                        margin-top: -20px !important;
-                        margin-bottom: 5px !important;
-                        padding-top: 0px !important;
-                        padding-bottom: 0px !important;
-                    }
-                    /* Reduce space before tabs */
-                    div[data-testid="stTabs"] {
-                        margin-top: -10px !important;
+                        margin-bottom: 4px !important;
                     }
                 }
                 </style>
@@ -1759,7 +1680,7 @@ def main() -> None:
                             'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
                             'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
                             'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
-                            'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming'
+                            'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
                         }
                         full_state_name = state_name_map.get(state_filter, state_filter)
                         
@@ -1849,7 +1770,7 @@ def main() -> None:
             with tab3:
                 state_search = st.selectbox(
                     "Select State",
-                    [""] + sorted(facilities_df['STATE'].unique().tolist()),
+                    ["", "USA"] + sorted(facilities_df['STATE'].unique().tolist()),
                     key="state_search_input",
                     help="Enter two letter state abbreviation"
                 )
@@ -1866,13 +1787,17 @@ def main() -> None:
                         'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
                         'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
                         'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
-                        'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming'
+                        'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
                     }
                     full_state_name = state_name_map.get(state_search, state_search)
                     
-                    # Create styled button link for state dashboard
-                    link_url = f"/?level=State&state={state_search}"
-                    button_text = f"View {full_state_name} Dashboard"
+                    # Create styled button link - USA goes to main dashboard, others go to state dashboard
+                    if state_search == "USA":
+                        link_url = "/"
+                        button_text = "View USA Dashboard"
+                    else:
+                        link_url = f"/?level=State&state={state_search}"
+                        button_text = f"View {full_state_name} Dashboard"
                     
                     st.markdown(f"""
                     <div style="text-align: center; margin: 20px 0;">
