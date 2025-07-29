@@ -56,6 +56,9 @@ def load_metrics_data():
         state_metrics = pd.read_csv('state_lite_metrics.csv')
         facility_metrics = pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
 
+        # Debug: Check original column names
+        print(f"Original state_metrics columns: {list(state_metrics.columns)}")
+
         # Standardize column names - apply specific mappings to each dataframe
         # National metrics column mapping - only rename CY_Qtr to CY_QTR and MDS to Census
         national_column_mapping = {
@@ -69,6 +72,9 @@ def load_metrics_data():
             'CY_Qtr': 'CY_QTR'
         }
         state_metrics.rename(columns=state_column_mapping, inplace=True)
+        
+        # Debug: Check column names after renaming
+        print(f"State_metrics columns after renaming: {list(state_metrics.columns)}")
         
         # Facility metrics column mapping - only rename CY_Qtr to CY_QTR
         facility_column_mapping = {
