@@ -1041,6 +1041,24 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
         .premium-services a:hover {
             text-decoration: underline;
         }
+        .nav-links {
+            text-align: center;
+            margin: 10px auto 5px auto;
+            padding: 10px 0;
+            border-top: 1px solid #e0e0e0;
+        }
+        .nav-links a {
+            color: #1769aa;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95em;
+            margin: 0 10px;
+            transition: all 0.2s ease;
+        }
+        .nav-links a:hover {
+            color: #0d47a1;
+            text-decoration: underline;
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -1050,6 +1068,14 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
             <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy.</p>
             <p>To request a report:</p>
             <p><a href="mailto:eric@320insight.com">📧 eric@320insight.com</a></p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Add navigation links below premium services
+    st.markdown("""
+        <div class="nav-links">
+            <a href="/About" target="_self">About the Dashboard</a> | 
+            <a href="/Premium" target="_self">Premium</a>
         </div>
     """, unsafe_allow_html=True)
 
@@ -1338,7 +1364,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
 def display_footer():
     """Display a consistent footer across all pages."""
     st.markdown("""
-        <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
+        <div style="text-align: center; margin-top: 10px; color: #666; font-size: 0.9em;">
             <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
             <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
         </div>
@@ -1493,7 +1519,7 @@ def main() -> None:
             return name
         # Add search functionality
         if not hide_search:
-            st.markdown("### 🔍 Search PBJ Data")
+            st.markdown("### Search PBJ Data")
             
             # Load data for search
             facilities_df = load_facility_data()
@@ -1504,8 +1530,6 @@ def main() -> None:
             tab1, tab2, tab3 = st.tabs(["🔍 Facility", "🏢 Ownership", "🗺️ State"])
             
             with tab1:
-                st.markdown("### Search by Provider")
-                
                 # Use responsive columns for mobile-friendly layout
                 col1, col2 = st.columns(2)
                 
@@ -1614,8 +1638,6 @@ def main() -> None:
                         st.info("No facilities found for this state.")
             
             with tab2:
-                st.markdown("### Search by Ownership Group")
-                
                 if not ownership_df.empty:
                     # Filter to show only major ownership groups (you can customize this list)
                     major_ownership_groups = [
@@ -1684,8 +1706,6 @@ def main() -> None:
                     st.info("Ownership data not available.")
             
             with tab3:
-                st.markdown("### Search by State")
-                
                 state_search = st.selectbox(
                     "Select State",
                     ["", "USA"] + sorted(facilities_df['STATE'].unique().tolist()),
