@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Set page config - this must be the first Streamlit command
-st.set_page_config(page_title="Premium", page_icon="⭐", layout="wide")
+st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="⭐", layout="wide")
 
 # Custom CSS for premium styling
 st.markdown("""

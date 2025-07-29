@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Set page configuration
-st.set_page_config(page_title="About the PBJ Dashboard", page_icon="��", layout="wide")
+st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="��", layout="wide")
 
 # Main intro block with soft background and padding (combine into one call)
 st.markdown("""
@@ -36,7 +36,7 @@ Staffing data is a key indicator of nursing home quality, revealing how much car
 * **CMS Citations (Premium)** - Citation data and inspection reports, categorized by date, type, severity, and more. 
 
 ### Quick tour  
-1. Head to the sidebar (>> icon on top left) and pick **State**, **Facility**, or **Ownership**.
+1. Start search by selecting **Facility**, **Ownership**, or **State**.
 2. Access state, facility, and ownership-level data and view data visualizations to spot trends over time.  
 3. Click **Export** for ready-to-use PNGs.
 
