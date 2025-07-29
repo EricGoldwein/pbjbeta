@@ -1513,7 +1513,7 @@ def main() -> None:
                     state_filter = st.selectbox(
                         "Filter by State (Optional)",
                         [""] + sorted(facilities_df['STATE'].unique().tolist()),
-                        key="facility_state_filter"
+                        key="facility_state_filter",
                         help="Enter two letter state abbreviation"
                     )
                 
