@@ -16,10 +16,13 @@ import re
 from plotly.subplots import make_subplots
 from typing import Dict, Optional, List, Tuple, Any
 
-<<<<<<< HEAD
-# Set sidebar collapsed on mobile
-import streamlit as st
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="auto")
+# Set page config
+st.set_page_config(
+    page_title="PBJ Nursing Home Staffing Dashboard by 320", 
+    page_icon="pbj_favicon.png", 
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
@@ -56,15 +59,6 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-=======
-# Set page config
-st.set_page_config(
-    page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-    page_icon="pbj_favicon.png", 
-    layout="wide", 
-    initial_sidebar_state="collapsed"
-)
->>>>>>> 96a1bcf9cc7f5fca15624648c0b0a9e1d1bd3ca4
 
 # Initialize DuckDB connection for facility data
 facility_db = duckdb.connect(':memory:')
