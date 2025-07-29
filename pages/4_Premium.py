@@ -59,7 +59,7 @@ st.markdown("""
 
 # Replace the introduction paragraph at the top of the Premium page
 st.markdown('''
-<a href="https://www.320insight.com/" target="_blank" style="font-weight: bold; text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy work. Reports include tailored data visualizations, interactive tables, and in-depth analyses to help you uncover patterns and build evidence.
+<a href="https://www.320insight.com/" target="_blank" style="font-weight: bold; text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time (including daily staffing data), ownership data, citation histories, and comparisons by geography or any category you need. These reports and analyses are built to support your case, investigation, or advocacy work. Reports include tailored data visualizations, interactive tables, and in-depth analyses to help you uncover patterns and build evidence.
 
 <a href="mailto:eric@320insight.com" style="text-decoration: none; font-size: 1.08em;">📧 eric@320insight.com</a>
 ''', unsafe_allow_html=True)
