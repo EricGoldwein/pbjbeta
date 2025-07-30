@@ -1436,6 +1436,18 @@ def main() -> None:
             <div style='text-align: center; margin-top: -20px; margin-bottom: 1.2em;'>
                 <span class="dashboard-title" style='font-size:2.8em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>PBJ Nursing Home Staffing Dashboard</span>
             </div>
+            <style>
+            @media (max-width: 768px) {
+                .dashboard-title {
+                    font-size: 2.1em !important;
+                    line-height: 1.2 !important;
+                }
+                div[data-testid="stMarkdown"] > div:has(> span.dashboard-title) {
+                    margin-top: -120px !important;
+                    margin-bottom: 0.1em !important;
+                }
+            }
+            </style>
         """, unsafe_allow_html=True)
 
         # Check if we should hide search based on URL parameters
@@ -1445,13 +1457,27 @@ def main() -> None:
 
         # Refined subhead: centered text and box with search link
         st.markdown(f'''
-            <div style="background: #f7fafd; border-radius: 6px; padding: 14px 14px 8px 14px; margin-bottom: 10px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
+            <div style="background: #f7fafd; border-radius: 6px; padding: 8px 14px 4px 14px; margin-bottom: 2px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
                 <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 2px;">
                     A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2024) across every U.S. nursing home.
                 </div>
-                {"<div style=\"margin-top: 8px;\" class=\"mobile-about-link\"><a href=\"/About\" target=\"_self\" style=\"color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400;\">About the PBJ Dashboard</a></div>" if not hide_search else ""}
+                {"<div style='margin-top: 8px;' class='mobile-about-link'><a href='/About' target='_self' style='color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400;'>About the PBJ Dashboard</a></div>" if not hide_search else ""}
             </div>
         ''', unsafe_allow_html=True)
+        
+        # Add mobile-specific CSS for reduced spacing
+        st.markdown("""
+            <style>
+            @media (max-width: 768px) {
+                div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
+                    margin-bottom: -10px !important;
+                }
+                div[style*="background: #f7fafd"] {
+                    margin-bottom: 2px !important;
+                }
+            }
+            </style>
+        """, unsafe_allow_html=True)
         
         # Add About link only on homepage and only on desktop
         if not hide_search:
@@ -1553,11 +1579,22 @@ def main() -> None:
                 }
                 @media (max-width: 768px) {
                     .search-header {
-                        margin-top: -30px;
+                        margin-top: -150px;
                         margin-bottom: 0px;
+                        transform: translateY(-30px);
                     }
                     div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
-                        margin-bottom: 4px !important;
+                        margin-bottom: 0px !important;
+                    }
+                    div[data-testid="stMarkdown"] > div:has(> h3.search-header) {
+                        margin-top: -40px !important;
+                        margin-bottom: 0px !important;
+                    }
+                    .stTabs [data-baseweb="tab-list"] {
+                        margin-top: -15px !important;
+                    }
+                    div[data-testid="stTabs"] {
+                        margin-top: -15px !important;
                     }
                 }
                 </style>
