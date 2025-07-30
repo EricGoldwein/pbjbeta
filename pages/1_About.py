@@ -1,9 +1,8 @@
 import streamlit as st
-from st_clickable_images import clickable_images
 import base64
 
 # Set page configuration
-st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide")
+st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="📊", layout="wide")
 
 # Custom CSS for Home button styling
 st.markdown("""
