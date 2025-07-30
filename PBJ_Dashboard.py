@@ -2509,7 +2509,7 @@ def main() -> None:
                                         provnum_str = provnum_str[-6:]
                                     return provnum_str
                                 facilities_display['Provider Name'] = facilities_display.apply(
-                                    lambda row: f'<a href="https://nursinghomedashboard.streamlit.app/?level=Facility&facility={format_provnum(row["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider Name"]}</a>',
+                                    lambda row: f'<a href="https://pbjdata.streamlit.app/?level=Facility&facility={format_provnum(row["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider Name"]}</a>',
                                     axis=1
                                 )
                                 
