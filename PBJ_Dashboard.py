@@ -10,7 +10,7 @@ from typing import Dict, Optional, List, Tuple, Any
 
 # Set sidebar collapsed on mobile
 import streamlit as st
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="📊", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="auto")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""

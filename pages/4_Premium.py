@@ -2,7 +2,7 @@ import streamlit as st
 import base64
 
 # Set page config - this must be the first Streamlit command
-st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="pbj_favicon.png", layout="wide")
 
 # Custom CSS for Home button styling
 st.markdown("""
@@ -37,7 +37,8 @@ st.markdown("""
 # Add Home button to top left
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
-    st.markdown('<button class="home-button" onclick="window.location.href=\'/\'">🏠 Home</button>', unsafe_allow_html=True)
+    if st.button("🏠 Home", key="home_button_premium"):
+        st.switch_page("PBJ_Dashboard.py")
 
 
 # Custom CSS for premium styling
