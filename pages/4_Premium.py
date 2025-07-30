@@ -8,28 +8,29 @@ st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", p
 st.markdown("""
 <style>
 .home-button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1769aa 0%, #0d47a1 100%);
     color: white;
     border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 600;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    transition: all 0.3s ease;
-    margin-top: 10px;
-    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    transition: all 0.2s ease;
+    margin-top: 8px;
+    margin-bottom: 8px;
 }
 
 .home-button:hover {
+    background: linear-gradient(135deg, #0d47a1 0%, #002171 100%);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
 .home-button:active {
     transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -37,7 +38,7 @@ st.markdown("""
 # Add Home button to top left
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
-    if st.button("🏠 Home", key="home_button_premium"):
+    if st.button("Home", key="home_button_premium", help="Return to main dashboard"):
         st.switch_page("PBJ_Dashboard.py")
 
 
