@@ -1305,7 +1305,9 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_hprd), row=1, col=1)
 
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Census'],
+        # Use State_Census for state-level charts, Census for facility and national charts
+        census_column = 'State_Census' if state else 'Census'
+        fig.add_trace(go.Scatter(x=data['date'], y=data[census_column],
                        mode='lines+markers', name='Census',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_census), row=2, col=1)
@@ -1635,7 +1637,7 @@ def main() -> None:
                     search_options.sort()
                     
                     facility_search = st.selectbox(
-                        "Enter Provider Name or CCN (6-digit ID).",
+                        "Enter Provider Name or CCN (6-digit ID)",
                         options=[""] + search_options,
                         key="facility_search_input",
                         help="Type to search facilities. Find CCN at https://data.cms.gov/provider-data/dataset/4pq5-n9py"
