@@ -3517,16 +3517,23 @@ def main() -> None:
                                 break
                         
                         if favicon_path:
-                            with open(favicon_path, 'rb') as f:
-                                favicon_data = base64.b64encode(f.read()).decode()
+                            try:
+                                with open(favicon_path, 'rb') as f:
+                                    favicon_data = base64.b64encode(f.read()).decode()
+                            except Exception as e:
+                                # Fallback without favicon if file can't be read
+                                favicon_data = ""
                         else:
                             # Fallback without favicon
                             favicon_data = ""
                         
                         # Create the button with favicon
                         state_button_class = "state-page-mobile-button" if level == "State" else "facility-page-mobile-button"
-                        # Only show favicon if data is available
-                        favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">' if favicon_data else ""
+                        # Only show favicon if data is available, otherwise use fallback icon
+                        if favicon_data:
+                            favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">'
+                        else:
+                            favicon_img = '<span style="font-size: 16px; margin-right: 4px;">📊</span>'
                         
                         button_html = f"""
                             <div class="pbj-button-container {state_button_class}" id="pbj-takeaway-button" style="position: fixed; top: 80px; z-index: 1000;">
@@ -5091,14 +5098,21 @@ def main() -> None:
                                     break
                             
                             if favicon_path:
-                                with open(favicon_path, 'rb') as f:
-                                    favicon_data = base64.b64encode(f.read()).decode()
+                                try:
+                                    with open(favicon_path, 'rb') as f:
+                                        favicon_data = base64.b64encode(f.read()).decode()
+                                except Exception as e:
+                                    # Fallback without favicon if file can't be read
+                                    favicon_data = ""
                             else:
                                 # Fallback without favicon
                                 favicon_data = ""
                             
-                            # Only show favicon if data is available
-                            favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">' if favicon_data else ""
+                            # Only show favicon if data is available, otherwise use fallback icon
+                            if favicon_data:
+                                favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">'
+                            else:
+                                favicon_img = '<span style="font-size: 16px; margin-right: 4px;">📊</span>'
                             
                             # Create the button with favicon
                             state_button_class = "state-page-mobile-button" if level == "State" else "facility-page-mobile-button"
