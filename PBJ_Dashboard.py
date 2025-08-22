@@ -13,7 +13,7 @@ import io
 import numpy as np
 
 # Add this import at the top of your file, after the other imports
-from pbj_icon_component import pbj_icon, pbj_icon_with_text  # Uncomment when you want to use the component
+# from pbj_icon_component import pbj_icon, pbj_icon_with_text  # Uncomment when you want to use the component
 
 # Set sidebar collapsed on mobile
 import streamlit as st
