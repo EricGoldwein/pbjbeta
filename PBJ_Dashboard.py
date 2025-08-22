@@ -2380,11 +2380,19 @@ def main() -> None:
             """Load provider info data."""
             try:
                 import os
-                # Try multiple possible paths
+                # Try multiple possible paths with better strategy
+                current_dir = os.getcwd()
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                
                 possible_paths = [
-                    os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
-                    'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                    os.path.join(current_dir, 'NH_ProviderInfo_Jul2025.csv'),
+                    os.path.join(script_dir, 'NH_ProviderInfo_Jul2025.csv'),
+                    'NH_ProviderInfo_Jul2025.csv',  # Try relative path
+                    # Try parent directory in case files are in root
+                    os.path.join(os.path.dirname(current_dir), 'NH_ProviderInfo_Jul2025.csv'),
+                    # Try common deployment paths
+                    '/app/NH_ProviderInfo_Jul2025.csv',
+                    '/workspace/NH_ProviderInfo_Jul2025.csv'
                 ]
                 
                 file_path = None
@@ -2394,7 +2402,13 @@ def main() -> None:
                         break
                 
                 if not file_path:
-                    st.error("Provider info file not found. Some features may be limited.")
+                    # Debug: show what paths were tried and current directory
+                    try:
+                        # List files in current directory to help debug
+                        files_in_dir = [f for f in os.listdir(current_dir) if 'provider' in f.lower() or 'jul' in f.lower()]
+                        st.warning(f"Provider info file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Available files with 'provider' or 'jul': {files_in_dir}")
+                    except Exception as e:
+                        st.warning(f"Provider info file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Error listing files: {str(e)}")
                     return pd.DataFrame()
                 
                 return pd.read_csv(file_path, dtype={'PROVNUM': str})
