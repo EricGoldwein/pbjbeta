@@ -37,6 +37,9 @@ standardized_PBJ/
 standardized_NonNurse/
 column_mapping_reports/
 
+# Ignore streamlit-extras (separate git repository)
+streamlit-extras/
+
 # Ignore virtual environments and system files
 venv/
 __pycache__/

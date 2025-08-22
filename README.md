@@ -74,6 +74,14 @@ Generate three main CSV files:
    - Affiliated Entities Dashboard
    - Help Documentation
 
+### Local Development Components
+
+**streamlit-extras/** - Custom Streamlit components
+- Contains locally developed Streamlit components
+- Not included in this repository (separate git repository)
+- Used for enhanced UI elements and functionality
+- See streamlit-extras/README.md for component documentation
+
 ### Features
 
 - **National View**

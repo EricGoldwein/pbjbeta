@@ -50,7 +50,7 @@ st.markdown("""
     </div>
 
 ### Why this matters
-Staffing data is a key indicator of nursing home quality, revealing how much care residents receive and what resources facilities commit. Yet most public data shows only the latest quarter, offering a narrow and incomplete view. This dashboard stitches together **eight years of federal CMS staffing files—billions of data points from payroll-based journal (PBJ) submissions—into interactive visualizations**, so you can see how staffing has changed over time and bring data-driven context to what’s happening inside the 15,000 nursing homes across the U.S.
+Staffing data is a key indicator of nursing home quality, revealing how much care residents receive and what resources facilities commit. Yet most public data shows only the latest quarter, offering a narrow and incomplete view. This dashboard stitches together **nine years of federal CMS staffing files—billions of data points from payroll-based journal (PBJ) submissions—into interactive visualizations**, so you can see how staffing has changed over time and bring data-driven context to what’s happening inside the 15,000 nursing homes across the U.S.
 
 ### Who it helps  
 * **Attorneys** – identify staffing patterns and trends that may support negligence cases, regulatory violations, or quality of care claims. Access historical data to demonstrate chronic understaffing, seasonal variations, or ownership-related staffing deficiencies.
@@ -65,12 +65,12 @@ Staffing data is a key indicator of nursing home quality, revealing how much car
 |------|--------------|
 | **National / State** | Nurse staffing hours per resident day (HPRD), contract staff %, census — every quarter since 2017 |
 | **Facility** | A nursing home's quarterly staffing, contract, and census data; ratings and risk indicators |
-| **Ownership Group** | Essential data on any chain and its facilities (e.g., **Genesis** → 218 facilities in 19 states, 2.2-star average) |
+| **Ownership Group** | Essential data on any chain and its facilities (e.g., **Genesis** → 215 facilities in 19 states, 2.3-star average) |
 
 ### Under the hood  
-* **Payroll-Based Journal (PBJ) Staffing Data** – 32 quarters of daily data, aggregated for clarity  
-* **CMS Provider Info** – 5-star ratings, enforcement data, and other key indicators (June 2025 & March 2025)  
-* **CMS Affiliated Entity** – Selected quality and performance metrics for groups of nursing homes sharing common owners, officers, or entities (June 2025)
+* **Payroll-Based Journal (PBJ) Staffing Data** – 33 quarters of daily data, aggregated for clarity  
+* **CMS Provider Info** – 5-star ratings, enforcement data, and other key indicators (July 2025 & June 2025)  
+* **CMS Affiliated Entity** – Selected quality and performance metrics for groups of nursing homes sharing common owners, officers, or entities (July 2025)
 * **CMS Citations (Premium)** - Citation data and inspection reports, categorized by date, type, severity, and more. 
 
 ### Quick tour  
@@ -95,7 +95,7 @@ st.markdown("""
     <div>
         <h2 style='font-size:1.5em; font-weight:700; color:#1769aa; margin-bottom:0.7em;'>Methodology</h2>
         <div style='font-size:1.08em; color:#222; font-weight:400;'>
-            This Nursing Home Staffing Dashboard uses <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">CMS Payroll-Based Journal (PBJ) data</a> from 2017 to 2024, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses <a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">Provider Information</a> (June 2025, March 2025) and <a href="https://data.cms.gov/quality-of-care/nursing-home-affiliated-entity-performance-measures/data" target="_blank">Affiliated Entity</a> (June 2025) datasets.
+            This Nursing Home Staffing Dashboard uses <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">CMS Payroll-Based Journal (PBJ) data</a> from 2017 to 2025, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses <a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">Provider Information</a> (July 2025, June 2025) and <a href="https://data.cms.gov/quality-of-care/nursing-home-affiliated-entity-performance-measures/data" target="_blank">Affiliated Entity</a> (July 2025) datasets.
         </div>
         <hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>
         <h2 style='font-size:1.3em; font-weight:700; color:#1769aa; margin-bottom:0.5em;'>Staffing Categories</h2>
@@ -134,7 +134,7 @@ st.markdown("""
     <div>
         <h2 style='font-size:1.5em; font-weight:700; color:#1769aa; margin-bottom:0.7em;'>About 320 Consulting</h2>
         <div style='font-size:1.08em; color:#222; font-weight:400;'>
-            <b><a href="https://www.320insight.com/" target="_blank" style="color:#1769aa; text-decoration:none;">320 Consulting</a></b> is led by Eric Goldwein, MPH, a data consultant with expertise in nursing home staffing. His work on nursing home data has been published in the <i>Journal of the American Geriatrics Society</i>, and he has presented at national conferences hosted by the National Association of Medicaid Fraud Control Units, Consumer Voice, the American Society on Aging, and the NYS Long Term Care Ombudsman Program. He previously led data and policy work at the Long Term Care Community Coalition.
+            <b><a href="https://www.320insight.com/" target="_blank" style="color:#1769aa; text-decoration:none;">320 Consulting</a></b> is led by Eric Goldwein, MPH, a data consultant with expertise in nursing home staffing. His work on nursing home data has been published in the <i>Journal of the American Geriatrics Society</i>, and he has presented at national conferences hosted by the National Association of Medicaid Fraud Control Units, Consumer Voice, the American Society on Aging, and the NYS Long Term Care Ombudsman Program. He previously served as policy director at the Long Term Care Community Coalition.
         </div>
     </div>
 </div>
@@ -146,7 +146,7 @@ st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px
 # Footer
 st.markdown("""
     <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
-        <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2024</a></p>
+        <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2025</a></p>
         <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
         <p><a href="/About" target="_self">About the Dashboard</a> | <a href="/Premium" target="_self">Premium</a></p>
     </div>
