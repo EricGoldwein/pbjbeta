@@ -4,6 +4,7 @@
 # But keep these specific Python files
 !PBJ_Dashboard.py
 !setup_database.py
+!pbj_icon_component.py
 
 # Keep only these Streamlit page files
 !pages/4_Premium.py
