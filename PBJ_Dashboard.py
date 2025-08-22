@@ -2437,11 +2437,19 @@ def main() -> None:
             """Load March ownership data for comparison."""
             try:
                 import os
-                # Try multiple possible paths
+                # Try multiple possible paths with better strategy
+                current_dir = os.getcwd()
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                
                 possible_paths = [
-                    os.path.join(os.getcwd(), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
-                    'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'  # Try relative path
+                    os.path.join(current_dir, 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
+                    os.path.join(script_dir, 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
+                    'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv',  # Try relative path
+                    # Try parent directory in case files are in root
+                    os.path.join(os.path.dirname(current_dir), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
+                    # Try common deployment paths
+                    '/app/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv',
+                    '/workspace/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'
                 ]
                 
                 file_path = None
@@ -2451,8 +2459,13 @@ def main() -> None:
                         break
                 
                 if not file_path:
-                    # Debug: show what paths were tried
-                    st.warning(f"March ownership data file not found. Tried paths: {possible_paths[:2]}...")
+                    # Debug: show what paths were tried and current directory
+                    try:
+                        # List files in current directory to help debug
+                        files_in_dir = [f for f in os.listdir(current_dir) if 'affiliated' in f.lower() or 'mar' in f.lower()]
+                        st.warning(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Available files with 'affiliated' or 'mar': {files_in_dir}")
+                    except Exception as e:
+                        st.warning(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Error listing files: {str(e)}")
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
