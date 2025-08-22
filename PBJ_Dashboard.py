@@ -2473,13 +2473,13 @@ def main() -> None:
                         break
                 
                 if not file_path:
-                    # Debug: show what paths were tried and current directory
+                    # Try to list ALL files in current directory to debug
                     try:
-                        # List files in current directory to help debug
-                        files_in_dir = [f for f in os.listdir(current_dir) if 'affiliated' in f.lower() or 'mar' in f.lower()]
-                        st.warning(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Available files with 'affiliated' or 'mar': {files_in_dir}")
+                        all_files = os.listdir(current_dir)
+                        csv_files = [f for f in all_files if f.endswith('.csv')]
+                        st.error(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}. All CSV files: {csv_files}")
                     except Exception as e:
-                        st.warning(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Error listing files: {str(e)}")
+                        st.error(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}, Error listing files: {str(e)}")
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
@@ -2801,7 +2801,7 @@ def main() -> None:
             if level not in ["Facility", "Entity", "State"]:
                 st.markdown('''
                     <h3 class="search-header">
-                        <span class="desktop-text">Search PBJ Data by Facility, State, or Ownership Group</span>
+                        <span class="desktop-text">Search PBJ Data by Facility, Ownership, or State</span>
                         <span class="mobile-text">Search PBJ Data</span>
                     </h3>
                     <style>
