@@ -74,15 +74,23 @@ def load_facility_data():
     """Load facility data for search."""
     try:
         import os
-        # Try current working directory first
-        file_path = os.path.join(os.getcwd(), 'facility_lite_metrics.csv')
-        if not os.path.exists(file_path):
-            # Try script directory as fallback
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            file_path = os.path.join(script_dir, 'facility_lite_metrics.csv')
-            if not os.path.exists(file_path):
-                st.error(f"Facility data file not found at: {file_path}")
-                return pd.DataFrame()
+        # Try multiple possible paths
+        possible_paths = [
+            os.path.join(os.getcwd(), 'facility_lite_metrics.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'facility_lite_metrics.csv'),
+            'facility_lite_metrics.csv'  # Try relative path
+        ]
+        
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
+        
+        if not file_path:
+            st.error("Facility data file not found. Some features may be limited.")
+            return pd.DataFrame()
+        
         return pd.read_csv(file_path, dtype={'PROVNUM': str})
     except Exception as e:
         st.error(f"Error loading facility data: {str(e)}")
@@ -384,10 +392,31 @@ def state_pbj_takeaway_card(
 def load_metrics_data():
     """Load and cache all metrics data."""
     try:
+        import os
+        # Try multiple possible paths for each file
+        def find_file(filename):
+            possible_paths = [
+                os.path.join(os.getcwd(), filename),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
+                filename  # Try relative path
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    return path
+            return None
+        
         # Load all metrics data at once
-        national_metrics = pd.read_csv('national_lite_metrics.csv')
-        state_metrics = pd.read_csv('state_lite_metrics.csv')
-        facility_metrics = pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
+        national_path = find_file('national_lite_metrics.csv')
+        state_path = find_file('state_lite_metrics.csv')
+        facility_path = find_file('facility_lite_metrics.csv')
+        
+        if not national_path or not state_path or not facility_path:
+            st.error("One or more metrics data files not found. Please check file availability.")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
+        national_metrics = pd.read_csv(national_path)
+        state_metrics = pd.read_csv(state_path)
+        facility_metrics = pd.read_csv(facility_path, dtype={'PROVNUM': str})
 
         # Standardize column names - apply specific mappings to each dataframe
         # National metrics column mapping - only rename CY_Qtr to CY_QTR and MDS to Census
@@ -425,9 +454,21 @@ def load_affiliated_entity_data():
     """Load and cache chain performance measures data."""
     try:
         import os
-        file_path = os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
-        if not os.path.exists(file_path):
-            st.warning(f"Affiliated entity data file not found at: {file_path}. Some features may be limited.")
+        # Try multiple possible paths
+        possible_paths = [
+            os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
+        ]
+        
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
+        
+        if not file_path:
+            st.warning("Affiliated entity data file not found. Some features may be limited.")
             return pd.DataFrame()
         df = pd.read_csv(file_path)
         
@@ -511,11 +552,22 @@ def load_affiliated_entity_data():
 def load_provider_info_data():
     """Load and cache provider information data."""
     try:
-        # Use absolute path to ensure file is found
         import os
-        file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
-        if not os.path.exists(file_path):
-            st.warning(f"Provider info data file not found at: {file_path}. Some features may be limited.")
+        # Try multiple possible paths
+        possible_paths = [
+            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+            'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+        ]
+        
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
+        
+        if not file_path:
+            st.warning("Provider info data file not found. Some features may be limited.")
             return pd.DataFrame()
         
         df = pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
@@ -548,9 +600,21 @@ def load_march_provider_info_data():
     """Load and cache July 2025 provider information data for comparison."""
     try:
         import os
-        file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jun2025.csv')
-        if not os.path.exists(file_path):
-            st.warning(f"June provider info file not found at: {file_path}")
+        # Try multiple possible paths
+        possible_paths = [
+            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jun2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jun2025.csv'),
+            'NH_ProviderInfo_Jun2025.csv'  # Try relative path
+        ]
+        
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
+        
+        if not file_path:
+            st.warning("June provider info file not found. Some features may be limited.")
             return pd.DataFrame()
         df = pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
         
@@ -1677,10 +1741,23 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
     try:
         # Load provider info data
         import os
-        file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
-        if not os.path.exists(file_path):
-            st.warning(f"Provider info file not found at: {file_path}")
+        # Try multiple possible paths
+        possible_paths = [
+            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+            'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+        ]
+        
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
+        
+        if not file_path:
+            st.warning("Provider info file not found. Some features may be limited.")
             return None, None
+        
         provider_df = pd.read_csv(file_path)
         
         # Find the facility by PROVNUM
@@ -2258,17 +2335,24 @@ def main() -> None:
         def load_provider_info_data():
             """Load provider info data."""
             try:
-                # Use absolute path to ensure file is found
                 import os
-                # Try current working directory first
-                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
-                if not os.path.exists(file_path):
-                    # Try script directory as fallback
-                    script_dir = os.path.dirname(os.path.abspath(__file__))
-                    file_path = os.path.join(script_dir, 'NH_ProviderInfo_Jul2025.csv')
-                    if not os.path.exists(file_path):
-                        st.error(f"Provider info file not found at: {file_path}")
-                        return pd.DataFrame()
+                # Try multiple possible paths
+                possible_paths = [
+                    os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+                    'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                ]
+                
+                file_path = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        file_path = path
+                        break
+                
+                if not file_path:
+                    st.error("Provider info file not found. Some features may be limited.")
+                    return pd.DataFrame()
+                
                 return pd.read_csv(file_path, dtype={'PROVNUM': str})
             except Exception as e:
                 st.error(f"Error loading provider info: {str(e)}")
@@ -2279,15 +2363,23 @@ def main() -> None:
             """Load ownership data."""
             try:
                 import os
-                # Try current working directory first
-                file_path = os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
-                if not os.path.exists(file_path):
-                    # Try script directory as fallback
-                    script_dir = os.path.dirname(os.path.abspath(__file__))
-                    file_path = os.path.join(script_dir, 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
-                    if not os.path.exists(file_path):
-                        st.warning(f"Ownership data file not found at: {file_path}. Some features may be limited.")
-                        return pd.DataFrame()
+                # Try multiple possible paths
+                possible_paths = [
+                    os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                    'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
+                ]
+                
+                file_path = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        file_path = path
+                        break
+                
+                if not file_path:
+                    st.warning("Ownership data file not found. Some features may be limited.")
+                    return pd.DataFrame()
+                
                 return pd.read_csv(file_path)
             except FileNotFoundError:
                 st.warning("Ownership data file not found. Some features may be limited.")
@@ -2301,15 +2393,23 @@ def main() -> None:
             """Load March ownership data for comparison."""
             try:
                 import os
-                # Try current working directory first
-                file_path = os.path.join(os.getcwd(), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv')
-                if not os.path.exists(file_path):
-                    # Try script directory as fallback
-                    script_dir = os.path.dirname(os.path.abspath(__file__))
-                    file_path = os.path.join(script_dir, 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv')
-                    if not os.path.exists(file_path):
-                        st.warning(f"March ownership data file not found at: {file_path}")
-                        return pd.DataFrame()
+                # Try multiple possible paths
+                possible_paths = [
+                    os.path.join(os.getcwd(), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
+                    'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'  # Try relative path
+                ]
+                
+                file_path = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        file_path = path
+                        break
+                
+                if not file_path:
+                    st.warning("March ownership data file not found. Some features may be limited.")
+                    return pd.DataFrame()
+                
                 df = pd.read_csv(file_path)
                 # Map March column names to July column names for comparison
                 column_mapping = {
@@ -2331,10 +2431,23 @@ def main() -> None:
             """Load March provider info data for comparison."""
             try:
                 import os
-                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Mar2025.csv')
-                if not os.path.exists(file_path):
-                    st.warning(f"March provider info file not found at: {file_path}")
+                # Try multiple possible paths
+                possible_paths = [
+                    os.path.join(os.getcwd(), 'NH_ProviderInfo_Mar2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Mar2025.csv'),
+                    'NH_ProviderInfo_Mar2025.csv'  # Try relative path
+                ]
+                
+                file_path = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        file_path = path
+                        break
+                
+                if not file_path:
+                    st.warning("March provider info file not found. Some features may be limited.")
                     return pd.DataFrame()
+                
                 return pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
             except Exception as e:
                 st.error(f"Error loading March provider info data: {str(e)}")
@@ -3517,7 +3630,24 @@ def main() -> None:
                                 year = "2025"
                             
                             # Get state average HPRD
-                            state_metrics = pd.read_csv('state_lite_metrics.csv')
+                            import os
+                            def find_file(filename):
+                                possible_paths = [
+                                    os.path.join(os.getcwd(), filename),
+                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
+                                    filename  # Try relative path
+                                ]
+                                for path in possible_paths:
+                                    if os.path.exists(path):
+                                        return path
+                                return None
+                            
+                            state_path = find_file('state_lite_metrics.csv')
+                            if state_path:
+                                state_metrics = pd.read_csv(state_path)
+                            else:
+                                st.error("State metrics file not found")
+                                return
                             state_avg = state_metrics[state_metrics['STATE'] == selected_facility['STATE']]['Total_Nurse_HPRD'].iloc[0] if not state_metrics[state_metrics['STATE'] == selected_facility['STATE']].empty else 3.5
                             
                             # Get case-mix expected HPRD
@@ -5000,11 +5130,30 @@ def main() -> None:
                             year = latest_data['CY_QTR'][:4]
                             
                             # Get national average HPRD
-                            national_metrics = pd.read_csv('national_lite_metrics.csv')
-                            national_hprd = national_metrics['Total_Nurse_HPRD'].iloc[0] if not national_metrics.empty else 3.5
+                            import os
+                            def find_file(filename):
+                                possible_paths = [
+                                    os.path.join(os.getcwd(), filename),
+                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
+                                    filename  # Try relative path
+                                ]
+                                for path in possible_paths:
+                                    if os.path.exists(path):
+                                        return path
+                                return None
                             
-                            # Calculate state rank for Q1 2025 only
-                            state_metrics = pd.read_csv('state_lite_metrics.csv')
+                            national_path = find_file('national_lite_metrics.csv')
+                            state_path = find_file('state_lite_metrics.csv')
+                            
+                            if national_path and state_path:
+                                national_metrics = pd.read_csv(national_path)
+                                national_hprd = national_metrics['Total_Nurse_HPRD'].iloc[0] if not national_metrics.empty else 3.5
+                                
+                                # Calculate state rank for Q1 2025 only
+                                state_metrics = pd.read_csv(state_path)
+                            else:
+                                st.error("Metrics data files not found")
+                                return
                             # Apply column mapping to ensure consistency
                             state_metrics.rename(columns={'CY_Qtr': 'CY_QTR'}, inplace=True)
                             q1_2025_data = state_metrics[state_metrics['CY_QTR'] == '2025Q1']
