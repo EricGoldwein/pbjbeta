@@ -485,6 +485,9 @@ def load_affiliated_entity_data():
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
         return df
+    except FileNotFoundError:
+        st.warning("Affiliated entity data file not found. Some features may be limited.")
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"Error loading affiliated entity data: {str(e)}")
         return pd.DataFrame()
@@ -511,6 +514,9 @@ def load_provider_info_data():
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
         return df
+    except FileNotFoundError:
+        st.warning("Provider info data file not found. Some features may be limited.")
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"Error loading provider info data: {str(e)}")
         return pd.DataFrame()
@@ -2226,6 +2232,9 @@ def main() -> None:
             """Load ownership data."""
             try:
                 return pd.read_csv('Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+            except FileNotFoundError:
+                st.warning("Ownership data file not found. Some features may be limited.")
+                return pd.DataFrame()
             except Exception as e:
                 st.error(f"Error loading ownership data: {str(e)}")
                 return pd.DataFrame()
