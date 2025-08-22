@@ -3542,6 +3542,7 @@ def main() -> None:
                             <style>
                             .pbj-button-container {{
                                 left: 35px;
+                                right: auto;
                             }}
                             .pbj-button-container a {{
                                 gap: 4px !important;
@@ -5185,10 +5186,12 @@ def main() -> None:
                             <style>
                             .pbj-button-container {
                                 right: 35px;
+                                left: auto;
                             }
                             @media (min-width: 768px) {
                                 .pbj-button-container {
                                     left: 65px;
+                                    right: auto;
                                 }
                             }
                             a[href="#pbj-takeaway"]:hover {
