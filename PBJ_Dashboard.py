@@ -2451,7 +2451,8 @@ def main() -> None:
                         break
                 
                 if not file_path:
-                    st.warning("March ownership data file not found. Some features may be limited.")
+                    # Debug: show what paths were tried
+                    st.warning(f"March ownership data file not found. Tried paths: {possible_paths[:2]}...")
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
