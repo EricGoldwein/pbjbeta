@@ -169,14 +169,36 @@ def pbj_takeaway_card(
     with st.container(border=True):
         # Add PBJ icon to the container - more compact
         try:
-            with open('pbj_favicon.png', 'rb') as f:
-                favicon_data = base64.b64encode(f.read()).decode()
-            st.markdown(f"""
-            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
-                <strong style="font-size: 16px;">PBJ Takeaway: {facility}</strong>
-            </div>
-            """, unsafe_allow_html=True)
+            import os
+            # Try multiple possible paths for favicon
+            possible_paths = [
+                os.path.join(os.getcwd(), 'pbj_favicon.png'),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
+                'pbj_favicon.png'  # Try relative path
+            ]
+            
+            favicon_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    favicon_path = path
+                    break
+            
+            if favicon_path:
+                with open(favicon_path, 'rb') as f:
+                    favicon_data = base64.b64encode(f.read()).decode()
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
+                    <strong style="font-size: 16px;">PBJ Takeaway: {facility}</strong>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                # Fallback without favicon if file can't be found
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <strong style="font-size: 16px;">PBJ Takeaway: {facility}</strong>
+                </div>
+                """, unsafe_allow_html=True)
         except Exception as e:
             # Fallback without favicon if file can't be read
             st.markdown(f"""
@@ -300,14 +322,36 @@ def state_pbj_takeaway_card(
     with st.container(border=True):
         # Add PBJ icon to the container - more compact
         try:
-            with open('pbj_favicon.png', 'rb') as f:
-                favicon_data = base64.b64encode(f.read()).decode()
-            st.markdown(f"""
-            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
-                <strong style="font-size: 16px;">PBJ Takeaway: {state_name}</strong>
-            </div>
-            """, unsafe_allow_html=True)
+            import os
+            # Try multiple possible paths for favicon
+            possible_paths = [
+                os.path.join(os.getcwd(), 'pbj_favicon.png'),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
+                'pbj_favicon.png'  # Try relative path
+            ]
+            
+            favicon_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    favicon_path = path
+                    break
+            
+            if favicon_path:
+                with open(favicon_path, 'rb') as f:
+                    favicon_data = base64.b64encode(f.read()).decode()
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
+                    <strong style="font-size: 16px;">PBJ Takeaway: {state_name}</strong>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                # Fallback without favicon if file can't be found
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <strong style="font-size: 16px;">PBJ Takeaway: {state_name}</strong>
+                </div>
+                """, unsafe_allow_html=True)
         except Exception as e:
             # Fallback without favicon if file can't be read
             st.markdown(f"""
@@ -3418,8 +3462,26 @@ def main() -> None:
                     
                     # Add flashy PBJ Takeaway button with responsive positioning
                     try:
-                        with open('pbj_favicon.png', 'rb') as f:
-                            favicon_data = base64.b64encode(f.read()).decode()
+                        import os
+                        # Try multiple possible paths for favicon
+                        possible_paths = [
+                            os.path.join(os.getcwd(), 'pbj_favicon.png'),
+                            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
+                            'pbj_favicon.png'  # Try relative path
+                        ]
+                        
+                        favicon_path = None
+                        for path in possible_paths:
+                            if os.path.exists(path):
+                                favicon_path = path
+                                break
+                        
+                        if favicon_path:
+                            with open(favicon_path, 'rb') as f:
+                                favicon_data = base64.b64encode(f.read()).decode()
+                        else:
+                            # Fallback without favicon
+                            favicon_data = ""
                         
                                                     # Create the button with favicon
                             state_button_class = "state-page-mobile-button" if level == "State" else ""
@@ -4941,8 +5003,26 @@ def main() -> None:
                     # Add PBJ Takeaway button for state level
                     if level == "State":
                         try:
-                            with open('pbj_favicon.png', 'rb') as f:
-                                favicon_data = base64.b64encode(f.read()).decode()
+                            import os
+                            # Try multiple possible paths for favicon
+                            possible_paths = [
+                                os.path.join(os.getcwd(), 'pbj_favicon.png'),
+                                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
+                                'pbj_favicon.png'  # Try relative path
+                            ]
+                            
+                            favicon_path = None
+                            for path in possible_paths:
+                                if os.path.exists(path):
+                                    favicon_path = path
+                                    break
+                            
+                            if favicon_path:
+                                with open(favicon_path, 'rb') as f:
+                                    favicon_data = base64.b64encode(f.read()).decode()
+                            else:
+                                # Fallback without favicon
+                                favicon_data = ""
                             
                             # Create the button with favicon
                             state_button_class = "state-page-mobile-button" if level == "State" else ""
