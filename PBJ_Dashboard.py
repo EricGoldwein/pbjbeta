@@ -15,6 +15,14 @@ import numpy as np
 # Add this import at the top of your file, after the other imports
 # from pbj_icon_component import pbj_icon, pbj_icon_with_text  # Uncomment when you want to use the component
 
+def load_pbj_favicon():
+    """Load PBJ favicon data for use in floating action button"""
+    try:
+        with open('pbj_favicon.png', 'rb') as f:
+            return base64.b64encode(f.read()).decode()
+    except:
+        return ""
+
 # Set sidebar collapsed on mobile
 import streamlit as st
 st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="auto")
@@ -2941,7 +2949,6 @@ def main() -> None:
                             "state": code,
                             "preserve_mobile": st.query_params.get("mobile")
                         }
-                        st.rerun()
 
                 st.selectbox(
                     "Select State",
@@ -3180,7 +3187,6 @@ def main() -> None:
                                 "state": code,
                                 "preserve_mobile": st.query_params.get("mobile")
                             }
-                            st.rerun()
 
                     st.selectbox(
                         "Select State",
@@ -3502,38 +3508,13 @@ def main() -> None:
                     
                     # Add flashy PBJ Takeaway button with responsive positioning
                     try:
-                        import os
-                        # Try multiple possible paths for favicon
-                        possible_paths = [
-                            os.path.join(os.getcwd(), 'pbj_favicon.png'),
-                            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
-                            'pbj_favicon.png'  # Try relative path
-                        ]
-                        
-                        favicon_path = None
-                        for path in possible_paths:
-                            if os.path.exists(path):
-                                favicon_path = path
-                                break
-                        
-                        if favicon_path:
-                            try:
-                                with open(favicon_path, 'rb') as f:
-                                    favicon_data = base64.b64encode(f.read()).decode()
-                            except Exception as e:
-                                # Fallback without favicon if file can't be read
-                                favicon_data = ""
-                        else:
-                            # Fallback without favicon
-                            favicon_data = ""
+                        # Load favicon data using simple function
+                        favicon_data = load_pbj_favicon()
                         
                         # Create the button with favicon
                         state_button_class = "state-page-mobile-button" if level == "State" else "facility-page-mobile-button"
-                        # Only show favicon if data is available, otherwise use fallback icon
-                        if favicon_data:
-                            favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">'
-                        else:
-                            favicon_img = '<span style="font-size: 16px; margin-right: 4px;">📊</span>'
+                        # Only show favicon if data is available
+                        favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">' if favicon_data else ""
                         
                         button_html = f"""
                             <div class="pbj-button-container {state_button_class}" id="pbj-takeaway-button" style="position: fixed; top: 80px; z-index: 1000;">
@@ -5083,36 +5064,11 @@ def main() -> None:
                     # Add PBJ Takeaway button for state level
                     if level == "State":
                         try:
-                            import os
-                            # Try multiple possible paths for favicon
-                            possible_paths = [
-                                os.path.join(os.getcwd(), 'pbj_favicon.png'),
-                                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
-                                'pbj_favicon.png'  # Try relative path
-                            ]
+                            # Load favicon data using simple function
+                            favicon_data = load_pbj_favicon()
                             
-                            favicon_path = None
-                            for path in possible_paths:
-                                if os.path.exists(path):
-                                    favicon_path = path
-                                    break
-                            
-                            if favicon_path:
-                                try:
-                                    with open(favicon_path, 'rb') as f:
-                                        favicon_data = base64.b64encode(f.read()).decode()
-                                except Exception as e:
-                                    # Fallback without favicon if file can't be read
-                                    favicon_data = ""
-                            else:
-                                # Fallback without favicon
-                                favicon_data = ""
-                            
-                            # Only show favicon if data is available, otherwise use fallback icon
-                            if favicon_data:
-                                favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">'
-                            else:
-                                favicon_img = '<span style="font-size: 16px; margin-right: 4px;">📊</span>'
+                            # Only show favicon if data is available
+                            favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">' if favicon_data else ""
                             
                             # Create the button with favicon
                             state_button_class = "state-page-mobile-button" if level == "State" else "facility-page-mobile-button"
