@@ -5060,7 +5060,7 @@ def main() -> None:
                             favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">' if favicon_data else ""
                             
                             # Create the button with favicon
-                            state_button_class = "state-page-mobile-button" if level == "State" else ""
+                            state_button_class = "state-page-mobile-button" if level == "State" else "facility-page-mobile-button"
                             button_html = f"""
                             <div class="pbj-button-container {state_button_class}" id="pbj-takeaway-button" style="position: fixed; top: 80px; z-index: 1000;">
                                 <a href="#pbj-takeaway" onclick="fadePBJButton()" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: white; padding: 10px 18px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
@@ -5155,6 +5155,12 @@ def main() -> None:
                                 transform: translateY(-2px);
                                 box-shadow: 0 6px 20px rgba(25, 118, 210, 0.5);
                                 background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
+                            }}
+                            /* Additional rule to move button up on facility pages */
+                            .stSelectbox .facility-page-mobile-button,
+                            div:has(select) .facility-page-mobile-button,
+                            .main:has(.stSelectbox) .facility-page-mobile-button {{
+                                top: 50px !important;
                             }}
                             </style>
                             """
