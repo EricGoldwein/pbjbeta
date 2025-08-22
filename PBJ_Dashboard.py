@@ -1943,9 +1943,21 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
             # Get the most recent facility name from provider info data
             try:
                 import os
-                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
-                if not os.path.exists(file_path):
-                    raise FileNotFoundError(f"Provider info file not found at: {file_path}")
+                # Try multiple possible paths for provider info file
+                possible_paths = [
+                    os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+                    'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                ]
+                
+                file_path = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        file_path = path
+                        break
+                
+                if not file_path:
+                    raise FileNotFoundError(f"Provider info file not found in any of the expected locations")
                 provider_df = pd.read_csv(file_path)
                 facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == facility]
                 if not facility_info.empty:
@@ -3685,9 +3697,21 @@ def main() -> None:
                             # Get the most recent facility name from provider info data
                             try:
                                 import os
-                                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
-                                if not os.path.exists(file_path):
-                                    raise FileNotFoundError(f"Provider info file not found at: {file_path}")
+                                # Try multiple possible paths for provider info file
+                                possible_paths = [
+                                    os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+                                    'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                                ]
+                                
+                                file_path = None
+                                for path in possible_paths:
+                                    if os.path.exists(path):
+                                        file_path = path
+                                        break
+                                
+                                if not file_path:
+                                    raise FileNotFoundError(f"Provider info file not found in any of the expected locations")
                                 provider_df = pd.read_csv(file_path)
                                 facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == selected_value]
                                 if not facility_info.empty:
@@ -3753,9 +3777,21 @@ def main() -> None:
                             # Get case-mix expected HPRD
                             try:
                                 import os
-                                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
-                                if not os.path.exists(file_path):
-                                    raise FileNotFoundError(f"Provider info file not found at: {file_path}")
+                                # Try multiple possible paths for provider info file
+                                possible_paths = [
+                                    os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+                                    'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                                ]
+                                
+                                file_path = None
+                                for path in possible_paths:
+                                    if os.path.exists(path):
+                                        file_path = path
+                                        break
+                                
+                                if not file_path:
+                                    raise FileNotFoundError(f"Provider info file not found in any of the expected locations")
                                 provider_df = pd.read_csv(file_path)
                                 facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == selected_value]
                                 if not facility_info.empty:
