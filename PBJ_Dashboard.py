@@ -3512,7 +3512,7 @@ def main() -> None:
                             favicon_data = ""
                         
                                                     # Create the button with favicon
-                            state_button_class = "state-page-mobile-button" if level == "State" else ""
+                            state_button_class = "state-page-mobile-button" if level == "State" else "facility-page-mobile-button"
                             # Only show favicon if data is available
                             favicon_img = f'<img src="data:image/png;base64,{favicon_data}" style="width: 20px; height: 20px; margin-right: 0px; display: inline-block; vertical-align: middle; object-fit: contain;">' if favicon_data else ""
                             
@@ -3611,6 +3611,12 @@ def main() -> None:
                                 transform: translateY(-2px);
                                 box-shadow: 0 6px 20px rgba(25, 118, 210, 0.5);
                                 background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
+                            }}
+                            /* Additional rule to move button up on facility pages */
+                            .stSelectbox .facility-page-mobile-button,
+                            div:has(select) .facility-page-mobile-button,
+                            .main:has(.stSelectbox) .facility-page-mobile-button {{
+                                top: 50px !important;
                             }}
                             </style>
                             """
