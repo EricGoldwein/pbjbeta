@@ -73,7 +73,17 @@ provider_info_cache: Dict[str, Dict[str, str]] = {}
 def load_facility_data():
     """Load facility data for search."""
     try:
-        return pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
+        import os
+        # Try current working directory first
+        file_path = os.path.join(os.getcwd(), 'facility_lite_metrics.csv')
+        if not os.path.exists(file_path):
+            # Try script directory as fallback
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(script_dir, 'facility_lite_metrics.csv')
+            if not os.path.exists(file_path):
+                st.error(f"Facility data file not found at: {file_path}")
+                return pd.DataFrame()
+        return pd.read_csv(file_path, dtype={'PROVNUM': str})
     except Exception as e:
         st.error(f"Error loading facility data: {str(e)}")
         return pd.DataFrame()
@@ -414,7 +424,12 @@ def load_metrics_data():
 def load_affiliated_entity_data():
     """Load and cache chain performance measures data."""
     try:
-        df = pd.read_csv('Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+        import os
+        file_path = os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+        if not os.path.exists(file_path):
+            st.warning(f"Affiliated entity data file not found at: {file_path}. Some features may be limited.")
+            return pd.DataFrame()
+        df = pd.read_csv(file_path)
         
         # Clean and standardize the data
         # Convert percentage columns to numeric, handling empty strings
@@ -496,7 +511,14 @@ def load_affiliated_entity_data():
 def load_provider_info_data():
     """Load and cache provider information data."""
     try:
-        df = pd.read_csv('NH_ProviderInfo_Jul2025.csv', dtype={'CMS Certification Number (CCN)': str})
+        # Use absolute path to ensure file is found
+        import os
+        file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
+        if not os.path.exists(file_path):
+            st.warning(f"Provider info data file not found at: {file_path}. Some features may be limited.")
+            return pd.DataFrame()
+        
+        df = pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
         
         # Clean and standardize the data
         # Convert numeric columns
@@ -525,7 +547,12 @@ def load_provider_info_data():
 def load_march_provider_info_data():
     """Load and cache July 2025 provider information data for comparison."""
     try:
-        df = pd.read_csv('NH_ProviderInfo_Jun2025.csv', dtype={'CMS Certification Number (CCN)': str})
+        import os
+        file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jun2025.csv')
+        if not os.path.exists(file_path):
+            st.warning(f"June provider info file not found at: {file_path}")
+            return pd.DataFrame()
+        df = pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
         
         # Clean and standardize the data
         # Convert numeric columns
@@ -1649,7 +1676,12 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
     """Create case-mix comparison charts for a facility."""
     try:
         # Load provider info data
-        provider_df = pd.read_csv('NH_ProviderInfo_Jul2025.csv')
+        import os
+        file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
+        if not os.path.exists(file_path):
+            st.warning(f"Provider info file not found at: {file_path}")
+            return None, None
+        provider_df = pd.read_csv(file_path)
         
         # Find the facility by PROVNUM
         facility_data = provider_df[provider_df['CMS Certification Number (CCN)'] == provnum]
@@ -1789,7 +1821,11 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         elif facility:
             # Get the most recent facility name from provider info data
             try:
-                provider_df = pd.read_csv('NH_ProviderInfo_Jul2025.csv')
+                import os
+                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
+                if not os.path.exists(file_path):
+                    raise FileNotFoundError(f"Provider info file not found at: {file_path}")
+                provider_df = pd.read_csv(file_path)
                 facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == facility]
                 if not facility_info.empty:
                     facility_name = proper_title_case(facility_info.iloc[0]['Provider Name'])
@@ -2222,7 +2258,18 @@ def main() -> None:
         def load_provider_info_data():
             """Load provider info data."""
             try:
-                return pd.read_csv('NH_ProviderInfo_Jul2025.csv', dtype={'PROVNUM': str})
+                # Use absolute path to ensure file is found
+                import os
+                # Try current working directory first
+                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
+                if not os.path.exists(file_path):
+                    # Try script directory as fallback
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    file_path = os.path.join(script_dir, 'NH_ProviderInfo_Jul2025.csv')
+                    if not os.path.exists(file_path):
+                        st.error(f"Provider info file not found at: {file_path}")
+                        return pd.DataFrame()
+                return pd.read_csv(file_path, dtype={'PROVNUM': str})
             except Exception as e:
                 st.error(f"Error loading provider info: {str(e)}")
                 return pd.DataFrame()
@@ -2231,7 +2278,17 @@ def main() -> None:
         def load_ownership_data():
             """Load ownership data."""
             try:
-                return pd.read_csv('Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+                import os
+                # Try current working directory first
+                file_path = os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+                if not os.path.exists(file_path):
+                    # Try script directory as fallback
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    file_path = os.path.join(script_dir, 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+                    if not os.path.exists(file_path):
+                        st.warning(f"Ownership data file not found at: {file_path}. Some features may be limited.")
+                        return pd.DataFrame()
+                return pd.read_csv(file_path)
             except FileNotFoundError:
                 st.warning("Ownership data file not found. Some features may be limited.")
                 return pd.DataFrame()
@@ -2243,7 +2300,17 @@ def main() -> None:
         def load_previous_ownership_data():
             """Load March ownership data for comparison."""
             try:
-                df = pd.read_csv('Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv')
+                import os
+                # Try current working directory first
+                file_path = os.path.join(os.getcwd(), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv')
+                if not os.path.exists(file_path):
+                    # Try script directory as fallback
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    file_path = os.path.join(script_dir, 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv')
+                    if not os.path.exists(file_path):
+                        st.warning(f"March ownership data file not found at: {file_path}")
+                        return pd.DataFrame()
+                df = pd.read_csv(file_path)
                 # Map March column names to July column names for comparison
                 column_mapping = {
                     'Affiliated entity': 'Chain',
@@ -2263,7 +2330,12 @@ def main() -> None:
         def load_march_provider_info_data():
             """Load March provider info data for comparison."""
             try:
-                return pd.read_csv('NH_ProviderInfo_Mar2025.csv', dtype={'CMS Certification Number (CCN)': str})
+                import os
+                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Mar2025.csv')
+                if not os.path.exists(file_path):
+                    st.warning(f"March provider info file not found at: {file_path}")
+                    return pd.DataFrame()
+                return pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
             except Exception as e:
                 st.error(f"Error loading March provider info data: {str(e)}")
                 return pd.DataFrame()
@@ -3107,8 +3179,18 @@ def main() -> None:
                     # Set the selected value directly from the CCN
                     selected_value = initial_facility
                     # Load facility data for display
-                    facilities_df = load_facility_data()
-                    matching_facilities = facilities_df[facilities_df['PROVNUM'] == initial_facility].to_dict('records')
+                    try:
+                        facilities_df = load_facility_data()
+                        if facilities_df.empty:
+                            st.error("Unable to load facility data. Please try again.")
+                            return
+                        matching_facilities = facilities_df[facilities_df['PROVNUM'] == initial_facility].to_dict('records')
+                        if not matching_facilities:
+                            st.error(f"Facility with CCN {initial_facility} not found in the database.")
+                            return
+                    except Exception as e:
+                        st.error(f"Error loading facility data: {str(e)}")
+                        return
                 else:
                     # Show search interface only when not coming from URL
                     search_container = st.sidebar.container()
@@ -3389,7 +3471,11 @@ def main() -> None:
                         if level == "Facility":
                             # Get the most recent facility name from provider info data
                             try:
-                                provider_df = pd.read_csv('NH_ProviderInfo_Jul2025.csv')
+                                import os
+                                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
+                                if not os.path.exists(file_path):
+                                    raise FileNotFoundError(f"Provider info file not found at: {file_path}")
+                                provider_df = pd.read_csv(file_path)
                                 facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == selected_value]
                                 if not facility_info.empty:
                                     facility_name = proper_title_case(facility_info.iloc[0]['Provider Name'])
@@ -3436,7 +3522,11 @@ def main() -> None:
                             
                             # Get case-mix expected HPRD
                             try:
-                                provider_df = pd.read_csv('NH_ProviderInfo_Jul2025.csv')
+                                import os
+                                file_path = os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv')
+                                if not os.path.exists(file_path):
+                                    raise FileNotFoundError(f"Provider info file not found at: {file_path}")
+                                provider_df = pd.read_csv(file_path)
                                 facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == selected_value]
                                 if not facility_info.empty:
                                     case_mix_hprd = facility_info.iloc[0]['Case-Mix Total Nurse Staffing Hours per Resident per Day']
