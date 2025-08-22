@@ -3187,6 +3187,7 @@ def main() -> None:
                                 "state": code,
                                 "preserve_mobile": st.query_params.get("mobile")
                             }
+                            st.rerun()
 
                     st.selectbox(
                         "Select State",
