@@ -2893,29 +2893,29 @@ def main() -> None:
                         </style>
                     """, unsafe_allow_html=True)
                     
+                    def _go_entity_from_dropdown():
+                        display = st.session_state.get("entity_ownership_dropdown", "")
+                        if not display:
+                            return
+                        entity_id = st.session_state.get(f"entity_{display}")
+                        ownership_name = st.session_state.get(f"name_{display}")
+                        
+                        if entity_id and ownership_name:
+                            st.session_state.pending_navigation = {
+                                "type": "entity", 
+                                "id": entity_id,
+                                "preserve_mobile": st.query_params.get("mobile")
+                            }
+                        else:
+                            st.info("Ownership group not found.")
+
                     ownership_search_display = st.selectbox(
                         "Select Ownership Group",
                         options=ownership_options,
                         key="entity_ownership_dropdown",
-                        help="Choose ownership group to view their dashboard"
+                        help="Choose ownership group to view their dashboard",
+                        on_change=_go_entity_from_dropdown
                     )
-                    
-                    if ownership_search_display:
-                        # Get the stored entity ID and name
-                        entity_id = st.session_state.get(f"entity_{ownership_search_display}")
-                        ownership_name = st.session_state.get(f"name_{ownership_search_display}")
-                        
-                        if entity_id and ownership_name:
-                            # Store navigation info in session state and trigger rerun
-                            if "pending_navigation" not in st.session_state:
-                                st.session_state.pending_navigation = {
-                                    "type": "entity", 
-                                    "id": entity_id,
-                                    "preserve_mobile": st.query_params.get("mobile")
-                                }
-                                st.rerun()
-                        else:
-                            st.info("Ownership group not found.")
                 else:
                     st.info("Ownership data not available.")
                     
