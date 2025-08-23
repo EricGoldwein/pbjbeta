@@ -400,7 +400,7 @@ def state_pbj_takeaway_card(
         avg_facility_staff_total = (avg_facility_size * reported_hprd / 24.0) if reported_hprd else None
         avg_facility_staff_aides = (avg_facility_staff_total * aide_share) if avg_facility_staff_total else None
         
-        st.markdown(f"**Put another way...** On a typical **30-bed floor** at a typical {state_name} nursing home you'd see about **{_fmt(floor_staff_total,1)} staff members**, including ~{_fmt(floor_staff_aides,1)} nurse aides. For the entire {int(avg_facility_size)}-resident facility, that's about {_fmt(avg_facility_staff_total,1)} total staff, including ~{_fmt(avg_facility_staff_aides,1)} nurse aides.")
+        st.markdown(f"**Put another way...** On a **30-bed floor** at a typical {state_name} nursing home you'd see about **{_fmt(floor_staff_total,1)} staff members**, including ~{_fmt(floor_staff_aides,1)} nurse aides. For the entire {int(avg_facility_size)}-resident facility ({state_name} average), that's about {_fmt(avg_facility_staff_total,1)} total staff, including ~{_fmt(avg_facility_staff_aides,1)} nurse aides.")
 
         # Note
         st.markdown("*Note: staffing varies by day and shift, with the lowest levels typically on nights and weekends.*")
