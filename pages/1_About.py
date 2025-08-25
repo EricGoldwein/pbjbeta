@@ -124,6 +124,19 @@ st.markdown("""
             A 2001 federal study identified 4.1 HPRD as the level linked to better outcomes for most residents. Facilities with higher-acuity residents—such as those with complex medical needs or limited mobility—generally require more staffing. Staffing levels can also vary significantly by day and shift.<br><br>
             Some states have their own standards (e.g., New Jersey, California, and New York each set a 3.5 HPRD minimum), though enforcement and definitions vary. Note: A federal 3.48 HPRD minimum was recently overturned by a court in 2025.
         </div>
+        <hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>
+        <div style='font-size:1.13em; font-weight:700; color:#1769aa; margin-bottom:0.5em; margin-top:1.2em;'>Transparency Note</div>
+        <div style='font-size:1.08em; color:#222; font-weight:400; line-height:1.45;'>
+            The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a fly sneaks into the jelly. 🪰 🥪
+        </div>
+        <div style='font-size:1.08em; color:#222; font-weight:400; line-height:1.45; margin-top:1em;'>
+            That could mean:
+            <ul style='margin-top:0.5em; margin-bottom:0.5em;'>
+                <li>A facility reported bad data to CMS (more common than you'd think).</li>
+                <li>Or I made a coding error (it happens).</li>
+            </ul>
+            Either way, I want to be the first to know. If you spot something that looks off, please let me know so I can squash the bug and set things right.
+        </div>
     </div>
 </div>
 """, unsafe_allow_html=True)

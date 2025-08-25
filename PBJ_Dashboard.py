@@ -149,7 +149,11 @@ def pbj_takeaway_card(
     census_trend: float = None,  # Change in census from previous quarter
     previous_quarter: str = "Q1 2024",  # Previous quarter for comparison
     aide_share: float = 0.60,  # or compute from PBJ if you have it
-    floor_beds: int = 30
+    floor_beds: int = 30,
+    ownership_type: str = None,  # Ownership type (For Profit, Non Profit, Government)
+    affiliated_entity: str = None,  # Affiliated entity name
+    affiliated_entity_id: str = None,  # Affiliated entity ID
+    high_risk_indicators: dict = None  # High-risk indicators
 ):
     # Force proper title case for facility name to ensure "At" is lowercase
     facility = proper_title_case(facility)
@@ -221,10 +225,20 @@ def pbj_takeaway_card(
         tone_cmix = "neutral"
         trend_emoji = "📈" if trend_delta and trend_delta > 0 else ("📉" if trend_delta and trend_delta < 0 else "")
         st.markdown(
+            (f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                 background:#dc2626;color:#ffffff;font-weight:600;font-size:0.85rem;margin-right:6px;border:1px solid #b91c1c;">
+                 High Risk</span>""" if high_risk_indicators and high_risk_indicators.get('is_high_risk', False) else "") +
             chip("Reported HPRD", f"{_fmt(reported_hprd)} {trend_emoji}") +
             chip(f"{state_name} HPRD", f"{_fmt(state_hprd)}", tone_state) +
             chip("Census", census) +
-            chip("Contract", contract),
+            chip("Contract", contract) +
+            (f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                 background:#f1f5f9;color:#334155;font-weight:600;font-size:0.85rem;margin-right:6px;">
+                 {ownership_type}</span>""" if ownership_type else "") +
+            (f"""<a href="?level=Entity&entity={affiliated_entity_id}" style="text-decoration: none;">
+                 <span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                 background:#e3f2fd;color:#1565c0;font-weight:600;font-size:0.85rem;margin-right:6px;cursor:pointer;border:1px solid #bbdefb;transition:all 0.2s ease;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                 Entity: {affiliated_entity} <span style="font-size:0.75em;margin-left:2px;">→</span></span></a>""" if affiliated_entity and affiliated_entity_id else ""),
             unsafe_allow_html=True
         )
 
@@ -259,6 +273,21 @@ def pbj_takeaway_card(
 
         # Note
         st.markdown("*Note: staffing varies by day and shift, with the lowest levels typically on nights and weekends.*")
+        
+        # High-risk explanation
+        if high_risk_indicators and high_risk_indicators.get('is_high_risk', False):
+            risk_reasons = []
+            if high_risk_indicators.get('one_star', False):
+                risk_reasons.append("1-star overall rating")
+            if high_risk_indicators.get('sff', False):
+                risk_reasons.append("Special Focus Facility (SFF)")
+            if high_risk_indicators.get('sff_candidate', False):
+                risk_reasons.append("SFF candidate")
+            if high_risk_indicators.get('abuse_icon', False):
+                risk_reasons.append("abuse icon")
+            
+            risk_text = ", ".join(risk_reasons)
+            st.markdown(f"**⚠️ High-Risk Facility:** This facility has been flagged due to: {risk_text}.")
         
         # Add 320 Consulting badge
         st.markdown("""
@@ -790,8 +819,13 @@ def proper_title_case(text: str) -> str:
     for i in range(1, len(words)):
         if words[i] not in lowercase_words:
             words[i] = words[i].capitalize()
-            
-    return ' '.join(words)
+    
+    result = ' '.join(words)
+    
+    # Fix specific abbreviations
+    result = result.replace('Ahc ', 'AHC ')
+    
+    return result
 
 @st.cache_data
 def get_provider_info(provnum: str, info_type: str) -> str:
@@ -1146,6 +1180,80 @@ def get_facility_info(provnum: str) -> dict:
         print(f"Error getting facility info: {str(e)}")
         return None
 
+@st.cache_data
+def get_facility_ownership_type(provnum: str) -> str:
+    """Get ownership type for a facility from provider info data."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return None
+            
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if facility_data.empty:
+            return None
+            
+        # Get the ownership type
+        ownership_type = facility_data.iloc[0]['Ownership Type']
+        
+        # Return None if it's NaN
+        if pd.isna(ownership_type):
+            return None
+            
+        # Simplify ownership type to three main categories
+        ownership_str = str(ownership_type).lower()
+        if 'for profit' in ownership_str:
+            return "For Profit"
+        elif 'non profit' in ownership_str:
+            return "Non Profit"
+        elif 'government' in ownership_str:
+            return "Government"
+        else:
+            return str(ownership_type)  # Return original if no match
+        
+    except Exception as e:
+        print(f"Error getting facility ownership type: {str(e)}")
+        return None
+
+@st.cache_data
+def get_facility_high_risk_indicators(provnum: str) -> dict:
+    """Get high-risk indicators for a facility."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return None
+            
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if facility_data.empty:
+            return None
+            
+        # Get the indicators
+        overall_rating = facility_data.iloc[0]['Overall Rating']
+        special_focus_status = facility_data.iloc[0]['Special Focus Status']
+        abuse_icon = facility_data.iloc[0]['Abuse Icon']
+        
+        # Check for high-risk indicators
+        is_one_star = pd.notna(overall_rating) and overall_rating == 1
+        is_sff = pd.notna(special_focus_status) and 'SFF' in str(special_focus_status)
+        is_sff_candidate = pd.notna(special_focus_status) and 'SFF Candidate' in str(special_focus_status)
+        has_abuse_icon = pd.notna(abuse_icon) and abuse_icon == 'Y'
+        
+        # Return indicators
+        return {
+            'is_high_risk': is_one_star or is_sff or is_sff_candidate or has_abuse_icon,
+            'one_star': is_one_star,
+            'sff': is_sff,
+            'sff_candidate': is_sff_candidate,
+            'abuse_icon': has_abuse_icon
+        }
+        
+    except Exception as e:
+        print(f"Error getting facility high-risk indicators: {str(e)}")
+        return None
+
 def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
     """Get quarterly metrics for a facility."""
     try:
@@ -1285,23 +1393,14 @@ def display_facility_info(provnum: str, quarter_name: str = None, affiliated_ent
         # Detect mobile
         is_mobile = st.session_state.get('is_mobile', False)
 
-        def format_title_case(text):
-            if pd.isna(text):
-                return 'N/A'
-            words = text.split()
-            formatted_words = []
-            for i, word in enumerate(words):
-                if i == 0 or word.lower() not in ['and', 'at', 'of', 'the', 'in', 'on', 'for', 'to', 'with', 'by']:
-                    formatted_words.append(word.capitalize())
-                else:
-                    formatted_words.append(word.lower())
-            return ' '.join(formatted_words)
-
-        formatted_provider_name = format_title_case(facility_info['provider_name'])
-        formatted_county = format_title_case(facility_info['county'])
+        formatted_provider_name = proper_title_case(facility_info['provider_name'])
+        formatted_county = proper_title_case(facility_info['county'])
         ccn = facility_info['ccn']
         state = facility_info['state']
         care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{ccn}?state={state}"
+        
+        # Get ownership type
+        ownership_type = get_facility_ownership_type(provnum)
 
         st.markdown("""
             <style>
@@ -1900,6 +1999,9 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
             bargroupgap=0.05
         )
         
+        # Hide legend on mobile by setting showlegend to False for mobile screens
+        # This will be handled by JavaScript or CSS in the frontend
+        
         # Add text boxes above each category showing delta and percentage difference
         for i, category in enumerate(categories):
             if i < len(deltas) and i < len(delta_percentages):
@@ -1931,6 +2033,8 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
             font=dict(size=10, color="#666666"),
             align="right"
         )
+        
+
         
         return fig, None
         
@@ -3826,13 +3930,27 @@ def main() -> None:
                                 # Add small caption for case-mix explanation
                                 st.markdown("""
                                 <div style="text-align: left; margin: 2px 0; font-size: 0.7em; color: #666;" class="case-mix-caption">
-                                    <em>Case-mix: Government benchmark for expected staffing based on resident needs. <a href="https://www.cms.gov/medicare/provider-enrollment-and-certification/certificationandcomplianc/downloads/usersguide.pdf" target="_blank" style="color: #1976d2;">Learn more</a></em>
+                                    <em>Case-mix is <a href="https://www.cms.gov/medicare/provider-enrollment-and-certification/certificationandcomplianc/downloads/usersguide.pdf" target="_blank" style="color: #1976d2;">a CMS benchmark</a> for expected staffing based on resident needs.</em>
                                 </div>
                                 <style>
                                 @media (min-width: 768px) {
                                     .case-mix-caption {
                                         margin-top: -15px !important;
                                         text-align: center !important;
+                                    }
+                                }
+                                @media (max-width: 768px) {
+                                    /* Hide legend on mobile for case-mix charts */
+                                    .js-plotly-plot .plotly .legend {
+                                        display: none !important;
+                                    }
+                                    /* Move case-mix caption closer to chart on mobile */
+                                    .case-mix-caption {
+                                        margin-top: -16px !important;
+                                    }
+                                    /* Move 320 Consulting source closer to chart on mobile */
+                                    .js-plotly-plot .plotly .annotation {
+                                        transform: translateY(-2px) !important;
                                     }
                                 }
                                 </style>
@@ -3955,6 +4073,12 @@ def main() -> None:
                             # Add anchor for PBJ Takeaway section with higher positioning
                             st.markdown('<div id="pbj-takeaway" style="margin-top: -110px; padding-top: 60px;"></div>', unsafe_allow_html=True)
                             
+                            # Get ownership type and affiliated entity for the facility
+                            ownership_type = get_facility_ownership_type(selected_value)
+                            affiliated_entity = get_facility_affiliated_entity(selected_value)
+                            affiliated_entity_id = get_facility_affiliated_entity_id(selected_value)
+                            high_risk_indicators = get_facility_high_risk_indicators(selected_value)
+                            
                             # Use the new PBJ Takeaway card
                             pbj_takeaway_card(
                                 facility=facility_name,
@@ -3967,18 +4091,122 @@ def main() -> None:
                                 contract=contract_value,
                                 trend_delta=trend_delta,
                                 census_trend=None,  # You can add actual census trend data here
-                                previous_quarter="Q1 2024"  # Previous quarter for comparison
+                                previous_quarter="Q1 2024",  # Previous quarter for comparison
+                                ownership_type=ownership_type,
+                                affiliated_entity=affiliated_entity,
+                                affiliated_entity_id=affiliated_entity_id,
+                                high_risk_indicators=high_risk_indicators
                             )
                         
-                        # Add CMS Care Compare link below the chart for facility level
-                        if level == "Facility":
+                                                    # Add methodology expander for facility pages - positioned above CMS link
+                            if level == "Facility":
+                                st.markdown("""
+                                <style>
+                                /* Aggressive styling for methodology expander */
+                                div[data-testid="stExpander"] {
+                                    margin: 15px 0 !important;
+                                }
+                                div[data-testid="stExpander"] > div:first-child {
+                                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+                                    border: 2px solid #dee2e6 !important;
+                                    border-radius: 12px !important;
+                                    padding: 16px 20px !important;
+                                    font-weight: 700 !important;
+                                    color: #495057 !important;
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+                                    transition: all 0.3s ease !important;
+                                    cursor: pointer !important;
+                                }
+                                div[data-testid="stExpander"] > div:first-child:hover {
+                                    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%) !important;
+                                    border-color: #adb5bd !important;
+                                    box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
+                                    transform: translateY(-2px) !important;
+                                }
+                                div[data-testid="stExpander"] > div:first-child:active {
+                                    transform: translateY(0) !important;
+                                    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+                                }
+                                /* Style the expander content */
+                                div[data-testid="stExpander"] > div:last-child {
+                                    background: #ffffff !important;
+                                    border: 2px solid #e9ecef !important;
+                                    border-top: none !important;
+                                    border-radius: 0 0 12px 12px !important;
+                                    padding: 20px !important;
+                                    margin-top: -2px !important;
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+                                }
+                                /* Style the expander icon */
+                                div[data-testid="stExpander"] svg {
+                                    color: #6c757d !important;
+                                    transition: transform 0.3s ease !important;
+                                    font-size: 1.2em !important;
+                                }
+                                div[data-testid="stExpander"][aria-expanded="true"] svg {
+                                    transform: rotate(180deg) !important;
+                                }
+                                /* Override any Streamlit default styling */
+                                .stExpander > div:first-child {
+                                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+                                    border: 2px solid #dee2e6 !important;
+                                    border-radius: 12px !important;
+                                }
+                                </style>
+                                """, unsafe_allow_html=True)
+                                
+                                with st.expander("📊 Methodology", expanded=False):
+                                    st.markdown("""
+                                    **Methodology**
+                                    
+                                    This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). It includes all reported nurse staff, including contract hours.
+                                    
+                                    **Metrics**
+                                    
+                                    <span style="color: #1976d2; font-weight: 600;">**Hours Per Resident Day (HPRD):**</span> Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                                    
+                                    <span style="color: #1976d2; font-weight: 600;">**Contract Staff %:**</span> Share of hours provided by contract staff.
+                                    
+                                    <span style="color: #1976d2; font-weight: 600;">**Census:**</span> Average number of residents during the period.
+                                    
+                                    A 2001 federal study found 4.1 HPRD linked to better outcomes.
+                                    
+                                    Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD). A federal 3.48 minimum was recently overturned (2025).
+                                    
+                                    Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
+                                    
+                                    **Disclaimer**
+                                    
+                                    Data is vetted, but not perfect—issues can stem from CMS reporting or coding errors. If you spot something off, please let me know (eric@320insight.com).
+                                    
+                                    [See About page to learn more](/About)
+                                    """, unsafe_allow_html=True)
+                            
+                            # Add CMS Care Compare link below the methodology button for facility level
                             care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{selected_value}/view-all?state={selected_facility['STATE']}"
                             # Use the same facility_name that was already defined in the PBJ Takeaway section above
+                            
+                            # Format facility name with proper capitalization (lowercase prepositions)
+                            def format_facility_name_for_link(name):
+                                if pd.isna(name):
+                                    return name
+                                # Common words to keep lowercase
+                                lowercase_words = {'and', 'or', 'of', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
+                                words = name.lower().split()
+                                formatted_words = []
+                                for i, word in enumerate(words):
+                                    if i == 0 or word not in lowercase_words:
+                                        formatted_words.append(word.capitalize())
+                                    else:
+                                        formatted_words.append(word)
+                                return ' '.join(formatted_words)
+                            
+                            formatted_facility_name = format_facility_name_for_link(facility_name)
                             
                             st.markdown(f"""
                             <div style='text-align: center; margin-top: 15px;'>
                                 <a href='{care_compare_url}' target='_blank' style='background: #e8f4fd; color: #1976d2; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; border: 1px solid #1976d2; display: inline-block;'>
-                                    <span class="desktop-text">View {facility_name} Details on Federal CMS Care Compare Website</span>
+                                    <span class="desktop-text">View {formatted_facility_name} Details on Federal CMS Care Compare Website</span>
                                     <span class="mobile-text">View Details on CMS Care Compare</span>
                                 </a>
                             </div>
@@ -5441,6 +5669,40 @@ def main() -> None:
                                 previous_quarter="Q1 2024",
                                 avg_facility_size=state_avg_census
                             )
+                            
+                            # Add methodology expander for state pages - centered below PBJ Takeaway
+                            st.markdown("""
+                            <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
+                            """, unsafe_allow_html=True)
+                            
+                            with st.expander("📊 Methodology", expanded=False):
+                                st.markdown("""
+                                **Methodology**
+                                
+                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). It includes all reported nurse staff, including contract hours.
+                                
+                                **Metrics**
+                                
+                                <span style="color: #1976d2; font-weight: 600;">**Hours Per Resident Day (HPRD):**</span> Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                                
+                                <span style="color: #1976d2; font-weight: 600;">**Contract Staff %:**</span> Share of hours provided by contract staff.
+                                
+                                <span style="color: #1976d2; font-weight: 600;">**Census:**</span> Average number of residents during the period.
+                                
+                                A 2001 federal study found 4.1 HPRD linked to better outcomes.
+                                
+                                Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD). A federal 3.48 minimum was recently overturned (2025).
+                                
+                                Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
+                                
+                                **Disclaimer**
+                                
+                                Data is vetted, but not perfect—issues can stem from CMS reporting or coding errors. If you spot something off, please let me know (eric@320insight.com).
+                                
+                                [See About page to learn more](/About)
+                                """, unsafe_allow_html=True)
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
                     
                     # Add subscription button for all levels
                     if level == "National":
