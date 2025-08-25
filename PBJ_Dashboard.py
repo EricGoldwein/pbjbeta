@@ -5615,28 +5615,22 @@ def main() -> None:
                                         return path
                                 return None
                             
-                            national_path = find_file('national_lite_metrics.csv')
-                            state_path = find_file('state_lite_metrics.csv')
+                            # Use cached metrics data for consistency
+                            national_metrics, state_metrics, facility_metrics = load_metrics_data()
                             
-                            if national_path and state_path:
-                                national_metrics = pd.read_csv(national_path)
-                                national_hprd = national_metrics['Total_Nurse_HPRD'].iloc[0] if not national_metrics.empty else 3.5
-                                
-                                # Calculate state rank for Q1 2025 only
-                                state_metrics = pd.read_csv(state_path)
-                            else:
-                                st.error("Metrics data files not found")
-                                return
-                            # Apply column mapping to ensure consistency
-                            state_metrics.rename(columns={'CY_Qtr': 'CY_QTR'}, inplace=True)
-                            q1_2025_data = state_metrics[state_metrics['CY_QTR'] == '2025Q1']
-                            if not q1_2025_data.empty:
-                                state_metrics_sorted = q1_2025_data.sort_values('Total_Nurse_HPRD', ascending=False).reset_index(drop=True)
+                            # Get national HPRD for most recent quarter
+                            most_recent_national = national_metrics.sort_values('CY_QTR', ascending=False).iloc[0]
+                            national_hprd = most_recent_national['Total_Nurse_HPRD'] if pd.notna(most_recent_national['Total_Nurse_HPRD']) else 3.5
+                            
+                            # Calculate state rank for most recent quarter
+                            most_recent_state_data = state_metrics.sort_values('CY_QTR', ascending=False).groupby('STATE').first().reset_index()
+                            if not most_recent_state_data.empty:
+                                state_metrics_sorted = most_recent_state_data.sort_values('Total_Nurse_HPRD', ascending=False).reset_index(drop=True)
                                 state_row = state_metrics_sorted[state_metrics_sorted['STATE'] == selected_value]
                                 state_rank = state_row.index[0] + 1 if not state_row.empty else 0
                                 total_states = len(state_metrics_sorted)
                             else:
-                                # Fallback to all data if Q1 2025 not available
+                                # Fallback to all data if most recent quarter not available
                                 state_metrics_sorted = state_metrics.sort_values('Total_Nurse_HPRD', ascending=False).reset_index(drop=True)
                                 state_row = state_metrics_sorted[state_metrics_sorted['STATE'] == selected_value]
                                 state_rank = state_row.index[0] + 1 if not state_row.empty else 0
