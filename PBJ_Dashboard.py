@@ -3984,13 +3984,23 @@ def main() -> None:
                             
                             # Get state average for the current quarter using cached metrics data
                             national_metrics, state_metrics, facility_metrics = load_metrics_data()
-                            current_quarter_state_data = state_metrics[
-                                (state_metrics['STATE'] == selected_facility['STATE']) & 
-                                (state_metrics['CY_QTR'] == f"Q{quarter} {year}")
-                            ]
-                            state_avg = current_quarter_state_data['Total_Nurse_HPRD'].iloc[0] if not current_quarter_state_data.empty else 3.5
+                            
+                            # Get the most recent quarter from facility data for this facility's state
+                            facility_state_data = facility_metrics[facility_metrics['STATE'] == selected_facility['STATE']]
+                            if not facility_state_data.empty:
+                                # Get the most recent quarter for this state
+                                most_recent_facility_quarter = facility_state_data.sort_values('CY_QTR', ascending=False).iloc[0]['CY_QTR']
+                                
+                                current_quarter_state_data = state_metrics[
+                                    (state_metrics['STATE'] == selected_facility['STATE']) & 
+                                    (state_metrics['CY_QTR'] == most_recent_facility_quarter)
+                                ]
+                                state_avg = current_quarter_state_data['Total_Nurse_HPRD'].iloc[0] if not current_quarter_state_data.empty else 3.5
+                            else:
+                                state_avg = 3.5
                             
                             # Get case-mix expected HPRD
+                            facility_info = None
                             try:
                                 import os
                                 # Try multiple possible paths for provider info file
@@ -4018,12 +4028,9 @@ def main() -> None:
                                 case_mix_hprd = reported_hprd  # fallback
                             
                             # Get the most recent facility name from provider info data
-                            try:
-                                if not facility_info.empty:
-                                    facility_name = proper_title_case(facility_info.iloc[0]['Provider Name'])
-                                else:
-                                    facility_name = proper_title_case(selected_facility['PROVNAME'])
-                            except:
+                            if facility_info is not None and not facility_info.empty:
+                                facility_name = proper_title_case(facility_info.iloc[0]['Provider Name'])
+                            else:
                                 facility_name = proper_title_case(selected_facility['PROVNAME'])
                             
                             # Calculate values
