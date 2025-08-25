@@ -2961,8 +2961,8 @@ def main() -> None:
             else:
                 # Show full search interface for other pages (National, etc.)
                 
-                # Set up ownership session state BEFORE creating tabs
-                if not ownership_df.empty:
+                # Set up ownership session state BEFORE creating tabs (only on main page)
+                if not ownership_df.empty and not (initial_facility or initial_state or initial_entity):
                     # Filter to show only major ownership groups (you can customize this list)
                     major_ownership_groups = [
                         "Genesis Healthcare",
