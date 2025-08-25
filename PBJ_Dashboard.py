@@ -2961,8 +2961,8 @@ def main() -> None:
             else:
                 # Show full search interface for other pages (National, etc.)
                 
-                # Set up ownership session state BEFORE creating tabs (only on main page)
-                if not ownership_df.empty and not (initial_facility or initial_state or initial_entity):
+                # Set up ownership session state BEFORE creating tabs (only for National level)
+                if level == "National" and not ownership_df.empty:
                     # Filter to show only major ownership groups (you can customize this list)
                     major_ownership_groups = [
                         "Genesis Healthcare",
@@ -3133,6 +3133,46 @@ def main() -> None:
                 
                 with tab2:
                     if not ownership_df.empty:
+                        # Set up ownership options for the tab (if not already set up)
+                        if level != "National":
+                            # Filter to show only major ownership groups (you can customize this list)
+                            major_ownership_groups = [
+                                "Genesis Healthcare",
+                                "Life Care Centers of America", 
+                                "HCR ManorCare",
+                                "Kindred Healthcare",
+                                "Sun Healthcare Group",
+                                "Golden Living",
+                                "Extendicare",
+                                "Brookdale Senior Living",
+                                "Five Star Senior Living",
+                                "Diversicare Healthcare Services"
+                            ]
+                            
+                            # Get ownership entities that match major groups or have significant facility counts
+                            ownership_entities = ownership_df[ownership_df['Chain'].notna()].copy()
+                            
+                            # Filter to major groups or those with 10+ facilities
+                            major_entities = ownership_entities[
+                                (ownership_entities['Chain'].isin(major_ownership_groups)) |
+                                (ownership_entities['Number of facilities'] >= 10)
+                            ].copy()
+                            
+                            # Remove National from the results
+                            major_entities = major_entities[major_entities['Chain'] != 'National'].copy()
+                            
+                            # Sort by number of facilities (descending)
+                            major_entities = major_entities.sort_values('Number of facilities', ascending=False)
+                            
+                            # Create display names with entity ID stored in session state
+                            ownership_options = [""]
+                            for _, row in major_entities.iterrows():
+                                display_name = smart_title(row['Chain']) + f" ({int(row['Number of facilities'])} NHs)"
+                                ownership_options.append(display_name)
+                                # Store entity ID in session state for later use, only if it's not NaN
+                                if pd.notna(row['Chain ID']):
+                                    st.session_state[f"entity_{display_name}"] = int(row['Chain ID'])
+                                    st.session_state[f"name_{display_name}"] = row['Chain']
                         
                         def _go_ownership_from_tab():
                             display = st.session_state.get("ownership_search_input", "")
