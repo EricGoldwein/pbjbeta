@@ -264,8 +264,8 @@ def pbj_takeaway_card(
         para = (
             f"**{facility}**'s reported **{_fmt(reported_hprd)} hours per resident day** "
             f"(≈ {_fmt(res_per_staff,1)} residents per total staff) in {quarter_label}{hprd_trend_text}{census_trend_text}. "
-            f"This level is {word_state} the {state_name} ratio of {_fmt(state_hprd)} HPRD "
-            f"and {word_cmix} the case-mix (expected) {_fmt(casemix_hprd)} HPRD given resident acuity."
+            f"This level is {word_state} the {state_name} ratio of {_fmt(state_hprd)} "
+            f"and {word_cmix} its case-mix (expected) {_fmt(casemix_hprd)} given resident acuity."
         )
         
         st.markdown(para)
@@ -287,7 +287,7 @@ def pbj_takeaway_card(
                 risk_reasons.append("abuse icon")
             
             risk_text = ", ".join(risk_reasons)
-            st.markdown(f"**⚠️ High-Risk Facility:** This facility has been flagged due to: {risk_text}.")
+            st.markdown(f"**⚠️ High-Risk Facility:** Flagged due to {risk_text}.")
         
         # Add 320 Consulting badge
         st.markdown("""
