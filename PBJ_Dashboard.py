@@ -2260,6 +2260,32 @@ def main() -> None:
         else:
             actual_level = "National"
         
+        # Auto-collapse sidebar on state and facility pages for desktop
+        if actual_level in ["State", "Facility"]:
+            st.markdown("""
+                <script>
+                (function() {
+                    function collapseSidebar() {
+                        const sidebarButton = document.querySelector('button[data-testid="collapsedControl"]');
+                        if (sidebarButton && window.innerWidth > 768) {
+                            // Check if sidebar is expanded
+                            const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+                            if (sidebar && !sidebar.classList.contains('collapsed')) {
+                                sidebarButton.click();
+                            }
+                        }
+                    }
+                    
+                    // Try to collapse immediately
+                    collapseSidebar();
+                    
+                    // Also try after a short delay to ensure DOM is ready
+                    setTimeout(collapseSidebar, 100);
+                    setTimeout(collapseSidebar, 500);
+                })();
+                </script>
+            """, unsafe_allow_html=True)
+        
         # Handle direct URL navigation for state, entity, and facility levels
         if actual_level in ["State", "Entity", "Facility"]:
             level = actual_level
@@ -3243,6 +3269,47 @@ def main() -> None:
         # st.markdown("""
         #     <hr style="margin: 8px 0; border: none; border-top: 1px solid #e0e0e0; height: 1px;">
         # """, unsafe_allow_html=True)
+        
+        # Auto-collapse sidebar on facility, state, or entity pages
+        if level in ["Facility", "State", "Entity"]:
+            st.markdown("""
+                <script>
+                // Auto-collapse sidebar on facility, state, or entity pages
+                (function() {
+                    function collapseSidebar() {
+                        // Find the sidebar collapse button and click it
+                        const sidebarButton = document.querySelector('button[data-testid="collapsedControl"]');
+                        if (sidebarButton) {
+                            sidebarButton.click();
+                        }
+                        
+                        // Alternative: Look for the sidebar toggle button
+                        const toggleButton = document.querySelector('[data-testid="collapsedControl"]');
+                        if (toggleButton) {
+                            toggleButton.click();
+                        }
+                        
+                        // Another alternative: Look for any button that might collapse the sidebar
+                        const buttons = document.querySelectorAll('button');
+                        for (let button of buttons) {
+                            if (button.textContent.includes('›') || button.textContent.includes('‹') || 
+                                button.getAttribute('aria-label')?.includes('sidebar') ||
+                                button.getAttribute('data-testid')?.includes('collapsed')) {
+                                button.click();
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Try to collapse immediately
+                    collapseSidebar();
+                    
+                    // Also try after a short delay to ensure DOM is ready
+                    setTimeout(collapseSidebar, 100);
+                    setTimeout(collapseSidebar, 500);
+                })();
+                </script>
+            """, unsafe_allow_html=True)
         
         # Sidebar
         st.sidebar.markdown("""
@@ -4905,31 +4972,31 @@ def main() -> None:
                                      .dataframe td:nth-child(7) {
                                          display: none !important; /* Hide Staffing Rating on mobile */
                                      }
-                                     /* Adjust widths for mobile */
-                                     .dataframe th:nth-child(1) { width: 8%; }  /* State */
-                                     .dataframe th:nth-child(2) { width: 30%; } /* Provider Name */
-                                     .dataframe th:nth-child(3) { width: 15%; } /* City */
-                                     .dataframe th:nth-child(4) { width: 10%; } /* Census */
-                                     .dataframe th:nth-child(5) { width: 10%; padding-left: 2px !important; padding-right: 2px !important; } /* Total Nurse HPRD */
-                                     .dataframe th:nth-child(6) { width: 10%; } /* Overall Rating */
-                                     .dataframe th:nth-child(8) { width: 10%; padding-left: 2px !important; } /* Special Focus Status */
-                                     .dataframe th:nth-child(9) { width: 0%; }  /* Abuse Icon */
+                                     /* Adjust widths for mobile - improved spacing */
+                                     .dataframe th:nth-child(1) { width: 7%; }  /* State */
+                                     .dataframe th:nth-child(2) { width: 28%; } /* Provider Name */
+                                     .dataframe th:nth-child(3) { width: 18%; } /* City - more space */
+                                     .dataframe th:nth-child(4) { width: 9%; }  /* Census */
+                                     .dataframe th:nth-child(5) { width: 11%; } /* Total Nurse HPRD */
+                                     .dataframe th:nth-child(6) { width: 9%; }  /* Overall Rating */
+                                     .dataframe th:nth-child(8) { width: 12%; padding-right: 4px !important; } /* Special Focus Status - prevent bleed */
+                                     .dataframe th:nth-child(9) { width: 6%; padding-left: 0.5px !important; padding-right: 0.5px !important; text-align: left !important; } /* Abuse Icon - less padding */
                                      
-                                     .dataframe td:nth-child(1) { width: 8%; }  /* State */
-                                     .dataframe td:nth-child(2) { width: 30%; } /* Provider Name */
-                                     .dataframe td:nth-child(3) { width: 15%; } /* City */
-                                     .dataframe td:nth-child(4) { width: 10%; } /* Census */
-                                     .dataframe td:nth-child(5) { width: 10%; padding-left: 2px !important; padding-right: 2px !important; } /* Total Nurse HPRD */
-                                     .dataframe td:nth-child(6) { width: 10%; } /* Overall Rating */
-                                     .dataframe td:nth-child(8) { width: 10%; padding-left: 2px !important; } /* Special Focus Status */
-                                     .dataframe td:nth-child(9) { width: 0%; }  /* Abuse Icon */
+                                     .dataframe td:nth-child(1) { width: 7%; }  /* State */
+                                     .dataframe td:nth-child(2) { width: 28%; } /* Provider Name */
+                                     .dataframe td:nth-child(3) { width: 18%; } /* City - more space */
+                                     .dataframe td:nth-child(4) { width: 9%; }  /* Census */
+                                     .dataframe td:nth-child(5) { width: 11%; } /* Total Nurse HPRD */
+                                     .dataframe td:nth-child(6) { width: 9%; }  /* Overall Rating */
+                                     .dataframe td:nth-child(8) { width: 12%; padding-right: 4px !important; } /* Special Focus Status - prevent bleed */
+                                     .dataframe td:nth-child(9) { width: 6%; }  /* Abuse Icon */
                                      
                                      /* Reduce font size on mobile */
                                      .dataframe {
                                          font-size: 0.7em !important;
                                      }
                                      .dataframe th {
-                                         font-size: 0.7em !important;
+                                         font-size: 0.65em !important; /* Smaller header font */
                                      }
                                      .dataframe td {
                                          font-size: 0.7em !important;
@@ -4959,32 +5026,31 @@ def main() -> None:
                                          z-index: 1;
                                      }
                                      
-                                     /* Reduce left padding on State column */
-
-                                     
-                                     /* Show sort arrows on mobile */
+                                     /* Hide arrows on mobile but keep sorting functionality */
                                      .dataframe th::after {
-                                         content: "↕";
-                                         font-size: 0.6em;
-                                         color: #6c757d;
-                                         position: absolute;
-                                         right: 2px;
-                                         top: 50%;
-                                         transform: translateY(-50%);
-                                         z-index: 2;
+                                         display: none !important;
                                      }
                                      
-                                     /* Give State column more space for arrow */
-                                     .dataframe th:nth-child(1) {
-                                         padding-right: 8px !important;
+                                     /* Remove darker border lines on mobile */
+                                     .dataframe {
+                                         border: none !important;
                                      }
-                                     .dataframe th.sort-asc::after {
-                                         content: "↑";
-                                         color: #495057;
+                                     .dataframe th {
+                                         border: none !important;
+                                         border-bottom: 1px solid #e9ecef !important;
                                      }
-                                     .dataframe th.sort-desc::after {
-                                         content: "↓";
-                                         color: #495057;
+                                     .dataframe td {
+                                         border: none !important;
+                                         border-bottom: 1px solid #f0f0f0 !important;
+                                     }
+                                     
+                                     /* Provider name text wrapping - break earlier for better space usage */
+                                     .dataframe td:nth-child(2) {
+                                         word-wrap: break-word !important;
+                                         word-break: break-word !important;
+                                         hyphens: auto !important;
+                                         line-height: 1.2 !important;
+                                         max-width: 0 !important; /* Force text wrapping */
                                      }
                                      
                                      /* Override custom header backgrounds when sorted */
@@ -4994,8 +5060,6 @@ def main() -> None:
                                      .dataframe th:nth-child(6).sort-desc::before {
                                          background: #e3f2fd !important;
                                      }
-                                     
-
                                      
                                      /* Use default sort highlighting (gray) */
                                      .dataframe th.sort-asc,
@@ -5009,7 +5073,11 @@ def main() -> None:
                                          background: #e9ecef !important;
                                      }
                                      
-
+                                     /* Ensure table doesn't overflow on mobile */
+                                     .dataframe {
+                                         max-width: 100% !important;
+                                         overflow-x: auto !important;
+                                     }
                                  }
                                  
                                  /* Fix column header capitalization */

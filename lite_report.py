@@ -16,7 +16,7 @@ def format_provnum(df):
     return False
 
 def generate_lite_metrics():
-    # Read the existing metrics files
+    # Read the existing metrnationalics files
     facility_metrics = pd.read_csv('facility_quarterly_metrics.csv', low_memory=False)
     state_metrics = pd.read_csv('state_quarterly_metrics.csv', low_memory=False)
     
