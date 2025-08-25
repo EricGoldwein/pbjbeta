@@ -117,7 +117,8 @@ st.markdown("""
         <div style='font-size:1.08em; color:#222; font-weight:400; line-height:1.45;'>
             <b>Total Nurse Hours Per Resident Day (HPRD):</b> Total nurse staff hours per resident per day.*<br>
             <b>Contract Staff Percentage:</b> Percentage of nurse staff hours provided by contract staff.<br>
-            <b>Census:</b> Average number of residents in facility or state during the reporting period.
+            <b>Census:</b> Average number of residents in facility or state during the reporting period.<br>
+            <b>Ownership Change:</b> Indicates facility ownership changed in the last 12 months.
         </div>
         <div style='font-size:0.95em; color:#666; font-weight:400; line-height:1.4; margin-top:1em; padding:1em; background:#f8f9fa; border-left:3px solid #1769aa; border-radius:3px;'>
             <b>* HPRD Explained:</b> This metric reflects the staffing ratio at a facility in terms of staff hours per resident. Example: A nursing home with 100 residents providing 350 staffing hours per day would have a 3.5 HPRD (350 ÷ 100).<br><br>

@@ -153,7 +153,8 @@ def pbj_takeaway_card(
     ownership_type: str = None,  # Ownership type (For Profit, Non Profit, Government)
     affiliated_entity: str = None,  # Affiliated entity name
     affiliated_entity_id: str = None,  # Affiliated entity ID
-    high_risk_indicators: dict = None  # High-risk indicators
+    high_risk_indicators: dict = None,  # High-risk indicators
+    ownership_change: bool = False  # Whether facility changed ownership in last 12 months
 ):
     # Force proper title case for facility name to ensure "At" is lowercase
     facility = proper_title_case(facility)
@@ -238,7 +239,10 @@ def pbj_takeaway_card(
             (f"""<a href="?level=Entity&entity={affiliated_entity_id}" style="text-decoration: none;">
                  <span style="display:inline-block;padding:2px 8px;border-radius:999px;
                  background:#e3f2fd;color:#1565c0;font-weight:600;font-size:0.85rem;margin-right:6px;cursor:pointer;border:1px solid #bbdefb;transition:all 0.2s ease;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                 Entity: {affiliated_entity} <span style="font-size:0.75em;margin-left:2px;">→</span></span></a>""" if affiliated_entity and affiliated_entity_id else ""),
+                 Entity: {affiliated_entity} <span style="font-size:0.75em;margin-left:2px;">→</span></span></a>""" if affiliated_entity and affiliated_entity_id else "") +
+            (f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                 background:#fef3c7;color:#92400e;font-weight:600;font-size:0.85rem;margin-right:6px;border:1px solid #f59e0b;">
+                 Ownership Change</span>""" if ownership_change else ""),
             unsafe_allow_html=True
         )
 
@@ -1215,6 +1219,30 @@ def get_facility_ownership_type(provnum: str) -> str:
     except Exception as e:
         print(f"Error getting facility ownership type: {str(e)}")
         return None
+
+@st.cache_data
+def get_facility_ownership_change(provnum: str) -> bool:
+    """Get ownership change status for a facility from provider info data."""
+    try:
+        provider_data = load_provider_info_data()
+        if provider_data.empty:
+            return False
+            
+        # Find the facility by CCN
+        facility_data = provider_data[provider_data['CMS Certification Number (CCN)'] == provnum]
+        
+        if facility_data.empty:
+            return False
+            
+        # Get the ownership change status
+        ownership_change = facility_data.iloc[0]['Provider Changed Ownership in Last 12 Months']
+        
+        # Return True if it's 'Y', False otherwise
+        return pd.notna(ownership_change) and ownership_change == 'Y'
+        
+    except Exception as e:
+        print(f"Error getting facility ownership change status: {str(e)}")
+        return False
 
 @st.cache_data
 def get_facility_high_risk_indicators(provnum: str) -> dict:
@@ -4086,6 +4114,9 @@ def main() -> None:
                             affiliated_entity_id = get_facility_affiliated_entity_id(selected_value)
                             high_risk_indicators = get_facility_high_risk_indicators(selected_value)
                             
+                            # Get ownership change status
+                            ownership_change = get_facility_ownership_change(selected_value)
+                            
                             # Use the new PBJ Takeaway card
                             pbj_takeaway_card(
                                 facility=facility_name,
@@ -4102,7 +4133,8 @@ def main() -> None:
                                 ownership_type=ownership_type,
                                 affiliated_entity=affiliated_entity,
                                 affiliated_entity_id=affiliated_entity_id,
-                                high_risk_indicators=high_risk_indicators
+                                high_risk_indicators=high_risk_indicators,
+                                ownership_change=ownership_change
                             )
                         
                                                     # Add methodology expander for facility pages - positioned above CMS link
@@ -4181,6 +4213,8 @@ def main() -> None:
                                     Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD). A federal 3.48 minimum was recently overturned (2025).
                                     
                                     Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
+                                    
+                                    **Ownership Change** indicates facility ownership changed in the last 12 months.
                                     
                                     **Disclaimer**
                                     
