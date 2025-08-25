@@ -228,7 +228,7 @@ def pbj_takeaway_card(
             (f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
                  background:#dc2626;color:#ffffff;font-weight:600;font-size:0.85rem;margin-right:6px;border:1px solid #b91c1c;">
                  High Risk</span>""" if high_risk_indicators and high_risk_indicators.get('is_high_risk', False) else "") +
-            chip("Reported HPRD", f"{_fmt(reported_hprd)} {trend_emoji}") +
+            chip("Total HPRD", f"{_fmt(reported_hprd)} {trend_emoji}") +
             chip(f"{state_name} HPRD", f"{_fmt(state_hprd)}", tone_state) +
             chip("Census", census) +
             chip("Contract", contract) +
@@ -3982,13 +3982,13 @@ def main() -> None:
                                         return path
                                 return None
                             
-                            state_path = find_file('state_lite_metrics.csv')
-                            if state_path:
-                                state_metrics = pd.read_csv(state_path)
-                            else:
-                                st.error("State metrics file not found")
-                                return
-                            state_avg = state_metrics[state_metrics['STATE'] == selected_facility['STATE']]['Total_Nurse_HPRD'].iloc[0] if not state_metrics[state_metrics['STATE'] == selected_facility['STATE']].empty else 3.5
+                            # Get state average for the current quarter using cached metrics data
+                            national_metrics, state_metrics, facility_metrics = load_metrics_data()
+                            current_quarter_state_data = state_metrics[
+                                (state_metrics['STATE'] == selected_facility['STATE']) & 
+                                (state_metrics['CY_QTR'] == f"Q{quarter} {year}")
+                            ]
+                            state_avg = current_quarter_state_data['Total_Nurse_HPRD'].iloc[0] if not current_quarter_state_data.empty else 3.5
                             
                             # Get case-mix expected HPRD
                             try:
