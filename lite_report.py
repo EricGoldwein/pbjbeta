@@ -16,9 +16,10 @@ def format_provnum(df):
     return False
 
 def generate_lite_metrics():
-    # Read the existing metrnationalics files
+    # Read the existing metrics files
     facility_metrics = pd.read_csv('facility_quarterly_metrics.csv', low_memory=False)
     state_metrics = pd.read_csv('state_quarterly_metrics.csv', low_memory=False)
+    national_metrics_df = pd.read_csv('national_quarterly_metrics.csv', low_memory=False)
     
     # Format PROVNUMs
     format_provnum(facility_metrics)
@@ -26,7 +27,7 @@ def generate_lite_metrics():
     # Create facility lite metrics with new column order, including fields needed for calculations
     facility_lite = facility_metrics[[
         'CY_Qtr', 'PROVNUM', 'PROVNAME', 'STATE', 'COUNTY_NAME',
-        'Total_Nurse_HPRD', 'Contract_Percentage', 'avg_daily_census',
+        'Total_Nurse_HPRD', 'Contract_Percentage', 'Total_Contract_Hours', 'Total_Nurse_Hours', 'avg_daily_census',
         'total_resident_days', 'days_reported', 'MDScensus'
     ]].copy()
     
@@ -61,34 +62,26 @@ def generate_lite_metrics():
     # Sort by state first, then quarter (AK 2017Q1, AK 2017Q2, etc.)
     state_lite = state_lite.sort_values(['STATE', 'CY_Qtr'])
     
-    # Create national metrics by calculating proper ratios
+    # Create national metrics from quarterly metrics directly
     national_metrics = []
     for quarter in facility_lite['CY_Qtr'].unique():
-        quarter_data = facility_lite[facility_lite['CY_Qtr'] == quarter]
-        
-        # Calculate national metrics using proper ratios
-        total_census = quarter_data['avg_daily_census'].sum()
-        total_nurse_hours = (quarter_data['Total_Nurse_HPRD'] * quarter_data['avg_daily_census']).sum()
-        total_contract_hours = (quarter_data['Contract_Percentage'] * quarter_data['Total_Nurse_HPRD'] * quarter_data['avg_daily_census']).sum()
-        
-        # Calculate MDScensus (total resident days / avg days reported)
-        total_resident_days = quarter_data['total_resident_days'].sum()
-        avg_days_reported = quarter_data['days_reported'].mean()
-        mdscensus = round(total_resident_days / avg_days_reported if avg_days_reported > 0 else 0, 1)
-        
-        national_metrics.append({
-            'CY_Qtr': quarter,
-            'Facility_Count': len(quarter_data),
-            'Total_Nurse_HPRD': round(total_nurse_hours / total_census if total_census > 0 else 0, 2),
-            'Contract_Percentage': round((total_contract_hours / total_nurse_hours) if total_nurse_hours > 0 else 0, 2),
-            'MDS': mdscensus
-        })
+        # Get national data from quarterly metrics
+        national_quarter_data = national_metrics_df[national_metrics_df['CY_Qtr'] == quarter]
+        if not national_quarter_data.empty:
+            national_row = national_quarter_data.iloc[0]
+            national_metrics.append({
+                'CY_Qtr': quarter,
+                'Facility_Count': national_row['facility_count'],
+                'Total_Nurse_HPRD': national_row['Total_Nurse_HPRD'],
+                'Contract_Percentage': national_row['Contract_Percentage'],
+                'MDS': national_row['MDScensus']
+            })
     
     national_lite = pd.DataFrame(national_metrics)
     national_lite = national_lite.sort_values('CY_Qtr')
     
     # Remove calculation fields from facility_lite before saving
-    facility_lite_output = facility_lite.drop(['avg_daily_census', 'total_resident_days', 'days_reported'], axis=1)
+    facility_lite_output = facility_lite.drop(['avg_daily_census', 'total_resident_days', 'days_reported', 'Total_Contract_Hours', 'Total_Nurse_Hours'], axis=1)
     
     # Rename columns to be consistent across all files
     facility_lite_output.columns = [
