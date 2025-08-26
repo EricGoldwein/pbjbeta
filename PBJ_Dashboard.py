@@ -4196,31 +4196,26 @@ def main() -> None:
                                 
                                 with st.expander("📊 Methodology", expanded=False):
                                     st.markdown("""
-                                    **Methodology**
-                                    
-                                    This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). It includes all reported nurse staff, including contract hours.
+                                    This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
                                     
                                     **Metrics**
                                     
-                                    <span style="color: #1976d2; font-weight: 600;">**Hours Per Resident Day (HPRD):**</span> Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                                    **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
                                     
-                                    <span style="color: #1976d2; font-weight: 600;">**Contract Staff %:**</span> Share of hours provided by contract staff.
+                                    **Contract Staff %:** Share of hours provided by contract staff.
                                     
-                                    <span style="color: #1976d2; font-weight: 600;">**Census:**</span> Average number of residents during the period.
+                                    **Census:** Average number of residents during the period.
                                     
-                                    A 2001 federal study found 4.1 HPRD linked to better outcomes.
+                                    **Note:** Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
                                     
-                                    Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD). A federal 3.48 minimum was recently overturned (2025).
+                                    **Data Transparency**
+                                    <div style="font-size: 0.9em; color: #666;">
+                                    The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
+                                    </div>
                                     
-                                    Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
-                                    
-                                    **Ownership Change** indicates facility ownership changed in the last 12 months.
-                                    
-                                    **Disclaimer**
-                                    
-                                    Data is vetted, but not perfect—issues can stem from CMS reporting or coding errors. If you spot something off, please let me know (eric@320insight.com).
-                                    
-                                    [See About page to learn more](/About)
+                                    <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
+                                    <a href="/About">Learn more about the PBJ Dashboard</a>
+                                    </div>
                                     """, unsafe_allow_html=True)
                             
                             # Add CMS Care Compare link below the methodology button for facility level
@@ -5430,6 +5425,37 @@ def main() -> None:
                         else:
                             st.info("Entity ID not available for facility lookup.")
                         
+                        # Add methodology expander for entity page - centered below content
+                        st.markdown("""
+                        <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
+                        """, unsafe_allow_html=True)
+                        
+                        with st.expander("📊 Methodology", expanded=False):
+                            st.markdown("""
+                            This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
+                            
+                            **Metrics**
+                            
+                            **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                            
+                            **Contract Staff %:** Share of hours provided by contract staff.
+                            
+                            **Census:** Average number of residents during the period.
+                            
+                            Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
+                            
+                            **Data Transparency**
+                            <div style="font-size: 0.9em; color: #666;">
+                            The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
+                            </div>
+                            
+                            <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
+                            <a href="/About">Learn more about the PBJ Dashboard</a>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        
                         # Add subscription button for entity
                         display_subscription_button("entity", selected_value, f"{selected_value} Entity Data")
                     else:
@@ -5631,6 +5657,38 @@ def main() -> None:
                             </style>
                         """, unsafe_allow_html=True)
                         st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Add methodology expander for national page - centered below chart
+                        if level == "National":
+                            st.markdown("""
+                            <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
+                            """, unsafe_allow_html=True)
+                            
+                            with st.expander("📊 Methodology", expanded=False):
+                                st.markdown("""
+                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
+                                
+                                **Metrics**
+                                
+                                **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                                
+                                **Contract Staff %:** Share of hours provided by contract staff.
+                                
+                                **Census:** Average number of residents during the period.
+                                
+                                **Note:** Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
+                                
+                                **Data Transparency**
+                                <div style="font-size: 0.9em; color: #666;">
+                                The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
+                                </div>
+                                
+                                <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
+                                <a href="/About">Learn more about the PBJ Dashboard</a>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
                     
                     # Add state PBJ Takeaway card for state level
                     if level == "State" and selected_value:
@@ -5712,29 +5770,26 @@ def main() -> None:
                             
                             with st.expander("📊 Methodology", expanded=False):
                                 st.markdown("""
-                                **Methodology**
-                                
-                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). It includes all reported nurse staff, including contract hours.
+                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
                                 
                                 **Metrics**
                                 
-                                <span style="color: #1976d2; font-weight: 600;">**Hours Per Resident Day (HPRD):**</span> Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                                **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
                                 
-                                <span style="color: #1976d2; font-weight: 600;">**Contract Staff %:**</span> Share of hours provided by contract staff.
+                                **Contract Staff %:** Share of hours provided by contract staff.
                                 
-                                <span style="color: #1976d2; font-weight: 600;">**Census:**</span> Average number of residents during the period.
+                                **Census:** Average number of residents during the period.
                                 
-                                A 2001 federal study found 4.1 HPRD linked to better outcomes.
+                                **Note:** Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
                                 
-                                Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD). A federal 3.48 minimum was recently overturned (2025).
+                                **Data Transparency**
+                                <div style="font-size: 0.9em; color: #666;">
+                                The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
+                                </div>
                                 
-                                Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
-                                
-                                **Disclaimer**
-                                
-                                Data is vetted, but not perfect—issues can stem from CMS reporting or coding errors. If you spot something off, please let me know (eric@320insight.com).
-                                
-                                [See About page to learn more](/About)
+                                <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
+                                <a href="/About">Learn more about the PBJ Dashboard</a>
+                                </div>
                                 """, unsafe_allow_html=True)
                             
                             st.markdown("</div>", unsafe_allow_html=True)
