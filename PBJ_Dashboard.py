@@ -5212,12 +5212,6 @@ def main() -> None:
                                 # Apply high-risk filter if selected
                                 if show_high_risk_only:
                                     total_facilities = len(facilities_display)
-                                    
-                                    # Debug: Show data types and sample values
-                                    st.write("Debug - Overall Rating unique values:", facilities_display['Overall Rating'].unique())
-                                    st.write("Debug - Special Focus Status unique values:", facilities_display['Special Focus Status'].unique())
-                                    st.write("Debug - Abuse Icon unique values:", facilities_display['Abuse Icon'].unique())
-                                    
                                     high_risk_mask = (
                                         (facilities_display['Overall Rating'].astype(str) == '1') |
                                         (facilities_display['Special Focus Status'].astype(str).str.contains('SFF', case=False, na=False)) |
