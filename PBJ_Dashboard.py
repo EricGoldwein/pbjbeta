@@ -318,6 +318,9 @@ def pbj_takeaway_card(
             """, unsafe_allow_html=True)
 
         
+        # Convert census to int if it's a string for calculations
+        census_int = int(census) if isinstance(census, str) and census.isdigit() else (round(census) if isinstance(census, (int, float)) else 120)
+        
         # Header chips
         tone_state = "neutral"
         tone_cmix = "neutral"
@@ -328,7 +331,7 @@ def pbj_takeaway_card(
                  High Risk</span>""" if high_risk_indicators and high_risk_indicators.get('is_high_risk', False) else "") +
             chip("Total HPRD", f"{_fmt(reported_hprd)} {trend_emoji}") +
             chip(f"{state_name} HPRD", f"{_fmt(state_hprd)}", tone_state) +
-            chip("Census", census) +
+            chip("Census", census_int) +
             chip("Contract", contract) +
             (f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
                  background:#f1f5f9;color:#334155;font-weight:600;font-size:0.85rem;margin-right:6px;">
@@ -361,9 +364,6 @@ def pbj_takeaway_card(
             previous_year_display = format_quarter_for_display(previous_year)
             census_trend_text = f" Census is {census_direction} {_fmt(abs(census_trend), 1)} since {previous_year_display}"
         
-        # Convert census to int if it's a string for calculations
-        census_int = int(census) if isinstance(census, str) and census.isdigit() else (census if isinstance(census, (int, float)) else 120)
-        
         para = (
             f"**{facility}**'s reported **{_fmt(reported_hprd)} hours per resident day** "
             f"(≈ {_fmt(res_per_staff,1)} residents per total staff) in {quarter_label}{hprd_trend_text}{census_trend_text}. "
@@ -372,7 +372,7 @@ def pbj_takeaway_card(
         )
         
         st.markdown(para)
-        st.markdown(f"**Put another way...** On a typical **30-bed floor** at {facility} you'd see about **{_fmt(floor_staff_total,1)} staff members**, including ~{_fmt(floor_staff_aides,1)} nurse aides. For the entire {census}-resident facility, that's about {_fmt(census_int * reported_hprd / 24.0,1)} total staff, including ~{_fmt(census_int * reported_hprd / 24.0 * aide_share,1)} nurse aides.")
+        st.markdown(f"**Put another way...** On a typical **30-bed floor** at {facility} you'd see about **{_fmt(floor_staff_total,1)} staff members**, including ~{_fmt(floor_staff_aides,1)} nurse aides. For the entire {census_int}-resident facility, that's about {_fmt(census_int * reported_hprd / 24.0,1)} total staff, including ~{_fmt(census_int * reported_hprd / 24.0 * aide_share,1)} nurse aides.")
 
         # Note
         st.markdown("*Note: staffing varies by day and shift, with the lowest levels typically on nights and weekends.*")
@@ -4254,10 +4254,10 @@ def main() -> None:
                             # Get census and contract from the most recent quarter data
                             if not filtered_data.empty:
                                 latest_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
-                                census_value = str(int(latest_data['Census'])) if 'Census' in latest_data and pd.notna(latest_data['Census']) else "—"
+                                census_value = str(round(latest_data['Census'])) if 'Census' in latest_data and pd.notna(latest_data['Census']) else "—"
                                 contract_value = f"{latest_data['Contract_Percentage']:.1f}%" if 'Contract_Percentage' in latest_data and pd.notna(latest_data['Contract_Percentage']) else "—"
                             else:
-                                census_value = str(int(selected_facility['Census'])) if 'Census' in selected_facility and pd.notna(selected_facility['Census']) else "—"
+                                census_value = str(round(selected_facility['Census'])) if 'Census' in selected_facility and pd.notna(selected_facility['Census']) else "—"
                                 contract_value = f"{selected_facility['Contract_Percentage']:.1f}%" if 'Contract_Percentage' in selected_facility and pd.notna(selected_facility['Contract_Percentage']) else "—"
                             
                             # Add anchor for PBJ Takeaway section with higher positioning
