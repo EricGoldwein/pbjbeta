@@ -79,12 +79,6 @@ st.markdown("""
         line-height: 1.2 !important;
     }
 }
-
-/* Fix dropdown positioning on mobile */
-.stSelectbox, .stTextInput {
-    position: fixed !important;
-    z-index: 1000 !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -800,6 +794,7 @@ def load_march_provider_info_data():
     except Exception as e:
         st.error(f"Error loading June provider info data: {str(e)}")
         return pd.DataFrame()
+
 @st.cache_data
 def create_facility_db():
     """Create an optimized DuckDB database for facility data."""
@@ -1487,6 +1482,7 @@ def sort_quarters(quarters, reverse=False):
     """Sort quarters in chronological order"""
     normalized = [normalize_quarter(q) for q in quarters]
     return sorted(normalized, reverse=reverse)
+
 def display_facility_info(provnum: str, quarter_name: str = None, affiliated_entity: str = None):
     """Display facility information in a formatted box. On mobile, remove ownership entity and show quarter below provider name."""
     try:
@@ -2145,6 +2141,8 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
     except Exception as e:
         st.error(f"Error creating case-mix charts: {str(e)}")
         return None, None
+
+
 def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
@@ -2807,6 +2805,7 @@ def main() -> None:
             name = name.replace(" On ", " on ").replace(" To ", " to ").replace(" For ", " for ")
             
             return name
+
         # Show "Back to Search" button for facility, entity, and state pages
         if level in ["Facility", "Entity", "State"]:
             # Preserve mobile parameter in home link
@@ -4340,6 +4339,7 @@ def main() -> None:
 
                     # 4. Add subscription button
                     display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
+
             # For entity level, display full entity content (verbatim from ownership page)
             elif level == "Entity" and selected_value and "pending_navigation" not in st.session_state and not st.query_params.get('state') and not st.query_params.get('facility'):
                 # Load current and previous data for comparison
@@ -4971,7 +4971,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help="The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
+                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help="The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs March 2025)")
                         with turn_col2:
                             # RN Turnover delta
                             current_rn_turnover = entity_row['Average Registered Nurse turnover percentage']
@@ -4985,7 +4985,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help="The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
+                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help="The percent of RN staff that stopped working at the nursing home over a 12-month period (vs March 2025)")
                         
                         # Compliance metrics
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5092,6 +5092,7 @@ def main() -> None:
                                 delta_display = None
                                 
                             st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help="Long-stay residents receiving antipsychotics (vs. March 2025)")
+                        
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
                         
@@ -5447,36 +5448,36 @@ def main() -> None:
                                  .dataframe th.sort-desc::after {
                                      content: ' ↓';
                                      color: #007bff;
-                                 }
-                                 .dataframe td {
-                                     padding: 4px 6px;
-                                     border-bottom: 1px solid #f0f0f0;
-                                     vertical-align: middle;
-                                     font-size: 0.8em;
-                                 }
-                                 .dataframe tr:hover {
-                                     background-color: #f8f9fa;
-                                     transform: translateY(-1px);
-                                     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                                 }
-                                 .dataframe tr:nth-child(even) {
-                                     background-color: #fafbfc;
-                                 }
-                                 .dataframe tr:nth-child(even):hover {
-                                     background-color: #f0f2f5;
-                                 }
-                                 .dataframe a {
-                                     color: #007bff;
-                                     text-decoration: none;
-                                     font-weight: 500;
-                                     transition: color 0.2s ease;
-                                 }
-                                 .dataframe a:hover {
-                                     color: #0056b3;
-                                     text-decoration: underline;
-                                 }
-                                 </style>
-                                 """, unsafe_allow_html=True)
+                                }
+                                .dataframe td {
+                                    padding: 4px 6px;
+                                    border-bottom: 1px solid #f0f0f0;
+                                    vertical-align: middle;
+                                    font-size: 0.8em;
+                                }
+                                .dataframe tr:hover {
+                                    background-color: #f8f9fa;
+                                    transform: translateY(-1px);
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                                }
+                                .dataframe tr:nth-child(even) {
+                                    background-color: #fafbfc;
+                                }
+                                .dataframe tr:nth-child(even):hover {
+                                    background-color: #f0f2f5;
+                                }
+                                .dataframe a {
+                                    color: #007bff;
+                                    text-decoration: none;
+                                    font-weight: 500;
+                                    transition: color 0.2s ease;
+                                }
+                                .dataframe a:hover {
+                                    color: #0056b3;
+                                    text-decoration: underline;
+                                }
+                                </style>
+                                """, unsafe_allow_html=True)
                                 
                                 st.markdown(html_table, unsafe_allow_html=True)
                                 
@@ -5542,6 +5543,7 @@ def main() -> None:
                         st.error(f"Entity '{selected_value}' not found in the data.")
                 else:
                     st.error("Unable to load entity data.")
+
             # For other levels (National, State)
             else:
                 if not filtered_data.empty:
