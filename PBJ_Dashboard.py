@@ -25,7 +25,7 @@ def load_pbj_favicon():
 
 # Set sidebar collapsed on mobile
 import streamlit as st
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
@@ -47,6 +47,17 @@ st.markdown("""
         color: #6c757d !important;
     }
     </style>
+    
+    <script>
+    // Force sidebar to be collapsed on page load
+    window.addEventListener('load', function() {
+        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+        if (sidebar) {
+            sidebar.setAttribute('aria-expanded', 'false');
+            sidebar.style.transform = 'translateX(-100%)';
+        }
+    });
+    </script>
 """, unsafe_allow_html=True)
 
 # Add CSS to hide the toggle tip on desktop and mobile-responsive title
@@ -76,6 +87,49 @@ facility_db = duckdb.connect(':memory:')
 
 # Initialize provider info cache
 provider_info_cache: Dict[str, Dict[str, str]] = {}
+
+def calculate_previous_year_quarter(quarter_label: str) -> str:
+    """
+    Calculate the previous year quarter (4 quarters behind).
+    
+    Args:
+        quarter_label: Current quarter in format "Q1 2025"
+        
+    Returns:
+        Previous year quarter in format "2024Q1" (matches CY_QTR format)
+    """
+    try:
+        # Parse quarter and year from quarter_label (e.g., "Q1 2025")
+        quarter = quarter_label[0:2]  # "Q1"
+        year = int(quarter_label[3:])  # 2025
+        
+        # Calculate previous year (4 quarters behind)
+        previous_year = year - 1
+        
+        return f"{previous_year}{quarter}"
+    except (ValueError, IndexError):
+        # Fallback to default if parsing fails
+        return "2024Q1"
+
+def format_quarter_for_display(quarter_db_format: str) -> str:
+    """
+    Convert database quarter format to display format.
+    
+    Args:
+        quarter_db_format: Quarter in format "2024Q1"
+        
+    Returns:
+        Quarter in display format "Q1 2024"
+    """
+    try:
+        # Parse year and quarter from database format (e.g., "2024Q1")
+        year = quarter_db_format[0:4]  # "2024"
+        quarter = quarter_db_format[4:]  # "Q1"
+        
+        return f"{quarter} {year}"
+    except (ValueError, IndexError):
+        # Fallback to default if parsing fails
+        return "Q1 2024"
 
 @st.cache_data
 def load_facility_data():
@@ -147,7 +201,7 @@ def pbj_takeaway_card(
     contract: str = "—",
     trend_delta: float = None,  # Change from previous quarter
     census_trend: float = None,  # Change in census from previous quarter
-    previous_quarter: str = "Q1 2024",  # Previous quarter for comparison
+    previous_year: str = None,  # Previous year quarter for comparison (4 quarters behind)
     aide_share: float = 0.60,  # or compute from PBJ if you have it
     floor_beds: int = 30,
     ownership_type: str = None,  # Ownership type (For Profit, Non Profit, Government)
@@ -156,6 +210,10 @@ def pbj_takeaway_card(
     high_risk_indicators: dict = None,  # High-risk indicators
     ownership_change: bool = False  # Whether facility changed ownership in last 12 months
 ):
+    # Calculate previous year quarter if not provided
+    if previous_year is None:
+        previous_year = calculate_previous_year_quarter(quarter_label)
+    
     # Force proper title case for facility name to ensure "At" is lowercase
     facility = proper_title_case(facility)
     # Core calcs
@@ -255,12 +313,14 @@ def pbj_takeaway_card(
         hprd_trend_text = ""
         if trend_delta is not None:
             trend_direction = "up" if trend_delta > 0 else "down"
-            hprd_trend_text = f" HPRD is {trend_direction} {_fmt(abs(trend_delta))} since Q1 2024"
+            previous_year_display = format_quarter_for_display(previous_year)
+            hprd_trend_text = f" HPRD is {trend_direction} {_fmt(abs(trend_delta))} since {previous_year_display}"
         
         census_trend_text = ""
         if census_trend is not None:
             census_direction = "up" if census_trend > 0 else "down"
-            census_trend_text = f" Census is {census_direction} {_fmt(abs(census_trend), 1)} since Q1 2024"
+            previous_year_display = format_quarter_for_display(previous_year)
+            census_trend_text = f" Census is {census_direction} {_fmt(abs(census_trend), 1)} since {previous_year_display}"
         
         # Convert census to int if it's a string for calculations
         census_int = int(census) if isinstance(census, str) and census.isdigit() else (census if isinstance(census, (int, float)) else 120)
@@ -336,11 +396,15 @@ def state_pbj_takeaway_card(
     state_rank: int,
     total_states: int,
     trend_delta: float = None,  # Change from previous quarter
-    previous_quarter: str = "Q1 2024",  # Previous quarter for comparison
+    previous_year: str = None,  # Previous year quarter for comparison (4 quarters behind)
     aide_share: float = 0.60,  # or compute from PBJ if you have it
     floor_beds: int = 30,
     avg_facility_size: float = 100  # Average facility size for the state
 ):
+    # Calculate previous year quarter if not provided
+    if previous_year is None:
+        previous_year = calculate_previous_year_quarter(quarter_label)
+    
     # Core calcs
     res_per_staff = 24.0 / reported_hprd if reported_hprd else None
     floor_staff_total = (floor_beds * reported_hprd / 24.0) if reported_hprd else None
@@ -349,14 +413,21 @@ def state_pbj_takeaway_card(
     vs_national = _classify(reported_hprd, national_hprd)
 
     # Styles
-    def chip(label, value, tone="neutral"):
+    def chip(label, value, tone="neutral", link=None):
         colors = {
             "good":   ("#065f46", "#ecfdf5"),
             "warn":   ("#7c2d12", "#fff7ed"),
             "neutral":("#334155", "#f1f5f9")
         }
         fg, bg = colors["neutral" if tone not in colors else tone]
-        return f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
+        
+        if link:
+            return f"""<a href="{link}" style="text-decoration: none;">
+                 <span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                 background:{bg};color:{fg};font-weight:600;font-size:0.85rem;margin-right:6px;cursor:pointer;transition:all 0.2s ease;border:1px solid {fg}20;">
+                 {label}: {value} <span style="font-size:0.75em;">→</span></span></a>"""
+        else:
+            return f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
                  background:{bg};color:{fg};font-weight:600;font-size:0.85rem;margin-right:6px;">
                  {label}: {value}</span>"""
 
@@ -419,7 +490,8 @@ def state_pbj_takeaway_card(
         hprd_trend_text = ""
         if trend_delta is not None:
             trend_direction = "up" if trend_delta > 0 else "down"
-            hprd_trend_text = f" HPRD is {trend_direction} {_fmt(abs(trend_delta))} since {previous_quarter}"
+            previous_year_display = format_quarter_for_display(previous_year)
+            hprd_trend_text = f" HPRD is {trend_direction} {_fmt(abs(trend_delta))} since {previous_year_display}"
 
         para = (
             f"**{state_name}**'s reported **{_fmt(reported_hprd)} hours per resident day** "
@@ -4025,7 +4097,7 @@ def main() -> None:
                                 ]
                                 state_avg = current_quarter_state_data['Total_Nurse_HPRD'].iloc[0] if not current_quarter_state_data.empty else 3.5
                             else:
-                                state_avg = 3.5
+                                state_avg = "N/A"
                             
                             # Get case-mix expected HPRD
                             facility_info = None
@@ -4087,12 +4159,21 @@ def main() -> None:
                             # Calculate trend from previous quarter
                             trend_delta = None
                             if not filtered_data.empty and len(filtered_data) > 1:
-                                # Get the two most recent quarters
-                                recent_data = filtered_data.sort_values('CY_QTR', ascending=False).head(2)
-                                if len(recent_data) == 2:
-                                    current_hprd = recent_data.iloc[0]['Total_Nurse_HPRD']
-                                    previous_hprd = recent_data.iloc[1]['Total_Nurse_HPRD']
+                                # Get current quarter data
+                                current_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
+                                current_hprd = current_data['Total_Nurse_HPRD']
+                                
+                                # Calculate previous year quarter
+                                current_quarter = current_data['CY_QTR']
+                                previous_year_quarter = calculate_previous_year_quarter(f"Q{quarter} {year}")
+                                
+                                # Find the same quarter from previous year
+                                previous_year_data = filtered_data[filtered_data['CY_QTR'] == previous_year_quarter]
+                                if not previous_year_data.empty:
+                                    previous_hprd = previous_year_data.iloc[0]['Total_Nurse_HPRD']
                                     trend_delta = current_hprd - previous_hprd
+                                else:
+                                    trend_delta = None
                             
 
                             
@@ -4129,7 +4210,7 @@ def main() -> None:
                                 contract=contract_value,
                                 trend_delta=trend_delta,
                                 census_trend=None,  # You can add actual census trend data here
-                                previous_quarter="Q1 2024",  # Previous quarter for comparison
+                                previous_year=None,  # Will be calculated automatically as 4 quarters behind
                                 ownership_type=ownership_type,
                                 affiliated_entity=affiliated_entity,
                                 affiliated_entity_id=affiliated_entity_id,
@@ -5738,10 +5819,17 @@ def main() -> None:
                             # Calculate trend from previous quarter
                             trend_delta = None
                             if len(filtered_data) > 1:
-                                recent_data = filtered_data.sort_values('CY_QTR', ascending=False).head(2)
-                                if len(recent_data) == 2:
-                                    current_hprd = recent_data.iloc[0]['Total_Nurse_HPRD']
-                                    previous_hprd = recent_data.iloc[1]['Total_Nurse_HPRD']
+                                # Get current quarter data
+                                current_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
+                                current_hprd = current_data['Total_Nurse_HPRD']
+                                
+                                # Calculate previous year quarter
+                                previous_year_quarter = calculate_previous_year_quarter(f"Q{quarter} {year}")
+                                
+                                # Find the same quarter from previous year
+                                previous_year_data = filtered_data[filtered_data['CY_QTR'] == previous_year_quarter]
+                                if not previous_year_data.empty:
+                                    previous_hprd = previous_year_data.iloc[0]['Total_Nurse_HPRD']
                                     trend_delta = current_hprd - previous_hprd
                             
                             # Get full state name
@@ -5759,9 +5847,188 @@ def main() -> None:
                                 state_rank=state_rank,
                                 total_states=total_states,
                                 trend_delta=trend_delta,
-                                previous_quarter="Q1 2024",
+                                previous_year=None,  # Will be calculated automatically as 4 quarters behind
                                 avg_facility_size=state_avg_census
                             )
+                            
+                            # State Rankings Expander
+                            with st.expander("📊 State Rankings", expanded=False):
+                                # Load state rankings data
+                                try:
+                                    import os
+                                    # Try multiple possible paths
+                                    possible_paths = [
+                                        os.path.join(os.getcwd(), 'state_lite_metrics.csv'),
+                                        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'state_lite_metrics.csv'),
+                                        'state_lite_metrics.csv'  # Try relative path
+                                    ]
+                                    
+                                    file_path = None
+                                    for path in possible_paths:
+                                        if os.path.exists(path):
+                                            file_path = path
+                                            break
+                                    
+                                    if file_path:
+                                        state_data = pd.read_csv(file_path)
+                                        
+                                        # Get the most recent quarter
+                                        latest_quarter = state_data['CY_Qtr'].max()
+                                        
+                                        # Filter for latest quarter
+                                        latest_data = state_data[state_data['CY_Qtr'] == latest_quarter].copy()
+                                        
+                                        if not latest_data.empty:
+                                            # State name mapping
+                                            state_name_map = {
+                                                'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona', 'CA': 'California', 'CO': 'Colorado',
+                                                'CT': 'Connecticut', 'DC': 'District of Columbia', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+                                                'HI': 'Hawaii', 'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
+                                                'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland', 'ME': 'Maine',
+                                                'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana',
+                                                'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+                                                'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
+                                                'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
+                                                'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
+                                                'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
+                                            }
+                                            
+                                            # Add full state names
+                                            latest_data['State_Name'] = latest_data['STATE'].map(state_name_map)
+                                            
+                                            # Sort by Total Nurse HPRD (descending)
+                                            latest_data = latest_data.sort_values('Total_Nurse_HPRD', ascending=False)
+                                            
+                                            # Add rank column
+                                            latest_data['Rank'] = range(1, len(latest_data) + 1)
+                                            
+                                            # Format quarter for display
+                                            quarter_display = latest_quarter[4:] + " " + latest_quarter[:4]  # Convert "2025Q1" to "Q1 2025"
+                                            
+                                            # Create the rankings table with Total Nurse HPRD as third column
+                                            rankings_df = latest_data[['Rank', 'State_Name', 'Total_Nurse_HPRD', 'Facility_Count', 'State_Census']].copy()
+                                            rankings_df.columns = ['Rank', 'State', 'Total Nurse HPRD', 'Total Providers', 'Total Residents (avg. per day)']
+                                            
+                                            # Format numeric columns
+                                            rankings_df['Total Providers'] = rankings_df['Total Providers'].astype(int)
+                                            rankings_df['Total Residents (avg. per day)'] = (rankings_df['Total Residents (avg. per day)'] + 0.5).astype(int)  # Round to whole numbers
+                                            rankings_df['Total Nurse HPRD'] = rankings_df['Total Nurse HPRD'].round(2)
+                                            
+                                            # Display the table with custom styling
+                                            st.markdown(f"### State Rankings by Total Nurse HPRD ({quarter_display})")
+                                            
+                                            # Apply custom styling to the dataframe with emphasis on HPRD column
+                                            def style_rankings(df):
+                                                return df.style.format({
+                                                    'Total Nurse HPRD': '{:.2f}',
+                                                    'Total Residents (avg. per day)': '{:,.0f}',
+                                                    'Total Providers': '{:,.0f}'
+                                                }).apply(lambda x: [
+                                                    'background-color: #e3f2fd; font-weight: 700; color: #1769aa; text-align: center' if i == 0 else  # Rank column
+                                                    '' if i == 1 else  # State column
+                                                    'background-color: #e8f5e8; font-weight: 700; color: #2e7d32; text-align: center' if i == 2 else  # HPRD column emphasis
+                                                    '' for i in range(len(x))
+                                                ], axis=1)
+                                            
+                                            # Add custom CSS for tighter, more polished table styling with narrow columns
+                                            st.markdown("""
+                                            <style>
+                                            /* Ultra-tight, polished table styling with narrow columns */
+                                            .dataframe {
+                                                font-size: 12px !important;
+                                                border-collapse: collapse !important;
+                                                width: 100% !important;
+                                                margin: 8px 0 !important;
+                                                border-radius: 4px !important;
+                                                overflow: hidden !important;
+                                                box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+                                                table-layout: fixed !important;
+                                            }
+                                            
+                                            .dataframe th {
+                                                background: linear-gradient(135deg, #1769aa 0%, #1565c0 100%) !important;
+                                                color: white !important;
+                                                padding: 6px 4px !important;
+                                                text-align: left !important;
+                                                font-weight: 600 !important;
+                                                border: none !important;
+                                                font-size: 11px !important;
+                                                letter-spacing: 0.5px !important;
+                                            }
+                                            
+                                            .dataframe td {
+                                                padding: 4px 4px !important;
+                                                border-bottom: 1px solid #e3e8f0 !important;
+                                                text-align: left !important;
+                                                font-size: 11px !important;
+                                                line-height: 1.2 !important;
+                                            }
+                                            
+                                            .dataframe tr:nth-child(even) {
+                                                background-color: #f8f9fa !important;
+                                            }
+                                            
+                                            .dataframe tr:hover {
+                                                background-color: #e3f2fd !important;
+                                                transition: all 0.15s ease !important;
+                                            }
+                                            
+                                            /* Column width control */
+                                            .dataframe th:nth-child(1),
+                                            .dataframe td:nth-child(1) {
+                                                width: 40px !important;
+                                                min-width: 40px !important;
+                                                max-width: 40px !important;
+                                                text-align: center !important;
+                                            }
+                                            
+                                            .dataframe th:nth-child(2),
+                                            .dataframe td:nth-child(2) {
+                                                width: 120px !important;
+                                                min-width: 120px !important;
+                                                max-width: 120px !important;
+                                            }
+                                            
+                                            .dataframe th:nth-child(3),
+                                            .dataframe td:nth-child(3) {
+                                                width: 80px !important;
+                                                min-width: 80px !important;
+                                                max-width: 80px !important;
+                                                font-weight: 700 !important;
+                                                color: #2e7d32 !important;
+                                                text-align: center !important;
+                                            }
+                                            
+                                            .dataframe th:nth-child(4),
+                                            .dataframe td:nth-child(4) {
+                                                width: 100px !important;
+                                                min-width: 100px !important;
+                                                max-width: 100px !important;
+                                                text-align: center !important;
+                                            }
+                                            
+                                            .dataframe th:nth-child(5),
+                                            .dataframe td:nth-child(5) {
+                                                width: 120px !important;
+                                                min-width: 120px !important;
+                                                max-width: 120px !important;
+                                                text-align: center !important;
+                                            }
+                                            </style>
+                                            """, unsafe_allow_html=True)
+                                            
+                                            st.dataframe(
+                                                style_rankings(rankings_df),
+                                                use_container_width=True,
+                                                hide_index=True
+                                            )
+                                            
+                                        else:
+                                            st.error("No data found for the latest quarter.")
+                                    else:
+                                        st.error("State metrics data file not found.")
+                                except Exception as e:
+                                    st.error(f"Error loading state rankings data: {str(e)}")
                             
                             # Add methodology expander for state pages - centered below PBJ Takeaway
                             st.markdown("""
