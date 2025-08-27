@@ -88,6 +88,45 @@ facility_db = duckdb.connect(':memory:')
 # Initialize provider info cache
 provider_info_cache: Dict[str, Dict[str, str]] = {}
 
+def get_db_connection():
+    """Get a connection to the DuckDB database."""
+    try:
+        # Use the existing in-memory facility database
+        return facility_db
+    except Exception as e:
+        print(f"Error connecting to database: {str(e)}")
+        return None
+
+@st.cache_data
+def load_macpac_standards():
+    """Load and cache MACPAC state staffing standards data."""
+    try:
+        import os
+        # Try multiple possible paths for the file
+        def find_file(filename):
+            possible_paths = [
+                os.path.join(os.getcwd(), filename),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
+                filename  # Try relative path
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    return path
+            return None
+        
+        macpac_path = find_file('macpac_state_standards_clean.csv')
+        
+        if not macpac_path:
+            st.warning("MACPAC state standards data not found. State requirements will not be displayed.")
+            return pd.DataFrame()
+        
+        macpac_data = pd.read_csv(macpac_path)
+        return macpac_data
+        
+    except Exception as e:
+        st.warning(f"Error loading MACPAC data: {e}. State requirements will not be displayed.")
+        return pd.DataFrame()
+
 def calculate_previous_year_quarter(quarter_label: str) -> str:
     """
     Calculate the previous year quarter (4 quarters behind).
@@ -411,6 +450,31 @@ def state_pbj_takeaway_card(
     floor_staff_aides = (floor_staff_total * aide_share) if floor_staff_total else None
 
     vs_national = _classify(reported_hprd, national_hprd)
+    
+    # Load MACPAC state standards data
+    macpac_data = load_macpac_standards()
+    state_standard = None
+    is_federal_minimum = False
+    standard_display_text = ""
+    standard_chip_text = ""
+    
+    if not macpac_data.empty:
+        # Find the state in MACPAC data
+        state_match = macpac_data[macpac_data['State'].str.lower() == state_name.lower()]
+        if not state_match.empty:
+            state_standard = state_match.iloc[0]
+            is_federal_minimum = state_standard['Is_Federal_Minimum']
+            standard_display_text = state_standard['Display_Text']
+            
+            # Create chip text based on state standard type
+            if pd.isna(state_standard['Min_Staffing']):
+                standard_chip_text = "Data Not Available"
+            elif state_standard['Min_Staffing'] == 0.30:
+                standard_chip_text = f"State Standard: {state_standard['Min_Staffing']} HPRD (federal min)"
+            elif state_standard['Value_Type'] == 'range':
+                standard_chip_text = f"State Standard: {state_standard['Min_Staffing']}-{state_standard['Max_Staffing']} HPRD"
+            else:
+                standard_chip_text = f"State Standard: {state_standard['Min_Staffing']} HPRD"
 
     # Styles
     def chip(label, value, tone="neutral", link=None):
@@ -475,12 +539,21 @@ def state_pbj_takeaway_card(
         # Header chips
         tone_national = "neutral"  # Always neutral for National HPRD
         trend_emoji = "📈" if trend_delta and trend_delta > 0 else ("📉" if trend_delta and trend_delta < 0 else "")
-        st.markdown(
+        
+        # Build header chips
+        header_chips = (
             chip(f"{state_name} HPRD", f"{_fmt(reported_hprd)} {trend_emoji}") +
             chip("National HPRD", f"{_fmt(national_hprd)}", tone_national) +
-            chip("State Rank", f"#{state_rank} of {total_states}"),
-            unsafe_allow_html=True
+            chip("State Rank", f"#{state_rank} of {total_states}")
         )
+        
+        # Add state standard chip if available
+        if standard_chip_text:
+            header_chips += f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                 background:#f1f5f9;color:#334155;font-weight:600;font-size:0.85rem;margin-right:6px;border:1px solid #cbd5e1;">
+                 {standard_chip_text}</span>"""
+        
+        st.markdown(header_chips, unsafe_allow_html=True)
 
         # Narrative
         # Pick "above/below/around" words
@@ -501,6 +574,7 @@ def state_pbj_takeaway_card(
         )
         
         st.markdown(para)
+        
         # Calculate staff for average facility size
         avg_facility_staff_total = (avg_facility_size * reported_hprd / 24.0) if reported_hprd else None
         avg_facility_staff_aides = (avg_facility_staff_total * aide_share) if avg_facility_staff_total else None
@@ -4275,9 +4349,9 @@ def main() -> None:
                                 </style>
                                 """, unsafe_allow_html=True)
                                 
-                                with st.expander("📊 Methodology", expanded=False):
+                                with st.expander("⚙️ Methodology", expanded=False):
                                     st.markdown("""
-                                    This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
+                                    This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                                     
                                     **Metrics**
                                     
@@ -4971,7 +5045,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help="The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs March 2025)")
+                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help="The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
                         with turn_col2:
                             # RN Turnover delta
                             current_rn_turnover = entity_row['Average Registered Nurse turnover percentage']
@@ -4985,7 +5059,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help="The percent of RN staff that stopped working at the nursing home over a 12-month period (vs March 2025)")
+                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help="The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
                         
                         # Compliance metrics
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5511,9 +5585,9 @@ def main() -> None:
                         <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
                         """, unsafe_allow_html=True)
                         
-                        with st.expander("📊 Methodology", expanded=False):
+                        with st.expander("⚙️ Methodology", expanded=False):
                             st.markdown("""
-                            This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
+                            This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                             
                             **Metrics**
                             
@@ -5745,9 +5819,9 @@ def main() -> None:
                             <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
                             """, unsafe_allow_html=True)
                             
-                            with st.expander("📊 Methodology", expanded=False):
+                            with st.expander("⚙️ Methodology", expanded=False):
                                 st.markdown("""
-                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
+                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                                 
                                 **Metrics**
                                 
@@ -6035,9 +6109,9 @@ def main() -> None:
                             <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
                             """, unsafe_allow_html=True)
                             
-                            with st.expander("📊 Methodology", expanded=False):
+                            with st.expander("⚙️ Methodology", expanded=False):
                                 st.markdown("""
-                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity).
+                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                                 
                                 **Metrics**
                                 
@@ -6090,108 +6164,7 @@ def main() -> None:
             return
     except Exception as e:
         st.error(f"Error in main app: {str(e)}")
-
-
-    
-    # Add footer at the end of the page
-    display_footer()
-
-def get_db_connection():
-    """Get a connection to the DuckDB database."""
-    db_file = "nursing_home_staffing.db"
-    if not os.path.exists(db_file):
-        print(f"Database file {db_file} not found")
-        return None
-    try:
-        return duckdb.connect(db_file)
-    except Exception as e:
-        print(f"Error connecting to database: {str(e)}")
-        return None
-
-def query_nurse_staffing(provnum: str, start_date: str, end_date: str, staff_category: str) -> pd.DataFrame:
-    """Query nurse staffing data for a specific facility and date range."""
-    try:
-        # Convert dates to datetime
-        start_dt = pd.to_datetime(start_date)
-        end_dt = pd.to_datetime(end_date)
-        
-        # Get the quarters we need to check
-        quarters = []
-        current = start_dt
-        while current <= end_dt:
-            quarter = f"{current.year}Q{(current.month-1)//3 + 1}"
-            if quarter not in quarters:
-                quarters.append(quarter)
-            current += pd.DateOffset(months=1)
-        
-        # Load data from each quarter file
-        dfs = []
-        for quarter in quarters:
-            file_path = f'standardized_PBJ/PBJ_dailynursestaffing_CY{quarter}.csv'
-            if os.path.exists(file_path):
-                df = pd.read_csv(file_path)
-                dfs.append(df)
-        
-        if not dfs:
-            return pd.DataFrame()
-            
-        # Combine all quarters
-        combined_df = pd.concat(dfs, ignore_index=True)
-        
-        # Filter for the specific facility and date range
-        mask = (
-            (combined_df['PROVNUM'] == provnum) &
-            (pd.to_datetime(combined_df['WorkDate']) >= start_dt) &
-            (pd.to_datetime(combined_df['WorkDate']) <= end_dt)
-        )
-        filtered_df = combined_df[mask].copy()
-        
-        if filtered_df.empty:
-            return pd.DataFrame()
-            
-        # Convert WorkDate to datetime and add day of week
-        filtered_df['WorkDate'] = pd.to_datetime(filtered_df['WorkDate'])
-        filtered_df['DayOfWeek'] = filtered_df['WorkDate'].dt.day_name()
-        
-        # Select relevant columns based on staff category
-        if staff_category == 'RN':
-            hours_cols = ['Hrs_RN', 'Hrs_RN_emp', 'Hrs_RN_ctr']
-        elif staff_category == 'LPN':
-            hours_cols = ['Hrs_LPN', 'Hrs_LPN_emp', 'Hrs_LPN_ctr']
-        elif staff_category == 'CNA':
-            hours_cols = ['Hrs_CNA', 'Hrs_CNA_emp', 'Hrs_CNA_ctr']
-        elif staff_category == 'Nurse Aide Trainee':
-            hours_cols = ['Hrs_NAtrn', 'Hrs_NAtrn_emp', 'Hrs_NAtrn_ctr']
-        elif staff_category == 'Medical Aide':
-            hours_cols = ['Hrs_MedAide', 'Hrs_MedAide_emp', 'Hrs_MedAide_ctr']
-        elif staff_category == 'RN Administrator':
-            hours_cols = ['Hrs_RNadmin', 'Hrs_RNadmin_emp', 'Hrs_RNadmin_ctr']
-        elif staff_category == 'LPN Administrator':
-            hours_cols = ['Hrs_LPNadmin', 'Hrs_LPNadmin_emp', 'Hrs_LPNadmin_ctr']
-        elif staff_category == 'RN Director of Nursing':
-            hours_cols = ['Hrs_RNDON', 'Hrs_RNDON_emp', 'Hrs_RNDON_ctr']
-        else:
-            return pd.DataFrame()
-            
-        # Select only the columns we need
-        result_df = filtered_df[['WorkDate', 'DayOfWeek', 'MDScensus'] + hours_cols].copy()
-        
-        # Rename columns for clarity
-        result_df.rename(columns={
-            'WorkDate': 'Date',
-            'MDScensus': 'Census',
-            hours_cols[0]: 'Total Hours',
-            hours_cols[1]: 'Employee Hours',
-            hours_cols[2]: 'Contract Hours'
-        }, inplace=True)
-        
-        return result_df
-        
-    except Exception as e:
-        print(f"Error querying nurse staffing data: {str(e)}")
-        return pd.DataFrame()
-
-
+        return
 
 if __name__ == "__main__":
     main()
