@@ -364,12 +364,23 @@ def pbj_takeaway_card(
             previous_year_display = format_quarter_for_display(previous_year)
             census_trend_text = f" Census is {census_direction} {_fmt(abs(census_trend), 1)} since {previous_year_display}"
         
-        para = (
-            f"**{facility}**'s reported **{_fmt(reported_hprd)} hours per resident day** "
-            f"(≈ {_fmt(res_per_staff,1)} residents per total staff) in {quarter_label}{hprd_trend_text}{census_trend_text}. "
-            f"This level is {word_state} the {state_name} ratio of {_fmt(state_hprd)} "
-            f"and {word_cmix} its case-mix (expected) {_fmt(casemix_hprd)} given resident acuity."
-        )
+        # Check if case-mix data is available
+        has_case_mix_data = casemix_hprd is not None and casemix_hprd != reported_hprd and not pd.isna(casemix_hprd)
+        
+        if has_case_mix_data:
+            para = (
+                f"**{facility}**'s reported **{_fmt(reported_hprd)} hours per resident day** "
+                f"(≈ {_fmt(res_per_staff,1)} residents per total staff) in {quarter_label}{hprd_trend_text}{census_trend_text}. "
+                f"This level is {word_state} the {state_name} ratio of {_fmt(state_hprd)} "
+                f"and {word_cmix} its case-mix (expected) {_fmt(casemix_hprd)} given resident acuity."
+            )
+        else:
+            para = (
+                f"**{facility}**'s reported **{_fmt(reported_hprd)} hours per resident day** "
+                f"(≈ {_fmt(res_per_staff,1)} residents per total staff) in {quarter_label}{hprd_trend_text}{census_trend_text}. "
+                f"This level is {word_state} the {state_name} ratio of {_fmt(state_hprd)}. "
+                f"CMS did not report case-mix data for this facility in latest staffing report."
+            )
         
         st.markdown(para)
         st.markdown(f"**Put another way...** On a typical **30-bed floor** at {facility} you'd see about **{_fmt(floor_staff_total,1)} staff members**, including ~{_fmt(floor_staff_aides,1)} nurse aides. For the entire {census_int}-resident facility, that's about {_fmt(census_int * reported_hprd / 24.0,1)} total staff, including ~{_fmt(census_int * reported_hprd / 24.0 * aide_share,1)} nurse aides.")
@@ -2101,6 +2112,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         delta_percentages = []
         reported_values = []
         case_mix_values = []
+        available_categories = []
         
         for category in categories:
             if category == "Total Nursing":
@@ -2113,17 +2125,24 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
                 reported_val = row["Reported Nurse Aide Staffing Hours per Resident per Day"]
                 case_mix_val = row["Case-Mix Nurse Aide Staffing Hours per Resident per Day"]
             
-            # Calculate values
-            delta = reported_val - case_mix_val if pd.notna(reported_val) and pd.notna(case_mix_val) else 0
-            delta_pct = ((reported_val / case_mix_val - 1) * 100) if pd.notna(reported_val) and pd.notna(case_mix_val) and case_mix_val > 0 else 0
+            # Check if we have valid data for this category
+            has_reported = pd.notna(reported_val) and reported_val > 0
+            has_case_mix = pd.notna(case_mix_val) and case_mix_val > 0
             
-            deltas.append(delta)
-            delta_percentages.append(delta_pct)
-            reported_values.append(reported_val if pd.notna(reported_val) else 0)
-            case_mix_values.append(case_mix_val if pd.notna(case_mix_val) else 0)
+            if has_reported or has_case_mix:
+                available_categories.append(category)
+                # Calculate values
+                delta = reported_val - case_mix_val if has_reported and has_case_mix else 0
+                delta_pct = ((reported_val / case_mix_val - 1) * 100) if has_reported and has_case_mix and case_mix_val > 0 else 0
+                
+                deltas.append(delta)
+                delta_percentages.append(delta_pct)
+                reported_values.append(reported_val if has_reported else 0)
+                case_mix_values.append(case_mix_val if has_case_mix else 0)
         
-        if not any(reported_values) and not any(case_mix_values):
-            return None
+        # If no case-mix data available at all, return None
+        if not any(case_mix_values):
+            return None, None
             
         # Create the chart using Plotly
         fig = go.Figure()
@@ -2133,7 +2152,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         
         # Add Reported bars (Blue)
         fig.add_trace(go.Bar(
-            x=categories,
+            x=available_categories,
             y=reported_values,
             name='Reported',
             marker_color='blue',
@@ -2142,7 +2161,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         
         # Add Case-Mix bars (Red)
         fig.add_trace(go.Bar(
-            x=categories,
+            x=available_categories,
             y=case_mix_values,
             name='Case-Mix',
             marker_color='red',
@@ -4097,38 +4116,60 @@ def main() -> None:
                             except:
                                 facility_name = proper_title_case(selected_facility['PROVNAME'])
                             
-                            case_mix_fig, _ = create_case_mix_charts(selected_value, quarter_label, facility_name)
-                            if case_mix_fig:
-                                st.plotly_chart(case_mix_fig, use_container_width=True)
-                                
-                                # Add small caption for case-mix explanation
-                                st.markdown("""
-                                <div style="text-align: left; margin: 2px 0; font-size: 0.7em; color: #666;" class="case-mix-caption">
-                                    <em>Case-mix is <a href="https://www.cms.gov/medicare/provider-enrollment-and-certification/certificationandcomplianc/downloads/usersguide.pdf" target="_blank" style="color: #1976d2;">a CMS benchmark</a> for expected staffing based on resident needs.</em>
-                                </div>
-                                <style>
-                                @media (min-width: 768px) {
-                                    .case-mix-caption {
-                                        margin-top: -15px !important;
-                                        text-align: center !important;
+                            # Check if case-mix data is available before creating chart
+                            try:
+                                provider_df = pd.read_csv(file_path)
+                                facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == selected_value]
+                                if not facility_info.empty:
+                                    row = facility_info.iloc[0]
+                                    # Check if any case-mix data exists
+                                    total_case_mix = row.get("Case-Mix Total Nurse Staffing Hours per Resident per Day")
+                                    rn_case_mix = row.get("Case-Mix RN Staffing Hours per Resident per Day")
+                                    cna_case_mix = row.get("Case-Mix Nurse Aide Staffing Hours per Resident per Day")
+                                    
+                                    has_case_mix_data = any([
+                                        pd.notna(total_case_mix) and total_case_mix > 0,
+                                        pd.notna(rn_case_mix) and rn_case_mix > 0,
+                                        pd.notna(cna_case_mix) and cna_case_mix > 0
+                                    ])
+                                else:
+                                    has_case_mix_data = False
+                            except:
+                                has_case_mix_data = False
+                            
+                            if has_case_mix_data:
+                                case_mix_fig, _ = create_case_mix_charts(selected_value, quarter_label, facility_name)
+                                if case_mix_fig:
+                                    st.plotly_chart(case_mix_fig, use_container_width=True)
+                                    
+                                    # Add small caption for case-mix explanation
+                                    st.markdown("""
+                                    <div style="text-align: left; margin: 2px 0; font-size: 0.7em; color: #666;" class="case-mix-caption">
+                                        <em>Case-mix is <a href="https://www.cms.gov/medicare/provider-enrollment-and-certification/certificationandcomplianc/downloads/usersguide.pdf" target="_blank" style="color: #1976d2;">a CMS benchmark</a> for expected staffing based on resident needs.</em>
+                                    </div>
+                                    <style>
+                                    @media (min-width: 768px) {
+                                        .case-mix-caption {
+                                            margin-top: -15px !important;
+                                            text-align: center !important;
+                                        }
                                     }
-                                }
-                                @media (max-width: 768px) {
-                                    /* Hide legend on mobile for case-mix charts */
-                                    .js-plotly-plot .plotly .legend {
-                                        display: none !important;
+                                    @media (max-width: 768px) {
+                                        /* Hide legend on mobile for case-mix charts */
+                                        .js-plotly-plot .plotly .legend {
+                                            display: none !important;
+                                        }
+                                        /* Move case-mix caption closer to chart on mobile */
+                                        .case-mix-caption {
+                                            margin-top: -16px !important;
+                                        }
+                                        /* Move 320 Consulting source closer to chart on mobile */
+                                        .js-plotly-plot .plotly .annotation {
+                                            transform: translateY(-2px) !important;
+                                        }
                                     }
-                                    /* Move case-mix caption closer to chart on mobile */
-                                    .case-mix-caption {
-                                        margin-top: -16px !important;
-                                    }
-                                    /* Move 320 Consulting source closer to chart on mobile */
-                                    .js-plotly-plot .plotly .annotation {
-                                        transform: translateY(-2px) !important;
-                                    }
-                                }
-                                </style>
-                                """, unsafe_allow_html=True)
+                                    </style>
+                                    """, unsafe_allow_html=True)
                         
                         # Add HPRD Explanation for facility level
                         if level == "Facility":
@@ -4195,7 +4236,12 @@ def main() -> None:
                                 provider_df = pd.read_csv(file_path)
                                 facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == selected_value]
                                 if not facility_info.empty:
-                                    case_mix_hprd = facility_info.iloc[0]['Case-Mix Total Nurse Staffing Hours per Resident per Day']
+                                    case_mix_raw = facility_info.iloc[0]['Case-Mix Total Nurse Staffing Hours per Resident per Day']
+                                    # Handle missing or invalid case-mix data
+                                    if pd.isna(case_mix_raw) or case_mix_raw == '' or case_mix_raw is None:
+                                        case_mix_hprd = reported_hprd  # fallback to reported HPRD
+                                    else:
+                                        case_mix_hprd = case_mix_raw
                                 else:
                                     case_mix_hprd = reported_hprd  # fallback
                             except:

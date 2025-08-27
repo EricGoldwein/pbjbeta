@@ -91,6 +91,16 @@ All methodology sections now include:
   - Single values: "State Standard: 3.56 HPRD"
   - Missing data: "Data Not Available"
 
+### State Rankings Table Enhancement
+- **Added**: "State Min. HPRD" column as the final column
+- **Column Formatting**:
+  - Federal minimum: "0.30 (fed. min)"
+  - Range requirements: "3.56-4.16"
+  - Single values: "3.56"
+  - Missing data: "N/A"
+- **Styling**: Purple background (#f3e5f5) with blue text (#1976d2) for emphasis
+- **Integration**: Seamlessly merged with existing rankings table
+
 ## About Page Updates
 
 ### Data Sources Section
@@ -116,6 +126,7 @@ Updated to include MACPAC as a formal data source:
 - Updated methodology expander icons from 📊 to ⚙️
 - Ensured consistent MACPAC attribution across all sections
 - Implemented state standard chips in PBJ Takeaway cards
+- Enhanced state rankings table with MACPAC minimum requirements
 
 ## Usage
 The MACPAC state standards are now automatically displayed in each state's PBJ Takeaway card, providing users with:
