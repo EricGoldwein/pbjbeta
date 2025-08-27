@@ -392,16 +392,16 @@ def pbj_takeaway_card(
         if high_risk_indicators and high_risk_indicators.get('is_high_risk', False):
             risk_reasons = []
             if high_risk_indicators.get('one_star', False):
-                risk_reasons.append("1-star overall rating")
+                risk_reasons.append("1-Star Overall Rating")
             if high_risk_indicators.get('sff', False):
-                risk_reasons.append("Special Focus Facility (SFF)")
+                risk_reasons.append("Special Focus Facility")
             if high_risk_indicators.get('sff_candidate', False):
-                risk_reasons.append("SFF candidate")
+                risk_reasons.append("Special Focus Facility Candidate")
             if high_risk_indicators.get('abuse_icon', False):
-                risk_reasons.append("abuse icon")
+                risk_reasons.append("Abuse")
             
             risk_text = ", ".join(risk_reasons)
-            st.markdown(f"**⚠️ High-Risk Facility:** Flagged due to {risk_text}.")
+            st.markdown(f"**⚠️ High-Risk Factors:** {risk_text}.")
         
         # Add 320 Consulting badge
         st.markdown("""
@@ -561,7 +561,7 @@ def state_pbj_takeaway_card(
         # Add state standard chip if available
         if standard_chip_text:
             header_chips += f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
-                 background:#f1f5f9;color:#334155;font-weight:600;font-size:0.85rem;margin-right:6px;border:1px solid #cbd5e1;">
+                 background:#f1f5f9;color:#334155;font-weight:600;font-size:0.85rem;margin-right:6px;">
                  {standard_chip_text}</span>"""
         
         st.markdown(header_chips, unsafe_allow_html=True)
@@ -1422,8 +1422,9 @@ def get_facility_high_risk_indicators(provnum: str) -> dict:
         
         # Check for high-risk indicators
         is_one_star = pd.notna(overall_rating) and overall_rating == 1
-        is_sff = pd.notna(special_focus_status) and 'SFF' in str(special_focus_status)
+        # Check for SFF Candidate first (more specific), then SFF
         is_sff_candidate = pd.notna(special_focus_status) and 'SFF Candidate' in str(special_focus_status)
+        is_sff = pd.notna(special_focus_status) and 'SFF' in str(special_focus_status) and not is_sff_candidate
         has_abuse_icon = pd.notna(abuse_icon) and abuse_icon == 'Y'
         
         # Return indicators
