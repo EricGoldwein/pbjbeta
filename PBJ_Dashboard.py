@@ -5979,9 +5979,30 @@ def main() -> None:
                                             # Format quarter for display
                                             quarter_display = latest_quarter[4:] + " " + latest_quarter[:4]  # Convert "2025Q1" to "Q1 2025"
                                             
-                                            # Create the rankings table with Total Nurse HPRD as third column
-                                            rankings_df = latest_data[['Rank', 'State_Name', 'Total_Nurse_HPRD', 'Facility_Count', 'State_Census']].copy()
-                                            rankings_df.columns = ['Rank', 'State', 'Total Nurse HPRD', 'Total Providers', 'Total Residents (avg. per day)']
+                                            # Load MACPAC data for state minimums
+                                            macpac_data = load_macpac_standards()
+                                            
+                                            # Create a mapping from state names to minimum HPRD values
+                                            state_min_mapping = {}
+                                            if not macpac_data.empty:
+                                                for _, row in macpac_data.iterrows():
+                                                    state_name = row['State']
+                                                    if pd.notna(row['Min_Staffing']):
+                                                        if row['Min_Staffing'] == 0.30:
+                                                            state_min_mapping[state_name] = f"{row['Min_Staffing']} (fed. min)"
+                                                        elif row['Value_Type'] == 'range':
+                                                            state_min_mapping[state_name] = f"{row['Min_Staffing']}-{row['Max_Staffing']}"
+                                                        else:
+                                                            state_min_mapping[state_name] = f"{row['Min_Staffing']}"
+                                                    else:
+                                                        state_min_mapping[state_name] = "N/A"
+                                            
+                                            # Add state minimum HPRD to the rankings data
+                                            latest_data['State_Min_HPRD'] = latest_data['State_Name'].map(state_min_mapping)
+                                            
+                                            # Create the rankings table with State Min HPRD as the final column
+                                            rankings_df = latest_data[['Rank', 'State_Name', 'Total_Nurse_HPRD', 'Facility_Count', 'State_Census', 'State_Min_HPRD']].copy()
+                                            rankings_df.columns = ['Rank', 'State', 'Total Nurse HPRD', 'Total Providers', 'Total Residents (avg. per day)', 'State Min. HPRD']
                                             
                                             # Format numeric columns
                                             rankings_df['Total Providers'] = rankings_df['Total Providers'].astype(int)
@@ -6001,6 +6022,7 @@ def main() -> None:
                                                     'background-color: #e3f2fd; font-weight: 700; color: #1769aa; text-align: center' if i == 0 else  # Rank column
                                                     '' if i == 1 else  # State column
                                                     'background-color: #e8f5e8; font-weight: 700; color: #2e7d32; text-align: center' if i == 2 else  # HPRD column emphasis
+                                                    'background-color: #f3e5f5; font-weight: 600; color: #1976d2; text-align: center' if i == 5 else  # State Min HPRD column
                                                     '' for i in range(len(x))
                                                 ], axis=1)
                                             
@@ -6087,6 +6109,16 @@ def main() -> None:
                                                 min-width: 120px !important;
                                                 max-width: 120px !important;
                                                 text-align: center !important;
+                                            }
+                                            
+                                            .dataframe th:nth-child(6),
+                                            .dataframe td:nth-child(6) {
+                                                width: 100px !important;
+                                                min-width: 100px !important;
+                                                max-width: 100px !important;
+                                                text-align: center !important;
+                                                font-weight: 600 !important;
+                                                color: #1976d2 !important;
                                             }
                                             </style>
                                             """, unsafe_allow_html=True)
