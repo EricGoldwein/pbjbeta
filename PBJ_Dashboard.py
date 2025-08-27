@@ -79,7 +79,85 @@ st.markdown("""
         line-height: 1.2 !important;
     }
 }
+
+/* Mobile dropdown positioning fix */
+@media (max-width: 768px) {
+    /* Force dropdowns to open downward on mobile */
+    div[data-testid="stSelectbox"] {
+        position: relative !important;
+    }
+    
+    div[data-testid="stSelectbox"] > div {
+        position: relative !important;
+    }
+    
+    /* Ensure dropdown menu appears below input */
+    div[data-testid="stSelectbox"] ul {
+        position: absolute !important;
+        top: 100% !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: auto !important;
+        transform: none !important;
+        max-height: 200px !important;
+        overflow-y: auto !important;
+        z-index: 1000 !important;
+    }
+    
+    /* Prevent viewport height changes from affecting positioning */
+    div[data-testid="stSelectbox"] input {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+}
+
+/* Prevent auto-focus on mobile */
+@media (max-width: 768px) {
+    div[data-testid="stSelectbox"] input {
+        -webkit-user-select: none !important;
+        -webkit-touch-callout: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+    }
+}
 </style>
+
+<script>
+// Mobile dropdown positioning fix
+if (window.innerWidth <= 768) {
+    // Listen for viewport changes (keyboard appearance)
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', function() {
+            // Re-position any open dropdowns
+            const openDropdowns = document.querySelectorAll('div[data-testid="stSelectbox"] ul[style*="display: block"]');
+            openDropdowns.forEach(dropdown => {
+                const selectbox = dropdown.closest('div[data-testid="stSelectbox"]');
+                if (selectbox) {
+                    const input = selectbox.querySelector('input');
+                    if (input) {
+                        const rect = input.getBoundingClientRect();
+                        dropdown.style.top = rect.bottom + 'px';
+                        dropdown.style.left = rect.left + 'px';
+                        dropdown.style.width = rect.width + 'px';
+                    }
+                }
+            });
+        });
+    }
+    
+    // Prevent auto-focus on selectbox inputs
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectboxInputs = document.querySelectorAll('div[data-testid="stSelectbox"] input');
+        selectboxInputs.forEach(input => {
+            input.addEventListener('focus', function(e) {
+                // Delay focus to allow dropdown to open first
+                setTimeout(() => {
+                    this.focus();
+                }, 100);
+            });
+        });
+    });
+}
+</script>
 """, unsafe_allow_html=True)
 
 # Initialize DuckDB connection for facility data
