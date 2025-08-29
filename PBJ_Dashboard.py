@@ -2880,10 +2880,10 @@ def main() -> None:
                     
                     st.markdown(f"""
                         <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
-                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
                                 <span class="desktop-text">View {state_name} nursing homes</span>
                                 <span class="mobile-text">View {facility_state} nursing homes</span>
                             </a>
@@ -2924,10 +2924,10 @@ def main() -> None:
                 if initial_state:
                     st.markdown(f"""
                         <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
-                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
                                 <span class="desktop-text">View {state_name} facilities</span>
                                 <span class="mobile-text">View {initial_state} facilities</span>
                             </a>

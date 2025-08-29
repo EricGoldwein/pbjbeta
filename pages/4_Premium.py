@@ -21,13 +21,11 @@ st.markdown("""
     margin-top: 8px;
     margin-bottom: 4px;
 }
-
 .home-button:hover {
     background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
 }
-
 .home-button:active {
     transform: translateY(0);
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
@@ -40,7 +38,6 @@ col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
     if st.button("Home", key="home_button_premium"):
         st.switch_page("PBJ_Dashboard.py")
-
 
 # Custom CSS for premium styling
 st.markdown("""
@@ -96,10 +93,10 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Replace the introduction paragraph at the top of the Premium page
+# Revised Introduction
 st.markdown('''
 <div style="margin-top: 0.5rem;">
-<a href="https://www.320insight.com/" target="_blank" style="font-weight: bold; text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time (including daily staffing data), ownership data, citation histories, and comparisons by geography or any category you need. These reports and analyses are built to support your case, investigation, or advocacy work. Reports include tailored data visualizations, interactive tables, and in-depth analyses to help you uncover patterns and build evidence.
+<a href="https://www.320insight.com/" target="_blank" style="font-weight: bold; text-decoration: none; color: inherit;"><b>320 Consulting</b></a> offers custom dashboards and reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time (including daily staffing data), ownership data, citation histories, and comparisons by geography or any category you need. These reports and analyses are designed to support your case, investigation, or advocacy work. Deliverables include tailored data visualizations, interactive tables, and in-depth analyses to help you uncover patterns and build evidence.
 
 <a href="mailto:eric@320insight.com" style="text-decoration: none; font-size: 1.08em;">📧 eric@320insight.com</a>
 </div>
@@ -110,12 +107,27 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Premium Features
+# Divider
 st.markdown('''
-
 <div style="margin-bottom: 32px; padding-bottom: 8px; border-bottom: 1.5px solid #e3eaf3;"></div>
+''', unsafe_allow_html=True)
 
-<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 32px;">
+# Features
+st.markdown('''
+<div class="premium-feature">
+<h3 style="margin-top: 0;">Custom Dashboards</h3>
+Interactive dashboards tailored to your needs, built to spotlight the issues and geographies most relevant to your work. Examples include:
+<ul>
+<li><b>Mississippi Staffing Dashboard:</b> Track staffing levels across all nursing homes in the state.</li>
+<li><b>Region 5 Citations:</b> Explore survey and enforcement patterns across the Chicago CMS region.</li>
+<li><b>Tennessee Financials:</b> Analyze cost reports and financial data for facilities statewide.</li>
+<li><b>Medical Director Focus:</b> Drill into staffing and oversight trends tied to physician leadership.</li>
+<li><b>RN Compliance:</b> Monitor daily RN coverage to identify gaps in the federal 8-hour rule.</li>
+</ul>
+<b><i>Example: Build a dashboard showing weekend RN compliance in California while linking citation history and ownership data.</i></b>
+</div>
+
+<div class="premium-feature">
 <h3 style="margin-top: 0;">Daily Staffing Analysis</h3>
 Access detailed daily staffing data for any facility since 2017.
 <ul>
@@ -127,7 +139,7 @@ Access detailed daily staffing data for any facility since 2017.
 <b><i>Example: Spot weekend staffing dips or compare RN levels before and after a major inspection.</i></b>
 </div>
 
-<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 32px;">
+<div class="premium-feature">
 <h3 style="margin-top: 0;">Comprehensive Staffing Reports</h3>
 Break down staffing by role, from RNs to social workers.
 <ul>
@@ -140,7 +152,7 @@ Break down staffing by role, from RNs to social workers.
 <b><i>Example: Build a full staffing profile of a facility cited for resident neglect.</i></b>
 </div>
 
-<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 32px;">
+<div class="premium-feature">
 <h3 style="margin-top: 0;">Ownership Group Analysis</h3>
 Trace staffing and performance across affiliated facilities.
 <ul>
@@ -149,10 +161,10 @@ Trace staffing and performance across affiliated facilities.
 <li>Ownership group performance metrics</li>
 <li>Historical ownership changes</li>
 </ul>
-<b><i>Example: Investigate how a chain’s staffing changed in the months before bankruptcy.</i></b>
+<b><i>Example: Investigate how a chain's staffing changed in the months before bankruptcy.</i></b>
 </div>
 
-<div style="background: #fafdff; border: 1.5px solid #e3eaf3; border-radius: 12px; padding: 24px 24px 18px 24px; margin-bottom: 16px;">
+<div class="premium-feature">
 <h3 style="margin-top: 0;">Citations Analysis</h3>
 Analyze inspection reports and link citations to staffing.
 <ul>
