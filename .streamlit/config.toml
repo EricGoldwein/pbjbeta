@@ -6,8 +6,7 @@ textColor = "#262730"
 
 [server]
 headless = true
-address = "0.0.0.0"
-enableCORS = false
+address = "localhost"
+enableCORS = true
 enableXsrfProtection = true
 enableWebsocketCompression = true
-favicon = "pbj_favicon.png"

@@ -214,7 +214,7 @@ def format_quarter_for_display(quarter_db_format: str) -> str:
         # Fallback to default if parsing fails
         return "Q1 2024"
 
-# @st.cache_data  # Temporarily disabled to force refresh
+@st.cache_data
 def load_facility_data():
     """Load facility data for search."""
     try:
@@ -1939,14 +1939,23 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         # Add custom CSS for metrics containers
         # (Removed custom CSS for stMetric, stMetricDelta, stMetricContainer to restore Streamlit defaults)
         
-                                        # Add CSS to prevent metric container borders from being cut off
+                                        # Add CSS to prevent metric container borders from being cut off and fix phantom containers
         st.markdown("""
             <style>
-            /* Add padding to prevent metric container borders from being cut off */
+            /* Prevent phantom containers and layout shifts */
             div[data-testid="stMetric"] {
                 padding-bottom: 12px !important;
                 margin-bottom: 16px !important;
                 overflow: visible !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+            }
+            /* Hide any phantom containers that might appear */
+            div[data-testid="stMetric"]:empty,
+            div[data-testid="stMetric"]:not(:has(*)) {
+                display: none !important;
+                opacity: 0 !important;
+                visibility: hidden !important;
             }
             /* Additional padding for mobile */
             @media (max-width: 768px) {
@@ -1966,6 +1975,13 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     margin-top: 20px !important;
                     padding-top: 15px !important;
                 }
+            }
+            /* Prevent layout shifts for the resource box */
+            div[style*="background: #f7fafd"] {
+                position: relative !important;
+                z-index: 1 !important;
+                opacity: 1 !important;
+                visibility: visible !important;
             }
             </style>
         """, unsafe_allow_html=True)
@@ -2308,7 +2324,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         tick_text = [str(year) for year in all_years]
         
         # Get the actual date range from the data
-        date_range = [data['date'].min(), data['date'].max()]
+        date_range = [data['date'].min().to_pydatetime(), data['date'].max().to_pydatetime()]
         
         # Define custom hover templates
         hover_hprd = "<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>"
@@ -2331,19 +2347,19 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                           vertical_spacing=0.15)
 
         # Add all traces for desktop view
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Total_Nurse_HPRD'],
+        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data['Total_Nurse_HPRD'],
                        mode='lines+markers', name='Total HPRD',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_hprd), row=1, col=1)
 
         # Use State_Census for state-level charts, Census for facility and national charts
         census_column = 'State_Census' if state else 'Census'
-        fig.add_trace(go.Scatter(x=data['date'], y=data[census_column],
+        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data[census_column],
                        mode='lines+markers', name='Census',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_census), row=2, col=1)
 
-        fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Percentage'],
+        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data['Contract_Percentage'],
                        mode='lines+markers', name='Contract %',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_contract), row=3, col=1)
@@ -2662,6 +2678,25 @@ def main() -> None:
         # Add mobile-specific CSS for reduced spacing
         st.markdown("""
             <style>
+            /* Set initial positions to prevent layout shifts */
+            div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
+                margin-bottom: 35px !important;
+            }
+            div[style*="background: #f7fafd"] {
+                margin-bottom: 35px !important;
+            }
+            /* Show desktop text, hide mobile text by default */
+            .desktop-text {
+                display: inline !important;
+            }
+            .mobile-text {
+                display: none !important;
+            }
+            /* Move down Back to Search button on mobile state pages */
+            a[href*="mobile=true"], a[href="/"] {
+                margin-top: 8px !important;
+            }
+            
             @media (max-width: 768px) {
                 div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
                     margin-bottom: 15px !important;
@@ -2675,25 +2710,6 @@ def main() -> None:
                 }
                 .mobile-text {
                     display: inline !important;
-                }
-                /* Move down Back to Search button on mobile state pages */
-                a[href*="mobile=true"], a[href="/"] {
-                    margin-top: 8px !important;
-                }
-            }
-            @media (min-width: 769px) {
-                div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
-                    margin-bottom: 35px !important;
-                }
-                div[style*="background: #f7fafd"] {
-                    margin-bottom: 35px !important;
-                }
-                /* Show desktop text, hide mobile text on desktop */
-                .desktop-text {
-                    display: inline !important;
-                }
-                .mobile-text {
-                    display: none !important;
                 }
             }
             </style>
