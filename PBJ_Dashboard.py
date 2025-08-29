@@ -24,7 +24,7 @@ def load_pbj_favicon():
         return ""
 
 # Set page config early for Render deployment
-st.set_page_config(page_title="PBJ Dashboard", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
