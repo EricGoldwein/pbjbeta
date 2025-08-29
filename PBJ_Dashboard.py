@@ -1669,46 +1669,6 @@ def display_facility_info(provnum: str, quarter_name: str = None, affiliated_ent
             }
             </style>
         """, unsafe_allow_html=True)
-
-        # Mobile: no ownership entity, quarter on its own row
-        if is_mobile:
-            st.markdown(f"""
-                <div class="facility-info-box">
-                    <div class="facility-info-grid">
-                        <div class="facility-info-item">
-                            <span class="label">Provider:</span> <strong>{formatted_provider_name} ({ccn})</strong>
-                        </div>
-                        <div class="facility-info-item">
-                            <span class="label">Location:</span> <strong>{formatted_county}, {state}</strong>
-                        </div>
-                        <div class="facility-quarter-row">{quarter_name if quarter_name else ''}</div>
-                        <div class="facility-info-item">
-                            <a href="{care_compare_url}" target="_blank">CMS Care Compare</a> <span title="CMS Care Compare is a federal resource providing comprehensive information on U.S. nursing homes, including quality ratings, staffing data, and inspection results." style="cursor: help; color: #666; font-size: 0.8em; font-weight: bold;">?</span>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            # Desktop: show ownership entity if present, quarter inline
-            st.markdown(f"""
-                <div class="facility-info-box">
-                    <div class="facility-info-grid">
-                        <div class="facility-info-item">
-                            <span class="label">Provider:</span> <strong>{formatted_provider_name} ({ccn})</strong>
-                        </div>
-                        <div class="facility-info-item">
-                            <span class="label">Location:</span> <strong>{formatted_county}, {state}</strong>
-                        </div>
-                        <div class="facility-info-item">
-                            <span class="label">Quarter:</span> <strong>{quarter_name if quarter_name else ''}</strong>
-                        </div>
-                        {f'<div class="facility-info-item"><span class="label">Ownership:</span> <strong>{affiliated_entity}</strong></div>' if affiliated_entity else ''}
-                        <div class="facility-info-item">
-                            <a href="{care_compare_url}" target="_blank">CMS Care Compare</a> <span title="CMS Care Compare is a federal resource providing comprehensive information on U.S. nursing homes, including quality ratings, staffing data, and inspection results." style="cursor: help; color: #666; font-size: 0.8em; font-weight: bold;">?</span>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Error displaying facility info: {str(e)}")
 
@@ -1904,7 +1864,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             
             if affiliated_entity and affiliated_entity_id:
                 st.markdown(f'''
-                    <div class="section-header" style="margin-top: 2px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                    <div class="section-header" style="margin-top: -30px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
                         <div style='color:#222; font-weight:400;'>
                             <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
                             <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
@@ -1915,7 +1875,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                 ''', unsafe_allow_html=True)
             else:
                 st.markdown(f'''
-                    <div class="section-header" style="margin-top: 2px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
+                    <div class="section-header" style="margin-top: -30px; font-size: 1.35em; font-weight: 700; color: #1976d2; border-bottom: 2.5px solid #e3eaf3; padding-bottom: 4px; letter-spacing: 0.01em;">
                         <div style='color:#222; font-weight:400;'>
                             <div style='font-size: 1.35em; font-weight: 700; color: #1976d2;'>{provname} ({quarter_name})</div>
                             <div style='font-size: 0.9em; color: #666; margin-top: 4px;'>
@@ -2639,7 +2599,7 @@ def main() -> None:
         if not initial_state_filter:
                         # Full text for all pages (mobile will be handled by CSS)
             st.markdown(f'''
-                <div style="background: #f7fafd; border-radius: 6px; padding: 6px 14px 2px 14px; margin-bottom: 1px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
+                <div style="background: #f7fafd; border-radius: 6px; padding: 6px 14px 2px 14px; margin-bottom: -15px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
                     <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 1px;">
                         <span class="desktop-text">A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2025) across every U.S. nursing home.</span>
                         <span class="mobile-text">A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>.</span>
@@ -2919,11 +2879,11 @@ def main() -> None:
                     state_href = f"/?mobile=true&state_filter={facility_state}" if st.query_params.get("mobile") else f"/?state_filter={facility_state}"
                     
                     st.markdown(f"""
-                        <div style="margin-bottom: 0px; padding: 0px; display: flex; gap: 8px; align-items: center;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                        <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center;">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
-                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                                 <span class="desktop-text">View {state_name} nursing homes</span>
                                 <span class="mobile-text">View {facility_state} nursing homes</span>
                             </a>
@@ -2963,11 +2923,11 @@ def main() -> None:
                 
                 if initial_state:
                     st.markdown(f"""
-                        <div style="margin-bottom: 0px; padding: 0px; display: flex; gap: 8px; align-items: center;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                        <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center;">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
-                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 600; font-size: 0.85em; padding: 4px 10px; border-radius: 4px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                                 <span class="desktop-text">View {state_name} facilities</span>
                                 <span class="mobile-text">View {initial_state} facilities</span>
                             </a>
@@ -3926,7 +3886,7 @@ def main() -> None:
                         
                         button_html = f"""
                             <div class="pbj-button-container {state_button_class}" id="pbj-takeaway-button" style="position: fixed; top: 80px; z-index: 1000;">
-                                <a href="#pbj-takeaway" onclick="fadePBJButton()" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: white; padding: 10px 18px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
+                                <a href="#pbj-takeaway" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: white; padding: 10px 18px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
                                     {favicon_img}
                                     <span class="desktop-text">PBJ Takeaway</span>
                                     <span class="mobile-text">PBJ Brief</span>
@@ -5682,7 +5642,7 @@ def main() -> None:
                             state_button_class = "state-page-mobile-button" if level == "State" else "facility-page-mobile-button"
                             button_html = f"""
                             <div class="pbj-button-container {state_button_class}" id="pbj-takeaway-button" style="position: fixed; top: 80px; z-index: 1000;">
-                                <a href="#pbj-takeaway" onclick="fadePBJButton()" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: white; padding: 10px 18px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
+                                <a href="#pbj-takeaway" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: white; padding: 10px 18px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
                                     {favicon_img}
                                     <span class="desktop-text">PBJ Takeaway</span>
                                     <span class="mobile-text">PBJ Brief</span>
@@ -5788,7 +5748,7 @@ def main() -> None:
                             # Fallback without favicon if file can't be read
                             st.markdown("""
                             <div class="pbj-button-container" id="pbj-takeaway-button" style="position: fixed; top: 80px; z-index: 1000;">
-                                <a href="#pbj-takeaway" onclick="fadePBJButton()" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: white; padding: 10px 18px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
+                                <a href="#pbj-takeaway" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: white; padding: 10px 18px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease;">
                                     <span class="desktop-text">PBJ Takeaway</span>
                                     <span class="mobile-text">PBJ Brief</span>
                                     <span style="font-size: 10px; opacity: 0.8;">→</span>
