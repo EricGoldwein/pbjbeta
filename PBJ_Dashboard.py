@@ -1319,9 +1319,9 @@ def get_facility_info(provnum: str) -> dict:
                 PROVNAME,
                 STATE,
                 COUNTY_NAME
-            FROM staffing 
+            FROM facility_metrics 
             WHERE PROVNUM = ?
-            ORDER BY WORKDATE DESC
+            ORDER BY date DESC
             LIMIT 1
         """
         
@@ -1450,12 +1450,12 @@ def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
             WITH daily_metrics AS (
                 SELECT 
                     PROVNUM,
-                    WORKDATE,
-                    MDSCENSUS,
-                    (HRS_RNDON + HRS_RNADMIN + HRS_RN + HRS_LPNADMIN + HRS_LPN + HRS_CNA + HRS_NATRN + HRS_MEDAIDE) as total_hours,
-                    (HRS_RNDON + HRS_RNADMIN + HRS_RN) as rn_hours,
-                    (HRS_RNDON + HRS_RNADMIN + HRS_RN + HRS_LPNADMIN + HRS_LPN) as nurse_care_hours
-                FROM staffing 
+                    date,
+                    Census,
+                    Total_Nurse_HPRD * Census as total_hours,
+                    RN_HPRD * Census as rn_hours,
+                    Total_Nurse_HPRD * Census as nurse_care_hours
+                FROM facility_metrics 
                 WHERE CY_QTR = ? AND PROVNUM = ?
             )
             SELECT
