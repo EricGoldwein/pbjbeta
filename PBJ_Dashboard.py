@@ -87,6 +87,51 @@ facility_db = duckdb.connect(':memory:')
 # Initialize provider info cache
 provider_info_cache: Dict[str, Dict[str, str]] = {}
 
+def smart_title(name: str) -> str:
+    """Convert facility name to smart title case."""
+    if pd.isna(name):
+        return ""
+    name = str(name).strip()
+    if not name:
+        return ""
+    
+    # Fix broken apostrophes - only fix the specific broken ones
+    name = name.replace("'S", "'s")
+    name = name.replace("'T", "'t")
+    name = name.replace("'L", "'l")
+    name = name.replace("'R", "'r")
+    name = name.replace("'D", "'d")
+    name = name.replace("'M", "'m")
+    name = name.replace("'N", "'n")
+    name = name.replace("'V", "'v")
+    
+    # Convert to title case first
+    name = name.title()
+    
+    # Fix ordinal numbers (1st, 2nd, 3rd, 4th, etc.) - AFTER title case
+    import re
+    # Pattern to match numbers followed by th, st, nd, rd
+    ordinal_pattern = r'(\d+)(Th|St|Nd|Rd)'
+    def fix_ordinal(match):
+        num = int(match.group(1))
+        suffix = match.group(2).lower()
+        return f"{num}{suffix}"
+    name = re.sub(ordinal_pattern, fix_ordinal, name)
+    
+    # Handle common abbreviations and terms properly
+    name = name.replace(" Llc", " LLC").replace(" Inc", " Inc").replace(" Lp", " LP")
+    name = name.replace(" Nh", " NH")
+    name = name.replace(" Rehab", " Rehab").replace(" Rehabilitation", " Rehabilitation")
+    name = name.replace(" Center", " Center").replace(" Facility", " Facility")
+    name = name.replace(" Nursing Home", " Nursing Home")
+    
+    # Handle common words that should be lowercase
+    name = name.replace(" Of ", " of ").replace(" At ", " at ").replace(" The ", " the ")
+    name = name.replace(" And ", " and ").replace(" Or ", " or ").replace(" In ", " in ")
+    name = name.replace(" On ", " on ").replace(" To ", " to ").replace(" For ", " for ")
+    
+    return name
+
 def get_db_connection():
     """Get a connection to the DuckDB database."""
     try:
@@ -169,7 +214,7 @@ def format_quarter_for_display(quarter_db_format: str) -> str:
         # Fallback to default if parsing fails
         return "Q1 2024"
 
-@st.cache_data
+# @st.cache_data  # Temporarily disabled to force refresh
 def load_facility_data():
     """Load facility data for search."""
     try:
@@ -191,7 +236,13 @@ def load_facility_data():
             st.error("Facility data file not found. Some features may be limited.")
             return pd.DataFrame()
         
-        return pd.read_csv(file_path, dtype={'PROVNUM': str})
+        df = pd.read_csv(file_path, dtype={'PROVNUM': str})
+        
+        # Apply smart_title formatting to PROVNAME column
+        if 'PROVNAME' in df.columns:
+            df['PROVNAME'] = df['PROVNAME'].apply(smart_title)
+        
+        return df
     except Exception as e:
         st.error(f"Error loading facility data: {str(e)}")
         return pd.DataFrame()
@@ -2604,7 +2655,7 @@ def main() -> None:
                         <span class="desktop-text">A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2025) across every U.S. nursing home.</span>
                         <span class="mobile-text">A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>.</span>
                     </div>
-                    {"<div style='margin-top: 0px;' class='mobile-about-link'><a href='/About' target='_self' style='color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400;'>About the PBJ Dashboard</a></div>" if not hide_search and level not in ["Entity", "State"] else ""}
+                    {"<div style='margin-top: 0px; position: relative; z-index: 1000;' class='mobile-about-link'><a href='/About' target='_self' style='color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400; position: relative; z-index: 1001;'>About the PBJ Dashboard</a></div>" if not hide_search and level not in ["Entity", "State"] else ""}
                 </div>
             ''', unsafe_allow_html=True)
         
@@ -2669,8 +2720,8 @@ def main() -> None:
                     }
                 }
                 </style>
-                <div class="desktop-about-link" style="text-align: center; margin-bottom: 45px; margin-top: 15px;">
-                    <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 600; background: #e8f4fd; padding: 3px 12px; border-radius: 6px; border: 1px solid #1976d2; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: all 0.2s ease;">
+                <div class="desktop-about-link" style="text-align: center; margin-bottom: 45px; margin-top: 15px; position: relative; z-index: 1000;">
+                    <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 600; background: #e8f4fd; padding: 3px 12px; border-radius: 6px; border: 1px solid #1976d2; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: all 0.2s ease; position: relative; z-index: 1001;">
                         About the PBJ Dashboard
                     </a>
                 </div>
@@ -2834,30 +2885,7 @@ def main() -> None:
                 return ""
             return text.title()
         
-        def smart_title(name: str) -> str:
-            """Convert facility name to smart title case."""
-            if pd.isna(name):
-                return ""
-            name = str(name).strip()
-            if not name:
-                return ""
-            
-            # Convert to title case first
-            name = name.title()
-            
-            # Handle common abbreviations and terms properly
-            name = name.replace(" Llc", " LLC").replace(" Inc", " INC").replace(" Lp", " LP")
-            name = name.replace(" Nh", " NH")
-            name = name.replace(" Rehab", " Rehab").replace(" Rehabilitation", " Rehabilitation")
-            name = name.replace(" Center", " Center").replace(" Facility", " Facility")
-            name = name.replace(" Nursing Home", " Nursing Home")
-            
-            # Handle common words that should be lowercase
-            name = name.replace(" Of ", " of ").replace(" At ", " at ").replace(" The ", " the ")
-            name = name.replace(" And ", " and ").replace(" Or ", " or ").replace(" In ", " in ")
-            name = name.replace(" On ", " on ").replace(" To ", " to ").replace(" For ", " for ")
-            
-            return name
+
 
         # Show "Back to Search" button for facility, entity, and state pages
         if level in ["Facility", "Entity", "State"]:
