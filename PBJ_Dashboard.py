@@ -23,9 +23,8 @@ def load_pbj_favicon():
     except:
         return ""
 
-# Set sidebar collapsed on mobile
-import streamlit as st
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
+# Set page config early for Render deployment
+st.set_page_config(page_title="PBJ Dashboard", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
 
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
@@ -470,7 +469,7 @@ def state_pbj_takeaway_card(
     standard_chip_text = ""
     
     if not macpac_data.empty:
-        # Find the state in MACPAC data
+        # Find streamlit state in MACPAC data
         state_match = macpac_data[macpac_data['State'].str.lower() == state_name.lower()]
         if not state_match.empty:
             state_standard = state_match.iloc[0]

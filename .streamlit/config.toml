@@ -5,4 +5,9 @@ secondaryBackgroundColor = "#f0f2f6"
 textColor = "#262730"
 
 [server]
+headless = true
+address = "0.0.0.0"
+enableCORS = false
+enableXsrfProtection = true
+enableWebsocketCompression = true
 favicon = "pbj_favicon.png"
