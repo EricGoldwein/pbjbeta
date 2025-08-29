@@ -1452,9 +1452,9 @@ def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
                     PROVNUM,
                     date,
                     Census,
-                    Total_Nurse_HPRD * Census as total_hours,
-                    RN_HPRD * Census as rn_hours,
-                    Total_Nurse_HPRD * Census as nurse_care_hours
+                    Total_Nurse_Hours as total_hours,
+                    RN_Hours as rn_hours,
+                    (RN_Hours + LPN_Hours) as nurse_care_hours
                 FROM facility_metrics 
                 WHERE CY_QTR = ? AND PROVNUM = ?
             )
