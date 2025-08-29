@@ -2879,11 +2879,11 @@ def main() -> None:
                     state_href = f"/?mobile=true&state_filter={facility_state}" if st.query_params.get("mobile") else f"/?state_filter={facility_state}"
                     
                     st.markdown(f"""
-                        <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                        <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center; position: relative; z-index: 1000;">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
-                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                                 <span class="desktop-text">View {state_name} nursing homes</span>
                                 <span class="mobile-text">View {facility_state} nursing homes</span>
                             </a>
@@ -2909,8 +2909,8 @@ def main() -> None:
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown(f"""
-                        <div style="margin-bottom: 0px; padding: 0px;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                        <div style="margin-bottom: 0px; padding: 0px; position: relative; z-index: 1000;">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
                         </div>
@@ -2923,28 +2923,19 @@ def main() -> None:
                 
                 if initial_state:
                     st.markdown(f"""
-                        <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                        <div style="margin-bottom: -35px; padding: 0px; display: flex; gap: 8px; align-items: center; margin-top: 10px; position: relative; z-index: 1000;">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
-                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                            <a href="{state_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f6 100%); border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                                 <span class="desktop-text">View {state_name} facilities</span>
                                 <span class="mobile-text">View {initial_state} facilities</span>
                             </a>
-
-
                         </div>
                         <style>
-                        /* Lower both buttons on state pages to prevent bleeding into content above */
-                        a[href*="state_filter"] {{
-                            margin-top: 15px !important;
-                        }}
-                        a[href="/"] {{
-                            margin-top: 15px !important;
-                        }}
-                        /* Move Select State dropdown down a bit */
+                        /* Move Select State dropdown and input box down */
                         div[data-testid="stSelectbox"] {{
-                            margin-top: 10px !important;
+                            margin-top: 25px !important;
                         }}
                         /* Mobile/Desktop text switching */
                         .mobile-text {{
@@ -2957,6 +2948,10 @@ def main() -> None:
                             .mobile-text {{
                                 display: inline;
                             }}
+                            /* Fix button alignment on mobile */
+                            div[style*="display: flex"] {{
+                                align-items: baseline !important;
+                            }}
                         }}
                         </style>
                     """, unsafe_allow_html=True)
@@ -2964,16 +2959,16 @@ def main() -> None:
 
                 else:
                     st.markdown(f"""
-                        <div style="margin-bottom: 0px; padding: 0px;">
-                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                        <div style="margin-bottom: 0px; padding: 0px; position: relative; z-index: 1000;">
+                            <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                                 <span style="font-size: 0.9em;">←</span> Back to Search
                             </a>
                         </div>
                     """, unsafe_allow_html=True)
             else:
                 st.markdown(f"""
-                    <div style="margin-bottom: 0px; padding: 0px;">
-                        <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                    <div style="margin-bottom: 0px; padding: 0px; position: relative; z-index: 1000;">
+                        <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                             <span style="font-size: 0.9em;">←</span> Back to Search
                         </a>
                     </div>
@@ -3030,8 +3025,8 @@ def main() -> None:
                 # Add "Back to Search" button
                 home_href = "/?mobile=true" if st.query_params.get("mobile") else "/"
                 st.markdown(f"""
-                    <div style="margin-bottom: 5px; padding: 0px;">
-                        <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px;">
+                    <div style="margin-bottom: 5px; padding: 0px; position: relative; z-index: 1000;">
+                        <a href="{home_href}" target="_self" style="color: #1976d2; text-decoration: none; font-weight: 500; font-size: 0.8em; padding: 3px 8px; border-radius: 3px; background: #f8f9fa; border: 1px solid #e3eaf3; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; position: relative; z-index: 1001;">
                             <span style="font-size: 0.9em;">←</span> Back to Search
                         </a>
                     </div>
