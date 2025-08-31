@@ -26,6 +26,63 @@ def load_pbj_favicon():
 # Set page config early for Render deployment
 st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
 
+# Add SEO meta tags for better search engine optimization and social media sharing
+st.markdown("""
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+    <meta name="keywords" content="PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics">
+    <meta name="author" content="320 Consulting">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="English">
+    <meta name="revisit-after" content="7 days">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://pbjdashboard.com/">
+    <meta property="og:title" content="PBJ Nursing Home Staffing Dashboard by 320 Consulting">
+    <meta property="og:description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+    <meta property="og:image" content="https://pbjdashboard.com/pbj.seo.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="PBJ Nursing Home Staffing Dashboard">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://pbjdashboard.com/">
+    <meta property="twitter:title" content="PBJ Nursing Home Staffing Dashboard by 320 Consulting">
+    <meta property="twitter:description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+    <meta property="twitter:image" content="https://pbjdashboard.com/pbj.seo.png">
+    
+    <!-- Additional SEO -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e88e5">
+    <link rel="canonical" href="https://pbjdashboard.com/">
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "PBJ Nursing Home Staffing Dashboard",
+        "description": "Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.",
+        "url": "https://pbjdashboard.com/",
+        "applicationCategory": "HealthcareApplication",
+        "operatingSystem": "Web Browser",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "provider": {
+            "@type": "Organization",
+            "name": "320 Consulting",
+            "url": "https://pbjdashboard.com/"
+        },
+        "keywords": "PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics"
+    }
+    </script>
+""", unsafe_allow_html=True)
+
 # Add subtle modern styling for metric containers only (not delta or value)
 st.markdown("""
     <style>
