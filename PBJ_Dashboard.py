@@ -29,7 +29,7 @@ st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page
 # Add SEO meta tags for better search engine optimization and social media sharing
 st.markdown("""
     <!-- SEO Meta Tags -->
-    <meta name="description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+    <meta name="description" content="Explore staffing trends for 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
     <meta name="keywords" content="PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics">
     <meta name="author" content="320 Consulting">
     <meta name="robots" content="index, follow">
