@@ -2572,11 +2572,9 @@ def _go_home():
 
 def main() -> None:
     """Main app layout and data flow."""
-    try:
-        # Initialize session state variables at the very start
-        if 'view_mode' not in st.session_state:
-            st.session_state.view_mode = "Desktop"
-        
+    # Initialize session state variables at the very start
+    if 'view_mode' not in st.session_state:
+        st.session_state.view_mode = "Desktop"
         # CRITICAL: apply navigation before any rendering
         _apply_navigation_and_stop()
         
@@ -6282,3 +6280,7 @@ def main() -> None:
         except Exception as e:
             st.error(f"Error filtering data: {str(e)}")
             return
+
+
+if __name__ == "__main__":
+    main()
