@@ -2682,33 +2682,55 @@ def main() -> None:
             level = None  # Will be set by radio button
             st.session_state.level_pre_set = False
 
-        # Title with custom styling - matching About page dark blue color and mobile responsive
+        # Clean, professional header with improved layout
         if not initial_state_filter:
             # Add state page mobile padding class if we're on a state page
             state_page_class = "state-page-mobile-padding" if actual_level == "State" else ""
             st.markdown(f"""
-                <div class="{state_page_class}" style='text-align: center; margin-top: -20px; margin-bottom: 1.2em;'>
-                    <span class="dashboard-title" style='font-size:2.8em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>PBJ Nursing Home Staffing Dashboard</span>
+                <div class="{state_page_class}" style='text-align: center; margin-top: -20px; margin-bottom: 1.5em;'>
+                    <div style='background: linear-gradient(135deg, #f8fafd 0%, #e3f2fd 100%); border-radius: 12px; padding: 2rem 2.5rem; border: 1px solid #e3eaf3; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
+                        <div style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
+                            PBJ Nursing Home Staffing Dashboard
+                        </div>
+                        <div style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem;'>
+                            Explore staffing trends across 15,000+ U.S. nursing homes
+                        </div>
+                        <div style='font-size:0.95em; color:#7a869a; font-weight:400;'>
+                            A free resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 600;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the PBJ Dashboard</a>
+                        </div>
+                    </div>
                 </div>
                 <style>
                 @media (max-width: 768px) {{
-                    .dashboard-title {{
-                        font-size: 2.1em !important;
+                    div[data-testid="stMarkdown"] > div:has(> div[style*="background: linear-gradient"]) {{
+                        margin-top: -80px !important;
+                        margin-bottom: 1em !important;
+                    }}
+                    div[style*="background: linear-gradient"] {{
+                        padding: 1.5rem 1.2rem !important;
+                        border-radius: 8px !important;
+                    }}
+                    div[style*="background: linear-gradient"] > div:first-child {{
+                        font-size: 2em !important;
                         line-height: 1.2 !important;
                     }}
-                    div[data-testid="stMarkdown"] > div:has(> span.dashboard-title) {{
-                        margin-top: -120px !important;
-                        margin-bottom: 0.1em !important;
+                    div[style*="background: linear-gradient"] > div:nth-child(2) {{
+                        font-size: 0.9em !important;
+                        white-space: nowrap !important;
+                    }}
+                    div[style*="background: linear-gradient"] > div:nth-child(3) {{
+                        font-size: 0.8em !important;
+                        white-space: nowrap !important;
                     }}
                     /* Additional padding for state page on mobile */
                     .state-page-mobile-padding {{
                         margin-top: 15px !important;
                     }}
-                    /* Additional padding for state page on desktop */
-                    @media (min-width: 768px) {{
-                        .state-page-mobile-padding {{
-                            margin-top: 25px !important;
-                        }}
+                }}
+                /* Additional padding for state page on desktop */
+                @media (min-width: 768px) {{
+                    .state-page-mobile-padding {{
+                        margin-top: 25px !important;
                     }}
                 }}
                 </style>
@@ -2719,86 +2741,11 @@ def main() -> None:
         if initial_facility:
             hide_search = True
 
-        # Refined subhead: centered text and box with search link
-        if not initial_state_filter:
-                        # Full text for all pages (mobile will be handled by CSS)
-            st.markdown(f'''
-                <div style="background: #f7fafd; border-radius: 6px; padding: 6px 14px 2px 14px; margin-bottom: -15px; border: 1px solid #e3eaf3; max-width: 950px; margin-left: auto; margin-right: auto; text-align: center;">
-                    <div style="font-size: 1.08em; color: #234; font-weight: 600; margin-bottom: 1px;">
-                        <span class="desktop-text">A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>, featuring quarterly staffing data (2017–2025) across every U.S. nursing home.</span>
-                        <span class="mobile-text">A free public resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 700;"><b>320 Consulting</b></a>.</span>
-                    </div>
-                    {"<div style='margin-top: 0px; position: relative; z-index: 1000;' class='mobile-about-link'><a href='/About' target='_self' style='color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 400; position: relative; z-index: 1001;'>About the PBJ Dashboard</a></div>" if not hide_search and level not in ["Entity", "State"] else ""}
-                </div>
-            ''', unsafe_allow_html=True)
+
         
-        # Add mobile-specific CSS for reduced spacing
-        st.markdown("""
-            <style>
-            /* Set initial positions to prevent layout shifts */
-            div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
-                margin-bottom: 35px !important;
-            }
-            div[style*="background: #f7fafd"] {
-                margin-bottom: 35px !important;
-            }
-            /* Show desktop text, hide mobile text by default */
-            .desktop-text {
-                display: inline !important;
-            }
-            .mobile-text {
-                display: none !important;
-            }
-            /* Move down Back to Search button on mobile state pages */
-            a[href*="mobile=true"], a[href="/"] {
-                margin-top: 8px !important;
-            }
-            
-            @media (max-width: 768px) {
-                div[data-testid="stMarkdown"] > div:has(> div[style*="background: #f7fafd"]) {
-                    margin-bottom: 15px !important;
-                }
-                div[style*="background: #f7fafd"] {
-                    margin-bottom: 15px !important;
-                }
-                /* Show mobile text, hide desktop text on mobile */
-                .desktop-text {
-                    display: none !important;
-                }
-                .mobile-text {
-                    display: inline !important;
-                }
-            }
-            </style>
-        """, unsafe_allow_html=True)
+
         
-        # Add About link only on homepage and only on desktop (exclude state filter pages)
-        if not hide_search and level not in ["Entity", "State"] and not initial_state_filter:
-            st.markdown('''
-                <style>
-                .mobile-about-link {
-                    display: block;
-                }
-                @media (min-width: 768px) {
-                    .mobile-about-link {
-                        display: none;
-                    }
-                }
-                .desktop-about-link {
-                    display: none;
-                }
-                @media (min-width: 768px) {
-                    .desktop-about-link {
-                        display: block;
-                    }
-                }
-                </style>
-                <div class="desktop-about-link" style="text-align: center; margin-bottom: 45px; margin-top: 15px; position: relative; z-index: 1000;">
-                    <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-size: 0.9em; font-weight: 600; background: #e8f4fd; padding: 3px 12px; border-radius: 6px; border: 1px solid #1976d2; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: all 0.2s ease; position: relative; z-index: 1001;">
-                        About the PBJ Dashboard
-                    </a>
-                </div>
-            ''', unsafe_allow_html=True)
+
         
         # Load search data functions (always available)
         
@@ -4558,10 +4505,8 @@ def main() -> None:
                         
                         # Responsive header with mobile optimization
                         st.markdown(f'''
-                                <div style="background: linear-gradient(90deg, #e3ecfa 80%, #dbeafe 100%); color: #1a2233; padding: 0.5rem 2rem; border-radius: 12px; margin-bottom: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #d3dbe8;">
-                                    <h2 style="margin-bottom: -0.2em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233; line-height: 1.0;">{entity_name_title_case} <span class="desktop-id" style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>
-                                    <div style="font-size: 0.8em; color: #666; margin-top: 0;">Source: CMS, {most_recent_period}</div>
-                                </div>
+                                <h2 style="margin-bottom: 0.1em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233; line-height: 1.0;">{entity_name_title_case} <span class="desktop-id" style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>
+                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS, {most_recent_period}</div>
                                 <style>
                                     @media (max-width: 768px) {{
                                         .desktop-id {{ display: none !important; }}
