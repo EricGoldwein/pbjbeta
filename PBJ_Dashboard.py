@@ -1864,10 +1864,9 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
     
     st.markdown(f"""
         <div class="premium-services">
-            <h3>Premium Services</h3>
-            <p>320 Consulting offers custom reports with full breakdowns of all nurse and non-nurse positions, staffing trends over time, ownership data, citation histories, and comparisons by geography or any category you need — built to support your case, investigation, or advocacy.</p>
-            <p>To request a report:</p>
-            <p><a href="mailto:eric@320insight.com">📧 eric@320insight.com</a></p>
+            <h3>Custom Dashboards</h3>
+            <p><strong><a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none;">320 Consulting</a></strong> offers custom dashboards and reports so you can dive deeper into the data. This includes full breakdowns of all nurse and non-nurse positions, staffing trends over time, state-specific data, citation histories, or any category you need — built to support your case, investigation, or advocacy.</p>
+            <p>Get in touch: <a href="mailto:eric@320insight.com">eric@320insight.com</a></p>
         </div>
     """, unsafe_allow_html=True)
     
