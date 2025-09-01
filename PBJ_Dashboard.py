@@ -29,7 +29,7 @@ st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page
 # Add SEO meta tags for better search engine optimization and social media sharing
 st.markdown("""
     <!-- SEO Meta Tags -->
-    <meta name="description" content="Explore staffing trends for 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+    <meta name="description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
     <meta name="keywords" content="PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics">
     <meta name="author" content="320 Consulting">
     <meta name="robots" content="index, follow">
@@ -797,7 +797,6 @@ def load_metrics_data():
     except Exception as e:
         st.error(f"Error loading metrics data: {str(e)}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
 @st.cache_data
 def load_affiliated_entity_data():
     """Load and cache chain performance measures data."""
@@ -1587,7 +1586,6 @@ def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
     except Exception as e:
         print(f"Error getting quarterly metrics: {str(e)}")
         return None
-
 def generate_report(provnum: str, selected_quarter: str) -> str:
     """Generate a comprehensive HTML report for the facility."""
     try:
@@ -2318,8 +2316,6 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
     except Exception as e:
         st.error(f"Error creating case-mix charts: {str(e)}")
         return None, None
-
-
 def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
@@ -3075,7 +3071,6 @@ def main() -> None:
                     }
                     </style>
                 """, unsafe_allow_html=True)
-        
         # Handle state filter parameter - show filtered facility list
         if initial_state_filter:
             hide_search = False
@@ -3738,7 +3733,6 @@ def main() -> None:
             #     st.session_state.level_pre_set = False
             #     st.query_params.clear()
             #     st.rerun()
-
         # Get selected value based on level
         selected_value = None
         try:
@@ -4497,7 +4491,6 @@ def main() -> None:
 
                     # 4. Add subscription button
                     display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
-
             # For entity level, display full entity content (verbatim from ownership page)
             elif level == "Entity" and selected_value and "pending_navigation" not in st.session_state and not st.query_params.get('state') and not st.query_params.get('facility'):
                 # Load current and previous data for comparison
@@ -4545,8 +4538,23 @@ def main() -> None:
                                 <style>
                                     @media (max-width: 768px) {{
                                         .desktop-id {{ display: none !important; }}
+                                        .mobile-header {{
+                                            display: block;
+                                            font-size: 1.5em;
+                                            font-weight: 700;
+                                            color: #1976d2;
+                                            line-height: 1.2;
+                                        }}
+                                        .mobile-description {{
+                                            display: block;
+                                            font-size: 1em;
+                                            color: #666;
+                                            line-height: 1.2;
+                                        }}
                                     }}
                                 </style>
+                                <div class="mobile-header">320 Consulting • About the Dashboard</div>
+                                <div class="mobile-description">Explore staffing trends across 15,000 U.S. nursing homes</div>
                             ''', unsafe_allow_html=True)
                         # Key metrics overview with comparison to previous month
                         # Add spacing before the metrics row on mobile to prevent ownership chart overlap
@@ -5251,7 +5259,6 @@ def main() -> None:
                         
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
-                        
                         # Get facilities for this entity
                         if entity_id and entity_id != "":
                             entity_facilities = provider_data[
@@ -5699,7 +5706,6 @@ def main() -> None:
                         st.error(f"Entity '{selected_value}' not found in the data.")
                 else:
                     st.error("Unable to load entity data.")
-
             # For other levels (National, State)
             else:
                 if not filtered_data.empty:
@@ -6276,9 +6282,3 @@ def main() -> None:
         except Exception as e:
             st.error(f"Error filtering data: {str(e)}")
             return
-    except Exception as e:
-        st.error(f"Error in main app: {str(e)}")
-        return
-
-if __name__ == "__main__":
-    main()
