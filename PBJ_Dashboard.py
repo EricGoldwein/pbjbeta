@@ -797,6 +797,7 @@ def load_metrics_data():
     except Exception as e:
         st.error(f"Error loading metrics data: {str(e)}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
 @st.cache_data
 def load_affiliated_entity_data():
     """Load and cache chain performance measures data."""
@@ -1586,6 +1587,7 @@ def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
     except Exception as e:
         print(f"Error getting quarterly metrics: {str(e)}")
         return None
+
 def generate_report(provnum: str, selected_quarter: str) -> str:
     """Generate a comprehensive HTML report for the facility."""
     try:
@@ -2316,6 +2318,8 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
     except Exception as e:
         st.error(f"Error creating case-mix charts: {str(e)}")
         return None, None
+
+
 def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
@@ -2572,9 +2576,11 @@ def _go_home():
 
 def main() -> None:
     """Main app layout and data flow."""
-    # Initialize session state variables at the very start
-    if 'view_mode' not in st.session_state:
-        st.session_state.view_mode = "Desktop"
+    try:
+        # Initialize session state variables at the very start
+        if 'view_mode' not in st.session_state:
+            st.session_state.view_mode = "Desktop"
+        
         # CRITICAL: apply navigation before any rendering
         _apply_navigation_and_stop()
         
@@ -2683,10 +2689,13 @@ def main() -> None:
             st.markdown(f"""
                 <div class="{state_page_class}" style='text-align: center; margin-top: -20px; margin-bottom: 1.5em;'>
                     <div style='background: linear-gradient(135deg, #f8fafd 0%, #e3f2fd 100%); border-radius: 12px; padding: 2rem 2.5rem; border: 1px solid #e3eaf3; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
-                        <div style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
+                        <div class="desktop-title" style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
                             PBJ Nursing Home Staffing Dashboard
                         </div>
-                        <div style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem;'>
+                        <div class="mobile-title" style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
+                            320 Consulting • About the Dashboard
+                        </div>
+                        <div style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem; white-space: nowrap;'>
                             Explore staffing trends across 15,000+ U.S. nursing homes
                         </div>
                         <div style='font-size:0.95em; color:#7a869a; font-weight:400;'>
@@ -2695,7 +2704,16 @@ def main() -> None:
                     </div>
                 </div>
                 <style>
+                .mobile-title {{
+                    display: none;
+                }}
                 @media (max-width: 768px) {{
+                    .desktop-title {{
+                        display: none;
+                    }}
+                    .mobile-title {{
+                        display: block;
+                    }}
                     div[data-testid="stMarkdown"] > div:has(> div[style*="background: linear-gradient"]) {{
                         margin-top: -80px !important;
                         margin-bottom: 1em !important;
@@ -3069,6 +3087,7 @@ def main() -> None:
                     }
                     </style>
                 """, unsafe_allow_html=True)
+        
         # Handle state filter parameter - show filtered facility list
         if initial_state_filter:
             hide_search = False
@@ -3731,6 +3750,7 @@ def main() -> None:
             #     st.session_state.level_pre_set = False
             #     st.query_params.clear()
             #     st.rerun()
+
         # Get selected value based on level
         selected_value = None
         try:
@@ -4489,6 +4509,7 @@ def main() -> None:
 
                     # 4. Add subscription button
                     display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
+
             # For entity level, display full entity content (verbatim from ownership page)
             elif level == "Entity" and selected_value and "pending_navigation" not in st.session_state and not st.query_params.get('state') and not st.query_params.get('facility'):
                 # Load current and previous data for comparison
@@ -4536,23 +4557,8 @@ def main() -> None:
                                 <style>
                                     @media (max-width: 768px) {{
                                         .desktop-id {{ display: none !important; }}
-                                        .mobile-header {{
-                                            display: block;
-                                            font-size: 1.5em;
-                                            font-weight: 700;
-                                            color: #1976d2;
-                                            line-height: 1.2;
-                                        }}
-                                        .mobile-description {{
-                                            display: block;
-                                            font-size: 1em;
-                                            color: #666;
-                                            line-height: 1.2;
-                                        }}
                                     }}
                                 </style>
-                                <div class="mobile-header">320 Consulting • About the Dashboard</div>
-                                <div class="mobile-description">Explore staffing trends across 15,000 U.S. nursing homes</div>
                             ''', unsafe_allow_html=True)
                         # Key metrics overview with comparison to previous month
                         # Add spacing before the metrics row on mobile to prevent ownership chart overlap
@@ -5257,6 +5263,7 @@ def main() -> None:
                         
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
+                        
                         # Get facilities for this entity
                         if entity_id and entity_id != "":
                             entity_facilities = provider_data[
@@ -5704,6 +5711,7 @@ def main() -> None:
                         st.error(f"Entity '{selected_value}' not found in the data.")
                 else:
                     st.error("Unable to load entity data.")
+
             # For other levels (National, State)
             else:
                 if not filtered_data.empty:
@@ -6280,7 +6288,9 @@ def main() -> None:
         except Exception as e:
             st.error(f"Error filtering data: {str(e)}")
             return
-
+    except Exception as e:
+        st.error(f"Error in main app: {str(e)}")
+        return
 
 if __name__ == "__main__":
     main()
