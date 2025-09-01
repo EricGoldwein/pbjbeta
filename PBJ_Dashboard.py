@@ -2689,29 +2689,29 @@ def main() -> None:
             st.markdown(f"""
                 <div class="{state_page_class}" style='text-align: center; margin-top: -20px; margin-bottom: 1.5em;'>
                     <div style='background: linear-gradient(135deg, #f8fafd 0%, #e3f2fd 100%); border-radius: 12px; padding: 2rem 2.5rem; border: 1px solid #e3eaf3; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
-                        <div class="desktop-title" style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
+                        <div style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
                             PBJ Nursing Home Staffing Dashboard
                         </div>
-                        <div class="mobile-title" style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
-                            320 Consulting • About the Dashboard
-                        </div>
-                        <div style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem; white-space: nowrap;'>
+                        <div style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem;'>
                             Explore staffing trends across 15,000+ U.S. nursing homes
                         </div>
-                        <div style='font-size:0.95em; color:#7a869a; font-weight:400;'>
+                        <div class="desktop-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
                             A free resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 600;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the PBJ Dashboard</a>
+                        </div>
+                        <div class="mobile-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
+                            320 Consulting • About the Dashboard
                         </div>
                     </div>
                 </div>
                 <style>
-                .mobile-title {{
+                .mobile-footer {{
                     display: none;
                 }}
                 @media (max-width: 768px) {{
-                    .desktop-title {{
+                    .desktop-footer {{
                         display: none;
                     }}
-                    .mobile-title {{
+                    .mobile-footer {{
                         display: block;
                     }}
                     div[data-testid="stMarkdown"] > div:has(> div[style*="background: linear-gradient"]) {{
