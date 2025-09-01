@@ -2700,7 +2700,7 @@ def main() -> None:
                             A free resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 600;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the PBJ Dashboard</a>
                         </div>
                         <div class="mobile-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
-                            320 Consulting • About the Dashboard
+                            <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 500;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the Dashboard</a>
                         </div>
                     </div>
                 </div>
@@ -2728,7 +2728,7 @@ def main() -> None:
                         line-height: 1.2 !important;
                     }}
                     div[style*="background: linear-gradient"] > div:nth-child(2) {{
-                        font-size: 0.8em !important;
+                        font-size: 0.9em !important;
                         white-space: nowrap !important;
                         overflow: hidden !important;
                         text-overflow: ellipsis !important;
@@ -2737,7 +2737,7 @@ def main() -> None:
                         box-sizing: border-box !important;
                     }}
                     div[style*="background: linear-gradient"] > div:nth-child(3) {{
-                        font-size: 0.7em !important;
+                        font-size: 0.75em !important;
                         white-space: nowrap !important;
                         overflow: hidden !important;
                         text-overflow: ellipsis !important;
