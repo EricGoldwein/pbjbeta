@@ -2692,7 +2692,7 @@ def main() -> None:
                         <div style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
                             PBJ Nursing Home Staffing Dashboard
                         </div>
-                        <div style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem; white-space: nowrap;'>
+                        <div class="description-text" style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem;'>
                             Explore staffing trends across 15,000+ U.S. nursing homes
                         </div>
                         <div class="desktop-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
@@ -2713,6 +2713,11 @@ def main() -> None:
                     }}
                     .mobile-footer {{
                         display: block;
+                    }}
+                    .description-text {{
+                        font-size: 0.95em !important;
+                        white-space: nowrap !important;
+                        overflow: hidden !important;
                     }}
                     div[data-testid="stMarkdown"] > div:has(> div[style*="background: linear-gradient"]) {{
                         margin-top: -80px !important;
