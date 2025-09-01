@@ -2715,16 +2715,38 @@ def main() -> None:
                         line-height: 1.2 !important;
                     }}
                     div[style*="background: linear-gradient"] > div:nth-child(2) {{
-                        font-size: 0.9em !important;
+                        font-size: 0.85em !important;
                         white-space: nowrap !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                        max-width: 100% !important;
                     }}
                     div[style*="background: linear-gradient"] > div:nth-child(3) {{
-                        font-size: 0.8em !important;
+                        font-size: 0.75em !important;
                         white-space: nowrap !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                        max-width: 100% !important;
                     }}
                     /* Additional padding for state page on mobile */
                     .state-page-mobile-padding {{
                         margin-top: 15px !important;
+                    }}
+                    /* Fix 320 Consulting badge padding on mobile */
+                    div[style*="320 Consulting"] {{
+                        padding: 2px 5px !important;
+                        font-size: 0.6em !important;
+                        border-radius: 5px !important;
+                    }}
+                    /* Override inline styles for 320 Consulting badges */
+                    div[style*="padding: 2px 5px"] {{
+                        padding: 2px 5px !important;
+                    }}
+                    div[style*="font-size: 0.6em"] {{
+                        font-size: 0.6em !important;
+                    }}
+                    div[style*="border-radius: 6px"] {{
+                        border-radius: 5px !important;
                     }}
                 }}
                 /* Additional padding for state page on desktop */
