@@ -2693,7 +2693,8 @@ def main() -> None:
                             PBJ Nursing Home Staffing Dashboard
                         </div>
                         <div class="description-text" style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem;'>
-                            Explore staffing trends across 15,000+ U.S. nursing homes
+                            <span class="desktop-desc">Explore staffing trends across 15,000+ U.S. nursing homes</span>
+                            <span class="mobile-desc">Explore staffing trends across 15,000+ nursing homes</span>
                         </div>
                         <div class="desktop-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
                             A free resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 600;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the PBJ Dashboard</a>
@@ -2704,20 +2705,15 @@ def main() -> None:
                     </div>
                 </div>
                 <style>
-                .mobile-footer {{
+                .mobile-footer, .mobile-desc {{
                     display: none;
                 }}
                 @media (max-width: 768px) {{
-                    .desktop-footer {{
+                    .desktop-footer, .desktop-desc {{
                         display: none;
                     }}
-                    .mobile-footer {{
+                    .mobile-footer, .mobile-desc {{
                         display: block;
-                    }}
-                    .description-text {{
-                        font-size: 0.95em !important;
-                        white-space: nowrap !important;
-                        overflow: hidden !important;
                     }}
                     div[data-testid="stMarkdown"] > div:has(> div[style*="background: linear-gradient"]) {{
                         margin-top: -80px !important;
