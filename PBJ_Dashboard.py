@@ -2693,7 +2693,7 @@ def main() -> None:
                         </div>
                         <div class="description-text" style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem;'>
                             <span class="desktop-desc">Explore staffing trends across 15,000+ U.S. nursing homes</span>
-                            <span class="mobile-desc">Explore staffing trends across 15,000+ nursing homes</span>
+                            <span class="mobile-desc">Staffing trends across 15,000+ U.S. nursing homes</span>
                         </div>
                         <div class="desktop-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
                             A free resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 600;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the PBJ Dashboard</a>
