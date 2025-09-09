@@ -11,6 +11,7 @@ import base64
 import math
 import io
 import numpy as np
+from decimal import Decimal, ROUND_HALF_UP
 
 # Add this import at the top of your file, after the other imports
 # from pbj_icon_component import pbj_icon, pbj_icon_with_text  # Uncomment when you want to use the component
@@ -329,10 +330,13 @@ def _classify(v, ref, tol=0.03):
     return "around"
 
 def _fmt(x, nd=2):
+    """Format a number to nd decimals using ROUND_HALF_UP (financial rounding)."""
     if x is None:
         return "—"
     try:
-        return f"{float(x):.{nd}f}"
+        quant = '1.' + ('0' * nd)
+        d = Decimal(str(x)).quantize(Decimal(quant), rounding=ROUND_HALF_UP)
+        return f"{d:.{nd}f}"
     except (ValueError, TypeError):
         return str(x)
 
@@ -2145,14 +2149,23 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         st.error(f"Error displaying metrics: {str(e)}")
 
 def format_metric(value, decimal_places=1, percentage=False, thousands=False):
-    """Format a metric value with appropriate decimal places and formatting."""
+    """Format a metric value using ROUND_HALF_UP with optional % and thousands."""
     if pd.isna(value):
         return "N/A"
-    if percentage:
-        return f"{value:.{decimal_places}f}%"
-    if thousands:
-        return f"{value:,.{decimal_places}f}"
-    return f"{value:.{decimal_places}f}"
+    try:
+        quant = '1.' + ('0' * decimal_places)
+        d = Decimal(str(value)).quantize(Decimal(quant), rounding=ROUND_HALF_UP)
+        if percentage:
+            return f"{d:.{decimal_places}f}%"
+        if thousands:
+            return f"{float(d):,.{decimal_places}f}"
+        return f"{d:.{decimal_places}f}"
+    except Exception:
+        if percentage:
+            return f"{value:.{decimal_places}f}%"
+        if thousands:
+            return f"{value:,.{decimal_places}f}"
+        return f"{value:.{decimal_places}f}"
 
 
 def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
@@ -2402,8 +2415,11 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                   subplot_titles=('Total Nurse HPRD - National', 'Census - National', 'Contract Staff Percentage - National'),
                           vertical_spacing=0.15)
 
+        # Pre-round HPRD using ROUND_HALF_UP for consistent tooltip display
+        hprd_display = data['Total_Nurse_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+
         # Add all traces for desktop view
-        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data['Total_Nurse_HPRD'],
+        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=hprd_display,
                        mode='lines+markers', name='Total HPRD',
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_hprd), row=1, col=1)
@@ -6101,7 +6117,10 @@ def main() -> None:
                                             # Format numeric columns
                                             rankings_df['Total Providers'] = rankings_df['Total Providers'].astype(int)
                                             rankings_df['Total Residents (avg. per day)'] = (rankings_df['Total Residents (avg. per day)'] + 0.5).astype(int)  # Round to whole numbers
-                                            rankings_df['Total Nurse HPRD'] = rankings_df['Total Nurse HPRD'].round(2)
+                                            # Use ROUND_HALF_UP to avoid bankers rounding (e.g., 3.465 -> 3.47)
+                                            rankings_df['Total Nurse HPRD'] = rankings_df['Total Nurse HPRD'].apply(
+                                                lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP))
+                                            )
                                             
                                             # Display the table with custom styling
                                             st.markdown(f"### State Rankings by Total Nurse HPRD ({quarter_display})")
