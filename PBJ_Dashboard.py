@@ -744,8 +744,8 @@ def state_pbj_takeaway_card(
         
 
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes to allow for updates
-def load_metrics_data():
+@st.cache_data(ttl=60)  # Reduced cache time for debugging - Cache for 1 minute to allow for updates
+def load_metrics_data(cache_version="v2024_12_15"):
     """Load and cache all metrics data."""
     try:
         import os
@@ -2747,7 +2747,7 @@ def main() -> None:
                                 <img src="data:image/png;base64,{favicon_data}" style="width: 19px; height: 19px; margin-right: 0px; vertical-align: text-top;"> About the PBJ Dashboard
                             </a>
                         </div>
-                        <div style='font-size:0.8em; color:#666; margin-top: 0.8rem; margin-bottom: -0.5rem; text-align: center;'>
+                        <div class="desktop-footer" style='font-size:0.8em; color:#666; margin-top: 0.8rem; margin-bottom: -0.5rem; text-align: center;'>
                             Powered by <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 700;">320 Consulting</a>
                         </div>
                         <div class="mobile-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
