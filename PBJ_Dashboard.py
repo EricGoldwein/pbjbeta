@@ -2420,7 +2420,12 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
 
         # Pre-round HPRD using ROUND_HALF_UP for consistent tooltip display
         hprd_display = data['Total_Nurse_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
-        nurse_care_hprd_display = data['Nurse_Care_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        
+        # Check if Nurse_Care_HPRD column exists, otherwise use Total_Nurse_HPRD
+        if 'Nurse_Care_HPRD' in data.columns:
+            nurse_care_hprd_display = data['Nurse_Care_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        else:
+            nurse_care_hprd_display = hprd_display
         
         # Pre-round RN HPRD data (with error handling for missing columns and NaN values)
         if 'Total_RN_HPRD' in data.columns and not data['Total_RN_HPRD'].isna().all():
