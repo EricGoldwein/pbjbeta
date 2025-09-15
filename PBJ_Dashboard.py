@@ -2474,17 +2474,21 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_contract, showlegend=False), row=4, col=1)
 
-        # Add explanatory text directly below the title
+        # Add explanatory text directly below the title with styled background
         fig.add_annotation(
-            text="<span style='font-size: 10px; color: #ff7f0e;'>Direct staff (orange) excludes RN Admin, RN DON, LPN Admin</span>",
+            text="Direct staff (orange) excludes RN Admin, RN DON, LPN Admin",
             x=0.5,
-            y=0.97,  # Moved up slightly to avoid y-axis overlap
+            y=0.975,  # Moved up a tiny bit more
             xref="x domain",
             yref="y domain",
             showarrow=False,
             xanchor="center",
             yanchor="bottom",
             align="center",
+            font=dict(size=10, color="#ff7f0e"),
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="rgba(255, 127, 14, 0.15)",
+            borderwidth=0.5,
             row=1,
             col=1
         )
