@@ -1840,8 +1840,14 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
             border: 1px solid #d1d5db;
             border-radius: 8px;
             background-color: #f8fafc;
-            max-width: 400px;
+            max-width: 500px;
             display: inline-block;
+        }
+        @media (max-width: 768px) {
+            .nav-links {
+                max-width: 90%;
+                padding: 8px 20px;
+            }
         }
         .nav-links a {
             color: #1769aa;
@@ -2722,12 +2728,14 @@ def main() -> None:
                         <div class="description-text" style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 0.5rem;'>
                              <span class="desktop-desc">Explore staffing trends across 15,000+ U.S. nursing homes</span>
                              <span class="mobile-desc">Staffing trends across 15,000+ U.S. nursing homes</span>
-                        </div> 
-                        <div class="desktop-footer" style='font-size:0.95em; color:#1769aa; font-weight:400; margin-bottom: 0.3rem; position: relative; text-align: center;'>
+                        </div>
+                        <div class="desktop-footer" style='font-size:0.95em; color:#1769aa; font-weight:400; margin-bottom: 0.2rem; text-align: center;'>
                             <a href="/About" target="_self" style="display: inline-block; background: #f5f8fc; border: 1px solid #333; border-radius: 4px; padding: 0.2rem 0.6rem; color: #333; text-decoration: none; font-weight: 450; font-size: 0.9em; transition: all 0.2s ease;">
                                 <img src="data:image/png;base64,{favicon_data}" style="width: 19px; height: 19px; margin-right: 0px; vertical-align: text-top;"> About the PBJ Dashboard
                             </a>
-                            <a href="https://www.320insight.com/" target="_blank" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: inline-block; background: #1769aa; color: white; padding: 0.2rem 0.8rem; border-radius: 12px; text-decoration: none; font-size: 0.8em; font-weight: 500;">320 Consulting</a>
+                        </div>
+                        <div style='font-size:0.8em; color:#666; margin-top: 0.8rem; margin-bottom: -0.5rem; text-align: center;'>
+                            Powered by <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 700;">320 Consulting</a>
                         </div>
                         <div class="mobile-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
                             <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the Dashboard</a> • <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 500;">320 Consulting</a>
