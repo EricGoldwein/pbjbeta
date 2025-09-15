@@ -2422,10 +2422,11 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         hprd_display = data['Total_Nurse_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
         
         # Check if Nurse_Care_HPRD column exists, otherwise use Total_Nurse_HPRD
-        if 'Nurse_Care_HPRD' in data.columns:
+        if 'Nurse_Care_HPRD' in data.columns and not data['Nurse_Care_HPRD'].isna().all():
             nurse_care_hprd_display = data['Nurse_Care_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
         else:
-            nurse_care_hprd_display = hprd_display
+            # Fallback should be different from total nurse to show the issue
+            nurse_care_hprd_display = hprd_display * 0.9  # Make it slightly different so we can see the problem
         
         # Pre-round RN HPRD data (with error handling for missing columns and NaN values)
         if 'Total_RN_HPRD' in data.columns and not data['Total_RN_HPRD'].isna().all():
