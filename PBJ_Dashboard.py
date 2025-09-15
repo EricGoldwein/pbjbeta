@@ -2501,7 +2501,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Move subplot titles up slightly for better spacing
         for annotation in fig.layout.annotations:
             if annotation.text and 'HPRD' in annotation.text:
-                annotation.y = annotation.y + 0.015
+                annotation.y = annotation.y + 0.008
         
         # Determine tick format based on number of data points
         num_data_points = len(data)
