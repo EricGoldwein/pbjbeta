@@ -744,7 +744,7 @@ def state_pbj_takeaway_card(
         
 
 
-@st.cache_data(ttl=60)  # Reduced cache time for debugging - Cache for 1 minute to allow for updates
+@st.cache_data(ttl=300)  # Cache for 5 minutes
 def load_metrics_data(cache_version="v2024_12_15"):
     """Load and cache all metrics data."""
     try:
