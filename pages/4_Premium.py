@@ -4,6 +4,21 @@ import base64
 # Set page config - this must be the first Streamlit command
 st.set_page_config(page_title="Premium | PBJ Nursing Home Staffing Dashboard", page_icon="pbj_favicon.png", layout="wide")
 
+# Load favicon data
+def load_pbj_favicon():
+    """Load PBJ favicon data for use in footer"""
+    try:
+        with open('pbj_favicon.png', 'rb') as f:
+            return base64.b64encode(f.read()).decode()
+    except FileNotFoundError:
+        print("Warning: pbj_favicon.png not found")
+        return ""
+    except Exception as e:
+        print(f"Warning: Error loading favicon: {e}")
+        return ""
+
+favicon_data = load_pbj_favicon()
+
 # Custom CSS for Home button styling
 st.markdown("""
 <style>
@@ -36,8 +51,13 @@ st.markdown("""
 # Add Home button to top left
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
-    if st.button("Home", key="home_button_premium"):
-        st.switch_page("PBJ_Dashboard.py")
+    st.markdown(f"""
+        <div style="margin-top: 8px; margin-bottom: 8px;">
+            <a href="PBJ_Dashboard.py" style="display: inline-block; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; border: 1px solid #90caf9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 500; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: all 0.2s ease;">
+                <img src="data:image/png;base64,{favicon_data}" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;"> Home
+            </a>
+        </div>
+    """, unsafe_allow_html=True)
 
 # Custom CSS for premium styling
 st.markdown("""
@@ -186,11 +206,11 @@ st.markdown("""
 
 def display_footer():
     """Display a consistent footer across all pages."""
-    st.markdown("""
+    st.markdown(f"""
         <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
             <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2025</a></p>
             <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
-            <p><a href="/About" target="_self">About the Dashboard</a> | <a href="/Premium" target="_self">Premium</a></p>
+            <p><a href="/About" target="_self" style="text-decoration: none;">About the Dashboard</a> | <a href="/Premium" target="_self" style="text-decoration: none;">Premium</a> | <a href="https://www.320insight.com/phoebe" target="_blank" style="text-decoration: none;">Phoebe J</a></p>
         </div>
     """, unsafe_allow_html=True)
 
