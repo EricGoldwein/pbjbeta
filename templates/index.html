@@ -1023,7 +1023,12 @@
                                 <select class="form-select" id="staffCategory" required>
                                     <optgroup label="Nurse Staff">
                                         {% for category in staff_categories.nurse %}
-                                            <option value="{{ category }}" {% if category == 'Total_RN' %}selected{% endif %}>{{ category }}</option>
+                                            <option value="{{ category }}" {% if category == 'RN' %}selected{% endif %}>{{ category }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    <optgroup label="Non-Nurse Staff">
+                                        {% for category in staff_categories.non_nurse %}
+                                            <option value="{{ category }}">{{ category }}</option>
                                         {% endfor %}
                                     </optgroup>
                                 </select>
@@ -1048,28 +1053,40 @@
                     </form>
                     <hr class="my-2" style="border-color:#e3eaf3; margin: 0 0 10px 0;">
                     <div class="row text-center mb-2">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="stat-item">
                                 <h4 id="totalDays">-</h4>
                                 <p class="stat-label">Total Days</p>
                 </div>
             </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="stat-item">
                                 <h4 id="avgHours">-</h4>
                                 <p class="stat-label">Avg Hours</p>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="stat-item">
                                 <h4 id="avgHPRD">-</h4>
                                 <p class="stat-label">Avg HPRD</p>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="stat-item">
-                                <h4 id="maxHours">-</h4>
-                                <p class="stat-label">Max Hours</p>
+                                <h4 id="totalHPRD">-</h4>
+                                <p class="stat-label">Total HPRD</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h4 id="contractPct">-</h4>
+                                <p class="stat-label">Contract %</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h4 id="avgCensus">-</h4>
+                                <p class="stat-label">Avg Census</p>
                             </div>
                         </div>
                     </div>
@@ -1801,16 +1818,25 @@
                         if (document.getElementById('contractHoursChart'))
                 Plotly.newPlot('contractHoursChart', data.contract_hours_chart.data, data.contract_hours_chart.layout);
                 // Update summary stats
-                const hours = data.data.map(row => row.Total_Hours || row.Hours);
-                const hprd = data.data.map(row => row.HPRD);
+                const hours = data.data.map(row => row.Hours || 0);
+                const totalHours = data.data.map(row => row.Total_Hours || row.Hours || 0);
+                const hprd = data.data.map(row => row.HPRD || 0);
+                const totalHprd = data.data.map(row => row.Total_HPRD || 0);
+                const contractPct = data.data.map(row => row.Contract_Percentage || 0);
+                const census = data.data.map(row => row.Census || 0);
+                
                         if (document.getElementById('totalDays'))
                 document.getElementById('totalDays').textContent = formatNumber(data.data.length);
                         if (document.getElementById('avgHours'))
                 document.getElementById('avgHours').textContent = (hours.reduce((a, b) => a + b, 0) / hours.length).toFixed(1);
                         if (document.getElementById('avgHPRD'))
                 document.getElementById('avgHPRD').textContent = (hprd.reduce((a, b) => a + b, 0) / hprd.length).toFixed(3);
-                        if (document.getElementById('maxHours'))
-                document.getElementById('maxHours').textContent = Math.max(...hours).toFixed(1);
+                        if (document.getElementById('totalHPRD'))
+                document.getElementById('totalHPRD').textContent = (totalHprd.reduce((a, b) => a + b, 0) / totalHprd.length).toFixed(3);
+                        if (document.getElementById('contractPct'))
+                document.getElementById('contractPct').textContent = (contractPct.reduce((a, b) => a + b, 0) / contractPct.length).toFixed(1) + '%';
+                        if (document.getElementById('avgCensus'))
+                document.getElementById('avgCensus').textContent = (census.reduce((a, b) => a + b, 0) / census.length).toFixed(1);
                         // Set filteredData for threshold analysis
                         filteredData = data.data;
                 currentDataPage = 1;
@@ -1925,6 +1951,54 @@
                 });
             }
         });
+
+        // Add date range lookup when provider number changes
+        const provnumInput = document.getElementById('provnum');
+        if (provnumInput) {
+            provnumInput.addEventListener('blur', function() {
+                const provnum = this.value.trim();
+                if (provnum) {
+                    fetchDateRange(provnum);
+                }
+            });
+        }
+
+        async function fetchDateRange(provnum) {
+            try {
+                const response = await fetch(`/date_range?provnum=${provnum}`);
+                const data = await response.json();
+                if (data.error) {
+                    console.log('No date range found for provider:', provnum);
+                    return;
+                }
+                
+                // Update date inputs with the available range
+                const startDateInput = document.getElementById('startDate');
+                const endDateInput = document.getElementById('endDate');
+                
+                if (startDateInput && endDateInput) {
+                    startDateInput.min = data.min_date;
+                    startDateInput.max = data.max_date;
+                    endDateInput.min = data.min_date;
+                    endDateInput.max = data.max_date;
+                    
+                    // Set default to last 30 days if available
+                    const endDate = new Date(data.max_date);
+                    const startDate = new Date(endDate);
+                    startDate.setDate(startDate.getDate() - 30);
+                    
+                    if (startDate >= new Date(data.min_date)) {
+                        startDateInput.value = startDate.toISOString().split('T')[0];
+                    } else {
+                        startDateInput.value = data.min_date;
+                    }
+                    endDateInput.value = data.max_date;
+                }
+                
+            } catch (error) {
+                console.error('Error fetching date range:', error);
+            }
+        }
     </script>
 </body>
 </html> 

@@ -108,10 +108,14 @@ st.markdown("""
     <script>
     // Force sidebar to be collapsed on page load
     window.addEventListener('load', function() {
-        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
-        if (sidebar) {
-            sidebar.setAttribute('aria-expanded', 'false');
-            sidebar.style.transform = 'translateX(-100%)';
+        try {
+            const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+            if (sidebar) {
+                sidebar.setAttribute('aria-expanded', 'false');
+                sidebar.style.transform = 'translateX(-100%)';
+            }
+        } catch (error) {
+            console.log('Error collapsing sidebar:', error);
         }
     });
     </script>
@@ -196,7 +200,6 @@ def get_db_connection():
         # Use the existing in-memory facility database
         return facility_db
     except Exception as e:
-        print(f"Error connecting to database: {str(e)}")
         return None
 
 @st.cache_data
@@ -741,7 +744,7 @@ def state_pbj_takeaway_card(
         
 
 
-@st.cache_data
+@st.cache_data(ttl=300)  # Cache for 5 minutes to allow for updates
 def load_metrics_data():
     """Load and cache all metrics data."""
     try:
@@ -996,16 +999,10 @@ def create_facility_db():
     """Create an optimized DuckDB database for facility data."""
     try:
         # Load facility metrics into DuckDB
-        print("Loading facility metrics from CSV...")
         facility_metrics = pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
         
         if facility_metrics.empty:
-            print("Warning: facility_metrics DataFrame is empty")
             return
-            
-        print(f"Loaded {len(facility_metrics)} facility records")
-        print("Sample of facility data:")
-        print(facility_metrics.head())
         
         # Rename columns to match expected format
         column_mapping = {
@@ -1054,11 +1051,11 @@ def create_facility_db():
         
         # Verify data was loaded
         result = facility_db.execute("SELECT COUNT(*) FROM facility_metrics").fetchone()
-        print(f"Total records in facility_metrics table: {result[0]}")
         
     except Exception as e:
-        print(f"Error creating facility database: {str(e)}")
         st.error(f"Error creating facility database: {str(e)}")
+
+# Function to clear cache and reload data
 
 # Initialize data at startup
 try:
@@ -1174,7 +1171,6 @@ def get_facility_staffing_rating(provnum: str) -> float:
         return float(staffing_rating) if pd.notna(staffing_rating) else None
         
     except Exception as e:
-        print(f"Error getting staffing rating for {provnum}: {str(e)}")
         return None
 
 @st.cache_data
@@ -1200,7 +1196,6 @@ def get_facility_affiliated_entity(provnum: str) -> str:
         return None
         
     except Exception as e:
-        print(f"Error getting chain name for {provnum}: {str(e)}")
         return None
 
 @st.cache_data
@@ -1226,7 +1221,6 @@ def get_facility_affiliated_entity_id(provnum: str) -> str:
         return None
         
     except Exception as e:
-        print(f"Error getting chain ID for {provnum}: {str(e)}")
         return None
 
 @st.cache_data
@@ -1388,7 +1382,6 @@ def search_facilities(search_term: str) -> List[Dict[str, str]]:
         # Sanitize search term to prevent SQL injection
         search_term = search_term.replace("'", "''")
         
-        print(f"Searching for facilities matching: {search_term}")
         
         # Get matching facilities using DuckDB with parameterized query
         query = """
@@ -1402,18 +1395,15 @@ def search_facilities(search_term: str) -> List[Dict[str, str]]:
             (f"%{search_term}%", f"%{search_term}%")
         ).fetchdf()
         
-        print(f"Found {len(matching_facilities)} matching facilities")
         
         if not matching_facilities.empty:
             # Apply proper title case to PROVNAME and CITY
             matching_facilities['PROVNAME'] = matching_facilities['PROVNAME'].apply(proper_title_case)
             return matching_facilities.to_dict('records')
             
-        print("No matching facilities found")
         return []
         
     except Exception as e:
-        print(f"Error searching facilities: {str(e)}")
         st.error(f"Error searching facilities: {str(e)}")
         return []
 
@@ -1449,7 +1439,6 @@ def get_facility_info(provnum: str) -> dict:
             }
         return None
     except Exception as e:
-        print(f"Error getting facility info: {str(e)}")
         return None
 
 @st.cache_data
@@ -1485,7 +1474,6 @@ def get_facility_ownership_type(provnum: str) -> str:
             return str(ownership_type)  # Return original if no match
         
     except Exception as e:
-        print(f"Error getting facility ownership type: {str(e)}")
         return None
 
 @st.cache_data
@@ -1509,7 +1497,6 @@ def get_facility_ownership_change(provnum: str) -> bool:
         return pd.notna(ownership_change) and ownership_change == 'Y'
         
     except Exception as e:
-        print(f"Error getting facility ownership change status: {str(e)}")
         return False
 
 @st.cache_data
@@ -1548,7 +1535,6 @@ def get_facility_high_risk_indicators(provnum: str) -> dict:
         }
         
     except Exception as e:
-        print(f"Error getting facility high-risk indicators: {str(e)}")
         return None
 
 def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
@@ -1589,7 +1575,6 @@ def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
             }
         return None
     except Exception as e:
-        print(f"Error getting quarterly metrics: {str(e)}")
         return None
 
 def generate_report(provnum: str, selected_quarter: str) -> str:
@@ -1818,11 +1803,14 @@ def is_mobile():
 
 def display_subscription_button(entity_type: str, entity_id: str, entity_name: str):
     """Display the premium services section with email link."""
+    # Load favicon data
+    favicon_data = load_pbj_favicon()
+    
     st.markdown("""
         <style>
         .premium-services {
             background-color: #f8f9fa;
-            padding: 20px;
+            padding: 15px 20px 10px 20px;
             border-radius: 8px;
             margin: 20px auto;
             max-width: 800px;
@@ -1831,11 +1819,11 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
         }
         .premium-services h3 {
             color: #2c3338;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
         .premium-services p {
             color: #555;
-            margin-bottom: 15px;
+            margin-bottom: 8px;
         }
         .premium-services a {
             color: #1E88E5;
@@ -1848,8 +1836,12 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
         .nav-links {
             text-align: center;
             margin: 10px auto 5px auto;
-            padding: 10px 0;
-            border-top: 1px solid #e0e0e0;
+            padding: 6px 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background-color: #f8fafc;
+            max-width: 400px;
+            display: inline-block;
         }
         .nav-links a {
             color: #1769aa;
@@ -1868,17 +1860,21 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
     
     st.markdown(f"""
         <div class="premium-services">
-            <h3>Custom Dashboards</h3>
-            <p><strong><a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none;">320 Consulting</a></strong> offers custom dashboards and reports so you can dive deeper into the data. This includes full breakdowns of all nurse and non-nurse positions, staffing trends over time, state-specific data, citation histories, or any category you need — built to support your case, investigation, or advocacy.</p>
+            <h3>Custom Dashboards and Reports</h3>
+            <p><strong><a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none;">320 Consulting</a></strong> offers custom dashboards and facility reports so you can dive deeper into the data. This includes full breakdowns of all nurse and non-nurse positions, staffing trends over time, state-specific data, citation histories, or any category you need — built to support your case, investigation, or advocacy.</p>
             <p>Get in touch: <a href="mailto:eric@320insight.com">eric@320insight.com</a></p>
         </div>
     """, unsafe_allow_html=True)
     
     # Add navigation links below premium services
-    st.markdown("""
-        <div class="nav-links">
-            <a href="/About" target="_self">About the Dashboard</a> | 
-            <a href="/Premium" target="_self">Premium</a>
+    st.markdown(f"""
+        <div style="text-align: center;">
+            <div class="nav-links">
+                <img src="data:image/png;base64,{favicon_data}" style="width: 18px; height: 18px; margin-right: -2px; vertical-align: middle;"> <a href="/About" target="_self">About</a> • <a href="/Premium" target="_self">Premium</a> • <a href="https://www.320insight.com/phoebe" target="_blank">Phoebe J</a>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 0.2rem;">
+            <a href="https://www.320insight.com/" target="_blank" style="display: inline-block; background: #1769aa; color: white; padding: 0.2rem 0.8rem; border-radius: 12px; text-decoration: none; font-size: 0.8em; font-weight: 500;">320 Consulting</a>
         </div>
     """, unsafe_allow_html=True)
 
@@ -2266,7 +2262,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         
         fig.update_layout(
             title=dict(
-                text=f"<span style='color: blue;'>Reported</span> vs. <span style='color: red;'>Case-Mix (Expected)</span><br><span style='font-weight: normal;'>{proper_title_case(facility_name)}, July 2025</span>",
+                text=f"<span style='color: blue;'>Reported</span> vs. <span style='color: red;'>Case-Mix (Expected)</span><br><span style='font-weight: normal;'>{proper_title_case(facility_name)}</span>",
                 x=0.5,
                 xanchor='center',
                 font=dict(size=16)
@@ -2385,7 +2381,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Sort data by date
         data = data.sort_values('date')
         
-        # Create year labels for x-axis ticks
+        # Create year labels for x-axis ticks (original logic)
         min_year = data['date'].dt.year.min()
         max_year = data['date'].dt.year.max()
         all_years = range(min_year, max_year + 1)
@@ -2395,74 +2391,141 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Get the actual date range from the data
         date_range = [data['date'].min().to_pydatetime(), data['date'].max().to_pydatetime()]
         
-        # Define custom hover templates
+        # Define custom hover templates - all use quarter format
         hover_hprd = "<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>"
         hover_census = "<b>%{customdata}</b><br>%{y:,.0f}<extra></extra>"
         hover_contract = "<b>%{customdata}</b><br>%{y:.2f}%<extra></extra>"
         
-        # Desktop figure (3 charts)
+        # Desktop figure (4 charts)
         if state:
             full_state_name = get_full_state_name(state)
-            fig = make_subplots(rows=3, cols=1,
-                  subplot_titles=(f'Total Nurse HPRD - {full_state_name}', f'Census - {full_state_name}', f'Contract Staff Percentage - {full_state_name}'),
-                          vertical_spacing=0.18)
+            fig = make_subplots(rows=4, cols=1,
+                  subplot_titles=(f'<span style="color: #333333;">Nursing Home Staff HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Total RN HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Resident Census - {full_state_name}</span>', f'<span style="color: #333333;">Contract Staff Percentage - {full_state_name}</span>'),
+                          vertical_spacing=0.10)
         elif facility:
-            fig = make_subplots(rows=3, cols=1,
-                  subplot_titles=('Total Nurse HPRD', 'Census', 'Contract Staff Percentage'),
-                          vertical_spacing=0.15)
+            fig = make_subplots(rows=4, cols=1,
+                  subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD</span>', '<span style="color: #333333;">Total RN HPRD</span>', '<span style="color: #333333;">Resident Census</span>', '<span style="color: #333333;">Contract Staff Percentage</span>'),
+                          vertical_spacing=0.08)
         else:
-            fig = make_subplots(rows=3, cols=1,
-                  subplot_titles=('Total Nurse HPRD - National', 'Census - National', 'Contract Staff Percentage - National'),
-                          vertical_spacing=0.15)
+            fig = make_subplots(rows=4, cols=1,
+                  subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD - National</span>', '<span style="color: #333333;">Total RN HPRD - National</span>', '<span style="color: #333333;">Resident Census - National</span>', '<span style="color: #333333;">Contract Staff Percentage - National</span>'),
+                          vertical_spacing=0.08)
+
 
         # Pre-round HPRD using ROUND_HALF_UP for consistent tooltip display
         hprd_display = data['Total_Nurse_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        nurse_care_hprd_display = data['Nurse_Care_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        
+        # Pre-round RN HPRD data (with error handling for missing columns and NaN values)
+        if 'Total_RN_HPRD' in data.columns and not data['Total_RN_HPRD'].isna().all():
+            total_rn_hprd_display = data['Total_RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        else:
+            total_rn_hprd_display = pd.Series([0.0] * len(data))
+            
 
         # Add all traces for desktop view
         fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=hprd_display,
-                       mode='lines+markers', name='Total HPRD',
+                       mode='lines+markers', name='Total Nurse Staff',
+                       line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                       hovertemplate=hover_hprd), row=1, col=1)
+                       hovertemplate=hover_hprd, showlegend=False), row=1, col=1)
+        
+        # Add nurse care HPRD line
+        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=nurse_care_hprd_display,
+                       mode='lines+markers', name='Direct (excl. Admin, DON)',
+                       line=dict(color='#ff7f0e', width=3, dash='dash'),
+                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                       hovertemplate="<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>", showlegend=False), row=1, col=1)
+
+        # Add RN HPRD traces (row 2)
+        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=total_rn_hprd_display,
+                       mode='lines+markers', name='Total RN',
+                       line=dict(color='#1f77b4', width=3),
+                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
+                       hovertemplate="<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>", showlegend=False), row=2, col=1)
+        
 
         # Use State_Census for state-level charts, Census for facility and national charts
         census_column = 'State_Census' if state else 'Census'
         fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data[census_column],
                        mode='lines+markers', name='Census',
+                       line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                       hovertemplate=hover_census), row=2, col=1)
+                       hovertemplate=hover_census, showlegend=False), row=3, col=1)
 
         fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data['Contract_Percentage'],
                        mode='lines+markers', name='Contract %',
+                       line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                       hovertemplate=hover_contract), row=3, col=1)
+                       hovertemplate=hover_contract, showlegend=False), row=4, col=1)
+
+        # Add explanatory text directly below the title
+        fig.add_annotation(
+            text="<span style='font-size: 10px; color: #ff7f0e;'>Direct staff (orange) excludes RN Admin, RN DON, LPN Admin</span>",
+            x=0.5,
+            y=0.95,  # Just below the title
+            xref="x domain",
+            yref="y domain",
+            showarrow=False,
+            xanchor="center",
+            yanchor="bottom",
+            align="center",
+            row=1,
+            col=1
+        )
 
         # Update desktop layout
         fig.update_layout(
-            height=1400,
+            height=1800,  # Increased height to make charts taller
             width=1200,
             title_text=title_prefix,
-            showlegend=False,
-            margin=dict(l=50, r=50, t=100, b=100),
-            hovermode='x unified'
+            showlegend=False,  # We'll add individual legends per subplot
+            margin=dict(l=50, r=50, t=100, b=100),  # Normal margins
+            hovermode='closest'
         )
         
+        # Determine tick format based on number of data points
+        num_data_points = len(data)
+        if num_data_points <= 20:
+            # Moderate data points - show quarters
+            tick_format = "Q%q %Y"
+        else:
+            # Many data points - show years initially, quarters when zoomed
+            tick_format = None  # Let Plotly auto-format
+            fig.update_layout(
+                xaxis=dict(
+                    tickformatstops=[
+                        dict(dtickrange=[None, "M3"], value="Q%q %Y"),
+                        dict(dtickrange=["M3", None], value="%Y")
+                    ]
+                )
+            )
+        
+        
+        
         # Add footer annotations for desktop view with improved styling
-        for row in range(1, 4):
+        for row in range(1, 5):
             fig.add_annotation(
                 text="<b>320 Consulting</b> | Source: CMS PBJ Data (2017-2025)",
                 x=0.99,
-                y=-0.3,
+                y=-0.15,  # Directly under x-axis ticks
                 xref="x domain",
                 yref="y domain",
                 showarrow=False,
                 font=dict(size=10, color="#666666"),
                 align="right",
                 row=row,
-                col=1
+                col=1,
+                bgcolor="rgba(240,248,255,0.9)",  # Light blue background
+                bordercolor="rgba(0,0,0,0.1)",
+                borderwidth=1,
+                borderpad=4,  # Reduced vertical padding
+                xanchor="right",
+                yanchor="top"
             )
         
         # Update desktop x-axes with improved tick handling for 33 quarters
-        for row in range(1, 4):
+        for row in range(1, 5):
             # For 33 quarters (2017-2025), show more years on x-axis
             # Show every year instead of every other year
             nticks_to_show = len(tick_values) if len(tick_values) <= 9 else 9
@@ -2477,64 +2540,15 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                 linecolor="rgba(200, 200, 200, 0.1)",
                 range=date_range,
                 nticks=nticks_to_show,
-                tickmode='auto'
+                tickmode='auto',
+                tickformat=tick_format if tick_format else None
             )
         
         # Add y-axis labels for each subplot using yaxis titles
         fig.update_yaxes(title_text="Hours Per Resident Day", row=1, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
-        fig.update_yaxes(title_text="Residents Per Day", row=2, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
-        fig.update_yaxes(title_text="% Contract Staff", row=3, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
-        
-        # Create mobile chart if on mobile device
-        if st.session_state.get('is_mobile', False):
-            # Mobile chart (single chart with tabs)
-            mobile_fig = go.Figure()
-            
-            # Add traces for mobile
-            mobile_fig.add_trace(go.Scatter(
-                x=data['date'], 
-                y=data['Total_Nurse_HPRD'],
-                mode='lines+markers', 
-                name='Total HPRD',
-                customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
-                hovertemplate=hover_hprd
-            ))
-            
-            # Update mobile layout
-            mobile_fig.update_layout(
-                height=400,
-                width=800,
-                title_text=title_prefix,
-                showlegend=True,
-                margin=dict(l=50, r=50, t=80, b=80),
-                hovermode='x unified',
-                xaxis=dict(
-                    tickvals=tick_values,
-                    tickangle=45,
-                    showline=True,
-                    linewidth=1,
-                    linecolor="rgba(200, 200, 200, 0.1)",
-                    range=date_range,
-                    nticks=nticks_to_show,
-                    tickmode='auto'
-                )
-            )
-            
-            # Add footer annotation for mobile
-            mobile_fig.add_annotation(
-                text="<b>320 Consulting</b> | Source: CMS PBJ Data (2017-2025)",
-                x=0.99,
-                y=-0.6,
-                xref="x domain",
-                yref="y domain",
-                showarrow=False,
-                font=dict(size=10, color="#666666"),
-                align="right"
-            )
-            
-
-            
-            return mobile_fig
+        fig.update_yaxes(title_text="RN Hours Per Resident Day", row=2, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
+        fig.update_yaxes(title_text="Residents Per Day", row=3, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
+        fig.update_yaxes(title_text="% Contract Staff", row=4, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         
         return fig
         
@@ -2605,25 +2619,20 @@ def main() -> None:
             # Default to desktop
             st.session_state.is_mobile = False
             
-        # Add JavaScript to detect mobile for warning message
-        st.markdown("""
+        # Simple mobile detection using components
+        import streamlit.components.v1 as components
+        mobile_detected = components.html("""
         <script>
-        (function() {
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile && !window.location.search.includes('mobile=true')) {
-                // Add mobile parameter to URL
-                const url = new URL(window.location);
-                url.searchParams.set('mobile', 'true');
-                window.history.replaceState({}, '', url);
-                window.location.reload();
-            }
-        })();
+        const isMobile = window.innerWidth <= 768;
+        // Mobile detection complete
         </script>
-        """, unsafe_allow_html=True)
+        """, height=1)
         
-        # Check URL parameter for mobile detection
-        if st.query_params.get('mobile') == 'true':
+        # Set mobile state based on detection
+        if mobile_detected == 'mobile':
             st.session_state.is_mobile = True
+        else:
+            st.session_state.is_mobile = False
 
         # Load metrics data early for sidebar logic
         national_metrics, state_metrics, facility_metrics = load_metrics_data()
@@ -2701,21 +2710,27 @@ def main() -> None:
         if not initial_state_filter:
             # Add state page mobile padding class if we're on a state page
             state_page_class = "state-page-mobile-padding" if actual_level == "State" else ""
+            # Load favicon data
+            favicon_data = load_pbj_favicon()
+            
             st.markdown(f"""
                 <div class="{state_page_class}" style='text-align: center; margin-top: -20px; margin-bottom: 1.5em;'>
-                    <div style='background: linear-gradient(135deg, #f8fafd 0%, #e3f2fd 100%); border-radius: 12px; padding: 2rem 2.5rem; border: 1px solid #e3eaf3; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
+                    <div style='background: linear-gradient(135deg, #f8fafd 0%, #e3f2fd 100%); border-radius: 12px; padding: 2rem 2.5rem 0.8rem 2.5rem; border: 1px solid #e3eaf3; box-shadow: 0 2px 8px rgba(0,0,0,0.04);'>
                         <div style='font-size:2.6em; font-weight:700; color:#1769aa; letter-spacing:-0.02em; line-height:1.1; margin-bottom: 0.5rem;'>
-                            PBJ Nursing Home Staffing Dashboard
+                             PBJ Nursing Home Staffing Dashboard
                         </div>
-                        <div class="description-text" style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 1rem;'>
-                            <span class="desktop-desc">Explore staffing trends across 15,000+ U.S. nursing homes</span>
-                            <span class="mobile-desc">Staffing trends across 15,000+ U.S. nursing homes</span>
-                        </div>
-                        <div class="desktop-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
-                            A free resource from <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 600;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the PBJ Dashboard</a>
+                        <div class="description-text" style='font-size:1.1em; color:#5a6c7d; font-weight:500; margin-bottom: 0.5rem;'>
+                             <span class="desktop-desc">Explore staffing trends across 15,000+ U.S. nursing homes</span>
+                             <span class="mobile-desc">Staffing trends across 15,000+ U.S. nursing homes</span>
+                        </div> 
+                        <div class="desktop-footer" style='font-size:0.95em; color:#1769aa; font-weight:400; margin-bottom: 0.3rem; position: relative; text-align: center;'>
+                            <a href="/About" target="_self" style="display: inline-block; background: #f5f8fc; border: 1px solid #333; border-radius: 4px; padding: 0.2rem 0.6rem; color: #333; text-decoration: none; font-weight: 450; font-size: 0.9em; transition: all 0.2s ease;">
+                                <img src="data:image/png;base64,{favicon_data}" style="width: 19px; height: 19px; margin-right: 0px; vertical-align: text-top;"> About the PBJ Dashboard
+                            </a>
+                            <a href="https://www.320insight.com/" target="_blank" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: inline-block; background: #1769aa; color: white; padding: 0.2rem 0.8rem; border-radius: 12px; text-decoration: none; font-size: 0.8em; font-weight: 500;">320 Consulting</a>
                         </div>
                         <div class="mobile-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
-                            <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 500;">320 Consulting</a> • <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the Dashboard</a>
+                            <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the Dashboard</a> • <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 500;">320 Consulting</a>
                         </div>
                     </div>
                 </div>
@@ -2724,7 +2739,7 @@ def main() -> None:
                     display: none;
                 }}
                 @media (max-width: 768px) {{
-                    .desktop-footer, .desktop-desc {{
+                    .desktop-footer, .desktop-desc, .desktop-badge {{
                         display: none;
                     }}
                     .mobile-footer, .mobile-desc {{
@@ -2839,9 +2854,7 @@ def main() -> None:
                         break
                 
                 if not file_path:
-                    # Debug: show what paths were tried and current directory
                     try:
-                        # List files in current directory to help debug
                         files_in_dir = [f for f in os.listdir(current_dir) if 'provider' in f.lower() or 'jul' in f.lower()]
                         st.warning(f"Provider info file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Available files with 'provider' or 'jul': {files_in_dir}")
                     except Exception as e:
@@ -2910,7 +2923,6 @@ def main() -> None:
                         break
                 
                 if not file_path:
-                    # Try to list ALL files in current directory to debug
                     try:
                         all_files = os.listdir(current_dir)
                         csv_files = [f for f in all_files if f.endswith('.csv')]
@@ -3751,6 +3763,7 @@ def main() -> None:
             
             # Track level changes for facility search persistence
             st.session_state.last_level = level
+            
         # If level is pre-set by URL, don't show radio button
         if st.session_state.get('level_pre_set', False):
             # Ensure level is properly set when pre-set by URL
@@ -4469,6 +4482,8 @@ def main() -> None:
                                     
                                     **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
                                     
+                                    **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
+                                    
                                     **Contract Staff %:** Share of hours provided by contract staff.
                                     
                                     **Census:** Average number of residents during the period.
@@ -4480,9 +4495,6 @@ def main() -> None:
                                     The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
                                     </div>
                                     
-                                    <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
-                                    <a href="/About">Learn more about the PBJ Dashboard</a>
-                                    </div>
                                     """, unsafe_allow_html=True)
                             
                             # Add CMS Care Compare link below the methodology button for facility level
@@ -5675,10 +5687,16 @@ def main() -> None:
                                     html('''
                                     <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js'></script>
                                     <script>
-                                        var table = window.parent.document.getElementById("facilities-table");
-                                        if (table) {
-                                            new Tablesort(table);
-                                            console.log("Table sorting initialized with Tablesort");
+                                        try {
+                                            var table = window.parent.document.getElementById("facilities-table");
+                                            if (table) {
+                                                new Tablesort(table);
+                                                console.log("Table sorting initialized with Tablesort");
+                                            } else {
+                                                console.log("Table not found, skipping sort initialization");
+                                            }
+                                        } catch (error) {
+                                            console.log("Error initializing table sort:", error);
                                         }
                                     </script>
                                     ''')
@@ -5703,6 +5721,8 @@ def main() -> None:
                             
                             **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
                             
+                            **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
+                            
                             **Contract Staff %:** Share of hours provided by contract staff.
                             
                             **Census:** Average number of residents during the period.
@@ -5714,9 +5734,6 @@ def main() -> None:
                             The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
                             </div>
                             
-                            <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
-                            <a href="/About">Learn more about the PBJ Dashboard</a>
-                            </div>
                             """, unsafe_allow_html=True)
                         
                         st.markdown("</div>", unsafe_allow_html=True)
@@ -5937,6 +5954,8 @@ def main() -> None:
                                 
                                 **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
                                 
+                                **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
+                                
                                 **Contract Staff %:** Share of hours provided by contract staff.
                                 
                                 **Census:** Average number of residents during the period.
@@ -5948,9 +5967,6 @@ def main() -> None:
                                 The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
                                 </div>
                                 
-                                <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
-                                <a href="/About">Learn more about the PBJ Dashboard</a>
-                                </div>
                                 """, unsafe_allow_html=True)
                             
                             st.markdown("</div>", unsafe_allow_html=True)
@@ -6262,6 +6278,8 @@ def main() -> None:
                                 
                                 **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
                                 
+                                **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
+                                
                                 **Contract Staff %:** Share of hours provided by contract staff.
                                 
                                 **Census:** Average number of residents during the period.
@@ -6273,9 +6291,6 @@ def main() -> None:
                                 The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
                                 </div>
                                 
-                                <div style="font-size: 0.8em; color: #666; margin-top: 8px;">
-                                <a href="/About">Learn more about the PBJ Dashboard</a>
-                                </div>
                                 """, unsafe_allow_html=True)
                             
                             st.markdown("</div>", unsafe_allow_html=True)
@@ -6285,25 +6300,6 @@ def main() -> None:
                         display_subscription_button("national", "national", "National Data")
                     elif level == "State":
                         display_subscription_button("state", selected_value, f"{selected_value} State Data")
-                else:
-                    # Show warning with CSS to hide on mobile using Streamlit's actual CSS classes
-                    st.markdown("""
-                    <style>
-                    @media (max-width: 768px) {
-                        /* Hide Streamlit warning boxes on mobile */
-                        div[data-testid="stAlert"] {
-                            display: none !important;
-                        }
-                        /* Alternative selectors for warning boxes */
-                        .stAlert {
-                            display: none !important;
-                        }
-                        [data-testid="stAlert"] {
-                            display: none !important;
-                        }
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error filtering data: {str(e)}")
             return

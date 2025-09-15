@@ -78,6 +78,9 @@ Staffing data is a key indicator of nursing home quality, revealing how much car
 2. Access state, facility, and ownership-level data and view data visualizations to spot trends over time.  
 3. Click **Export** for ready-to-use PNGs.
 
+### Try Phoebe J
+Check out [Phoebe J, the PBJ nursing home staffing data assistant (in training!)](https://www.320insight.com/phoebe) for quick PBJ data searches by state or nursing home.
+
 ### Digging deeper?  
 Daily staffing data and analysis, role-specific hours (Nurse and Non-Nurse), weekend vs. weekday splits, and citation-linked timelines live in the premium layer.  
 Email **eric@320insight.com** for requests. Journalists: If you're working on a story, I'm happy to share data or walk you through it.
@@ -116,6 +119,7 @@ st.markdown("""
         <div style='font-size:1.13em; font-weight:700; color:#1769aa; margin-bottom:0.5em; margin-top:1.2em;'>Metrics Explained</div>
         <div style='font-size:1.08em; color:#222; font-weight:400; line-height:1.45;'>
             <b>Total Nurse Hours Per Resident Day (HPRD):</b> Total nurse staff hours per resident per day.*<br>
+            <b>Direct Care (excl. Admin, DON):</b> Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.<br>
             <b>Contract Staff Percentage:</b> Percentage of nurse staff hours provided by contract staff.<br>
             <b>Census:</b> Average number of residents in facility or state during the reporting period.<br>
             <b>Ownership Change:</b> Indicates facility ownership changed in the last 12 months.

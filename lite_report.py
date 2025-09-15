@@ -27,7 +27,7 @@ def generate_lite_metrics():
     # Create facility lite metrics with new column order, including fields needed for calculations
     facility_lite = facility_metrics[[
         'CY_Qtr', 'PROVNUM', 'PROVNAME', 'STATE', 'COUNTY_NAME',
-        'Total_Nurse_HPRD', 'Contract_Percentage', 'Total_Contract_Hours', 'Total_Nurse_Hours', 'avg_daily_census',
+        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'Total_Contract_Hours', 'Total_Nurse_Hours', 'Total_Nurse_Care_Hours', 'avg_daily_census',
         'total_resident_days', 'days_reported', 'MDScensus'
     ]].copy()
     
@@ -37,7 +37,7 @@ def generate_lite_metrics():
     # Create state lite metrics with new column order
     state_lite = state_metrics[[
         'CY_Qtr', 'STATE', 'facility_count', 'avg_daily_census',
-        'Total_Nurse_HPRD', 'Contract_Percentage'
+        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage'
     ]].copy()
     
     # Calculate statewide census (total census across all facilities in state)
@@ -73,6 +73,7 @@ def generate_lite_metrics():
                 'CY_Qtr': quarter,
                 'Facility_Count': national_row['facility_count'],
                 'Total_Nurse_HPRD': national_row['Total_Nurse_HPRD'],
+                'Nurse_Care_HPRD': national_row['Nurse_Care_HPRD'],
                 'Contract_Percentage': national_row['Contract_Percentage'],
                 'MDS': national_row['MDScensus']
             })
@@ -81,21 +82,21 @@ def generate_lite_metrics():
     national_lite = national_lite.sort_values('CY_Qtr')
     
     # Remove calculation fields from facility_lite before saving
-    facility_lite_output = facility_lite.drop(['avg_daily_census', 'total_resident_days', 'days_reported', 'Total_Contract_Hours', 'Total_Nurse_Hours'], axis=1)
+    facility_lite_output = facility_lite.drop(['avg_daily_census', 'total_resident_days', 'days_reported', 'Total_Contract_Hours', 'Total_Nurse_Hours', 'Total_Nurse_Care_Hours'], axis=1)
     
     # Rename columns to be consistent across all files
     facility_lite_output.columns = [
         'CY_Qtr', 'PROVNUM', 'PROVNAME', 'STATE', 'COUNTY_NAME',
-        'Total_Nurse_HPRD', 'Contract_Percentage', 'Census'
+        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'Census'
     ]
     
     state_lite.columns = [
         'CY_Qtr', 'STATE', 'Facility_Count', 'Census',
-        'Total_Nurse_HPRD', 'Contract_Percentage', 'State_Census'
+        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'State_Census'
     ]
     
     national_lite.columns = [
-        'CY_Qtr', 'Facility_Count', 'Total_Nurse_HPRD',
+        'CY_Qtr', 'Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD',
         'Contract_Percentage', 'MDS'
     ]
     
@@ -115,12 +116,12 @@ def generate_lite_metrics():
     latest_quarter = state_lite['CY_Qtr'].max()
     print(f"\nLatest quarter ({latest_quarter}) state summary:")
     latest_state = state_lite[state_lite['CY_Qtr'] == latest_quarter].sort_values('STATE')
-    print(latest_state[['STATE', 'Facility_Count', 'Census', 'State_Census', 'Total_Nurse_HPRD', 'Contract_Percentage']].to_string())
+    print(latest_state[['STATE', 'Facility_Count', 'Census', 'State_Census', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage']].to_string())
     
     # Print latest quarter's national summary
     print(f"\nLatest quarter ({latest_quarter}) national summary:")
     latest_national = national_lite[national_lite['CY_Qtr'] == latest_quarter]
-    print(latest_national[['Facility_Count', 'Total_Nurse_HPRD', 'Contract_Percentage', 'MDS']].to_string())
+    print(latest_national[['Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'MDS']].to_string())
 
 if __name__ == "__main__":
     generate_lite_metrics() 
