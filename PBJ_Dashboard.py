@@ -2430,6 +2430,9 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Pre-round RN HPRD data (with error handling for missing columns and NaN values)
         if 'Total_RN_HPRD' in data.columns and not data['Total_RN_HPRD'].isna().all():
             total_rn_hprd_display = data['Total_RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        elif 'RN_HPRD' in data.columns and not data['RN_HPRD'].isna().all():
+            # Fallback to RN_HPRD if Total_RN_HPRD doesn't exist
+            total_rn_hprd_display = data['RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
         else:
             total_rn_hprd_display = pd.Series([0.0] * len(data))
             
