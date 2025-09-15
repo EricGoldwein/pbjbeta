@@ -1845,8 +1845,8 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
         }
         @media (max-width: 768px) {
             .nav-links {
-                max-width: 90%;
-                padding: 8px 20px;
+                max-width: 95%;
+                padding: 8px 25px;
             }
         }
         .nav-links a {
@@ -2407,15 +2407,15 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
             full_state_name = get_full_state_name(state)
             fig = make_subplots(rows=4, cols=1,
                   subplot_titles=(f'<span style="color: #333333;">Nursing Home Staff HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Total RN HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Resident Census - {full_state_name}</span>', f'<span style="color: #333333;">Contract Staff Percentage - {full_state_name}</span>'),
-                          vertical_spacing=0.10)
+                          vertical_spacing=0.12)
         elif facility:
             fig = make_subplots(rows=4, cols=1,
                   subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD</span>', '<span style="color: #333333;">Total RN HPRD</span>', '<span style="color: #333333;">Resident Census</span>', '<span style="color: #333333;">Contract Staff Percentage</span>'),
-                          vertical_spacing=0.08)
+                          vertical_spacing=0.10)
         else:
             fig = make_subplots(rows=4, cols=1,
                   subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD - National</span>', '<span style="color: #333333;">Total RN HPRD - National</span>', '<span style="color: #333333;">Resident Census - National</span>', '<span style="color: #333333;">Contract Staff Percentage - National</span>'),
-                          vertical_spacing=0.08)
+                          vertical_spacing=0.10)
 
 
         # Pre-round HPRD using ROUND_HALF_UP for consistent tooltip display
@@ -2469,7 +2469,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         fig.add_annotation(
             text="<span style='font-size: 10px; color: #ff7f0e;'>Direct staff (orange) excludes RN Admin, RN DON, LPN Admin</span>",
             x=0.5,
-            y=0.95,  # Just below the title
+            y=0.97,  # Moved up slightly to avoid y-axis overlap
             xref="x domain",
             yref="y domain",
             showarrow=False,
