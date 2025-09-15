@@ -2395,7 +2395,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         tick_text = [str(year) for year in all_years]
         
         # Get the actual date range from the data
-        date_range = [data['date'].min().to_pydatetime(), data['date'].max().to_pydatetime()]
+        date_range = [data['date'].min(), data['date'].max()]
         
         # Define custom hover templates - all use quarter format
         hover_hprd = "<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>"
@@ -2438,21 +2438,21 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
             
 
         # Add all traces for desktop view
-        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=hprd_display,
+        fig.add_trace(go.Scatter(x=data['date'], y=hprd_display,
                        mode='lines+markers', name='Total Nurse Staff',
                        line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_hprd, showlegend=False), row=1, col=1)
         
         # Add nurse care HPRD line
-        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=nurse_care_hprd_display,
+        fig.add_trace(go.Scatter(x=data['date'], y=nurse_care_hprd_display,
                        mode='lines+markers', name='Direct (excl. Admin, DON)',
                        line=dict(color='#ff7f0e', width=3, dash='dash'),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate="<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>", showlegend=False), row=1, col=1)
 
         # Add RN HPRD traces (row 2)
-        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=total_rn_hprd_display,
+        fig.add_trace(go.Scatter(x=data['date'], y=total_rn_hprd_display,
                        mode='lines+markers', name='Total RN',
                        line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
@@ -2461,13 +2461,13 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
 
         # Use State_Census for state-level charts, Census for facility and national charts
         census_column = 'State_Census' if state else 'Census'
-        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data[census_column],
+        fig.add_trace(go.Scatter(x=data['date'], y=data[census_column],
                        mode='lines+markers', name='Census',
                        line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_census, showlegend=False), row=3, col=1)
 
-        fig.add_trace(go.Scatter(x=data['date'].dt.to_pydatetime(), y=data['Contract_Percentage'],
+        fig.add_trace(go.Scatter(x=data['date'], y=data['Contract_Percentage'],
                        mode='lines+markers', name='Contract %',
                        line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
