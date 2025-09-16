@@ -2487,7 +2487,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
             align="center",
             font=dict(size=10, color="#ff7f0e"),
             bgcolor="rgba(255, 255, 255, 0.8)",
-            bordercolor="rgba(255, 127, 14, 0.15)",
+            bordercolor="rgba(128, 128, 128, 0.3)",
             borderwidth=0.5,
             row=1,
             col=1
@@ -4405,10 +4405,10 @@ def main() -> None:
                             # Get census and contract from the most recent quarter data
                             if not filtered_data.empty:
                                 latest_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
-                                census_value = str(round(latest_data['Census'])) if 'Census' in latest_data and pd.notna(latest_data['Census']) else "—"
+                                census_value = str(int(latest_data['Census'])) if 'Census' in latest_data and pd.notna(latest_data['Census']) else "—"
                                 contract_value = f"{latest_data['Contract_Percentage']:.1f}%" if 'Contract_Percentage' in latest_data and pd.notna(latest_data['Contract_Percentage']) else "—"
                             else:
-                                census_value = str(round(selected_facility['Census'])) if 'Census' in selected_facility and pd.notna(selected_facility['Census']) else "—"
+                                census_value = str(int(selected_facility['Census'])) if 'Census' in selected_facility and pd.notna(selected_facility['Census']) else "—"
                                 contract_value = f"{selected_facility['Contract_Percentage']:.1f}%" if 'Contract_Percentage' in selected_facility and pd.notna(selected_facility['Contract_Percentage']) else "—"
                             
                             # Add anchor for PBJ Takeaway section with higher positioning
