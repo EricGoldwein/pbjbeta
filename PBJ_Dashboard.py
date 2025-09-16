@@ -711,7 +711,7 @@ def state_pbj_takeaway_card(
         
         # Add 320 Consulting badge
         st.markdown("""
-        <div style="position: absolute; bottom: -8px; right: 2px; background: linear-gradient(135deg, #333333 0%, #666666 100%); color: white; padding: 2px 5px; border-radius: 6px; font-size: 0.6em; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+        <div style="position: absolute; bottom: -10px; right: 2px; background: linear-gradient(135deg, #333333 0%, #666666 100%); color: white; padding: 2px 5px; border-radius: 6px; font-size: 0.6em; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
             320 Consulting
         </div>
         <style>
