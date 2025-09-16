@@ -2532,7 +2532,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
             fig.add_annotation(
                 text="<b>320 Consulting</b> | Source: CMS PBJ Data (2017-2025)",
                 x=0.99,
-                y=-0.15,  # Directly under x-axis ticks
+                y=-0.22,  # More space from x-axis ticks
                 xref="x domain",
                 yref="y domain",
                 showarrow=False,
