@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PBJ Nursing Home Staffing Dashboard - OG Image</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Open+Sans:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .og-container {
+            width: 1200px;
+            height: 630px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 60px 80px;
+            color: white;
+        }
+
+        /* Subtle grid background */
+        .og-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(34, 197, 94, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 197, 94, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+        }
+
+        /* Accent elements */
+        .accent-circle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(34, 197, 94, 0.15);
+        }
+
+        .accent-circle-1 {
+            width: 200px;
+            height: 200px;
+            top: -100px;
+            right: -100px;
+        }
+
+        .accent-circle-2 {
+            width: 150px;
+            height: 150px;
+            bottom: -75px;
+            left: -75px;
+            background: rgba(20, 184, 166, 0.1);
+        }
+
+        .top-tag {
+            font-family: 'Open Sans', sans-serif;
+            font-size: 22px;
+            font-weight: 500;
+            color: #22c55e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            z-index: 10;
+            position: relative;
+        }
+
+        .main-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 74px;
+            font-weight: 700;
+            line-height: 1.1;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            position: relative;
+            margin: 20px 0;
+            max-width: 800px;
+        }
+
+        .subtitle {
+            font-family: 'Open Sans', sans-serif;
+            font-size: 28px;
+            font-weight: 400;
+            color: #cbd5e1;
+            line-height: 1.3;
+            z-index: 10;
+            position: relative;
+            margin-bottom: 40px;
+        }
+
+        .bottom-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 10;
+            position: relative;
+        }
+
+        .left-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .supporting-text {
+            font-family: 'Open Sans', sans-serif;
+            font-size: 20px;
+            font-weight: 500;
+            color: #e2e8f0;
+            line-height: 1.4;
+        }
+
+        .resource-text {
+            font-family: 'Open Sans', sans-serif;
+            font-size: 18px;
+            font-weight: 400;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+
+        .branding {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: #22c55e;
+            text-align: right;
+        }
+
+        .branding-sub {
+            font-family: 'Open Sans', sans-serif;
+            font-size: 16px;
+            font-weight: 400;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        /* Data visualization accent */
+        .data-bars {
+            position: absolute;
+            right: 100px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0.2;
+            z-index: 1;
+        }
+
+        .bar {
+            width: 8px;
+            background: #22c55e;
+            margin: 3px;
+            border-radius: 2px;
+        }
+
+        .bar:nth-child(1) { height: 40px; }
+        .bar:nth-child(2) { height: 60px; }
+        .bar:nth-child(3) { height: 45px; }
+        .bar:nth-child(4) { height: 70px; }
+        .bar:nth-child(5) { height: 35px; }
+        .bar:nth-child(6) { height: 55px; }
+    </style>
+</head>
+<body>
+    <div class="og-container">
+        <div class="accent-circle accent-circle-1"></div>
+        <div class="accent-circle accent-circle-2"></div>
+        
+        <div class="data-bars">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+
+        <div class="top-content">
+            <div class="main-title">PBJ Nursing Home Staffing Dashboard</div>
+            <div class="subtitle">Explore staffing trends across 15,000+ U.S. nursing homes with PBJ data.</div>
+        </div>
+
+        <div class="bottom-section">
+            <div class="left-content">
+                <div class="supporting-text">
+                    Built for attorneys, journalists, researchers, providers, and advocates.
+                </div>
+                <div class="resource-text">
+                    A free public interest resource by 320 Consulting
+                </div>
+            </div>
+            <div class="branding">
+                320 Consulting
+                <div class="branding-sub">Spreadsheets to Stories</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
