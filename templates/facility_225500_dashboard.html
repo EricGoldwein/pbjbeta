@@ -1,0 +1,3455 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facility 225500 - Comprehensive Staffing Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .main-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            margin: 20px auto;
+            padding: 30px;
+        }
+        .chart-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .sortable {
+            position: relative;
+            user-select: none;
+            cursor: pointer;
+        }
+        
+        .sortable:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sortable::after {
+            content: 'Γåò';
+            position: absolute;
+            right: 8px;
+            opacity: 0.5;
+            font-size: 0.8em;
+        }
+        
+        .sort-asc::after {
+            content: 'Γåæ';
+            opacity: 1;
+        }
+        
+        .sort-desc::after {
+            content: 'Γåô';
+            opacity: 1;
+        }
+        .table-container {
+            margin: 20px 0;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background-color: white;
+        }
+        
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        
+        .sortable:hover {
+            background-color: rgba(0, 123, 255, 0.1);
+        }
+        
+        .table tbody tr:hover {
+            background-color: #e9ecef !important;
+            color: #333 !important;
+        }
+        
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1055;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
+            outline: 0;
+        }
+        
+        .modal.show {
+            display: block !important;
+        }
+        
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1050;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            opacity: 0.5;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: #e9ecef !important;
+            color: #333 !important;
+        }
+        
+        .sortable i {
+            margin-left: 5px;
+            opacity: 0.5;
+        }
+        
+        .sortable:hover i {
+            opacity: 1;
+        }
+        .form-card {
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin: 5px 0;
+        }
+        .stat-item h4 {
+            color: #0d6efd;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin: 0;
+        }
+        .facility-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .facility-header h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .facility-header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- Facility Header -->
+            <div class="facility-header">
+                <h1><i class="fas fa-hospital me-3"></i>WEST SIDE HOUSE LTC FACILITY</h1>
+                <p>CCN 225500 ΓÇó Worcester, MA ΓÇó Comprehensive Staffing Analysis</p>
+            </div>
+
+            <!-- Data Completeness Alert -->
+            <div id="dataCompletenessAlert" class="alert alert-warning alert-dismissible fade show" style="display: none;">
+                <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Data Completeness Issues Detected</h6>
+                <div id="completenessContent"></div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <!-- Single Day Report -->
+            <div class="single-day-report-section">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i>Single Day Report</h5>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSingleDayReport()">
+                        <i class="fas fa-times me-1"></i>Clear
+                    </button>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label for="singleDayDate" class="form-label">Select Date:</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearSingleDayDate()" title="Clear date selection">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <input type="date" id="singleDayDate" class="form-control" min="2017-01-01" max="2025-03-31">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <button type="button" class="btn btn-primary" onclick="generateSingleDayReport()">
+                            <i class="fas fa-chart-line me-2"></i>Generate Report
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="singleDayReport" style="display: none;">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0" id="singleDayReportTitle"></h6>
+                            <div class="d-flex align-items-center">
+                                <div id="singleDayReportSourceLink" style="font-size: 0.8em; margin-right: 15px;"></div>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="shareSingleDayReport()" title="Share this report">
+                                        <i class="fas fa-share-alt me-1"></i>Share Link
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="shareSingleDayReportImage()" title="Share as image">
+                                        <i class="fas fa-image me-1"></i>Share Image
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Metric</th>
+                                                    <th>Target Day</th>
+                                                    <th>Quarter Avg</th>
+                                                    <th>Year Avg</th>
+                                                    <th>Day of Week Avg</th>
+                                                    <th>Year Z-Score</th>
+                                                    <th>Quarter Z-Score</th>
+                                                    <th>DOW Z-Score</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="singleDayReportTable">
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-section">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Analysis Filters</h5>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearAllFilters()">
+                        <i class="fas fa-times me-1"></i>Clear All Filters
+                    </button>
+                </div>
+                
+                <!-- Time Period Selection -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h6 class="text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>Time Period Selection</h6>
+                        <p class="text-muted small mb-3">Choose either a specific date range OR a specific quarter (not both)</p>
+                    </div>
+                </div>
+                
+                 <div class="row mb-3">
+                     <div class="col-md-3">
+                         <div class="d-flex justify-content-between align-items-center">
+                             <label for="startDate" class="form-label fw-bold">Start Date</label>
+                             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearDateRange()" title="Clear date range">
+                                 <i class="fas fa-times"></i>
+                             </button>
+                         </div>
+                         <input type="date" class="form-control" id="startDate" min="2017-01-01" max="2025-03-31" value="">
+                         <small class="text-muted">Leave empty to use quarter selection</small>
+                     </div>
+                     <div class="col-md-3">
+                         <div class="d-flex justify-content-between align-items-center">
+                             <label for="endDate" class="form-label fw-bold">End Date</label>
+                             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearDateRange()" title="Clear date range">
+                                 <i class="fas fa-times"></i>
+                             </button>
+                         </div>
+                         <input type="date" class="form-control" id="endDate" min="2017-01-01" max="2025-03-31" value="">
+                         <small class="text-muted">Leave empty to use quarter selection</small>
+                     </div>
+                     <div class="col-md-3">
+                         <div class="d-flex justify-content-between align-items-center">
+                             <label for="quarterRange" class="form-label fw-bold">OR Select Quarter(s)</label>
+                             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearQuarterSelection()" title="Clear quarter selection">
+                                 <i class="fas fa-times"></i>
+                             </button>
+                         </div>
+                         <select class="form-select" id="quarterRange" multiple>
+                             <option value="all">All Quarters (2017-2025)</option>
+                         </select>
+                         <small class="text-muted">Hold Ctrl/Cmd to select multiple quarters</small>
+                     </div>
+                     <div class="col-md-3">
+                         <div class="d-flex justify-content-between align-items-center">
+                             <label for="yearFilter" class="form-label fw-bold">OR Select Year(s)</label>
+                             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearYearSelection()" title="Clear year selection">
+                                 <i class="fas fa-times"></i>
+                             </button>
+                         </div>
+                         <select class="form-select" id="yearFilter" multiple>
+                             <option value="all">All Years (2017-2025)</option>
+                             <option value="2017">2017</option>
+                             <option value="2018">2018</option>
+                             <option value="2019">2019</option>
+                             <option value="2020">2020</option>
+                             <option value="2021">2021</option>
+                             <option value="2022">2022</option>
+                             <option value="2023">2023</option>
+                             <option value="2024">2024</option>
+                             <option value="2025">2025</option>
+                         </select>
+                         <small class="text-muted">Hold Ctrl/Cmd to select multiple years</small>
+                     </div>
+                 </div>
+                
+                <!-- Additional Filters -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h6 class="text-muted mb-2"><i class="fas fa-sliders-h me-1"></i>Additional Filters</h6>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label for="dayOfWeek" class="form-label fw-bold">Day of Week</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearDayOfWeek()" title="Clear day of week filter">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <select class="form-select" id="dayOfWeek">
+                            <option value="all">All Days</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label for="holidaysOnly" class="form-label fw-bold">Holiday Filter</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearHolidayFilter()" title="Clear holiday filter">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <select class="form-select" id="holidaysOnly">
+                            <option value="false">All Days</option>
+                            <option value="true">Holidays Only</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="button" class="btn btn-primary w-100" onclick="updateAnalysis()">
+                            <i class="fas fa-search me-1"></i>Apply Filters
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Quick Filters -->
+                <div class="row">
+                    <div class="col-12">
+                        <h6 class="text-muted mb-2"><i class="fas fa-bolt me-1"></i>Quick Filters</h6>
+                        <div class="btn-group w-100" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('last30')">Last 30 Days</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('last90')">Last 90 Days</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('lastYear')">Last Year</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('all')">All Data</button>
+                        </div>
+                        <small class="text-muted">Quick filters will clear quarter selection and use date ranges</small>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="text-center" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Analyzing data...</p>
+            </div>
+
+            <!-- Summary Statistics -->
+            <div class="row mb-4" id="summaryStats">
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="totalDays">-</h4>
+                        <p class="stat-label">Total Days</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgCensus">-</h4>
+                        <p class="stat-label">Avg Census</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgRNHPRD">-</h4>
+                        <p class="stat-label">Avg RN HPRD</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgLPNHPRD">-</h4>
+                        <p class="stat-label">Avg LPN HPRD</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgCNAHPRD">-</h4>
+                        <p class="stat-label">Avg CNA HPRD</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgTotalHPRD">-</h4>
+                        <p class="stat-label">Avg Total HPRD</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Summary Statistics -->
+            <div class="row mb-4" id="additionalSummaryStats">
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgRNAdminHours">-</h4>
+                        <p class="stat-label">Avg RN Admin Hours</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgRNDONHours">-</h4>
+                        <p class="stat-label">Avg RN DON Hours</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgLPNAdminHours">-</h4>
+                        <p class="stat-label">Avg LPN Admin Hours</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgRNContractPct">-</h4>
+                        <p class="stat-label">Avg RN Contract %</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgLPNContractPct">-</h4>
+                        <p class="stat-label">Avg LPN Contract %</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-item">
+                        <h4 id="avgCNAContractPct">-</h4>
+                        <p class="stat-label">Avg CNA Contract %</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quarterly Statistics Table -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Quarterly Statistics by Position</h5>
+                        <div class="d-flex align-items-center gap-3">
+                            <span id="quarterlyStatsPeriod" class="text-muted">All Quarters</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <select id="quarterlyStatsQuarter" class="form-select form-select-sm" style="width: auto;" onchange="loadQuarterlyStats()">
+                                    <option value="all">All Quarters</option>
+                                <option value="2017Q1">2017 Q1</option>
+                                <option value="2017Q2">2017 Q2</option>
+                                <option value="2017Q3">2017 Q3</option>
+                                <option value="2017Q4">2017 Q4</option>
+                                <option value="2018Q1">2018 Q1</option>
+                                <option value="2018Q2">2018 Q2</option>
+                                <option value="2018Q3">2018 Q3</option>
+                                <option value="2018Q4">2018 Q4</option>
+                                <option value="2019Q1">2019 Q1</option>
+                                <option value="2019Q2">2019 Q2</option>
+                                <option value="2019Q3">2019 Q3</option>
+                                <option value="2019Q4">2019 Q4</option>
+                                <option value="2020Q1">2020 Q1</option>
+                                <option value="2020Q2">2020 Q2</option>
+                                <option value="2020Q3">2020 Q3</option>
+                                <option value="2020Q4">2020 Q4</option>
+                                <option value="2021Q1">2021 Q1</option>
+                                <option value="2021Q2">2021 Q2</option>
+                                <option value="2021Q3">2021 Q3</option>
+                                <option value="2021Q4">2021 Q4</option>
+                                <option value="2022Q1">2022 Q1</option>
+                                <option value="2022Q2">2022 Q2</option>
+                                <option value="2022Q3">2022 Q3</option>
+                                <option value="2022Q4">2022 Q4</option>
+                                <option value="2023Q1">2023 Q1</option>
+                                <option value="2023Q2">2023 Q2</option>
+                                <option value="2023Q3">2023 Q3</option>
+                                <option value="2023Q4">2023 Q4</option>
+                                <option value="2024Q1">2024 Q1</option>
+                                <option value="2024Q2">2024 Q2</option>
+                                <option value="2024Q3">2024 Q3</option>
+                                <option value="2024Q4">2024 Q4</option>
+                                <option value="2025Q1">2025 Q1</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearQuarterlyStatsFilter()" title="Clear quarterly stats filter">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped table-hover" id="quarterlyStatsTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th rowspan="2" class="text-center align-middle">Position</th>
+                                    <th colspan="3" class="text-center">HPRD Ratios</th>
+                                    <th colspan="3" class="text-center">Total Hours</th>
+                                    <th rowspan="2" class="text-center align-middle">Zero Count</th>
+                                </tr>
+                                <tr>
+                                    <th class="text-center">Mean</th>
+                                    <th class="text-center">Median</th>
+                                    <th class="text-center">Std Dev</th>
+                                    <th class="text-center">Mean</th>
+                                    <th class="text-center">Median</th>
+                                    <th class="text-center">Std Dev</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quarterlyStatsBody">
+                                <!-- Quarterly statistics will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Statistics calculated from quarterly aggregated data. HPRD = Hours Per Resident Day. 
+                            Zero Count shows number of quarters with zero hours for each position.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="chart-container">
+                        <div id="hprdTrendChart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <div id="hoursTrendChart"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <div id="censusTrendChart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <div id="dowComparisonChart"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <div id="contractTrendChart"></div>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Outlier Detection Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Outlier Detection</h5>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearOutlierDetection()">
+                            <i class="fas fa-times me-1"></i>Clear
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <p class="text-muted">Detect statistical outliers in the current filtered dataset or across all historical data.</p>
+                        </div>
+                    </div>
+                   <div class="row mb-3">
+                       <div class="col-md-6">
+                           <label for="outlierCategory" class="form-label">Select Category to Analyze:</label>
+                           <select id="outlierCategory" class="form-select mb-3">
+                               <option value="all">All Categories</option>
+                               <option value="census">Census</option>
+                               <option value="total_staff_hprd">Total Staff HPRD</option>
+                               <option value="total_hours">Total Staff Hours</option>
+                               <option value="nurse_staff_hprd_excl_admin">Nurse Staff HPRD (excl. Admin & DON)</option>
+                               <option value="total_rn_hprd">Total RN HPRD</option>
+                               <option value="total_rn_hours">Total RN Hours</option>
+                               <option value="rn_hprd">RN HPRD (Direct Care Only)</option>
+                               <option value="rn_hours">RN Hours (Direct Care Only)</option>
+                               <option value="total_lpn_hprd">Total LPN HPRD</option>
+                               <option value="total_lpn_hours">Total LPN Hours</option>
+                               <option value="lpn_hprd">LPN HPRD (Direct Care Only)</option>
+                               <option value="lpn_hours">LPN Hours (Direct Care Only)</option>
+                               <option value="total_nurse_aide_hours">Total Nurse Aide Hours</option>
+                               <option value="total_nurse_aide_hprd">Total Nurse Aide HPRD</option>
+                               <option value="cna_hours">CNA Hours (Direct Care Only)</option>
+                           </select>
+                       </div>
+                       <div class="col-md-6">
+                           <label for="outlierFilter" class="form-label">Filter Outliers:</label>
+                           <select id="outlierFilter" class="form-select mb-3">
+                               <option value="all">All Outliers</option>
+                               <option value="low">Low Outliers Only</option>
+                               <option value="high">High Outliers Only</option>
+                           </select>
+                       </div>
+                   </div>
+                   <div class="row mb-3">
+                       <div class="col-md-6">
+                           <button class="btn btn-outline-warning w-100" onclick="detectOutliers('current')">
+                               <i class="fas fa-search me-2"></i>Detect Outliers in Current Range
+                           </button>
+                           <small class="text-muted d-block mt-1" id="currentFilterDescription">Find outliers within the currently filtered data</small>
+                       </div>
+                       <div class="col-md-6">
+                           <button class="btn btn-outline-danger w-100" onclick="detectOutliers('all')">
+                               <i class="fas fa-globe me-2"></i>Detect Outliers vs All Historical Data
+                           </button>
+                           <small class="text-muted d-block mt-1">Find outliers compared to all data (2017-2025)</small>
+                       </div>
+                   </div>
+                    <div id="outlierResults" style="display: none;">
+                        <h6>Outlier Analysis Results</h6>
+                        <div id="outlierContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="table-container">
+                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                    <h5 class="mb-0">Daily Data</h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-info btn-sm" type="button" onclick="showSummaryStats()">
+                            <i class="fas fa-chart-bar"></i> Summary Stats
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" type="button" onclick="exportTable()">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                        <div class="input-group" style="width: 250px;">
+                            <input type="date" class="form-control form-control-sm" id="dateRangeStart" placeholder="Start date">
+                            <input type="date" class="form-control form-control-sm" id="dateRangeEnd" placeholder="End date">
+                            <button class="btn btn-outline-primary btn-sm" type="button" onclick="searchDateRange()">
+                                <i class="fas fa-calendar-week"></i>
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <select id="yearFilterTable" class="form-select form-select-sm" style="width: auto;" onchange="filterByYear()">
+                                <option value="all">All Years</option>
+                                <option value="2017">2017</option>
+                                <option value="2018">2018</option>
+                                <option value="2019">2019</option>
+                                <option value="2020">2020</option>
+                                <option value="2021">2021</option>
+                                <option value="2022">2022</option>
+                                <option value="2023">2023</option>
+                                <option value="2024">2024</option>
+                                <option value="2025">2025</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearDataTableFilters()" title="Clear data table filters">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <select id="quarterFilterTable" class="form-select form-select-sm" style="width: auto;" onchange="filterByQuarter()">
+                            <option value="all">All Quarters</option>
+                            <option value="2017Q1">2017 Q1</option>
+                            <option value="2017Q2">2017 Q2</option>
+                            <option value="2017Q3">2017 Q3</option>
+                            <option value="2017Q4">2017 Q4</option>
+                            <option value="2018Q1">2018 Q1</option>
+                            <option value="2018Q2">2018 Q2</option>
+                            <option value="2018Q3">2018 Q3</option>
+                            <option value="2018Q4">2018 Q4</option>
+                            <option value="2019Q1">2019 Q1</option>
+                            <option value="2019Q2">2019 Q2</option>
+                            <option value="2019Q3">2019 Q3</option>
+                            <option value="2019Q4">2019 Q4</option>
+                            <option value="2020Q1">2020 Q1</option>
+                            <option value="2020Q2">2020 Q2</option>
+                            <option value="2020Q3">2020 Q3</option>
+                            <option value="2020Q4">2020 Q4</option>
+                            <option value="2021Q1">2021 Q1</option>
+                            <option value="2021Q2">2021 Q2</option>
+                            <option value="2021Q3">2021 Q3</option>
+                            <option value="2021Q4">2021 Q4</option>
+                            <option value="2022Q1">2022 Q1</option>
+                            <option value="2022Q2">2022 Q2</option>
+                            <option value="2022Q3">2022 Q3</option>
+                            <option value="2022Q4">2022 Q4</option>
+                            <option value="2023Q1">2023 Q1</option>
+                            <option value="2023Q2">2023 Q2</option>
+                            <option value="2023Q3">2023 Q3</option>
+                            <option value="2023Q4">2023 Q4</option>
+                            <option value="2024Q1">2024 Q1</option>
+                            <option value="2024Q2">2024 Q2</option>
+                            <option value="2024Q3">2024 Q3</option>
+                            <option value="2024Q4">2024 Q4</option>
+                            <option value="2025Q1">2025 Q1</option>
+                        </select>
+                        <div class="input-group" style="width: 200px;">
+                            <input type="date" class="form-control form-control-sm" id="specificDaySearch" placeholder="Search specific day">
+                            <button class="btn btn-outline-primary btn-sm" type="button" onclick="searchSpecificDay()">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleExpandedView()" id="expandToggle">
+                            <i class="fas fa-expand-arrows-alt me-1"></i>Expand All
+                        </button>
+                        <select id="pageSize" class="form-select form-select-sm" style="width: auto;">
+                            <option value="25">25 rows</option>
+                            <option value="50" selected>50 rows</option>
+                            <option value="100">100 rows</option>
+                            <option value="all">All rows</option>
+                        </select>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="prevPage" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="nextPage">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr id="tableHeader">
+                                <th class="sortable" data-column="rowIndex" onclick="sortTable('rowIndex')"># <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="WorkDate" onclick="sortTable('WorkDate')">Date <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="DayOfWeek" onclick="sortTable('DayOfWeek')">Day <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="MDScensus" onclick="sortTable('MDScensus')">Census <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_Staff_HPRD" onclick="sortTable('Total_Staff_HPRD')">Total Staff HPRD <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_Staff_Hours" onclick="sortTable('Total_Staff_Hours')">Total Staff Hours <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Nurse_Staff_HPRD_Excl_Admin" onclick="sortTable('Nurse_Staff_HPRD_Excl_Admin')">Nurse Staff HPRD (excl. Admin & DON) <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_RN_HPRD" onclick="sortTable('Total_RN_HPRD')">Total RN HPRD <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_RN_Hours" onclick="sortTable('Total_RN_Hours')">Total RN Hours <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_LPN_HPRD" onclick="sortTable('Total_LPN_HPRD')">Total LPN HPRD <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_LPN_Hours" onclick="sortTable('Total_LPN_Hours')">Total LPN Hours <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_Nurse_Aide_HPRD" onclick="sortTable('Total_Nurse_Aide_HPRD')">Nurse Aide HPRD <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="Total_Nurse_Aide_Hours" onclick="sortTable('Total_Nurse_Aide_Hours')">Nurse Aide Hours <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="RN_Contract_Pct" onclick="sortTable('RN_Contract_Pct')">RN Contract % <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="LPN_Contract_Pct" onclick="sortTable('LPN_Contract_Pct')">LPN Contract % <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="CNA_Contract_Pct" onclick="sortTable('CNA_Contract_Pct')">Aide Contract % <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-column="IsHoliday" onclick="sortTable('IsHoliday')">Holiday <i class="fas fa-sort"></i></th>
+                                <!-- Expanded columns (hidden by default) - Position Breakdown -->
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_RN" onclick="sortTable('Hrs_RN')">RN (Direct Care) Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="RN_HPRD" onclick="sortTable('RN_HPRD')">RN (Direct Care) HPRD <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_RNadmin" onclick="sortTable('Hrs_RNadmin')">RN Admin Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_RNDON" onclick="sortTable('Hrs_RNDON')">RN DON Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_LPN" onclick="sortTable('Hrs_LPN')">LPN (Direct Care) Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="LPN_HPRD" onclick="sortTable('LPN_HPRD')">LPN (Direct Care) HPRD <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_LPNadmin" onclick="sortTable('Hrs_LPNadmin')">LPN Admin Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_CNA" onclick="sortTable('Hrs_CNA')">CNA Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="CNA_HPRD" onclick="sortTable('CNA_HPRD')">CNA HPRD <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_NAtrn" onclick="sortTable('Hrs_NAtrn')">NA Train Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_MedAide" onclick="sortTable('Hrs_MedAide')">Med Aide Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_RN_ctr" onclick="sortTable('Hrs_RN_ctr')">RN Contract Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_LPN_ctr" onclick="sortTable('Hrs_LPN_ctr')">LPN Contract Hrs <i class="fas fa-sort"></i></th>
+                                <th class="expanded-col sortable" style="display: none;" data-column="Hrs_CNA_ctr" onclick="sortTable('Hrs_CNA_ctr')">CNA Contract Hrs <i class="fas fa-sort"></i></th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-3 border-top">
+                    <small class="text-muted">
+                        Showing <span id="showingRange">0-0</span> of <span id="totalRecords">0</span> records
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Quarterly Data Table -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-table me-2"></i>Quarterly Data by Quarter</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="exportQuarterlyDataToCSV()">
+                        <i class="fas fa-download me-1"></i>Export CSV
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-2">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-striped table-hover mb-0" id="quarterlyDataTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="text-center sortable" style="width: 6%;" data-sort="quarter">Quarter</th>
+                                <th class="text-center sortable" style="width: 6%;" data-sort="census">Census</th>
+                                <th class="text-center sortable" style="width: 11%;" data-sort="total_hprd">Total HPRD</th>
+                                <th class="text-center sortable" style="width: 11%;" data-sort="direct_hprd">Direct HPRD</th>
+                                <th class="text-center sortable" style="width: 11%;" data-sort="total_rn_hprd">Total RN HPRD</th>
+                                <th class="text-center sortable" style="width: 11%;" data-sort="rn_hprd">RN HPRD</th>
+                                <th class="text-center sortable" style="width: 11%;" data-sort="rn_admin_hprd">RN Admin HPRD</th>
+                                <th class="text-center sortable" style="width: 11%;" data-sort="rn_don_hprd">RN DON HPRD</th>
+                            </tr>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th class="text-center" style="font-size: 0.8em; color: #6c757d;">(Avg Hrs/Day)</th>
+                                <th class="text-center" style="font-size: 0.8em; color: #6c757d;">(Avg Hrs/Day)</th>
+                                <th class="text-center" style="font-size: 0.8em; color: #6c757d;">(Avg Hrs/Day)</th>
+                                <th class="text-center" style="font-size: 0.8em; color: #6c757d;">(Avg Hrs/Day)</th>
+                                <th class="text-center" style="font-size: 0.8em; color: #6c757d;">(Avg Hrs/Day)</th>
+                                <th class="text-center" style="font-size: 0.8em; color: #6c757d;">(Avg Hrs/Day)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="quarterlyDataBody">
+                            <!-- Quarterly data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        All values rounded to 2 decimal places. Hours shown are average hours per day.
+                    </small>
+                </div>
+            </div>
+        </div>
+
+    <!-- Methodology Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Methodology & Definitions</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-user-nurse me-2"></i>Staff Categories</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>RN (Registered Nurse):</strong> Includes direct care RNs + RN administrators + RN DON (Director of Nursing)</li>
+                        <li><strong>LPN (Licensed Practical Nurse):</strong> Includes direct care LPNs + LPN administrators</li>
+                        <li><strong>CNA (Certified Nursing Assistant):</strong> Includes CNAs + NA trainees + Medication Aides</li>
+                        <li><strong>Contract Staff:</strong> Temporary/agency staff (marked with "_ctr" suffix)</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-calculator me-2"></i>Calculations</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>HPRD (Hours Per Resident Day):</strong> Total hours ├╖ Census</li>
+                        <li><strong>Contract %:</strong> (Contract hours ├╖ Total hours) ├ù 100</li>
+                        <li><strong>Averages:</strong> Weighted by census when applicable</li>
+                        <li><strong>Rounding:</strong> Financial rounding (ROUND_HALF_UP) for all displayed metrics</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h6><i class="fas fa-chart-line me-2"></i>Statistical Analysis</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Z-Score:</strong> (Value - Mean) ├╖ Standard Deviation</li>
+                        <li><strong>Outlier Detection:</strong> |Z-Score| ΓëÑ 2.0 (High), |Z-Score| ΓëÑ 3.0 (Extreme)</li>
+                        <li><strong>Percentile:</strong> Approximate ranking compared to historical data</li>
+                        <li><strong>Holidays:</strong> Federal holidays as defined by U.S. government</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Statistics Modal -->
+    <div class="modal fade" id="summaryStatsModal" tabindex="-1" aria-labelledby="summaryStatsModalLabel" aria-hidden="true" style="display: none;">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="summaryStatsModalLabel">Summary Statistics</h5>
+                    <button type="button" class="btn-close" onclick="closeSummaryStats()" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="summaryStatsContent">
+                        <!-- Summary statistics will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" onclick="exportSummaryStats()">
+                        <i class="fas fa-download"></i> Export Summary
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeSummaryStats()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = [];
+        let currentPage = 1;
+        let pageSize = 50;
+
+         // Initialize the app
+         document.addEventListener('DOMContentLoaded', function() {
+             loadInitialData();
+             setupEventListeners();
+             checkDataCompleteness();
+             updateAnalysis(); // Load initial data
+             loadQuarterlyStats(); // Load quarterly statistics
+             loadQuarterlyData(); // Load quarterly data table
+             handleSharedReport(); // Check for shared report parameters
+         });
+
+         function handleSharedReport() {
+             const urlParams = new URLSearchParams(window.location.search);
+             const date = urlParams.get('date');
+             const report = urlParams.get('report');
+             
+             if (report === 'single_day' && date) {
+                 // Set the date and generate the report
+                 document.getElementById('singleDayDate').value = date;
+                 setTimeout(() => {
+                     generateSingleDayReport();
+                 }, 1000); // Small delay to ensure page is fully loaded
+             }
+         }
+
+         function loadInitialData() {
+             // Load quarters
+             fetch('/api/quarters')
+                 .then(response => response.json())
+                 .then(quarters => {
+                     const quarterSelect = document.getElementById('quarterRange');
+                     quarterSelect.innerHTML = '<option value="all">All Quarters (2017-2025)</option>';
+                     quarters.forEach(quarter => {
+                         const option = document.createElement('option');
+                         option.value = quarter;
+                         option.textContent = formatQuarter(quarter);
+                         quarterSelect.appendChild(option);
+                     });
+                 });
+
+             // Set default to show all data (no date filters)
+             document.getElementById('startDate').value = '';
+             document.getElementById('endDate').value = '';
+             
+             // Force update analysis with no filters
+             setTimeout(() => {
+                 updateAnalysis();
+             }, 100);
+         }
+
+         function formatQuarter(quarter) {
+             // Convert 2023Q1 to Q1 2023
+             const match = quarter.match(/(\d{4})Q(\d)/);
+             if (match) {
+                 return `Q${match[2]} ${match[1]}`;
+             }
+             return quarter;
+         }
+
+         function checkDataCompleteness() {
+             fetch('/api/data_completeness')
+                 .then(response => response.json())
+                 .then(data => {
+                     if (data.has_issues) {
+                         displayCompletenessIssues(data.issues);
+                     }
+                 })
+                 .catch(error => {
+                     console.error('Error checking data completeness:', error);
+                 });
+         }
+
+        function displayCompletenessIssues(issues) {
+            const alertDiv = document.getElementById('dataCompletenessAlert');
+            const contentDiv = document.getElementById('completenessContent');
+            
+            // Group issues by type for more compact display
+            const groupedIssues = {};
+            issues.forEach(issue => {
+                if (!groupedIssues[issue.type]) {
+                    groupedIssues[issue.type] = [];
+                }
+                groupedIssues[issue.type].push(issue);
+            });
+            
+            let html = '<div class="mb-0">';
+            
+            Object.keys(groupedIssues).forEach(type => {
+                const typeIssues = groupedIssues[type];
+                const severityClass = typeIssues[0].severity === 'high' ? 'text-danger' : 
+                                    typeIssues[0].severity === 'medium' ? 'text-warning' : 'text-info';
+                const icon = typeIssues[0].severity === 'high' ? 'fas fa-exclamation-circle' :
+                            typeIssues[0].severity === 'medium' ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle';
+                
+                if (type === 'incomplete_quarter') {
+                    const messages = typeIssues.map(issue => issue.message).join('; ');
+                    html += `<div class="${severityClass} mb-1"><i class="${icon} me-1"></i>${messages}</div>`;
+                } else if (type === 'data_gaps') {
+                    const messages = typeIssues.map(issue => issue.message).join('; ');
+                    html += `<div class="${severityClass} mb-1"><i class="${icon} me-1"></i>Data gaps: ${messages}</div>`;
+                } else {
+                    html += `<div class="${severityClass} mb-1"><i class="${icon} me-1"></i>${typeIssues[0].message}</div>`;
+                }
+            });
+            
+            html += '</div>';
+            
+            // Change alert class based on highest severity
+            const highestSeverity = issues.reduce((max, issue) => {
+                const severityOrder = {'high': 3, 'medium': 2, 'low': 1};
+                return severityOrder[issue.severity] > severityOrder[max] ? issue.severity : max;
+            }, 'low');
+            
+            if (highestSeverity === 'high') {
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+            } else if (highestSeverity === 'medium') {
+                alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+            } else {
+                alertDiv.className = 'alert alert-info alert-dismissible fade show';
+            }
+            
+            contentDiv.innerHTML = html;
+            alertDiv.style.display = 'block';
+        }
+
+        function setupEventListeners() {
+            const pageSizeElement = document.getElementById('pageSize');
+            if (pageSizeElement) {
+                pageSizeElement.addEventListener('change', function() {
+                    pageSize = this.value === 'all' ? currentData.length : parseInt(this.value);
+                    currentPage = 1;
+                    renderTable();
+                });
+            }
+
+            const prevPageElement = document.getElementById('prevPage');
+            if (prevPageElement) {
+                prevPageElement.addEventListener('click', function() {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        renderTable();
+                    }
+                });
+            }
+
+            const nextPageElement = document.getElementById('nextPage');
+            if (nextPageElement) {
+                nextPageElement.addEventListener('click', function() {
+                    const maxPage = Math.ceil(currentData.length / pageSize);
+                    if (currentPage < maxPage) {
+                        currentPage++;
+                        renderTable();
+                    }
+                });
+            }
+
+            // Day comparison type change
+            const comparisonTypeElement = document.getElementById('comparisonType');
+            if (comparisonTypeElement) {
+                comparisonTypeElement.addEventListener('change', function() {
+                    const customRangeDiv = document.getElementById('customRangeDiv');
+                    if (this.value === 'custom') {
+                        customRangeDiv.style.display = 'block';
+                    } else {
+                        customRangeDiv.style.display = 'none';
+                    }
+                });
+            }
+            
+             // Clear date inputs when quarter is selected
+             const quarterRangeElement = document.getElementById('quarterRange');
+             if (quarterRangeElement) {
+                 quarterRangeElement.addEventListener('change', function() {
+                     const selectedOptions = Array.from(this.selectedOptions).map(option => option.value);
+                     if (!selectedOptions.includes('all') && selectedOptions.length > 0) {
+                         const startDateElement = document.getElementById('startDate');
+                         const endDateElement = document.getElementById('endDate');
+                         if (startDateElement) startDateElement.value = '';
+                         if (endDateElement) endDateElement.value = '';
+                     }
+                 });
+             }
+             
+             // Clear quarter when date inputs are used
+             const startDateElement = document.getElementById('startDate');
+             if (startDateElement) {
+                 startDateElement.addEventListener('change', function() {
+                     if (this.value) {
+                         const quarterRangeElement = document.getElementById('quarterRange');
+                         if (quarterRangeElement) quarterRangeElement.selectedIndex = 0; // Select "All Quarters"
+                     }
+                 });
+             }
+             
+             const endDateElement = document.getElementById('endDate');
+             if (endDateElement) {
+                 endDateElement.addEventListener('change', function() {
+                     if (this.value) {
+                         const quarterRangeElement = document.getElementById('quarterRange');
+                         if (quarterRangeElement) quarterRangeElement.selectedIndex = 0; // Select "All Quarters"
+                     }
+                 });
+             }
+             
+             // Outlier filter change - re-run outlier detection with new filter
+             const outlierFilterElement = document.getElementById('outlierFilter');
+             if (outlierFilterElement) {
+                 outlierFilterElement.addEventListener('change', function() {
+                     // Only re-run if outlier results are currently displayed
+                     const outlierResults = document.getElementById('outlierResults');
+                     if (outlierResults && outlierResults.style.display !== 'none') {
+                         // Get the current scope (current or all)
+                         const currentScope = window.lastOutlierScope || 'current';
+                         detectOutliers(currentScope);
+                     }
+                 });
+             }
+        }
+
+         async function updateAnalysis() {
+             const loading = document.getElementById('loading');
+             loading.style.display = 'block';
+
+             // Get selected quarters
+             const quarterSelect = document.getElementById('quarterRange');
+             const selectedQuarters = Array.from(quarterSelect.selectedOptions).map(option => option.value);
+             const quarterParam = selectedQuarters.includes('all') ? 'all' : selectedQuarters.join(',');
+
+             // Get selected years
+             const yearSelect = document.getElementById('yearFilter');
+             const selectedYears = Array.from(yearSelect.selectedOptions).map(option => option.value);
+             const yearParam = selectedYears.includes('all') ? 'all' : selectedYears.join(',');
+
+             const params = new URLSearchParams({
+                 start_date: document.getElementById('startDate').value,
+                 end_date: document.getElementById('endDate').value,
+                 quarter: quarterParam,
+                 year: yearParam,
+                 day_of_week: document.getElementById('dayOfWeek').value,
+                 holidays_only: document.getElementById('holidaysOnly').value
+             });
+
+            try {
+                // Load data, summary, and charts in parallel
+                const [dataResponse, summaryResponse, chartsResponse] = await Promise.all([
+                    fetch(`/api/data?${params}`),
+                    fetch(`/api/summary?${params}`),
+                    fetch(`/api/charts?${params}`)
+                ]);
+
+                const data = await dataResponse.json();
+                const summary = await summaryResponse.json();
+                const charts = await chartsResponse.json();
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                if (charts.error) {
+                    console.error('Charts error:', charts.error);
+                    alert('Error loading charts: ' + charts.error);
+                    return;
+                }
+                
+                // Check if charts object exists and has data
+                if (!charts.charts || Object.keys(charts.charts).length === 0) {
+                    console.error('No charts data available');
+                    alert('No data available for the selected date range and filters');
+                    return;
+                }
+
+                console.log('Charts response:', charts); // Debug log
+                console.log('Charts.charts:', charts.charts); // Debug log
+                console.log('Charts keys:', Object.keys(charts)); // Debug log
+
+                currentData = data.data;
+                
+                // Update summary statistics
+                updateSummaryStats(summary);
+                
+                // Update charts
+                try {
+                    updateCharts(charts);
+                } catch (chartError) {
+                    console.error('Chart update error:', chartError);
+                    console.log('Charts object:', charts);
+                }
+                
+                // Update table
+                currentPage = 1;
+                renderTable();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while fetching the data.');
+            } finally {
+                loading.style.display = 'none';
+                updateFilterDescription();
+            }
+        }
+
+        function updateSummaryStats(summary) {
+            document.getElementById('totalDays').textContent = summary.total_days.toLocaleString();
+            document.getElementById('avgCensus').textContent = summary.avg_census.toFixed(1);
+            document.getElementById('avgRNHPRD').textContent = summary.avg_rn_hprd.toFixed(3);
+            document.getElementById('avgLPNHPRD').textContent = summary.avg_lpn_hprd.toFixed(3);
+            document.getElementById('avgCNAHPRD').textContent = summary.avg_cna_hprd.toFixed(3);
+            document.getElementById('avgTotalHPRD').textContent = summary.avg_total_hprd.toFixed(3);
+            
+            // Additional summary statistics
+            document.getElementById('avgRNAdminHours').textContent = summary.avg_rn_admin_hours.toFixed(1);
+            document.getElementById('avgRNDONHours').textContent = summary.avg_rn_don_hours.toFixed(1);
+            document.getElementById('avgLPNAdminHours').textContent = summary.avg_lpn_admin_hours.toFixed(1);
+            document.getElementById('avgRNContractPct').textContent = summary.avg_rn_contract_pct.toFixed(1) + '%';
+            document.getElementById('avgLPNContractPct').textContent = summary.avg_lpn_contract_pct.toFixed(1) + '%';
+            document.getElementById('avgCNAContractPct').textContent = summary.avg_cna_contract_pct.toFixed(1) + '%';
+        }
+
+        async function loadQuarterlyStats() {
+            try {
+                const quarterSelect = document.getElementById('quarterlyStatsQuarter');
+                const selectedQuarter = quarterSelect.value;
+                const periodSpan = document.getElementById('quarterlyStatsPeriod');
+                
+                // Update period display
+                if (selectedQuarter === 'all') {
+                    periodSpan.textContent = 'All Quarters';
+                } else {
+                    const year = selectedQuarter.substring(0, 4);
+                    const quarter = selectedQuarter.substring(4);
+                    periodSpan.textContent = `${year} ${quarter}`;
+                }
+                
+                const params = new URLSearchParams();
+                if (selectedQuarter !== 'all') {
+                    params.append('quarter', selectedQuarter);
+                }
+                
+                const response = await fetch(`/api/quarterly-stats?${params}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error loading quarterly stats:', data.error);
+                    return;
+                }
+                
+                populateQuarterlyStatsTable(data.quarterly_stats);
+            } catch (error) {
+                console.error('Error fetching quarterly stats:', error);
+            }
+        }
+
+        function populateQuarterlyStatsTable(stats) {
+            const tbody = document.getElementById('quarterlyStatsBody');
+            tbody.innerHTML = '';
+            
+            if (!stats || Object.keys(stats).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No quarterly statistics available</td></tr>';
+                return;
+            }
+            
+            // Define position categories in the specified order
+            const positions = [
+                { key: 'total_nurse_staff', name: 'Total Nurse Staff' },
+                { key: 'direct_staff_excl_admin', name: 'Direct Staff (excl. Admin, DON)' },
+                { key: 'total_rn', name: 'Total RN' },
+                { key: 'rn_direct', name: 'Direct RN' },
+                { key: 'rn_admin', name: 'RN Admin' },
+                { key: 'rn_don', name: 'RN DON' },
+                { key: 'total_lpn', name: 'Total LPN' },
+                { key: 'lpn_direct', name: 'LPN' },
+                { key: 'lpn_admin', name: 'LPN Admin' },
+                { key: 'total_cna', name: 'Total Nurse Aide' },
+                { key: 'cna_direct', name: 'CNA' },
+                { key: 'med_aide', name: 'Med Aide' },
+                { key: 'na_trainee', name: 'NA Trainee' },
+                { key: 'total_contract', name: 'Total Contract' },
+                { key: 'direct_care_contract', name: 'Direct Care Contract' },
+                { key: 'total_rn_contract', name: 'Total RN Contract' },
+                { key: 'direct_rn_contract', name: 'Direct RN Contract' },
+                { key: 'nurse_aide_contract', name: 'Nurse Aide Contract' }
+            ];
+            
+            positions.forEach(position => {
+                const positionStats = stats[position.key];
+                if (!positionStats) return;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="fw-bold">${position.name}</td>
+                    <td class="text-center">${formatNumber(positionStats.hprd?.mean, 3)}</td>
+                    <td class="text-center">${formatNumber(positionStats.hprd?.median, 3)}</td>
+                    <td class="text-center">${formatNumber(positionStats.hprd?.std_dev, 3)}</td>
+                    <td class="text-center">${formatNumber(positionStats.total_hours?.mean)}</td>
+                    <td class="text-center">${formatNumber(positionStats.total_hours?.median)}</td>
+                    <td class="text-center">${formatNumber(positionStats.total_hours?.std_dev)}</td>
+                    <td class="text-center">${positionStats.zero_count || 0}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function formatNumber(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) {
+                return '-';
+            }
+            return Number(value).toFixed(decimals);
+        }
+
+        async function loadQuarterlyData() {
+            try {
+                const response = await fetch('/api/quarterly-data');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error loading quarterly data:', data.error);
+                    return;
+                }
+                
+                populateQuarterlyDataTable(data.quarterly_data);
+            } catch (error) {
+                console.error('Error fetching quarterly data:', error);
+            }
+        }
+
+        function populateQuarterlyDataTable(data) {
+            const tbody = document.getElementById('quarterlyDataBody');
+            tbody.innerHTML = '';
+            
+            if (!data || Object.keys(data).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No quarterly data available</td></tr>';
+                return;
+            }
+            
+            // Sort quarters chronologically
+            const sortedQuarters = Object.keys(data).sort((a, b) => {
+                const yearA = parseInt(a.substring(0, 4));
+                const quarterA = parseInt(a.substring(4));
+                const yearB = parseInt(b.substring(0, 4));
+                const quarterB = parseInt(b.substring(4));
+                
+                if (yearA !== yearB) return yearA - yearB;
+                return quarterA - quarterB;
+            });
+            
+            sortedQuarters.forEach(quarter => {
+                const quarterData = data[quarter];
+                const row = document.createElement('tr');
+                
+                // Format quarter display (e.g., "2024Q3" -> "2024 Q3")
+                const year = quarter.substring(0, 4);
+                const q = quarter.substring(4);
+                const quarterNum = q.substring(1); // Extract just the number (e.g., "Q1" -> "1")
+                const quarterDisplay = `${year} ${q}`;
+                
+                // Determine PROVNUM case based on quarter (same logic as generate_pbj_source_link)
+                const earlyQuarters = [
+                    "2017Q1", "2017Q2", "2017Q3", "2017Q4",
+                    "2018Q4", 
+                    "2019Q1", "2019Q2", "2019Q3", "2019Q4",
+                    "2020Q2", "2020Q3"
+                ];
+                const provnumCol = earlyQuarters.includes(quarter) ? "provnum" : "PROVNUM";
+                
+                // Create CMS data portal link - recent quarters don't have quarter in URL path
+                let cmsUrl;
+                const yearInt = parseInt(year);
+                const quarterInt = parseInt(quarterNum);
+                
+                // Only the most recent quarter (2025Q1) doesn't include quarter in URL path
+                if (yearInt === 2025 && quarterInt === 1) {
+                    cmsUrl = `https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data?query=%7B%22filters%22%3A%7B%22list%22%3A%5B%7B%22conditions%22%3A%5B%7B%22column%22%3A%7B%22value%22%3A%22${provnumCol}%22%7D%2C%22comparator%22%3A%7B%22value%22%3A%22%3D%22%7D%2C%22filterValue%22%3A%5B%22225500%22%5D%7D%5D%7D%5D%2C%22rootConjunction%22%3A%7B%22value%22%3A%22AND%22%7D%7D%2C%22keywords%22%3A%22%22%2C%22offset%22%3A0%2C%22limit%22%3A10%2C%22sort%22%3A%7B%22sortBy%22%3Anull%2C%22sortOrder%22%3Anull%7D%2C%22columns%22%3A%5B%5D%7D`;
+                } else {
+                    // For all other quarters, include quarter in URL path (format: q1-2017, q2-2022, etc.)
+                    const quarterUrl = `q${quarterNum}-${year}`;
+                    cmsUrl = `https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data/${quarterUrl}?query=%7B%22filters%22%3A%7B%22list%22%3A%5B%7B%22conditions%22%3A%5B%7B%22column%22%3A%7B%22value%22%3A%22${provnumCol}%22%7D%2C%22comparator%22%3A%7B%22value%22%3A%22%3D%22%7D%2C%22filterValue%22%3A%5B%22225500%22%5D%7D%5D%7D%5D%2C%22rootConjunction%22%3A%7B%22value%22%3A%22AND%22%7D%7D%2C%22keywords%22%3A%22%22%2C%22offset%22%3A0%2C%22limit%22%3A10%2C%22sort%22%3A%7B%22sortBy%22%3Anull%2C%22sortOrder%22%3Anull%7D%2C%22columns%22%3A%5B%5D%7D`;
+                }
+                
+                row.innerHTML = `
+                    <td class="fw-bold text-center" data-quarter="${quarter}">
+                        <a href="${cmsUrl}" target="_blank" class="text-decoration-none">${quarterDisplay}</a>
+                    </td>
+                    <td class="text-center" data-census="${quarterData.census}">${formatNumber(quarterData.census)}</td>
+                    <td class="text-center" data-total_hprd="${quarterData.total_hprd}">${formatNumber(quarterData.total_hprd)} <span class="text-muted">(${formatNumber(quarterData.total_hours)})</span></td>
+                    <td class="text-center" data-direct_hprd="${quarterData.direct_hprd}">${formatNumber(quarterData.direct_hprd)} <span class="text-muted">(${formatNumber(quarterData.direct_hours)})</span></td>
+                    <td class="text-center" data-total_rn_hprd="${quarterData.total_rn_hprd}">${formatNumber(quarterData.total_rn_hprd)} <span class="text-muted">(${formatNumber(quarterData.total_rn_hours)})</span></td>
+                    <td class="text-center" data-rn_hprd="${quarterData.rn_hprd}">${formatNumber(quarterData.rn_hprd)} <span class="text-muted">(${formatNumber(quarterData.rn_hours)})</span></td>
+                    <td class="text-center" data-rn_admin_hprd="${quarterData.rn_admin_hprd}">${formatNumber(quarterData.rn_admin_hprd)} <span class="text-muted">(${formatNumber(quarterData.rn_admin_hours)})</span></td>
+                    <td class="text-center" data-rn_don_hprd="${quarterData.rn_don_hprd}">${formatNumber(quarterData.rn_don_hprd)} <span class="text-muted">(${formatNumber(quarterData.rn_don_hours)})</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // Add sorting functionality
+            setupTableSorting();
+        }
+
+        function setupTableSorting() {
+            const table = document.getElementById('quarterlyDataTable');
+            const headers = table.querySelectorAll('th.sortable');
+            
+            headers.forEach(header => {
+                header.style.cursor = 'pointer';
+                header.addEventListener('click', () => {
+                    const sortKey = header.getAttribute('data-sort');
+                    console.log('Sorting by:', sortKey);
+                    sortTable(sortKey, header);
+                });
+            });
+        }
+
+        function sortTable(sortKey, header) {
+            const table = document.getElementById('quarterlyDataTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            console.log('Found rows:', rows.length);
+            
+            // Determine sort direction
+            const isAscending = !header.classList.contains('sort-asc');
+            console.log('Sort direction:', isAscending ? 'ascending' : 'descending');
+            
+            // Clear all sort classes
+            table.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            // Add sort class to current header
+            header.classList.add(isAscending ? 'sort-asc' : 'sort-desc');
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                let aVal, bVal;
+                
+                if (sortKey === 'quarter') {
+                    aVal = a.querySelector('[data-quarter]').getAttribute('data-quarter');
+                    bVal = b.querySelector('[data-quarter]').getAttribute('data-quarter');
+                    console.log('Quarter values:', aVal, bVal);
+                    // Sort quarters chronologically
+                    const [yearA, qA] = aVal.split('Q');
+                    const [yearB, qB] = bVal.split('Q');
+                    if (yearA !== yearB) {
+                        return isAscending ? yearA - yearB : yearB - yearA;
+                    }
+                    return isAscending ? qA - qB : qB - qA;
+                } else {
+                    const aElement = a.querySelector(`[data-${sortKey}]`);
+                    const bElement = b.querySelector(`[data-${sortKey}]`);
+                    console.log('Elements found:', aElement, bElement);
+                    if (aElement && bElement) {
+                        aVal = parseFloat(aElement.getAttribute(`data-${sortKey}`));
+                        bVal = parseFloat(bElement.getAttribute(`data-${sortKey}`));
+                        console.log('Values:', aVal, bVal);
+                        return isAscending ? aVal - bVal : bVal - aVal;
+                    }
+                    return 0;
+                }
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+            console.log('Sorting completed');
+        }
+
+        function exportQuarterlyDataToCSV() {
+            const table = document.getElementById('quarterlyDataTable');
+            const rows = table.querySelectorAll('tr');
+            
+            let csvContent = '';
+            
+            // Add headers - separate HPRD and Hours columns
+            const headerRow = rows[0];
+            const headers = headerRow.querySelectorAll('th');
+            const headerTexts = [];
+            
+            // First two columns (Quarter, Census)
+            headerTexts.push('Quarter', 'Census');
+            
+            // Add separate HPRD and Hours columns for each metric
+            const hprdColumns = [
+                { hprd: 'Total HPRD', hours: 'Total Nurse Hrs/Day' },
+                { hprd: 'Direct HPRD', hours: 'Direct Hrs/Day' },
+                { hprd: 'Total RN HPRD', hours: 'Total RN Hrs/Day' },
+                { hprd: 'RN HPRD', hours: 'RN Hrs/Day' },
+                { hprd: 'RN Admin HPRD', hours: 'RN Admin Hrs/Day' },
+                { hprd: 'RN DON HPRD', hours: 'RN DON Hrs/Day' }
+            ];
+            hprdColumns.forEach(column => {
+                headerTexts.push(column.hprd, column.hours);
+            });
+            
+            csvContent += headerTexts.join(',') + '\n';
+            
+            // Add data rows
+            for (let i = 2; i < rows.length; i++) { // Skip header rows
+                const row = rows[i];
+                const cells = row.querySelectorAll('td');
+                const rowData = [];
+                
+                // Quarter (remove link text, keep just the quarter)
+                const quarterCell = cells[0];
+                const quarterText = quarterCell.textContent.trim();
+                rowData.push(quarterText);
+                
+                // Census
+                rowData.push(cells[1].textContent.trim());
+                
+                // HPRD and Hours columns (separate them)
+                for (let j = 2; j < cells.length; j++) {
+                    const cellText = cells[j].textContent.trim();
+                    const parts = cellText.split('(');
+                    if (parts.length === 2) {
+                        const hprd = parts[0].trim();
+                        const hours = parts[1].replace(')', '').trim();
+                        rowData.push(hprd, hours);
+                    } else {
+                        rowData.push(cellText, '');
+                    }
+                }
+                
+                // Escape commas and quotes for all data
+                const escapedData = rowData.map(cellText => {
+                    cellText = cellText.replace(/"/g, '""');
+                    if (cellText.includes(',') || cellText.includes('"') || cellText.includes('\n')) {
+                        cellText = `"${cellText}"`;
+                    }
+                    return cellText;
+                });
+                
+                csvContent += escapedData.join(',') + '\n';
+            }
+            
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'quarterly_data.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function updateCharts(response) {
+            const charts = response.charts;
+            const filterInfo = response.filter_info;
+            
+            // Check if charts object exists and has expected properties
+            if (!charts || typeof charts !== 'object' || Object.keys(charts).length === 0) {
+                console.error('Invalid or empty charts object:', charts);
+                return;
+            }
+            
+            // Update chart titles with filter information
+            if (charts.hprd_trend && charts.hprd_trend.data && charts.hprd_trend.layout) {
+                const layout = { ...charts.hprd_trend.layout };
+                layout.title = `HPRD Trends - ${filterInfo}`;
+                Plotly.newPlot('hprdTrendChart', charts.hprd_trend.data, layout);
+            } else {
+                console.error('Missing hprd_trend chart data:', charts.hprd_trend);
+            }
+            
+            if (charts.hours_trend && charts.hours_trend.data && charts.hours_trend.layout) {
+                const layout = { ...charts.hours_trend.layout };
+                layout.title = `Staffing Hours Trends - ${filterInfo}`;
+                Plotly.newPlot('hoursTrendChart', charts.hours_trend.data, layout);
+            } else {
+                console.error('Missing hours_trend chart data:', charts.hours_trend);
+            }
+            
+            if (charts.census_trend && charts.census_trend.data && charts.census_trend.layout) {
+                const layout = { ...charts.census_trend.layout };
+                layout.title = `Census Trends - ${filterInfo}`;
+                Plotly.newPlot('censusTrendChart', charts.census_trend.data, layout);
+            } else {
+                console.error('Missing census_trend chart data:', charts.census_trend);
+            }
+            
+            if (charts.dow_comparison && charts.dow_comparison.data && charts.dow_comparison.layout) {
+                const layout = { ...charts.dow_comparison.layout };
+                layout.title = `Average HPRD by Day of Week - ${filterInfo}`;
+                Plotly.newPlot('dowComparisonChart', charts.dow_comparison.data, layout);
+            } else {
+                console.error('Missing dow_comparison chart data:', charts.dow_comparison);
+            }
+            
+            if (charts.contract_trend && charts.contract_trend.data && charts.contract_trend.layout) {
+                const layout = { ...charts.contract_trend.layout };
+                layout.title = `Contract Staff Percentage Trends - ${filterInfo}`;
+                Plotly.newPlot('contractTrendChart', charts.contract_trend.data, layout);
+            } else {
+                console.error('Missing contract_trend chart data:', charts.contract_trend);
+            }
+        }
+
+         function setDateRange(type) {
+             const maxDate = new Date('2025-03-31'); // Latest available data
+             const startDateInput = document.getElementById('startDate');
+             const endDateInput = document.getElementById('endDate');
+             const quarterSelect = document.getElementById('quarterRange');
+             
+             // Clear quarter selection when using date ranges
+             quarterSelect.selectedIndex = 0; // Select "All Quarters"
+             
+             let startDate = new Date();
+             
+             switch(type) {
+                 case 'last30':
+                     startDate = new Date(maxDate);
+                     startDate.setDate(startDate.getDate() - 30);
+                     break;
+                 case 'last90':
+                     startDate = new Date(maxDate);
+                     startDate.setDate(startDate.getDate() - 90);
+                     break;
+                 case 'lastYear':
+                     startDate = new Date(maxDate);
+                     startDate.setFullYear(startDate.getFullYear() - 1);
+                     break;
+                 case 'all':
+                     startDateInput.value = '';
+                     endDateInput.value = '';
+                     return;
+             }
+             
+             startDateInput.value = startDate.toISOString().split('T')[0];
+             endDateInput.value = '2025-03-31'; // Always use March 31, 2025 as end date
+             
+             // Auto-update analysis
+             updateAnalysis();
+         }
+
+        async function compareDay() {
+            const targetDate = document.getElementById('targetDate').value;
+            const comparisonType = document.getElementById('comparisonType').value;
+            
+            if (!targetDate) {
+                alert('Please select a target date');
+                return;
+            }
+            
+            const params = new URLSearchParams({
+                target_date: targetDate,
+                comparison_type: comparisonType
+            });
+            
+            if (comparisonType === 'custom') {
+                const customStart = document.getElementById('customStartDate').value;
+                const customEnd = document.getElementById('customEndDate').value;
+                
+                if (!customStart || !customEnd) {
+                    alert('Please select custom date range');
+                    return;
+                }
+                
+                params.append('start_date', customStart);
+                params.append('end_date', customEnd);
+            }
+            
+            try {
+                const response = await fetch(`/api/day_comparison?${params}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                displayComparisonResults(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while comparing the day.');
+            }
+        }
+
+        function displayComparisonResults(data) {
+            const resultsDiv = document.getElementById('dayComparisonResults');
+            const contentDiv = document.getElementById('comparisonContent');
+            
+            const target = data.target_data;
+            const comparison = data.comparison_data;
+            const aberrations = data.aberrations || [];
+            
+            // Generate aberration alerts
+            let aberrationAlerts = '';
+            if (aberrations.length > 0) {
+                aberrationAlerts = `
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Statistical Aberrations Detected</h6>
+                            ${aberrations.map(ab => `
+                                <div class="alert alert-${ab.color} alert-dismissible fade show" role="alert">
+                                    <strong>${ab.severity} ${ab.direction}</strong> - ${ab.description}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            contentDiv.innerHTML = `
+                ${aberrationAlerts}
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Target Date: ${data.target_date} (${data.target_day_of_week})</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Metric</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Census</td><td>${target.census.toFixed(1)}</td></tr>
+                                    <tr><td>RN HPRD</td><td>${target.rn_hprd.toFixed(3)}</td></tr>
+                                    <tr><td>LPN HPRD</td><td>${target.lpn_hprd.toFixed(3)}</td></tr>
+                                    <tr><td>CNA HPRD</td><td>${target.cna_hprd.toFixed(3)}</td></tr>
+                                    <tr><td>Total HPRD</td><td>${target.total_hprd.toFixed(3)}</td></tr>
+                                    <tr><td>RN Hours</td><td>${target.rn_hours.toFixed(1)}</td></tr>
+                                    <tr><td>LPN Hours</td><td>${target.lpn_hours.toFixed(1)}</td></tr>
+                                    <tr><td>CNA Hours</td><td>${target.cna_hours.toFixed(1)}</td></tr>
+                                    <tr><td>RN Contract Hours</td><td>${target.rn_contract_hours.toFixed(1)}</td></tr>
+                                    <tr><td>LPN Contract Hours</td><td>${target.lpn_contract_hours.toFixed(1)}</td></tr>
+                                    <tr><td>CNA Contract Hours</td><td>${target.cna_contract_hours.toFixed(1)}</td></tr>
+                                    <tr><td>RN Contract %</td><td>${target.rn_contract_pct.toFixed(1)}%</td></tr>
+                                    <tr><td>CNA Contract %</td><td>${target.cna_only_contract_pct.toFixed(1)}%</td></tr>
+                                    <tr><td>Nurse Aide Contract % (CNA, MedAide, Tech)</td><td>${target.nurse_aide_contract_pct.toFixed(1)}%</td></tr>
+                                    <tr><td>LPN Contract %</td><td>${target.lpn_only_contract_pct.toFixed(1)}%</td></tr>
+                                    <tr><td>Total LPN Contract %</td><td>${target.total_lpn_contract_pct.toFixed(1)}%</td></tr>
+                                    <tr><td>Total Contract %</td><td>${target.total_contract_pct.toFixed(1)}%</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Comparison Average (${comparison.count} days)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Metric</th>
+                                        <th>Average</th>
+                                        <th>Difference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Census</td><td>${comparison.avg_census.toFixed(1)}</td><td>${(target.census - comparison.avg_census).toFixed(1)}</td></tr>
+                                    <tr><td>RN HPRD</td><td>${comparison.avg_rn_hprd.toFixed(3)}</td><td>${(target.rn_hprd - comparison.avg_rn_hprd).toFixed(3)}</td></tr>
+                                    <tr><td>LPN HPRD</td><td>${comparison.avg_lpn_hprd.toFixed(3)}</td><td>${(target.lpn_hprd - comparison.avg_lpn_hprd).toFixed(3)}</td></tr>
+                                    <tr><td>CNA HPRD</td><td>${comparison.avg_cna_hprd.toFixed(3)}</td><td>${(target.cna_hprd - comparison.avg_cna_hprd).toFixed(3)}</td></tr>
+                                    <tr><td>Total HPRD</td><td>${comparison.avg_total_hprd.toFixed(3)}</td><td>${(target.total_hprd - comparison.avg_total_hprd).toFixed(3)}</td></tr>
+                                    <tr><td>RN Hours</td><td>${comparison.avg_rn_hours.toFixed(1)}</td><td>${(target.rn_hours - comparison.avg_rn_hours).toFixed(1)}</td></tr>
+                                    <tr><td>LPN Hours</td><td>${comparison.avg_lpn_hours.toFixed(1)}</td><td>${(target.lpn_hours - comparison.avg_lpn_hours).toFixed(1)}</td></tr>
+                                    <tr><td>CNA Hours</td><td>${comparison.avg_cna_hours.toFixed(1)}</td><td>${(target.cna_hours - comparison.avg_cna_hours).toFixed(1)}</td></tr>
+                                    <tr><td>RN Contract Hours</td><td>${comparison.avg_rn_contract_hours.toFixed(1)}</td><td>${(target.rn_contract_hours - comparison.avg_rn_contract_hours).toFixed(1)}</td></tr>
+                                    <tr><td>LPN Contract Hours</td><td>${comparison.avg_lpn_contract_hours.toFixed(1)}</td><td>${(target.lpn_contract_hours - comparison.avg_lpn_contract_hours).toFixed(1)}</td></tr>
+                                    <tr><td>CNA Contract Hours</td><td>${comparison.avg_cna_contract_hours.toFixed(1)}</td><td>${(target.cna_contract_hours - comparison.avg_cna_contract_hours).toFixed(1)}</td></tr>
+                                    <tr><td>RN Contract %</td><td>${comparison.avg_rn_contract_pct.toFixed(1)}%</td><td>${(target.rn_contract_pct - comparison.avg_rn_contract_pct).toFixed(1)}%</td></tr>
+                                    <tr><td>CNA Contract %</td><td>${comparison.avg_cna_only_contract_pct.toFixed(1)}%</td><td>${(target.cna_only_contract_pct - comparison.avg_cna_only_contract_pct).toFixed(1)}%</td></tr>
+                                    <tr><td>Nurse Aide Contract % (CNA, MedAide, Tech)</td><td>${comparison.avg_nurse_aide_contract_pct.toFixed(1)}%</td><td>${(target.nurse_aide_contract_pct - comparison.avg_nurse_aide_contract_pct).toFixed(1)}%</td></tr>
+                                    <tr><td>LPN Contract %</td><td>${comparison.avg_lpn_only_contract_pct.toFixed(1)}%</td><td>${(target.lpn_only_contract_pct - comparison.avg_lpn_only_contract_pct).toFixed(1)}%</td></tr>
+                                    <tr><td>Total LPN Contract %</td><td>${comparison.avg_total_lpn_contract_pct.toFixed(1)}%</td><td>${(target.total_lpn_contract_pct - comparison.avg_total_lpn_contract_pct).toFixed(1)}%</td></tr>
+                                    <tr><td>Total Contract %</td><td>${comparison.avg_total_contract_pct.toFixed(1)}%</td><td>${(target.total_contract_pct - comparison.avg_total_contract_pct).toFixed(1)}%</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Statistical Analysis</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Metric</th>
+                                        <th>Z-Score</th>
+                                        <th>Percentile</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Census</td><td>${((target.census - comparison.avg_census) / comparison.std_census).toFixed(2)}</td><td>${getPercentile((target.census - comparison.avg_census) / comparison.std_census)}</td></tr>
+                                    <tr><td>RN HPRD</td><td>${((target.rn_hprd - comparison.avg_rn_hprd) / comparison.std_rn_hprd).toFixed(2)}</td><td>${getPercentile((target.rn_hprd - comparison.avg_rn_hprd) / comparison.std_rn_hprd)}</td></tr>
+                                    <tr><td>LPN HPRD</td><td>${((target.lpn_hprd - comparison.avg_lpn_hprd) / comparison.std_lpn_hprd).toFixed(2)}</td><td>${getPercentile((target.lpn_hprd - comparison.avg_lpn_hprd) / comparison.std_lpn_hprd)}</td></tr>
+                                    <tr><td>CNA HPRD</td><td>${((target.cna_hprd - comparison.avg_cna_hprd) / comparison.std_cna_hprd).toFixed(2)}</td><td>${getPercentile((target.cna_hprd - comparison.avg_cna_hprd) / comparison.std_cna_hprd)}</td></tr>
+                                    <tr><td>Total HPRD</td><td>${((target.total_hprd - comparison.avg_total_hprd) / comparison.std_total_hprd).toFixed(2)}</td><td>${getPercentile((target.total_hprd - comparison.avg_total_hprd) / comparison.std_total_hprd)}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            resultsDiv.style.display = 'block';
+        }
+
+        function getPercentile(zScore) {
+            if (zScore > 0) {
+                return Math.min(99.9, (50 + (zScore * 34.1))).toFixed(1) + 'th';
+            } else {
+                return Math.max(0.1, (50 - (Math.abs(zScore) * 34.1))).toFixed(1) + 'th';
+            }
+        }
+
+        // Global variables for table state
+        let isExpanded = false;
+        let aberrationData = null;
+        let sortColumn = null;
+        let sortDirection = 'asc';
+
+         function formatDate(dateString) {
+             // Convert YYYY-MM-DD to MM-DD-YYYY
+             const parts = dateString.split('-');
+             return `${parts[1]}-${parts[2]}-${parts[0]}`;
+         }
+
+         function getMetricDisplayName(metric) {
+             const metricNames = {
+                 'MDScensus': 'Census',
+                 'Hrs_RN': 'RN Hours (Direct Care)',
+                 'Total_RN_Hours': 'Total RN Hours (Incl. Admin, DON)',
+                 'Total_RN_HPRD': 'Total RN HPRD',
+                 'Hrs_LPN': 'LPN Hours (Direct Care)',
+                 'Total_LPN_Hours': 'Total LPN Hours (Incl. Admin)',
+                 'Total_LPN_HPRD': 'Total LPN HPRD',
+                 'Hrs_CNA': 'CNA Hours (Direct Care)',
+                 'Total_Nurse_Aide_Hours': 'Total Nurse Aide Hours (CNA + MedAide + Natr)',
+                 'Total_Nurse_Aide_HPRD': 'Total Nurse Aide HPRD',
+                 'Total_Staff_Hours': 'Total Staff Hours (RN + LPN + CNA)',
+                 'Total_Nurse_HPRD': 'Total Staff HPRD',
+                 'RN_HPRD': 'RN HPRD',
+                 'LPN_HPRD': 'LPN HPRD',
+                 'CNA_HPRD': 'CNA HPRD'
+             };
+             return metricNames[metric] || metric.replace(/_/g, ' ');
+         }
+
+         function updateFilterDescription() {
+             const startDate = document.getElementById('startDate').value;
+             const endDate = document.getElementById('endDate').value;
+             const quarterSelect = document.getElementById('quarterRange');
+             const dayOfWeek = document.getElementById('dayOfWeek').value;
+             const holidaysOnly = document.getElementById('holidaysOnly').checked;
+             
+             let description = 'Find outliers within: ';
+             const filters = [];
+             
+             if (startDate && endDate) {
+                 filters.push(`${formatDate(startDate)} to ${formatDate(endDate)}`);
+             } else if (quarterSelect.selectedOptions.length > 0) {
+                 const quarters = Array.from(quarterSelect.selectedOptions).map(opt => formatQuarter(opt.value));
+                 filters.push(`Quarters: ${quarters.join(', ')}`);
+             }
+             
+             if (dayOfWeek !== 'all') {
+                 filters.push(`Day: ${dayOfWeek}`);
+             }
+             
+             if (holidaysOnly) {
+                 filters.push('Holidays only');
+             }
+             
+             if (filters.length === 0) {
+                 description += 'all data';
+             } else {
+                 description += filters.join(', ');
+             }
+             
+             document.getElementById('currentFilterDescription').textContent = description;
+         }
+
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            
+            // Sort the data
+            currentData.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                // Handle different data types
+                if (column === 'WorkDate') {
+                    aVal = new Date(aVal);
+                    bVal = new Date(bVal);
+                } else if (column === 'IsHoliday') {
+                    aVal = aVal ? 1 : 0;
+                    bVal = bVal ? 1 : 0;
+                } else if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+            
+            // Update sort indicators
+            updateSortIndicators();
+            
+            // Reset to first page and re-render
+            currentPage = 1;
+            renderTable();
+        }
+
+        function updateSortIndicators() {
+            // Clear all sort indicators
+            document.querySelectorAll('.sortable i').forEach(icon => {
+                icon.className = 'fas fa-sort';
+            });
+            
+            // Set current sort indicator
+            if (sortColumn) {
+                const header = document.querySelector(`[data-column="${sortColumn}"] i`);
+                if (header) {
+                    header.className = sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                }
+            }
+        }
+
+        function searchSpecificDay() {
+            const dateInput = document.getElementById('specificDaySearch');
+            const targetDate = dateInput.value;
+            
+            if (!targetDate) {
+                alert('Please select a date to search for.');
+                return;
+            }
+            
+            // Get the full dataset (not current filtered data)
+            const fullData = window.originalData || window.allData || currentData;
+            
+            // Find the specific day in the full data
+            const foundRecord = fullData.find(record => record.WorkDate === targetDate);
+            
+            if (foundRecord) {
+                // Filter to show only this day
+                if (!window.originalData) {
+                    window.originalData = fullData;
+                }
+                currentData = [foundRecord];
+                currentPage = 1;
+                renderTable();
+                
+                // Clear any existing filter messages
+                clearFilterMessages();
+                
+                // Show a message and restore button
+                const message = document.createElement('div');
+                message.className = 'alert alert-info alert-dismissible fade show filter-message';
+                message.innerHTML = `
+                    <strong>Filtered by Specific Day: ${formatDate(targetDate)} (${foundRecord.DayOfWeek})</strong> (1 record)
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="restoreFullData()"></button>
+                `;
+                document.getElementById('dataTableBody').parentElement.parentElement.insertBefore(message, document.getElementById('dataTableBody').parentElement);
+                
+                // Reset dropdowns to "All" options
+                document.getElementById('yearFilterTable').value = 'all';
+                document.getElementById('quarterFilterTable').value = 'all';
+            } else {
+                alert(`No data found for ${formatDate(targetDate)}. Please check the date range.`);
+            }
+        }
+
+        function searchDateRange() {
+            const startDate = document.getElementById('dateRangeStart').value;
+            const endDate = document.getElementById('dateRangeEnd').value;
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates.');
+                return;
+            }
+            
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('Start date must be before end date.');
+                return;
+            }
+            
+            // Get the full dataset (not current filtered data)
+            const fullData = window.originalData || window.allData || currentData;
+            
+            // Filter data to the specified date range
+            const filteredData = fullData.filter(record => {
+                // Parse YYYY-MM-DD format explicitly to avoid timezone issues
+                const [year, month, day] = record.WorkDate.split('-');
+                const recordDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                return recordDate >= start && recordDate <= end;
+            });
+            
+            if (filteredData.length === 0) {
+                alert(`No data found for the date range ${formatDate(startDate)} to ${formatDate(endDate)}.`);
+                return;
+            }
+            
+            // Store original data and show filtered results
+            if (!window.originalData) {
+                window.originalData = fullData;
+            }
+            currentData = filteredData;
+            currentPage = 1;
+            renderTable();
+            
+            // Clear any existing filter messages
+            clearFilterMessages();
+            
+            // Show a message and restore button
+            const message = document.createElement('div');
+            message.className = 'alert alert-info alert-dismissible fade show filter-message';
+            message.innerHTML = `
+                <strong>Filtered by Date Range: ${formatDate(startDate)} to ${formatDate(endDate)}</strong> (${filteredData.length} records)
+                <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="restoreFullData()"></button>
+            `;
+            document.getElementById('dataTableBody').parentElement.parentElement.insertBefore(message, document.getElementById('dataTableBody').parentElement);
+            
+            // Reset dropdowns to "All" options
+            document.getElementById('yearFilterTable').value = 'all';
+            document.getElementById('quarterFilterTable').value = 'all';
+        }
+
+
+        function filterByYear() {
+            const selectedYear = document.getElementById('yearFilterTable').value;
+            
+            if (selectedYear === 'all') {
+                // Restore full data if "All Years" is selected
+                if (window.originalData) {
+                    restoreFullData();
+                }
+                return;
+            }
+            
+            // Get the full dataset (not current filtered data)
+            const fullData = window.originalData || window.allData || currentData;
+            
+            // Filter data to the selected year
+            const filteredData = fullData.filter(record => {
+                // Parse YYYY-MM-DD format explicitly to avoid timezone issues
+                const [year, month, day] = record.WorkDate.split('-');
+                const recordDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                return recordDate.getFullYear() == selectedYear;
+            });
+            
+            if (filteredData.length === 0) {
+                alert(`No data found for year ${selectedYear}.`);
+                return;
+            }
+            
+            // Store original data and show filtered results
+            if (!window.originalData) {
+                window.originalData = fullData;
+            }
+            currentData = filteredData;
+            currentPage = 1;
+            renderTable();
+            
+            // Clear any existing filter messages
+            clearFilterMessages();
+            
+            // Show a message and restore button
+            const message = document.createElement('div');
+            message.className = 'alert alert-info alert-dismissible fade show filter-message';
+            message.innerHTML = `
+                <strong>Filtered by Year: ${selectedYear}</strong> (${filteredData.length} records)
+                <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="restoreFullData()"></button>
+            `;
+            document.getElementById('dataTableBody').parentElement.parentElement.insertBefore(message, document.getElementById('dataTableBody').parentElement);
+        }
+
+        function filterByQuarter() {
+            const selectedQuarter = document.getElementById('quarterFilterTable').value;
+            
+            if (selectedQuarter === 'all') {
+                // Restore full data if "All Quarters" is selected
+                if (window.originalData) {
+                    restoreFullData();
+                }
+                return;
+            }
+            
+            // Get the full dataset (not current filtered data)
+            const fullData = window.originalData || window.allData || currentData;
+            
+            // Filter data to the selected quarter
+            const filteredData = fullData.filter(record => {
+                return record.CY_Qtr === selectedQuarter;
+            });
+            
+            if (filteredData.length === 0) {
+                alert(`No data found for quarter ${selectedQuarter}.`);
+                return;
+            }
+            
+            // Store original data and show filtered results
+            if (!window.originalData) {
+                window.originalData = fullData;
+            }
+            currentData = filteredData;
+            currentPage = 1;
+            renderTable();
+            
+            // Clear any existing filter messages
+            clearFilterMessages();
+            
+            // Show a message and restore button
+            const message = document.createElement('div');
+            message.className = 'alert alert-info alert-dismissible fade show filter-message';
+            message.innerHTML = `
+                <strong>Filtered by Quarter: ${selectedQuarter}</strong> (${filteredData.length} records)
+                <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="restoreFullData()"></button>
+            `;
+            document.getElementById('dataTableBody').parentElement.parentElement.insertBefore(message, document.getElementById('dataTableBody').parentElement);
+        }
+
+        function clearFilterMessages() {
+            // Remove any existing filter messages
+            const existingMessages = document.querySelectorAll('.filter-message');
+            existingMessages.forEach(msg => msg.remove());
+        }
+
+        function restoreFullData() {
+            if (window.originalData) {
+                currentData = window.originalData;
+                currentPage = 1;
+                renderTable();
+                window.originalData = null;
+                
+                // Clear filter messages
+                clearFilterMessages();
+                
+                // Reset dropdowns to "All" options
+                document.getElementById('yearFilterTable').value = 'all';
+                document.getElementById('quarterFilterTable').value = 'all';
+            }
+        }
+
+        function toggleExpandedView() {
+            isExpanded = !isExpanded;
+            const expandedCols = document.querySelectorAll('.expanded-col');
+            const toggleBtn = document.getElementById('expandToggle');
+            
+            expandedCols.forEach(col => {
+                col.style.display = isExpanded ? 'table-cell' : 'none';
+            });
+            
+            toggleBtn.innerHTML = isExpanded ? 
+                '<i class="fas fa-compress-arrows-alt me-1"></i>Collapse' : 
+                '<i class="fas fa-expand-arrows-alt me-1"></i>Expand All';
+            
+            renderTable(); // Re-render to show/hide expanded columns
+        }
+
+         function detectOutliers(scope) {
+             const dataToAnalyze = scope === 'all' ? window.allData || currentData : currentData;
+             const selectedCategory = document.getElementById('outlierCategory').value;
+             
+             // Define metrics based on selected category
+             let metrics = [];
+             switch(selectedCategory) {
+                 case 'rn_hours':
+                     metrics = ['Hrs_RN'];
+                     break;
+                 case 'total_rn_hours':
+                     metrics = ['Total_RN_Hours'];
+                     break;
+                 case 'total_rn_hprd':
+                     metrics = ['Total_RN_HPRD'];
+                     break;
+                 case 'lpn_hours':
+                     metrics = ['Hrs_LPN'];
+                     break;
+                 case 'total_lpn_hours':
+                     metrics = ['Total_LPN_Hours'];
+                     break;
+                 case 'total_lpn_hprd':
+                     metrics = ['Total_LPN_HPRD'];
+                     break;
+                 case 'cna_hours':
+                     metrics = ['Hrs_CNA'];
+                     break;
+                 case 'total_nurse_aide_hours':
+                     metrics = ['Total_Nurse_Aide_Hours'];
+                     break;
+                 case 'total_nurse_aide_hprd':
+                     metrics = ['Total_Nurse_Aide_HPRD'];
+                     break;
+                 case 'total_hours':
+                     metrics = ['Total_Staff_Hours'];
+                     break;
+                 case 'total_staff_hprd':
+                     metrics = ['Total_Nurse_HPRD'];
+                     break;
+                 case 'nurse_staff_hprd_excl_admin':
+                     metrics = ['Nurse_Staff_HPRD_Excl_Admin'];
+                     break;
+                 case 'census':
+                     metrics = ['MDScensus'];
+                     break;
+                 case 'all':
+                     metrics = ['MDScensus', 'Hrs_RN', 'Total_RN_Hours', 'Total_RN_HPRD', 'Hrs_LPN', 'Total_LPN_Hours', 'Total_LPN_HPRD', 'Hrs_CNA', 'Total_Nurse_Aide_Hours', 'Total_Nurse_Aide_HPRD', 'Nurse_Staff_HPRD_Excl_Admin', 'Total_Staff_Hours', 'Total_Nurse_HPRD'];
+                     break;
+             }
+             
+             const outliers = [];
+            
+            // Calculate statistics for each metric
+            metrics.forEach(metric => {
+                const values = dataToAnalyze.map(d => d[metric]).filter(v => v !== null && v !== undefined);
+                if (values.length > 1) {
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+                    const stdDev = Math.sqrt(variance);
+                    
+                    if (stdDev > 0) {
+                        // Find outliers (Z-score >= 2.0)
+                        dataToAnalyze.forEach(record => {
+                            const zScore = (record[metric] - mean) / stdDev;
+                            if (Math.abs(zScore) >= 2.0) {
+                                outliers.push({
+                                    date: record.WorkDate,
+                                    dayOfWeek: record.DayOfWeek,
+                                    metric: metric,
+                                    value: record[metric],
+                                    zScore: zScore,
+                                    severity: Math.abs(zScore) >= 3.0 ? 'extreme' : 'high',
+                                    direction: zScore > 0 ? 'HIGH' : 'LOW',
+                                    percentile: zScore > 0 ? 
+                                        Math.min(99.9, 50 + (zScore * 34.1)) : 
+                                        Math.max(0.1, 50 - (Math.abs(zScore) * 34.1))
+                                });
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // Sort by severity and Z-score
+            outliers.sort((a, b) => {
+                const severityOrder = {'extreme': 2, 'high': 1};
+                if (severityOrder[a.severity] !== severityOrder[b.severity]) {
+                    return severityOrder[b.severity] - severityOrder[a.severity];
+                }
+                return Math.abs(b.zScore) - Math.abs(a.zScore);
+            });
+            
+            // Store the current scope for filter re-runs
+            window.lastOutlierScope = scope;
+            displayOutlierResults(outliers, scope);
+        }
+
+        function displayOutlierResults(outliers, scope) {
+            const resultsDiv = document.getElementById('outlierResults');
+            const contentDiv = document.getElementById('outlierContent');
+            const selectedCategory = document.getElementById('outlierCategory').value;
+             const categoryNames = {
+                 'census': 'Census',
+                 'total_staff_hprd': 'Total Staff HPRD',
+                 'total_hours': 'Total Staff Hours',
+                 'nurse_staff_hprd_excl_admin': 'Nurse Staff HPRD (excl. Admin & DON)',
+                 'total_rn_hprd': 'Total RN HPRD',
+                 'total_rn_hours': 'Total RN Hours',
+                 'rn_hprd': 'RN HPRD (Direct Care Only)',
+                 'rn_hours': 'RN Hours (Direct Care Only)',
+                 'total_lpn_hprd': 'Total LPN HPRD',
+                 'total_lpn_hours': 'Total LPN Hours',
+                 'lpn_hprd': 'LPN HPRD (Direct Care Only)',
+                 'lpn_hours': 'LPN Hours (Direct Care Only)',
+                 'total_nurse_aide_hours': 'Total Nurse Aide Hours',
+                 'total_nurse_aide_hprd': 'Total Nurse Aide HPRD',
+                 'cna_hours': 'CNA Hours (Direct Care Only)',
+                 'all': 'All Categories'
+             };
+            
+            if (outliers.length === 0) {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        No outliers detected in ${categoryNames[selectedCategory]} for ${scope === 'all' ? 'historical data' : 'current range'}.
+                    </div>
+                `;
+            } else {
+                // Group outliers by date
+                const outliersByDate = {};
+                outliers.forEach(outlier => {
+                    if (!outliersByDate[outlier.date]) {
+                        outliersByDate[outlier.date] = [];
+                    }
+                    outliersByDate[outlier.date].push(outlier);
+                });
+                
+                // Apply filter
+                const filter = document.getElementById('outlierFilter').value;
+                let filteredOutliers = outliers;
+                if (filter === 'low') {
+                    filteredOutliers = outliers.filter(outlier => outlier.zScore < 0);
+                } else if (filter === 'high') {
+                    filteredOutliers = outliers.filter(outlier => outlier.zScore > 0);
+                }
+                
+                // Store filtered outliers globally for pagination
+                window.currentOutlierData = filteredOutliers;
+                window.currentOutlierPage = 1;
+                window.outlierPageSize = 50;
+                
+                let html = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Found ${filteredOutliers.length} outlier(s) in ${categoryNames[selectedCategory]} for ${scope === 'all' ? 'historical data' : 'current range'}${filter !== 'all' ? ` (${filter} outliers only)` : ''}.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="outlierTable">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" onclick="sortOutlierTable(0)">Date <i class="fas fa-sort"></i></th>
+                                    <th class="sortable" onclick="sortOutlierTable(1)">Day <i class="fas fa-sort"></i></th>
+                                    <th class="sortable" onclick="sortOutlierTable(2)">Metric <i class="fas fa-sort"></i></th>
+                                    <th class="sortable" onclick="sortOutlierTable(3)">Value <i class="fas fa-sort"></i></th>
+                                    <th class="sortable" onclick="sortOutlierTable(4)">Z-Score <i class="fas fa-sort"></i></th>
+                                    <th class="sortable" onclick="sortOutlierTable(5)">Severity <i class="fas fa-sort"></i></th>
+                                    <th class="sortable" onclick="sortOutlierTable(6)">Percentile <i class="fas fa-sort"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody id="outlierTableBody">
+                `;
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div>
+                            <small class="text-muted">
+                                Showing <span id="outlierRange">1-0</span> of <span id="outlierTotal">0</span> outliers
+                            </small>
+                        </div>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="outlierPrevPage" onclick="changeOutlierPage(-1)">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="outlierNextPage" onclick="changeOutlierPage(1)">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                contentDiv.innerHTML = html;
+                
+                // Render first page of outliers after HTML is inserted
+                renderOutlierTable();
+            }
+            
+            resultsDiv.style.display = 'block';
+        }
+        
+        function renderOutlierTable() {
+            if (!window.currentOutlierData) return;
+            
+            const tbody = document.getElementById('outlierTableBody');
+            const startIndex = (window.currentOutlierPage - 1) * window.outlierPageSize;
+            const endIndex = Math.min(startIndex + window.outlierPageSize, window.currentOutlierData.length);
+            
+            tbody.innerHTML = '';
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const outlier = window.currentOutlierData[i];
+                const severityClass = outlier.severity === 'extreme' ? 'table-danger' : 'table-warning';
+                const row = document.createElement('tr');
+                row.className = severityClass;
+                row.innerHTML = `
+                    <td><a href="#" onclick="openSingleDayReport('${outlier.date}'); return false;" class="text-primary" style="text-decoration: none; cursor: pointer;">${formatDate(outlier.date)}</a></td>
+                    <td>${outlier.dayOfWeek}</td>
+                    <td>${getMetricDisplayName(outlier.metric)}</td>
+                    <td>${outlier.value.toFixed(3)}</td>
+                    <td>${outlier.zScore.toFixed(2)}</td>
+                    <td><span class="badge bg-${outlier.severity === 'extreme' ? 'danger' : 'warning'}">${outlier.severity.toUpperCase()}</span></td>
+                    <td>${outlier.percentile.toFixed(1)}th</td>
+                `;
+                tbody.appendChild(row);
+            }
+            
+            // Update pagination info
+            document.getElementById('outlierRange').textContent = `${startIndex + 1}-${endIndex}`;
+            document.getElementById('outlierTotal').textContent = window.currentOutlierData.length.toLocaleString();
+            
+            // Update pagination buttons
+            const maxPage = Math.ceil(window.currentOutlierData.length / window.outlierPageSize);
+            document.getElementById('outlierPrevPage').disabled = window.currentOutlierPage === 1;
+            document.getElementById('outlierNextPage').disabled = window.currentOutlierPage === maxPage;
+        }
+        
+        function changeOutlierPage(direction) {
+            if (!window.currentOutlierData) return;
+            
+            const maxPage = Math.ceil(window.currentOutlierData.length / window.outlierPageSize);
+            const newPage = window.currentOutlierPage + direction;
+            
+            if (newPage >= 1 && newPage <= maxPage) {
+                window.currentOutlierPage = newPage;
+                renderOutlierTable();
+            }
+        }
+        
+        function sortOutlierTable(columnIndex) {
+            if (!window.currentOutlierData) return;
+            
+            // Sort the data
+            window.currentOutlierData.sort((a, b) => {
+                let aVal, bVal;
+                switch(columnIndex) {
+                    case 0: // Date
+                        aVal = new Date(a.date);
+                        bVal = new Date(b.date);
+                        break;
+                    case 1: // Day
+                        aVal = a.dayOfWeek;
+                        bVal = b.dayOfWeek;
+                        break;
+                    case 2: // Metric
+                        aVal = getMetricDisplayName(a.metric);
+                        bVal = getMetricDisplayName(b.metric);
+                        break;
+                    case 3: // Value
+                        aVal = a.value;
+                        bVal = b.value;
+                        break;
+                    case 4: // Z-Score
+                        aVal = a.zScore;
+                        bVal = b.zScore;
+                        break;
+                    case 5: // Severity
+                        aVal = a.severity;
+                        bVal = b.severity;
+                        break;
+                    case 6: // Percentile
+                        aVal = a.percentile;
+                        bVal = b.percentile;
+                        break;
+                    default:
+                        return 0;
+                }
+                
+                if (typeof aVal === 'string') {
+                    return aVal.localeCompare(bVal);
+                } else {
+                    return aVal - bVal;
+                }
+            });
+            
+            // Reset to first page and re-render
+            window.currentOutlierPage = 1;
+            renderOutlierTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('dataTableBody');
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, currentData.length);
+            
+            tbody.innerHTML = '';
+            
+            for (let i = startIndex; i < endIndex; i++) {
+                const row = currentData[i];
+                const tr = document.createElement('tr');
+                
+                // Format date as MM-DD-YYYY
+                const formattedDate = formatDate(row.WorkDate);
+                
+                 tr.innerHTML = `
+                     <td>${startIndex + i + 1}</td>
+                     <td><a href="#" onclick="openSingleDayReport('${row.WorkDate}'); return false;" class="text-primary" style="text-decoration: none; cursor: pointer;">${formattedDate}</a></td>
+                     <td>${row.DayOfWeek}</td>
+                     <td>${row.MDScensus.toFixed(1)}</td>
+                     <td>${row.Total_Staff_HPRD.toFixed(2)}</td>
+                     <td>${row.Total_Staff_Hours.toFixed(2)}</td>
+                     <td>${row.Nurse_Staff_HPRD_Excl_Admin.toFixed(2)}</td>
+                     <td>${row.Total_RN_HPRD.toFixed(2)}</td>
+                     <td>${row.Total_RN_Hours.toFixed(2)}</td>
+                     <td>${row.Total_LPN_HPRD.toFixed(2)}</td>
+                     <td>${row.Total_LPN_Hours.toFixed(2)}</td>
+                     <td>${row.Total_Nurse_Aide_HPRD.toFixed(2)}</td>
+                     <td>${row.Total_Nurse_Aide_Hours.toFixed(2)}</td>
+                     <td>${row.RN_Contract_Pct.toFixed(1)}%</td>
+                     <td>${row.LPN_Contract_Pct.toFixed(1)}%</td>
+                     <td>${row.CNA_Contract_Pct.toFixed(1)}%</td>
+                     <td>${row.IsHoliday ? 'Yes' : 'No'}</td>
+                     <!-- Expanded columns - Position Breakdown -->
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RN || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.RN_HPRD || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RNadmin || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RNDON || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_LPN || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.LPN_HPRD || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_LPNadmin || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_CNA || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.CNA_HPRD || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_NAtrn || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_MedAide || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RN_ctr || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_LPN_ctr || 0).toFixed(2)}</td>
+                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_CNA_ctr || 0).toFixed(2)}</td>
+                 `;
+                tbody.appendChild(tr);
+            }
+            
+            // Update pagination info
+            document.getElementById('showingRange').textContent = `${startIndex + 1}-${endIndex}`;
+            document.getElementById('totalRecords').textContent = currentData.length.toLocaleString();
+            
+            // Update pagination buttons
+            const maxPage = Math.ceil(currentData.length / pageSize);
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage === maxPage;
+        }
+
+        function generateSingleDayReport() {
+            const date = document.getElementById('singleDayDate').value;
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+
+            fetch(`/api/single_day_report?date=${date}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                        return;
+                    }
+                    displaySingleDayReport(data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error generating report');
+                });
+        }
+        
+        function openSingleDayReport(dateString) {
+            // Set the date in the single day report date picker
+            document.getElementById('singleDayDate').value = dateString;
+            
+            // Generate the report
+            generateSingleDayReport();
+            
+            // Scroll to the single day report section
+            document.getElementById('singleDayReport').scrollIntoView({ 
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+
+        function shareSingleDayReport() {
+            const date = document.getElementById('singleDayDate').value;
+            if (!date) {
+                alert('No report to share. Please generate a report first.');
+                return;
+            }
+            
+            // Create shareable URL
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('date', date);
+            currentUrl.searchParams.set('report', 'single_day');
+            
+            const shareUrl = currentUrl.toString();
+            
+            // Try to use Web Share API if available (mobile)
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Single Day Report - Facility 225500',
+                    text: `Single Day Report for ${formatDate(date)}`,
+                    url: shareUrl
+                }).catch(err => {
+                    console.log('Error sharing:', err);
+                    fallbackShare(shareUrl);
+                });
+            } else {
+                fallbackShare(shareUrl);
+            }
+        }
+        
+        async function shareSingleDayReportImage() {
+            const date = document.getElementById('singleDayDate').value;
+            if (!date) {
+                alert('No report to share. Please generate a report first.');
+                return;
+            }
+            
+            const reportElement = document.getElementById('singleDayReport');
+            if (!reportElement || reportElement.style.display === 'none') {
+                alert('No report to share. Please generate a report first.');
+                return;
+            }
+            
+            const shareBtn = event.target.closest('button');
+            const originalText = shareBtn.innerHTML;
+            
+            try {
+                // Show loading state
+                shareBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Capturing...';
+                shareBtn.disabled = true;
+                
+                // Try modern browser screenshot API first (faster)
+                if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+                    try {
+                        await captureWithScreenAPI(reportElement, date, shareBtn, originalText);
+                        return;
+                    } catch (screenError) {
+                        console.log('Screen API failed, trying html2canvas:', screenError);
+                    }
+                }
+                
+                // Fallback to html2canvas with timeout
+                await captureWithHtml2Canvas(reportElement, date, shareBtn, originalText);
+                
+            } catch (error) {
+                console.error('Error capturing image:', error);
+                alert('Error capturing image. Please try the "Share Link" option instead.');
+                
+                // Reset button
+                shareBtn.innerHTML = originalText;
+                shareBtn.disabled = false;
+            }
+        }
+        
+        async function captureWithScreenAPI(element, date, shareBtn, originalText) {
+            // This is a simplified approach - in practice, you'd need user permission
+            // For now, let's skip this and go straight to html2canvas with timeout
+            throw new Error('Screen API not implemented');
+        }
+        
+        async function captureWithHtml2Canvas(element, date, shareBtn, originalText) {
+            // Load html2canvas with timeout
+            if (typeof html2canvas === 'undefined') {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                document.head.appendChild(script);
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error('Library load timeout')), 10000);
+                    script.onload = () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    };
+                    script.onerror = () => {
+                        clearTimeout(timeout);
+                        reject(new Error('Failed to load html2canvas'));
+                    };
+                });
+            }
+            
+            // Capture with timeout
+            const capturePromise = html2canvas(element, {
+                backgroundColor: '#ffffff',
+                scale: 1.5, // Reduced scale for faster processing
+                useCORS: true,
+                allowTaint: true,
+                scrollX: 0,
+                scrollY: 0,
+                width: element.offsetWidth,
+                height: element.offsetHeight
+            });
+            
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Capture timeout')), 15000)
+            );
+            
+            const canvas = await Promise.race([capturePromise, timeoutPromise]);
+            
+            // Convert to blob
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
+            
+            // Create filename
+            const filename = `single-day-report-${date}.png`;
+            
+            // Try to use Web Share API with image
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
+                await navigator.share({
+                    title: 'Single Day Report - Facility 225500',
+                    text: `Single Day Report for ${formatDate(date)}`,
+                    files: [new File([blob], filename, { type: 'image/png' })]
+                });
+            } else {
+                // Fallback: download the image
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Show success message
+                shareBtn.innerHTML = '<i class="fas fa-check me-1"></i>Downloaded!';
+                shareBtn.classList.remove('btn-outline-primary');
+                shareBtn.classList.add('btn-success');
+            }
+            
+            // Reset button after delay
+            setTimeout(() => {
+                shareBtn.innerHTML = originalText;
+                shareBtn.classList.remove('btn-success');
+                shareBtn.classList.add('btn-outline-primary');
+                shareBtn.disabled = false;
+            }, 2000);
+        }
+        
+        function fallbackShare(url) {
+            // Copy to clipboard
+            navigator.clipboard.writeText(url).then(() => {
+                // Show success message
+                const shareBtn = event.target.closest('button');
+                const originalText = shareBtn.innerHTML;
+                shareBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                shareBtn.classList.remove('btn-outline-secondary');
+                shareBtn.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    shareBtn.innerHTML = originalText;
+                    shareBtn.classList.remove('btn-success');
+                    shareBtn.classList.add('btn-outline-secondary');
+                }, 2000);
+            }).catch(() => {
+                // Fallback: show URL in prompt
+                prompt('Copy this link to share:', url);
+            });
+        }
+
+        function displaySingleDayReport(data) {
+            const { target_metrics, comparisons, aberrations, nurse_source_link, nonnurse_source_link } = data;
+            
+            // Update title
+            const title = `Single Day Report - ${formatDate(target_metrics.date)} (${target_metrics.day_of_week})`;
+            document.getElementById('singleDayReportTitle').textContent = title;
+            
+            // Update table headers dynamically
+            const targetDate = new Date(target_metrics.date);
+            const targetYear = targetDate.getFullYear();
+            const targetQuarter = Math.ceil((targetDate.getMonth() + 1) / 3);
+            const targetDayOfWeek = target_metrics.day_of_week;
+            
+            // Update table headers
+            const tableHeaders = document.querySelectorAll('#singleDayReportTable').length > 0 ? 
+                document.querySelector('#singleDayReportTable').closest('table').querySelectorAll('thead th') : [];
+            
+            if (tableHeaders.length >= 5) {
+                tableHeaders[1].textContent = `${formatDate(target_metrics.date)} (${targetDayOfWeek})`;
+                tableHeaders[2].textContent = `Q${targetQuarter} ${targetYear} Avg`;
+                tableHeaders[3].textContent = `${targetYear} Avg`;
+                tableHeaders[4].textContent = `${targetDayOfWeek} Avg`;
+            }
+            
+            // Update source links in header
+            const sourceLinkDiv = document.getElementById('singleDayReportSourceLink');
+            const displayDate = formatDate(target_metrics.date);
+            let linksHtml = '';
+            
+            if (nurse_source_link) {
+                const urlMatch = nurse_source_link.match(/href="([^"]+)"/);
+                if (urlMatch) {
+                    const url = urlMatch[1];
+                    linksHtml += `<a href="${url}" target="_blank" style="color: #333; text-decoration: none; margin-right: 15px; font-size: 0.9em; font-weight: 500;">CMS PBJ Source: ${displayDate}</a>`;
+                }
+            }
+            
+            if (nonnurse_source_link) {
+                const urlMatch = nonnurse_source_link.match(/href="([^"]+)"/);
+                if (urlMatch) {
+                    const url = urlMatch[1];
+                    linksHtml += `<a href="${url}" target="_blank" style="color: #333; text-decoration: none; font-size: 0.9em; font-weight: 500;">See also: CMS NonNurse: ${displayDate}</a>`;
+                }
+            }
+            
+            sourceLinkDiv.innerHTML = linksHtml;
+            
+            // Build table rows
+            const tableBody = document.getElementById('singleDayReportTable');
+            tableBody.innerHTML = '';
+            
+            const metrics = [
+                { key: 'census', label: 'Census' },
+                { key: 'total_staff_hprd', label: 'Total Staff HPRD' },
+                { key: 'total_staff_hours', label: 'Total Staff Hours' },
+                { key: 'nurse_staff_hprd_excl_admin', label: 'Nurse Staff HPRD (excl. Admin & DON)' },
+                { key: 'nurse_staff_hours_excl_admin', label: 'Nurse Staff Hours (excl. Admin & DON)' },
+                { key: 'total_rn_hprd', label: 'Total RN HPRD' },
+                { key: 'total_rn_hours', label: 'Total RN Hours' },
+                { key: 'rn_hprd', label: 'RN HPRD (Direct Care Only)' },
+                { key: 'rn_hours', label: 'RN Hours (Direct Care Only)' },
+                { key: 'total_lpn_hprd', label: 'Total LPN HPRD' },
+                { key: 'total_lpn_hours', label: 'Total LPN Hours' },
+                { key: 'lpn_hprd', label: 'LPN HPRD (Direct Care Only)' },
+                { key: 'lpn_hours', label: 'LPN Hours (Direct Care Only)' },
+                { key: 'total_nurse_aide_hours', label: 'Total Nurse Aide Hours' },
+                { key: 'rn_contract_pct', label: 'Total RN Contract %' },
+                { key: 'cna_only_contract_pct', label: 'CNA Contract %' },
+                { key: 'nurse_aide_contract_pct', label: 'Nurse Aide Contract % (CNA, MedAide, Tech)' },
+                { key: 'lpn_only_contract_pct', label: 'LPN Contract %' },
+                { key: 'total_lpn_contract_pct', label: 'Total LPN Contract %' },
+                { key: 'total_contract_pct', label: 'Total Contract %' }
+            ];
+            
+            metrics.forEach(metric => {
+                const row = document.createElement('tr');
+                
+                // Get values
+                const targetValue = target_metrics[metric.key];
+                const quarterAvg = comparisons.quarter ? comparisons.quarter[metric.key] : '-';
+                const yearAvg = comparisons.year ? comparisons.year[metric.key] : '-';
+                const dowAvg = comparisons.dow_year ? comparisons.dow_year[metric.key] : '-';
+                
+                // Get aberration info
+                const aberration = aberrations[metric.key];
+                const yearAberration = aberration ? aberration.year : null;
+                const quarterAberration = aberration ? aberration.quarter : null;
+                const dowAberration = aberration ? aberration.dow : null;
+                
+                // Helper function to format Z-score with status
+                const formatZScoreWithStatus = (aberration, metricKey) => {
+                    if (!aberration) return '-';
+                    const zScore = aberration.z_score.toFixed(2);
+                    const color = aberration.color;
+                    let status = '';
+                    let statusClass = '';
+                    let tooltip = '';
+                    
+                    if (color === 'red') {
+                        status = ' (low)';
+                        statusClass = 'text-danger';
+                    } else if (color === 'green') {
+                        status = ' (high)';
+                        statusClass = 'text-success';
+                    }
+                    // For normal (no color), don't add any status text
+                    
+                    // Add tooltip for outliers
+                    if (aberration.is_outlier && aberration.ranking_info) {
+                        tooltip = `title="${aberration.ranking_info}"`;
+                    }
+                    
+                    return `<span class="${statusClass}" ${tooltip} style="cursor: ${aberration.is_outlier ? 'help' : 'default'}">${zScore}${status}</span>`;
+                };
+                
+                // Format each Z-score column
+                const yearZScore = formatZScoreWithStatus(yearAberration, metric.key);
+                const quarterZScore = formatZScoreWithStatus(quarterAberration, metric.key);
+                const dowZScore = formatZScoreWithStatus(dowAberration, metric.key);
+                
+                // Format values
+                const formatValue = (val) => {
+                    if (val === '-' || val === null || val === undefined) return '-';
+                    if (metric.key.includes('pct')) {
+                        return val.toFixed(1) + '%';
+                    }
+                    return val.toFixed(2);
+                };
+                
+                // Determine target value color based on quarter comparison (most relevant)
+                const targetValueColor = quarterAberration ? quarterAberration.color : 'normal';
+                
+                row.innerHTML = `
+                    <td><strong>${metric.label}</strong></td>
+                    <td class="${targetValueColor === 'red' ? 'text-danger' : targetValueColor === 'green' ? 'text-success' : ''}">${formatValue(targetValue)}</td>
+                    <td>${formatValue(quarterAvg)}</td>
+                    <td>${formatValue(yearAvg)}</td>
+                    <td>${formatValue(dowAvg)}</td>
+                    <td>${yearZScore}</td>
+                    <td>${quarterZScore}</td>
+                    <td>${dowZScore}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Show the report
+            document.getElementById('singleDayReport').style.display = 'block';
+            
+            // Initialize tooltips for the new content (using simple title attribute)
+            // Bootstrap tooltips require bootstrap.js to be loaded, so we'll use simple HTML tooltips
+        }
+
+        // Summary Statistics Functions
+        function showSummaryStats() {
+            const data = currentData || window.originalData || [];
+            if (data.length === 0) {
+                alert('No data available for summary statistics.');
+                return;
+            }
+
+            const summaryStats = calculateSummaryStats(data);
+            displaySummaryStats(summaryStats);
+            
+            // Show the modal using vanilla JavaScript
+            const modal = document.getElementById('summaryStatsModal');
+            modal.style.display = 'block';
+            modal.classList.add('show');
+            document.body.classList.add('modal-open');
+            
+            // Add backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.id = 'modalBackdrop';
+            document.body.appendChild(backdrop);
+        }
+
+        function closeSummaryStats() {
+            const modal = document.getElementById('summaryStatsModal');
+            modal.style.display = 'none';
+            modal.classList.remove('show');
+            document.body.classList.remove('modal-open');
+            
+            // Remove backdrop
+            const backdrop = document.getElementById('modalBackdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+        }
+
+        function calculateSummaryStats(data) {
+            const numericColumns = [
+                'MDScensus', 'Total_Staff_HPRD', 'Total_Staff_Hours', 'Nurse_Staff_HPRD_Excl_Admin',
+                'Total_RN_HPRD', 'Total_RN_Hours', 'RN_HPRD', 'Hrs_RN',
+                'Total_LPN_HPRD', 'Total_LPN_Hours', 'Total_Nurse_Aide_HPRD', 'Total_Nurse_Aide_Hours', 
+                'RN_Contract_Pct', 'LPN_Contract_Pct', 'CNA_Contract_Pct',
+                'Hrs_RNadmin', 'Hrs_RNDON', 'Hrs_LPNadmin', 'Hrs_NAtrn', 'Hrs_MedAide',
+                'Hrs_RN_ctr', 'Hrs_LPN_ctr', 'Hrs_CNA_ctr'
+            ];
+
+            const stats = {};
+            
+            numericColumns.forEach(column => {
+                const values = data.map(row => parseFloat(row[column]) || 0);
+                const nonZeroValues = values.filter(v => v !== 0);
+                
+                // For HPRD columns, check actual zeros (before rounding) not rounded zeros
+                let actualZeroCount = values.filter(v => v === 0).length;
+                
+                if (column.includes('HPRD') && !column.includes('Total_')) {
+                    // For HPRD columns, recalculate to check for actual zeros
+                    const actualZeroCountRecalc = data.filter(row => {
+                        let hoursColumn;
+                        if (column === 'RN_HPRD') hoursColumn = 'Hrs_RN';
+                        else if (column === 'LPN_HPRD') hoursColumn = 'Hrs_LPN';
+                        else if (column === 'CNA_HPRD') hoursColumn = 'Hrs_CNA';
+                        else if (column === 'Total_RN_HPRD') hoursColumn = 'Total_RN_Hours';
+                        else if (column === 'Total_LPN_HPRD') hoursColumn = 'Total_LPN_Hours';
+                        else if (column === 'Total_Nurse_Aide_HPRD') hoursColumn = 'Total_Nurse_Aide_Hours';
+                        else if (column === 'Nurse_Staff_HPRD_Excl_Admin') hoursColumn = 'Nurse_Staff_Hours_Excl_Admin';
+                        else if (column === 'Total_Staff_HPRD') hoursColumn = 'Total_Staff_Hours';
+                        else hoursColumn = column.replace('_HPRD', '_Hours');
+                        
+                        const hours = parseFloat(row[hoursColumn]) || 0;
+                        const census = parseFloat(row['MDScensus']) || 0;
+                        return hours === 0;
+                    }).length;
+                    actualZeroCount = actualZeroCountRecalc;
+                }
+                
+                stats[column] = {
+                    mean: values.reduce((a, b) => a + b, 0) / values.length,
+                    median: calculateMedian(values),
+                    stdev: calculateStandardDeviation(values),
+                    count: values.length,
+                    zeroCount: actualZeroCount,
+                    nonZeroCount: values.length - actualZeroCount,
+                    min: Math.min(...values),
+                    max: Math.max(...values)
+                };
+            });
+
+            // Add individual RN Admin and DON HPRD calculations
+            const rnAdminHPRD = data.map(row => {
+                const rnAdmin = parseFloat(row['Hrs_RNadmin']) || 0;
+                const census = parseFloat(row['MDScensus']) || 0;
+                return census > 0 ? rnAdmin / census : 0;
+            });
+
+            const rnDonHPRD = data.map(row => {
+                const rnDon = parseFloat(row['Hrs_RNDON']) || 0;
+                const census = parseFloat(row['MDScensus']) || 0;
+                return census > 0 ? rnDon / census : 0;
+            });
+
+            // Add combined Admin/DON metrics
+            const adminDonHours = data.map(row => {
+                const rnAdmin = parseFloat(row['Hrs_RNadmin']) || 0;
+                const rnDon = parseFloat(row['Hrs_RNDON']) || 0;
+                const lpnAdmin = parseFloat(row['Hrs_LPNadmin']) || 0;
+                return rnAdmin + rnDon + lpnAdmin;
+            });
+
+            const adminDonHPRD = data.map(row => {
+                const rnAdmin = parseFloat(row['Hrs_RNadmin']) || 0;
+                const rnDon = parseFloat(row['Hrs_RNDON']) || 0;
+                const lpnAdmin = parseFloat(row['Hrs_LPNadmin']) || 0;
+                const census = parseFloat(row['MDScensus']) || 0;
+                const totalAdminHours = rnAdmin + rnDon + lpnAdmin;
+                return census > 0 ? totalAdminHours / census : 0;
+            });
+
+            // Add combined RN Admin/DON metrics (without LPN Admin)
+            const rnAdminDonHours = data.map(row => {
+                const rnAdmin = parseFloat(row['Hrs_RNadmin']) || 0;
+                const rnDon = parseFloat(row['Hrs_RNDON']) || 0;
+                return rnAdmin + rnDon;
+            });
+
+            const rnAdminDonHPRD = data.map(row => {
+                const rnAdmin = parseFloat(row['Hrs_RNadmin']) || 0;
+                const rnDon = parseFloat(row['Hrs_RNDON']) || 0;
+                const census = parseFloat(row['MDScensus']) || 0;
+                const totalRnAdminDonHours = rnAdmin + rnDon;
+                return census > 0 ? totalRnAdminDonHours / census : 0;
+            });
+
+            // Add individual RN Admin HPRD to stats
+            stats['RN_Admin_HPRD'] = {
+                mean: rnAdminHPRD.reduce((a, b) => a + b, 0) / rnAdminHPRD.length,
+                median: calculateMedian(rnAdminHPRD),
+                stdev: calculateStandardDeviation(rnAdminHPRD),
+                count: rnAdminHPRD.length,
+                zeroCount: rnAdminHPRD.filter(v => v === 0).length,
+                nonZeroCount: rnAdminHPRD.length - rnAdminHPRD.filter(v => v === 0).length,
+                min: Math.min(...rnAdminHPRD),
+                max: Math.max(...rnAdminHPRD)
+            };
+
+            // Add individual RN DON HPRD to stats
+            stats['RN_DON_HPRD'] = {
+                mean: rnDonHPRD.reduce((a, b) => a + b, 0) / rnDonHPRD.length,
+                median: calculateMedian(rnDonHPRD),
+                stdev: calculateStandardDeviation(rnDonHPRD),
+                count: rnDonHPRD.length,
+                zeroCount: rnDonHPRD.filter(v => v === 0).length,
+                nonZeroCount: rnDonHPRD.length - rnDonHPRD.filter(v => v === 0).length,
+                min: Math.min(...rnDonHPRD),
+                max: Math.max(...rnDonHPRD)
+            };
+
+            // Add combined RN Admin/DON HPRD to stats
+            stats['RN_Admin_DON_HPRD'] = {
+                mean: rnAdminDonHPRD.reduce((a, b) => a + b, 0) / rnAdminDonHPRD.length,
+                median: calculateMedian(rnAdminDonHPRD),
+                stdev: calculateStandardDeviation(rnAdminDonHPRD),
+                count: rnAdminDonHPRD.length,
+                zeroCount: rnAdminDonHPRD.filter(v => v === 0).length,
+                nonZeroCount: rnAdminDonHPRD.length - rnAdminDonHPRD.filter(v => v === 0).length,
+                min: Math.min(...rnAdminDonHPRD),
+                max: Math.max(...rnAdminDonHPRD)
+            };
+
+            // Add combined metrics to stats
+            stats['Nurse_Admin_DON_Hours'] = {
+                mean: adminDonHours.reduce((a, b) => a + b, 0) / adminDonHours.length,
+                median: calculateMedian(adminDonHours),
+                stdev: calculateStandardDeviation(adminDonHours),
+                count: adminDonHours.length,
+                zeroCount: adminDonHours.filter(v => v === 0).length,
+                nonZeroCount: adminDonHours.length - adminDonHours.filter(v => v === 0).length,
+                min: Math.min(...adminDonHours),
+                max: Math.max(...adminDonHours)
+            };
+
+            stats['Nurse_Admin_DON_HPRD'] = {
+                mean: adminDonHPRD.reduce((a, b) => a + b, 0) / adminDonHPRD.length,
+                median: calculateMedian(adminDonHPRD),
+                stdev: calculateStandardDeviation(adminDonHPRD),
+                count: adminDonHPRD.length,
+                zeroCount: adminDonHPRD.filter(v => v === 0).length,
+                nonZeroCount: adminDonHPRD.length - adminDonHPRD.filter(v => v === 0).length,
+                min: Math.min(...adminDonHPRD),
+                max: Math.max(...adminDonHPRD)
+            };
+
+            return stats;
+        }
+
+        function calculateMedian(values) {
+            const sorted = [...values].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+
+        function calculateStandardDeviation(values) {
+            if (values.length === 0) return 0;
+            
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const squaredDiffs = values.map(value => Math.pow(value - mean, 2));
+            const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / values.length;
+            
+            return Math.sqrt(avgSquaredDiff);
+        }
+
+        function displaySummaryStats(stats) {
+            const content = document.getElementById('summaryStatsContent');
+            const data = currentData || window.originalData || [];
+            
+            // Calculate date range and missing days
+            const dates = data.map(row => row.WorkDate).sort((a, b) => {
+                // Convert to Date objects for proper chronological sorting
+                const dateA = new Date(a);
+                const dateB = new Date(b);
+                return dateA - dateB;
+            });
+            const startDate = dates[0];
+            const endDate = dates[dates.length - 1];
+            
+            // Calculate total days in range
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            const missingDays = totalDays - data.length;
+            
+            const periodLabel = `${formatDate(startDate)} to ${formatDate(endDate)} (${data.length} records, ${missingDays} missing days)`;
+            
+            let html = `<div class="alert alert-info mb-3">
+                <strong>Summary Statistics Period:</strong> ${periodLabel}
+            </div>`;
+            html += '<div class="table-responsive"><table class="table table-striped table-sm">';
+            html += '<thead><tr><th>Metric</th><th>Mean</th><th>Median</th><th>StDev</th><th>Min</th><th>Max</th><th>Zero Count</th><th>Zero %</th></tr></thead><tbody>';
+            
+            Object.entries(stats).forEach(([column, stat]) => {
+                const displayName = getDisplayName(column);
+                const zeroPercentage = ((stat.zeroCount / stat.count) * 100).toFixed(1);
+                html += `<tr>
+                    <td><strong>${displayName}</strong></td>
+                    <td>${stat.mean.toFixed(2)}</td>
+                    <td>${stat.median.toFixed(2)}</td>
+                    <td>${stat.stdev.toFixed(2)}</td>
+                    <td>${stat.min.toFixed(2)}</td>
+                    <td>${stat.max.toFixed(2)}</td>
+                    <td>${stat.zeroCount}</td>
+                    <td>${zeroPercentage}%</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table></div>';
+            content.innerHTML = html;
+        }
+
+        function getDisplayName(column) {
+            const names = {
+                'MDScensus': 'Census',
+                'Total_Staff_HPRD': 'Total Staff HPRD',
+                'Total_Staff_Hours': 'Total Staff Hours',
+                'Nurse_Staff_HPRD_Excl_Admin': 'Nurse Staff HPRD (excl. Admin)',
+                'Total_RN_HPRD': 'Total RN HPRD',
+                'Total_RN_Hours': 'Total RN Hours',
+                'RN_HPRD': 'Direct RN HPRD',
+                'Hrs_RN': 'Direct RN Hours',
+                'Total_LPN_HPRD': 'Total LPN HPRD',
+                'Total_LPN_Hours': 'Total LPN Hours',
+                'Total_Nurse_Aide_HPRD': 'Nurse Aide HPRD',
+                'Total_Nurse_Aide_Hours': 'Nurse Aide Hours',
+                'RN_Contract_Pct': 'RN Contract %',
+                'LPN_Contract_Pct': 'LPN Contract %',
+                'CNA_Contract_Pct': 'CNA Contract %',
+                'Hrs_RNadmin': 'RN Admin Hours',
+                'Hrs_RNDON': 'RN DON Hours',
+                'Hrs_LPNadmin': 'LPN Admin Hours',
+                'Hrs_NAtrn': 'NA Trainee Hours',
+                'Hrs_MedAide': 'Med Aide Hours',
+                'Hrs_RN_ctr': 'RN Contract Hours',
+                'Hrs_LPN_ctr': 'LPN Contract Hours',
+                'Hrs_CNA_ctr': 'CNA Contract Hours',
+                'Nurse_Admin_DON_Hours': 'Nurse Admin/DON Hours',
+                'Nurse_Admin_DON_HPRD': 'Nurse Admin/DON HPRD',
+                'RN_Admin_HPRD': 'RN Admin HPRD',
+                'RN_DON_HPRD': 'RN DON HPRD',
+                'RN_Admin_DON_HPRD': 'RN Admin/DON HPRD'
+            };
+            return names[column] || column;
+        }
+
+        // Export Functions
+        function exportTable() {
+            const data = currentData || window.originalData || [];
+            if (data.length === 0) {
+                alert('No data available to export.');
+                return;
+            }
+
+            // Add row index to data
+            const exportData = data.map((row, index) => ({
+                '#': index + 1,
+                'Date': formatDate(row.WorkDate),
+                'Day': row.DayOfWeek,
+                'Census': row.MDScensus.toFixed(1),
+                'Total Staff HPRD': row.Total_Staff_HPRD.toFixed(2),
+                'Total Staff Hours': row.Total_Staff_Hours.toFixed(2),
+                'Nurse Staff HPRD (excl. Admin)': row.Nurse_Staff_HPRD_Excl_Admin.toFixed(2),
+                'Total RN HPRD': row.Total_RN_HPRD.toFixed(2),
+                'Total RN Hours': row.Total_RN_Hours.toFixed(2),
+                'Total LPN HPRD': row.Total_LPN_HPRD.toFixed(2),
+                'Total LPN Hours': row.Total_LPN_Hours.toFixed(2),
+                'Nurse Aide HPRD': row.Total_Nurse_Aide_HPRD.toFixed(2),
+                'Nurse Aide Hours': row.Total_Nurse_Aide_Hours.toFixed(2),
+                'RN Contract %': row.RN_Contract_Pct.toFixed(1) + '%',
+                'LPN Contract %': row.LPN_Contract_Pct.toFixed(1) + '%',
+                'CNA Contract %': row.CNA_Contract_Pct.toFixed(1) + '%',
+                'Holiday': row.IsHoliday ? 'Yes' : 'No'
+            }));
+
+            // Convert to CSV
+            const csv = convertToCSV(exportData);
+            
+            // Download file
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `facility_225500_daily_data_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function convertToCSV(data) {
+            if (data.length === 0) return '';
+            
+            const headers = Object.keys(data[0]);
+            const csvContent = [
+                headers.join(','),
+                ...data.map(row => headers.map(header => {
+                    const value = row[header];
+                    // Escape commas and quotes in CSV
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                        return `"${value.replace(/"/g, '""')}"`;
+                    }
+                    return value;
+                }).join(','))
+            ].join('\n');
+            
+            return csvContent;
+        }
+
+        // Export Summary Statistics
+        function exportSummaryStats() {
+            const data = currentData || window.originalData || [];
+            if (data.length === 0) {
+                alert('No data available to export summary statistics.');
+                return;
+            }
+
+            const summaryStats = calculateSummaryStats(data);
+            
+            // Calculate date range and missing days for export
+            const dates = data.map(row => row.WorkDate).sort((a, b) => {
+                // Convert to Date objects for proper chronological sorting
+                const dateA = new Date(a);
+                const dateB = new Date(b);
+                return dateA - dateB;
+            });
+            const startDate = dates[0];
+            const endDate = dates[dates.length - 1];
+            
+            // Calculate total days in range
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            const missingDays = totalDays - data.length;
+            
+            const periodLabel = `${formatDate(startDate)} to ${formatDate(endDate)} (${data.length} records, ${missingDays} missing days)`;
+            
+            const exportData = [];
+            
+            // Add period information as first row
+            exportData.push({
+                'Metric': 'PERIOD',
+                'Mean': periodLabel,
+                'Median': '',
+                'StDev': '',
+                'Min': '',
+                'Max': '',
+                'Zero Count': '',
+                'Zero %': '',
+                'Total Records': ''
+            });
+            
+            // Add empty row for separation
+            exportData.push({
+                'Metric': '',
+                'Mean': '',
+                'Median': '',
+                'StDev': '',
+                'Min': '',
+                'Max': '',
+                'Zero Count': '',
+                'Zero %': '',
+                'Total Records': ''
+            });
+            
+            Object.entries(summaryStats).forEach(([column, stat]) => {
+                const displayName = getDisplayName(column);
+                const zeroPercentage = ((stat.zeroCount / stat.count) * 100).toFixed(1);
+                exportData.push({
+                    'Metric': displayName,
+                    'Mean': stat.mean.toFixed(2),
+                    'Median': stat.median.toFixed(2),
+                    'StDev': stat.stdev.toFixed(2),
+                    'Min': stat.min.toFixed(2),
+                    'Max': stat.max.toFixed(2),
+                    'Zero Count': stat.zeroCount,
+                    'Zero %': zeroPercentage + '%',
+                    'Total Records': stat.count
+                });
+            });
+
+            // Convert to CSV
+            const csv = convertToCSV(exportData);
+            
+            // Download file
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `facility_225500_summary_stats_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Clear filter functions
+        function clearAllFilters() {
+            // Clear date inputs
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            
+            // Reset quarter selection to "All Quarters"
+            const quarterSelect = document.getElementById('quarterRange');
+            quarterSelect.selectedIndex = 0;
+            
+            // Reset year selection to "All Years"
+            const yearSelect = document.getElementById('yearFilter');
+            yearSelect.selectedIndex = 0;
+            
+            // Reset day of week to "All Days"
+            document.getElementById('dayOfWeek').value = 'all';
+            
+            // Reset holiday filter to "All Days"
+            document.getElementById('holidaysOnly').value = 'false';
+            
+            // Update analysis with cleared filters
+            updateAnalysis();
+        }
+
+        function clearDateRange() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+        }
+
+        function clearQuarterSelection() {
+            const quarterSelect = document.getElementById('quarterRange');
+            quarterSelect.selectedIndex = 0; // Select "All Quarters"
+        }
+
+        function clearYearSelection() {
+            const yearSelect = document.getElementById('yearFilter');
+            yearSelect.selectedIndex = 0; // Select "All Years"
+        }
+
+        function clearDayOfWeek() {
+            document.getElementById('dayOfWeek').value = 'all';
+        }
+
+        function clearHolidayFilter() {
+            document.getElementById('holidaysOnly').value = 'false';
+        }
+
+        // Additional clear functions for other sections
+        function clearSingleDayReport() {
+            document.getElementById('singleDayDate').value = '';
+            document.getElementById('singleDayReport').style.display = 'none';
+        }
+
+        function clearSingleDayDate() {
+            document.getElementById('singleDayDate').value = '';
+        }
+
+        function clearQuarterlyStatsFilter() {
+            document.getElementById('quarterlyStatsQuarter').value = 'all';
+            loadQuarterlyStats();
+        }
+
+        function clearDataTableFilters() {
+            document.getElementById('yearFilterTable').value = 'all';
+            document.getElementById('quarterFilterTable').value = 'all';
+            document.getElementById('dateRangeStart').value = '';
+            document.getElementById('dateRangeEnd').value = '';
+            // Restore full data if it was filtered
+            if (window.originalData) {
+                currentData = window.originalData;
+                currentPage = 1;
+                renderTable();
+                window.originalData = null;
+                clearFilterMessages();
+            }
+        }
+
+        function clearOutlierDetection() {
+            document.getElementById('outlierCategory').value = 'all';
+            document.getElementById('outlierFilter').value = 'all';
+            document.getElementById('outlierResults').style.display = 'none';
+            document.getElementById('outlierContent').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import os
 
 def format_provnum(df):
@@ -24,79 +24,118 @@ def generate_lite_metrics():
     # Format PROVNUMs
     format_provnum(facility_metrics)
     
-    # Create facility lite metrics with new column order, including fields needed for calculations
+    # Create facility lite metrics with existing columns and calculate missing ones
     facility_lite = facility_metrics[[
         'CY_Qtr', 'PROVNUM', 'PROVNAME', 'STATE', 'COUNTY_NAME',
-        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'Total_Contract_Hours', 'Total_Nurse_Hours', 'Total_Nurse_Care_Hours', 'avg_daily_census',
+        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'RN_HPRD', 'RN_Care_HPRD', 'Contract_Percentage', 'Total_Contract_Hours', 'Total_Nurse_Hours', 'Total_Nurse_Care_Hours', 'Total_RN_Hours', 'Total_RN_Care_Hours', 'avg_daily_census',
         'total_resident_days', 'days_reported', 'MDScensus'
     ]].copy()
+    
+    # Use the existing RN_HPRD values for facilities - these are already calculated correctly
+    facility_lite['Total_RN_HPRD'] = facility_lite['RN_HPRD']  # Total RN HPRD from existing RN_HPRD
+    facility_lite['Direct_Care_RN_HPRD'] = facility_lite['RN_Care_HPRD']  # Direct Care RN HPRD from existing RN_Care_HPRD
+    
+    # Handle division by zero
+    facility_lite['Total_RN_HPRD'] = facility_lite['Total_RN_HPRD'].fillna(0)
+    facility_lite['Direct_Care_RN_HPRD'] = facility_lite['Direct_Care_RN_HPRD'].fillna(0)
     
     # Sort by quarter and PROVNUM
     facility_lite = facility_lite.sort_values(['CY_Qtr', 'PROVNUM'])
     
-    # Create state lite metrics with new column order
-    state_lite = state_metrics[[
-        'CY_Qtr', 'STATE', 'facility_count', 'avg_daily_census',
-        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage'
-    ]].copy()
-    
-    # Calculate statewide census (total census across all facilities in state)
-    state_census_data = []
+    # Calculate state lite metrics with proper weighted averages
+    state_data = []
     for quarter in facility_lite['CY_Qtr'].unique():
         quarter_facilities = facility_lite[facility_lite['CY_Qtr'] == quarter]
         for state in quarter_facilities['STATE'].unique():
             state_facilities = quarter_facilities[quarter_facilities['STATE'] == state]
-            # Sum all facility census values for the state
-            total_state_census = state_facilities['avg_daily_census'].sum()
-            state_census_data.append({
+            
+            # Calculate weighted averages
+            total_census = state_facilities['avg_daily_census'].sum()
+            total_nurse_hours = state_facilities['Total_Nurse_Hours'].sum()
+            total_nurse_care_hours = state_facilities['Total_Nurse_Care_Hours'].sum()
+            total_rn_hours = state_facilities['Total_RN_Hours'].sum()
+            total_rn_care_hours = state_facilities['Total_RN_Care_Hours'].sum()
+            total_contract_hours = state_facilities['Total_Contract_Hours'].sum()
+            
+            # Calculate HPRD values (weighted by census) 
+            # Use total_resident_days as denominator since hours are quarterly totals
+            total_resident_days = state_facilities['total_resident_days'].sum()
+            total_nurse_hprd = total_nurse_hours / total_resident_days if total_resident_days > 0 else 0
+            nurse_care_hprd = total_nurse_care_hours / total_resident_days if total_resident_days > 0 else 0
+            total_rn_hprd = total_rn_hours / total_resident_days if total_resident_days > 0 else 0
+            direct_care_rn_hprd = total_rn_care_hours / total_resident_days if total_resident_days > 0 else 0
+            contract_percentage = (total_contract_hours / total_nurse_hours * 100) if total_nurse_hours > 0 else 0
+            
+            state_data.append({
                 'CY_Qtr': quarter,
                 'STATE': state,
-                'avg_state_census': total_state_census
+                'facility_count': len(state_facilities),
+                'avg_daily_census': state_facilities['avg_daily_census'].mean(),
+                'Total_Nurse_HPRD': total_nurse_hprd,
+                'Nurse_Care_HPRD': nurse_care_hprd,
+                'Total_RN_HPRD': total_rn_hprd,
+                'Direct_Care_RN_HPRD': direct_care_rn_hprd,
+                'Contract_Percentage': contract_percentage,
+                'avg_state_census': total_census
             })
     
-    state_census_df = pd.DataFrame(state_census_data)
-    
-    # Merge the statewide census data with state_lite
-    state_lite = state_lite.merge(state_census_df, on=['CY_Qtr', 'STATE'], how='left')
+    state_lite = pd.DataFrame(state_data)
     
     # Sort by state first, then quarter (AK 2017Q1, AK 2017Q2, etc.)
     state_lite = state_lite.sort_values(['STATE', 'CY_Qtr'])
     
-    # Create national metrics from quarterly metrics directly
+    # Calculate national metrics with proper weighted averages
     national_metrics = []
     for quarter in facility_lite['CY_Qtr'].unique():
-        # Get national data from quarterly metrics
-        national_quarter_data = national_metrics_df[national_metrics_df['CY_Qtr'] == quarter]
-        if not national_quarter_data.empty:
-            national_row = national_quarter_data.iloc[0]
-            national_metrics.append({
-                'CY_Qtr': quarter,
-                'Facility_Count': national_row['facility_count'],
-                'Total_Nurse_HPRD': national_row['Total_Nurse_HPRD'],
-                'Nurse_Care_HPRD': national_row['Nurse_Care_HPRD'],
-                'Contract_Percentage': national_row['Contract_Percentage'],
-                'MDS': national_row['MDScensus']
-            })
+        quarter_facilities = facility_lite[facility_lite['CY_Qtr'] == quarter]
+        
+        # Calculate weighted averages nationally
+        total_census = quarter_facilities['avg_daily_census'].sum()
+        total_nurse_hours = quarter_facilities['Total_Nurse_Hours'].sum()
+        total_nurse_care_hours = quarter_facilities['Total_Nurse_Care_Hours'].sum()
+        total_rn_hours = quarter_facilities['Total_RN_Hours'].sum()
+        total_rn_care_hours = quarter_facilities['Total_RN_Care_Hours'].sum()
+        total_contract_hours = quarter_facilities['Total_Contract_Hours'].sum()
+        
+        # Calculate HPRD values (weighted by census)
+        # Use total_resident_days as denominator since hours are quarterly totals
+        total_resident_days = quarter_facilities['total_resident_days'].sum()
+        total_nurse_hprd = total_nurse_hours / total_resident_days if total_resident_days > 0 else 0
+        nurse_care_hprd = total_nurse_care_hours / total_resident_days if total_resident_days > 0 else 0
+        total_rn_hprd = total_rn_hours / total_resident_days if total_resident_days > 0 else 0
+        direct_care_rn_hprd = total_rn_care_hours / total_resident_days if total_resident_days > 0 else 0
+        contract_percentage = (total_contract_hours / total_nurse_hours * 100) if total_nurse_hours > 0 else 0
+        
+        national_metrics.append({
+            'CY_Qtr': quarter,
+            'Facility_Count': len(quarter_facilities),
+            'Total_Nurse_HPRD': total_nurse_hprd,
+            'Nurse_Care_HPRD': nurse_care_hprd,
+            'Total_RN_HPRD': total_rn_hprd,
+            'Direct_Care_RN_HPRD': direct_care_rn_hprd,
+            'Contract_Percentage': contract_percentage,
+            'MDS': total_census
+        })
     
     national_lite = pd.DataFrame(national_metrics)
     national_lite = national_lite.sort_values('CY_Qtr')
     
-    # Remove calculation fields from facility_lite before saving
-    facility_lite_output = facility_lite.drop(['avg_daily_census', 'total_resident_days', 'days_reported', 'Total_Contract_Hours', 'Total_Nurse_Hours', 'Total_Nurse_Care_Hours'], axis=1)
-    
-    # Rename columns to be consistent across all files
-    facility_lite_output.columns = [
+    # Create the output dataframe with correct column order
+    facility_lite_output = facility_lite[[
         'CY_Qtr', 'PROVNUM', 'PROVNAME', 'STATE', 'COUNTY_NAME',
-        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'Census'
-    ]
+        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Direct_Care_RN_HPRD', 'Contract_Percentage', 'MDScensus'
+    ]].copy()
+    
+    # Rename the MDScensus column to Census
+    facility_lite_output = facility_lite_output.rename(columns={'MDScensus': 'Census'})
     
     state_lite.columns = [
         'CY_Qtr', 'STATE', 'Facility_Count', 'Census',
-        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'State_Census'
+        'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Direct_Care_RN_HPRD', 'Contract_Percentage', 'State_Census'
     ]
     
     national_lite.columns = [
-        'CY_Qtr', 'Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD',
+        'CY_Qtr', 'Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Direct_Care_RN_HPRD',
         'Contract_Percentage', 'MDS'
     ]
     
@@ -116,12 +155,12 @@ def generate_lite_metrics():
     latest_quarter = state_lite['CY_Qtr'].max()
     print(f"\nLatest quarter ({latest_quarter}) state summary:")
     latest_state = state_lite[state_lite['CY_Qtr'] == latest_quarter].sort_values('STATE')
-    print(latest_state[['STATE', 'Facility_Count', 'Census', 'State_Census', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage']].to_string())
+    print(latest_state[['STATE', 'Facility_Count', 'Census', 'State_Census', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Contract_Percentage']].to_string())
     
     # Print latest quarter's national summary
     print(f"\nLatest quarter ({latest_quarter}) national summary:")
     latest_national = national_lite[national_lite['CY_Qtr'] == latest_quarter]
-    print(latest_national[['Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Contract_Percentage', 'MDS']].to_string())
+    print(latest_national[['Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Contract_Percentage', 'MDS']].to_string())
 
 if __name__ == "__main__":
     generate_lite_metrics() 
