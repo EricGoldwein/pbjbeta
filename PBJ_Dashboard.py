@@ -1848,6 +1848,9 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
                 max-width: 95%;
                 padding: 8px 12px;
             }
+            .nav-links a {
+                margin: 0 6px;
+            }
         }
         .nav-links a {
             color: #1769aa;
