@@ -911,9 +911,9 @@ def load_provider_info_data():
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+            'NH_ProviderInfo_Jul2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -958,9 +958,9 @@ def load_march_provider_info_data():
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jun2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jun2025.csv'),
-            'provider_info/NH_ProviderInfo_Jun2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jun2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jun2025.csv'),
+            'NH_ProviderInfo_Jun2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -2177,9 +2177,9 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
+            'NH_ProviderInfo_Jul2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -2863,9 +2863,9 @@ def main() -> None:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 
                 possible_paths = [
-                    os.path.join(current_dir, 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                    os.path.join(script_dir, 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                    'provider_info/NH_ProviderInfo_Jul2025.csv',  # Try relative path
+                    os.path.join(current_dir, 'NH_ProviderInfo_Jul2025.csv'),
+                    os.path.join(script_dir, 'NH_ProviderInfo_Jul2025.csv'),
+                    'NH_ProviderInfo_Jul2025.csv',  # Try relative path
                     # Try parent directory in case files are in root
                     os.path.join(os.path.dirname(current_dir), 'NH_ProviderInfo_Jul2025.csv'),
                     # Try common deployment paths
@@ -2980,9 +2980,9 @@ def main() -> None:
                 import os
                 # Try multiple possible paths
                 possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Mar2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Mar2025.csv'),
-            'provider_info/NH_ProviderInfo_Mar2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'NH_ProviderInfo_Mar2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Mar2025.csv'),
+            'NH_ProviderInfo_Mar2025.csv'  # Try relative path
                 ]
                 
                 file_path = None
