@@ -25,6 +25,7 @@ def load_pbj_favicon():
         return ""
 
 # Set page config early for Render deployment
+# Trigger deployment
 st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_images/pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
 
 # Add SEO meta tags for better search engine optimization and social media sharing
