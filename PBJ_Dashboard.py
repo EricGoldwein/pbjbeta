@@ -19,13 +19,13 @@ from decimal import Decimal, ROUND_HALF_UP
 def load_pbj_favicon():
     """Load PBJ favicon data for use in floating action button"""
     try:
-        with open('pbj_favicon.png', 'rb') as f:
+        with open('pbj_images/pbj_favicon.png', 'rb') as f:
             return base64.b64encode(f.read()).decode()
     except:
         return ""
 
 # Set page config early for Render deployment
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_images/pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
 
 # Add SEO meta tags for better search engine optimization and social media sharing
 st.markdown("""
@@ -219,7 +219,7 @@ def load_macpac_standards():
                     return path
             return None
         
-        macpac_path = find_file('macpac_state_standards_clean.csv')
+        macpac_path = find_file('macpac/macpac_state_standards_clean.csv')
         
         if not macpac_path:
             st.warning("MACPAC state standards data not found. State requirements will not be displayed.")
@@ -396,9 +396,9 @@ def pbj_takeaway_card(
             import os
             # Try multiple possible paths for favicon
             possible_paths = [
-                os.path.join(os.getcwd(), 'pbj_favicon.png'),
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
-                'pbj_favicon.png'  # Try relative path
+                os.path.join(os.getcwd(), 'pbj_images/pbj_favicon.png'),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images/pbj_favicon.png'),
+                'pbj_images/pbj_favicon.png'  # Try relative path
             ]
             
             favicon_path = None
@@ -626,9 +626,9 @@ def state_pbj_takeaway_card(
             import os
             # Try multiple possible paths for favicon
             possible_paths = [
-                os.path.join(os.getcwd(), 'pbj_favicon.png'),
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
-                'pbj_favicon.png'  # Try relative path
+                os.path.join(os.getcwd(), 'pbj_images/pbj_favicon.png'),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images/pbj_favicon.png'),
+                'pbj_images/pbj_favicon.png'  # Try relative path
             ]
             
             favicon_path = None
@@ -812,9 +812,9 @@ def load_affiliated_entity_data():
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-            'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -911,9 +911,9 @@ def load_provider_info_data():
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
-            'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
+            'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -958,9 +958,9 @@ def load_march_provider_info_data():
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jun2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jun2025.csv'),
-            'NH_ProviderInfo_Jun2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jun2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jun2025.csv'),
+            'provider_info/NH_ProviderInfo_Jun2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -1846,7 +1846,7 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
         @media (max-width: 768px) {
             .nav-links {
                 max-width: 95%;
-                padding: 8px 25px;
+                padding: 8px 12px;
             }
         }
         .nav-links a {
@@ -2177,9 +2177,9 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'NH_ProviderInfo_Jul2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Jul2025.csv'),
-            'NH_ProviderInfo_Jul2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
+            'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -2753,7 +2753,7 @@ def main() -> None:
                             </a>
                         </div>
                         <div class="desktop-footer" style='font-size:0.8em; color:#666; margin-top: 0.8rem; margin-bottom: -0.5rem; text-align: center;'>
-                            Powered by <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 700;">320 Consulting</a>
+                            A free public resource powered by <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 700;">320 Consulting</a>
                         </div>
                         <div class="mobile-footer" style='font-size:0.95em; color:#7a869a; font-weight:400;'>
                             <a href="/About" target="_self" style="color: #1769aa; text-decoration: none; font-weight: 500;">About the Dashboard</a> • <a href="https://www.320insight.com/" target="_blank" style="color: #1769aa; text-decoration: none; font-weight: 500;">320 Consulting</a>
@@ -2863,9 +2863,9 @@ def main() -> None:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 
                 possible_paths = [
-                    os.path.join(current_dir, 'NH_ProviderInfo_Jul2025.csv'),
-                    os.path.join(script_dir, 'NH_ProviderInfo_Jul2025.csv'),
-                    'NH_ProviderInfo_Jul2025.csv',  # Try relative path
+                    os.path.join(current_dir, 'provider_info/NH_ProviderInfo_Jul2025.csv'),
+                    os.path.join(script_dir, 'provider_info/NH_ProviderInfo_Jul2025.csv'),
+                    'provider_info/NH_ProviderInfo_Jul2025.csv',  # Try relative path
                     # Try parent directory in case files are in root
                     os.path.join(os.path.dirname(current_dir), 'NH_ProviderInfo_Jul2025.csv'),
                     # Try common deployment paths
@@ -2899,9 +2899,9 @@ def main() -> None:
                 import os
                 # Try multiple possible paths
                 possible_paths = [
-                    os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                    'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
+                    os.path.join(os.getcwd(), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                    'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
                 ]
                 
                 file_path = None
@@ -2932,9 +2932,9 @@ def main() -> None:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 
                 possible_paths = [
-                    os.path.join(current_dir, 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
-                    os.path.join(script_dir, 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
-                    'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv',  # Try relative path
+                    os.path.join(current_dir, 'ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
+                    os.path.join(script_dir, 'ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
+                    'ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv',  # Try relative path
                     # Try parent directory in case files are in root
                     os.path.join(os.path.dirname(current_dir), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
                     # Try common deployment paths
@@ -2980,9 +2980,9 @@ def main() -> None:
                 import os
                 # Try multiple possible paths
                 possible_paths = [
-                    os.path.join(os.getcwd(), 'NH_ProviderInfo_Mar2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'NH_ProviderInfo_Mar2025.csv'),
-                    'NH_ProviderInfo_Mar2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Mar2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Mar2025.csv'),
+            'provider_info/NH_ProviderInfo_Mar2025.csv'  # Try relative path
                 ]
                 
                 file_path = None
