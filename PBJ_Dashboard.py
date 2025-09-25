@@ -3248,7 +3248,7 @@ def main() -> None:
             if level not in ["Facility", "Entity", "State"]:
                 st.markdown('''
                     <h3 class="search-header">
-                        <span class="desktop-text">Search PBJ Data by Facility, Ownership, or State</span>
+                        <span class="desktop-text">Search PBJ Data by Facility, State, or Ownership</span>
                         <span class="mobile-text">Search PBJ Data</span>
                     </h3>
                     <style>
@@ -3430,7 +3430,7 @@ def main() -> None:
                             st.session_state[f"name_{display_name}"] = row['Chain']
                 
                 # Create search tabs
-                tab1, tab2, tab3 = st.tabs(["🔍 Facility", "🏢 Ownership", "🗺️ State"])
+                tab1, tab2, tab3 = st.tabs(["🔍 Facility", "🗺️ State", "🏢 Ownership"])
                 
                 with tab1:
                     # Use responsive columns for mobile-friendly layout
@@ -3559,6 +3559,46 @@ def main() -> None:
                             st.info("No facilities found for this state.")
                 
                 with tab2:
+                    # --- inside the "State" tab (tab2) ---
+
+                    # Build options and map display -> code
+                    state_options = [""]
+                    for state_code in sorted(facilities_df['STATE'].unique().tolist()):
+                        state_name = get_full_state_name(state_code)
+                        display_name = f"{state_name} ({state_code})"
+                        state_options.append(display_name)
+                        st.session_state[f"state_{display_name}"] = state_code
+
+                    state_options.append("USA")
+                    st.session_state["state_USA"] = "USA"
+
+                    state_key = f"state_search_input_{st.query_params.get('entity', 'main')}"
+
+                    def _go_state_from_tab():
+                        display = st.session_state.get(state_key, "")
+                        if not display:
+                            return
+                        code = st.session_state.get(f"state_{display}")
+                        if not code:
+                            return
+                        if code == "USA":
+                            _go_home()
+                        else:
+                            st.session_state.pending_navigation = {
+                                "type": "state", 
+                                "state": code,
+                                "preserve_mobile": st.query_params.get("mobile")
+                            }
+
+                    st.selectbox(
+                        "Select State",
+                        options=state_options,
+                        key=state_key,
+                        help="Choose state to view their dashboard",
+                        on_change=_go_state_from_tab
+                    )
+                
+                with tab3:
                     if not ownership_df.empty:
                         # Set up ownership options for the tab (if not already set up)
                         if level != "National":
@@ -3626,46 +3666,6 @@ def main() -> None:
                         )
                     else:
                         st.info("Ownership data not available.")
-                
-                with tab3:
-                    # --- inside the "State" tab (tab3) ---
-
-                    # Build options and map display -> code
-                    state_options = [""]
-                    for state_code in sorted(facilities_df['STATE'].unique().tolist()):
-                        state_name = get_full_state_name(state_code)
-                        display_name = f"{state_name} ({state_code})"
-                        state_options.append(display_name)
-                        st.session_state[f"state_{display_name}"] = state_code
-
-                    state_options.append("USA")
-                    st.session_state["state_USA"] = "USA"
-
-                    state_key = f"state_search_input_{st.query_params.get('entity', 'main')}"
-
-                    def _go_state_from_tab():
-                        display = st.session_state.get(state_key, "")
-                        if not display:
-                            return
-                        code = st.session_state.get(f"state_{display}")
-                        if not code:
-                            return
-                        if code == "USA":
-                            _go_home()
-                        else:
-                            st.session_state.pending_navigation = {
-                                "type": "state", 
-                                "state": code,
-                                "preserve_mobile": st.query_params.get("mobile")
-                            }
-
-                    st.selectbox(
-                        "Select State",
-                        options=state_options,
-                        key=state_key,
-                        help="Choose state to view their dashboard",
-                        on_change=_go_state_from_tab
-                    )
         
         # st.markdown("""
         #     <hr style="margin: 8px 0; border: none; border-top: 1px solid #e0e0e0; height: 1px;">
