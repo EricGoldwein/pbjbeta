@@ -306,7 +306,9 @@ def load_facility_data():
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'facility_lite_metrics.csv'),
+            os.path.join(os.getcwd(), 'pbj_lite', 'facility_lite_metrics.csv'),  # New pbj_lite directory
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_lite', 'facility_lite_metrics.csv'),
+            os.path.join(os.getcwd(), 'facility_lite_metrics.csv'),  # Original root directory
             os.path.join(os.path.dirname(os.path.abspath(__file__)), 'facility_lite_metrics.csv'),
             'facility_lite_metrics.csv'  # Try relative path
         ]
@@ -791,7 +793,9 @@ def load_metrics_data(cache_version="v2024_12_15"):
         # Try multiple possible paths for each file
         def find_file(filename):
             possible_paths = [
-                os.path.join(os.getcwd(), filename),
+                os.path.join(os.getcwd(), 'pbj_lite', filename),  # New pbj_lite directory
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_lite', filename),
+                os.path.join(os.getcwd(), filename),  # Original root directory
                 os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
                 filename  # Try relative path
             ]
@@ -1103,7 +1107,12 @@ def create_facility_db():
     """Create an optimized DuckDB database for facility data."""
     try:
         # Load facility metrics into DuckDB
-        facility_metrics = pd.read_csv('facility_lite_metrics.csv', dtype={'PROVNUM': str})
+        facility_path = find_file('facility_lite_metrics.csv')
+        if facility_path:
+            facility_metrics = pd.read_csv(facility_path, dtype={'PROVNUM': str})
+        else:
+            st.error("Facility metrics file not found")
+            return
         
         if facility_metrics.empty:
             return
@@ -6191,7 +6200,9 @@ def main() -> None:
                                     import os
                                     # Try multiple possible paths
                                     possible_paths = [
-                                        os.path.join(os.getcwd(), 'state_lite_metrics.csv'),
+                                        os.path.join(os.getcwd(), 'pbj_lite', 'state_lite_metrics.csv'),  # New pbj_lite directory
+                                        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_lite', 'state_lite_metrics.csv'),
+                                        os.path.join(os.getcwd(), 'state_lite_metrics.csv'),  # Original root directory
                                         os.path.join(os.path.dirname(os.path.abspath(__file__)), 'state_lite_metrics.csv'),
                                         'state_lite_metrics.csv'  # Try relative path
                                     ]
