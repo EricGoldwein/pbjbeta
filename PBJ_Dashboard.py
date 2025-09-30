@@ -16,6 +16,21 @@ from decimal import Decimal, ROUND_HALF_UP
 # Add this import at the top of your file, after the other imports
 # from pbj_icon_component import pbj_icon, pbj_icon_with_text  # Uncomment when you want to use the component
 
+def find_file(filename):
+    """Find a file in multiple possible locations."""
+    import os
+    possible_paths = [
+        os.path.join(os.getcwd(), 'pbj_lite', filename),  # New pbj_lite directory
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_lite', filename),
+        os.path.join(os.getcwd(), filename),  # Original root directory
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
+        filename  # Try relative path
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    return None
+
 def load_pbj_favicon():
     """Load PBJ favicon data for use in floating action button"""
     try:
@@ -790,19 +805,7 @@ def load_metrics_data(cache_version="v2024_12_15"):
         import os
         import gc
         
-        # Try multiple possible paths for each file
-        def find_file(filename):
-            possible_paths = [
-                os.path.join(os.getcwd(), 'pbj_lite', filename),  # New pbj_lite directory
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_lite', filename),
-                os.path.join(os.getcwd(), filename),  # Original root directory
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
-                filename  # Try relative path
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    return path
-            return None
+        # Use the global find_file function
         
         # Load all metrics data at once with memory optimization
         national_path = find_file('national_lite_metrics.csv')
