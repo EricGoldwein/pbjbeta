@@ -4,9 +4,11 @@ services:
     env: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run deployment_test.py --server.port $PORT --server.address 0.0.0.0
+    startCommand: streamlit run staging_dashboard.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false
     autoDeploy: false
     healthCheckPath: /
     envVars:
       - key: STAGING
+        value: "true"
+      - key: STREAMLIT_SERVER_HEADLESS
         value: "true"
