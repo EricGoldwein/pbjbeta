@@ -4,6 +4,6 @@ services:
     env: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run PBJ_Dashboard.py --server.port $PORT --server.address 0.0.0.0
+    startCommand: streamlit run staging_app.py --server.port $PORT --server.address 0.0.0.0
     autoDeploy: true
     healthCheckPath: /
