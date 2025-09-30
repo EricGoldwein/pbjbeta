@@ -2004,7 +2004,7 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
     st.markdown(f"""
         <div style="text-align: center;">
             <div class="nav-links">
-                <img src="data:image/png;base64,{favicon_data}" style="width: 18px; height: 18px; margin-right: -2px; vertical-align: middle;"> <a href="/About" target="_self">About</a> • <a href="/Premium" target="_self">Premium</a> • <a href="https://www.320insight.com/phoebe" target="_blank">Phoebe J</a>
+                <img src="data:image/png;base64,{favicon_data}" style="width: 18px; height: 18px; margin-right: -2px; vertical-align: middle;"> <a href="/About" target="_self">About</a> • <a href="/Premium" target="_self">Premium</a> • <a href="https://www.320insight.com/phoebe" target="_blank" style="white-space: nowrap;">Phoebe J</a>
             </div>
         </div>
         <div style="text-align: center; margin-top: 0.2rem;">
