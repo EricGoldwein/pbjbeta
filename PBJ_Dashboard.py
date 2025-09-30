@@ -58,6 +58,9 @@ if IS_STAGING:
     # Memory optimization for staging
     import gc
     gc.set_threshold(100, 10, 10)  # More aggressive garbage collection
+    
+    # Force garbage collection
+    gc.collect()
 else:
     st.set_page_config(
         page_title="PBJ Nursing Home Staffing Dashboard by 320", 
@@ -848,9 +851,15 @@ def load_metrics_data(cache_version="v2024_12_15"):
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         
         # Load with optimized dtypes to reduce memory usage
-        national_metrics = pd.read_csv(national_path, dtype={'CY_QTR': 'category'})
-        state_metrics = pd.read_csv(state_path, dtype={'STATE': 'category', 'CY_QTR': 'category'})
-        facility_metrics = pd.read_csv(facility_path, dtype={'PROVNUM': str, 'CY_QTR': 'category'})
+        if IS_STAGING:
+            # Use smaller chunks for staging to save memory
+            national_metrics = pd.read_csv(national_path, dtype={'CY_QTR': 'category'}, nrows=1000)
+            state_metrics = pd.read_csv(state_path, dtype={'STATE': 'category', 'CY_QTR': 'category'}, nrows=1000)
+            facility_metrics = pd.read_csv(facility_path, dtype={'PROVNUM': str, 'CY_QTR': 'category'}, nrows=1000)
+        else:
+            national_metrics = pd.read_csv(national_path, dtype={'CY_QTR': 'category'})
+            state_metrics = pd.read_csv(state_path, dtype={'STATE': 'category', 'CY_QTR': 'category'})
+            facility_metrics = pd.read_csv(facility_path, dtype={'PROVNUM': str, 'CY_QTR': 'category'})
 
         # Standardize column names - apply specific mappings to each dataframe
         # National metrics column mapping - only rename CY_Qtr to CY_QTR and MDS to Census
