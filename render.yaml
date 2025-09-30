@@ -1,9 +1,15 @@
 services:
-  - type: web
-    name: pbj-dashboard
-    env: python
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run staging_app.py --server.port $PORT --server.address 0.0.0.0
-    autoDeploy: true
-    healthCheckPath: /
+  - type: static
+    name: pbjdashboard-root
+    buildCommand: ""
+    publishPath: .
+    routes:
+      # Proxy /app/* to the Streamlit service (same-origin for the iframe)
+      - type: rewrite
+        source: /app/*
+        destination: https://pbj-dashboard.onrender.com/:splat
+      # Tidy redirect so /app (no slash) becomes /app/
+      - type: redirect
+        source: /app
+        destination: /app/
+        status: 301
