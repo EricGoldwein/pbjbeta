@@ -318,8 +318,21 @@ def load_facility_data():
                 break
         
         if not file_path:
-            st.error("Facility data file not found. Some features may be limited.")
-            return pd.DataFrame()
+            if IS_STAGING:
+                st.warning("🚧 **STAGING MODE** - Using test facility data")
+                return pd.DataFrame({
+                    'PROVNUM': ['123456', '789012', '345678'],
+                    'PROVNAME': ['Test Facility 1', 'Test Facility 2', 'Test Facility 3'],
+                    'STATE': ['CA', 'TX', 'FL'],
+                    'CY_QTR': ['Q4 2024', 'Q4 2024', 'Q4 2024'],
+                    'Total_Nurse_HPRD': [3.2, 3.8, 3.1],
+                    'RN_HPRD': [1.1, 1.3, 1.0],
+                    'LPN_HPRD': [0.7, 0.9, 0.6],
+                    'CNA_HPRD': [1.4, 1.6, 1.5]
+                })
+            else:
+                st.error("Facility data file not found. Some features may be limited.")
+                return pd.DataFrame()
         
         df = pd.read_csv(file_path, dtype={'PROVNUM': str})
         
@@ -793,8 +806,39 @@ def load_metrics_data(cache_version="v2024_12_15"):
         facility_path = find_file('facility_lite_metrics.csv')
         
         if not national_path or not state_path or not facility_path:
-            st.error("One or more metrics data files not found. Please check file availability.")
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            if IS_STAGING:
+                st.warning("🚧 **STAGING MODE** - Creating minimal test data")
+                # Create minimal test data for staging
+                national_metrics = pd.DataFrame({
+                    'CY_QTR': ['Q4 2024'],
+                    'Total_Nurse_HPRD': [3.5],
+                    'RN_HPRD': [1.2],
+                    'LPN_HPRD': [0.8],
+                    'CNA_HPRD': [1.5],
+                    'Census': [1000]
+                })
+                state_metrics = pd.DataFrame({
+                    'STATE': ['CA', 'TX', 'FL'],
+                    'CY_QTR': ['Q4 2024', 'Q4 2024', 'Q4 2024'],
+                    'Total_Nurse_HPRD': [3.2, 3.8, 3.1],
+                    'RN_HPRD': [1.1, 1.3, 1.0],
+                    'LPN_HPRD': [0.7, 0.9, 0.6],
+                    'CNA_HPRD': [1.4, 1.6, 1.5]
+                })
+                facility_metrics = pd.DataFrame({
+                    'PROVNUM': ['123456', '789012', '345678'],
+                    'PROVNAME': ['Test Facility 1', 'Test Facility 2', 'Test Facility 3'],
+                    'STATE': ['CA', 'TX', 'FL'],
+                    'CY_QTR': ['Q4 2024', 'Q4 2024', 'Q4 2024'],
+                    'Total_Nurse_HPRD': [3.2, 3.8, 3.1],
+                    'RN_HPRD': [1.1, 1.3, 1.0],
+                    'LPN_HPRD': [0.7, 0.9, 0.6],
+                    'CNA_HPRD': [1.4, 1.6, 1.5]
+                })
+                return national_metrics, state_metrics, facility_metrics
+            else:
+                st.error("One or more metrics data files not found. Please check file availability.")
+                return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         
         # Load with optimized dtypes to reduce memory usage
         national_metrics = pd.read_csv(national_path, dtype={'CY_QTR': 'category'})
