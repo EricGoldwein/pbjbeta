@@ -39,6 +39,10 @@ if IS_STAGING:
         initial_sidebar_state="collapsed"
     )
     st.warning("🚧 **STAGING ENVIRONMENT** - This is a test site")
+    
+    # Memory optimization for staging
+    import gc
+    gc.set_threshold(100, 10, 10)  # More aggressive garbage collection
 else:
     st.set_page_config(
         page_title="PBJ Nursing Home Staffing Dashboard by 320", 
@@ -764,11 +768,13 @@ def state_pbj_takeaway_card(
         
 
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=300, max_entries=1)  # Cache for 5 minutes, limit cache entries
 def load_metrics_data(cache_version="v2024_12_15"):
-    """Load and cache all metrics data."""
+    """Load and cache all metrics data with memory optimization."""
     try:
         import os
+        import gc
+        
         # Try multiple possible paths for each file
         def find_file(filename):
             possible_paths = [
@@ -781,7 +787,7 @@ def load_metrics_data(cache_version="v2024_12_15"):
                     return path
             return None
         
-        # Load all metrics data at once
+        # Load all metrics data at once with memory optimization
         national_path = find_file('national_lite_metrics.csv')
         state_path = find_file('state_lite_metrics.csv')
         facility_path = find_file('facility_lite_metrics.csv')
@@ -790,9 +796,10 @@ def load_metrics_data(cache_version="v2024_12_15"):
             st.error("One or more metrics data files not found. Please check file availability.")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         
-        national_metrics = pd.read_csv(national_path)
-        state_metrics = pd.read_csv(state_path)
-        facility_metrics = pd.read_csv(facility_path, dtype={'PROVNUM': str})
+        # Load with optimized dtypes to reduce memory usage
+        national_metrics = pd.read_csv(national_path, dtype={'CY_QTR': 'category'})
+        state_metrics = pd.read_csv(state_path, dtype={'STATE': 'category', 'CY_QTR': 'category'})
+        facility_metrics = pd.read_csv(facility_path, dtype={'PROVNUM': str, 'CY_QTR': 'category'})
 
         # Standardize column names - apply specific mappings to each dataframe
         # National metrics column mapping - only rename CY_Qtr to CY_QTR and MDS to Census
@@ -819,6 +826,9 @@ def load_metrics_data(cache_version="v2024_12_15"):
             df['date'] = pd.to_datetime(df['CY_QTR'].str[:4] + '-' + 
                                       ((df['CY_QTR'].str[-1].astype(int) - 1) * 3 + 1).astype(str).str.zfill(2) + 
                                       '-01')
+        
+        # Force garbage collection to free memory
+        gc.collect()
         
         return national_metrics, state_metrics, facility_metrics
     except Exception as e:
