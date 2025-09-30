@@ -1,4 +1,7 @@
-﻿Flask==2.3.3
-pandas==2.0.3
-numpy==1.24.3
-plotly==5.15.0
+﻿streamlit==1.32.0
+pandas==2.2.1
+plotly==5.19.0
+numpy==1.25.2
+duckdb==0.10.0
+Flask==3.0.2
+Werkzeug==3.0.6

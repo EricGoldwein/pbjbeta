@@ -26,7 +26,26 @@ def load_pbj_favicon():
 
 # Set page config early for Render deployment
 # Trigger deployment
-st.set_page_config(page_title="PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_images/pbj_favicon.png", layout="wide", initial_sidebar_state="collapsed")
+import os
+
+# Check if we're in staging environment
+IS_STAGING = os.getenv('STAGING', 'false').lower() == 'true'
+
+if IS_STAGING:
+    st.set_page_config(
+        page_title="PBJ Dashboard - STAGING", 
+        page_icon="pbj_images/pbj_favicon.png", 
+        layout="wide", 
+        initial_sidebar_state="collapsed"
+    )
+    st.warning("🚧 **STAGING ENVIRONMENT** - This is a test site")
+else:
+    st.set_page_config(
+        page_title="PBJ Nursing Home Staffing Dashboard by 320", 
+        page_icon="pbj_images/pbj_favicon.png", 
+        layout="wide", 
+        initial_sidebar_state="collapsed"
+    )
 
 # Add SEO meta tags for better search engine optimization and social media sharing
 st.markdown("""
