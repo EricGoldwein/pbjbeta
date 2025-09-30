@@ -898,8 +898,18 @@ def load_affiliated_entity_data():
                 break
         
         if not file_path:
-            st.warning("Affiliated entity data file not found. Some features may be limited.")
-            return pd.DataFrame()
+            if IS_STAGING:
+                st.warning("🚧 **STAGING MODE** - Using test ownership data")
+                return pd.DataFrame({
+                    'Entity_Name': ['Test Entity 1', 'Test Entity 2', 'Test Entity 3'],
+                    'Total_Facilities': [10, 15, 8],
+                    'Total_Beds': [1000, 1500, 800],
+                    'Avg_HPRD': [3.2, 3.8, 3.1],
+                    'Entity_Type': ['For-Profit', 'Non-Profit', 'Government']
+                })
+            else:
+                st.warning("Affiliated entity data file not found. Some features may be limited.")
+                return pd.DataFrame()
         df = pd.read_csv(file_path)
         
         # Clean and standardize the data
@@ -997,8 +1007,18 @@ def load_provider_info_data():
                 break
         
         if not file_path:
-            st.warning("Provider info data file not found. Some features may be limited.")
-            return pd.DataFrame()
+            if IS_STAGING:
+                st.warning("🚧 **STAGING MODE** - Using test provider data")
+                return pd.DataFrame({
+                    'PROVNUM': ['123456', '789012', '345678'],
+                    'PROVNAME': ['Test Facility 1', 'Test Facility 2', 'Test Facility 3'],
+                    'STATE': ['CA', 'TX', 'FL'],
+                    'BEDS': [100, 150, 80],
+                    'OWNERSHIP': ['For-Profit', 'Non-Profit', 'Government']
+                })
+            else:
+                st.warning("Provider info data file not found. Some features may be limited.")
+                return pd.DataFrame()
         
         df = pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
         
@@ -1019,8 +1039,18 @@ def load_provider_info_data():
         
         return df
     except FileNotFoundError:
-        st.warning("Provider info data file not found. Some features may be limited.")
-        return pd.DataFrame()
+        if IS_STAGING:
+            st.warning("🚧 **STAGING MODE** - Using test provider data")
+            return pd.DataFrame({
+                'PROVNUM': ['123456', '789012', '345678'],
+                'PROVNAME': ['Test Facility 1', 'Test Facility 2', 'Test Facility 3'],
+                'STATE': ['CA', 'TX', 'FL'],
+                'BEDS': [100, 150, 80],
+                'OWNERSHIP': ['For-Profit', 'Non-Profit', 'Government']
+            })
+        else:
+            st.warning("Provider info data file not found. Some features may be limited.")
+            return pd.DataFrame()
     except Exception as e:
         st.error(f"Error loading provider info data: {str(e)}")
         return pd.DataFrame()
