@@ -1011,9 +1011,9 @@ def load_provider_info_data():
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+            'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -1073,7 +1073,7 @@ def load_provider_info_data():
 
 @st.cache_data
 def load_march_provider_info_data():
-    """Load and cache July 2025 provider information data for comparison."""
+    """Load and cache June 2025 provider information data for comparison."""
     try:
         import os
         # Try multiple possible paths
@@ -2266,12 +2266,12 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     st.metric("CMS Staffing Rating", 
                              f"{int(staffing_rating)}",
                              staffing_trend,
-                             help="5-star rating determined by federal CMS (July 2025 vs. June 2025).")
+                             help="5-star rating determined by federal CMS (September 2025 vs. June 2025).")
                 else:
                     st.metric("CMS Staffing Rating", 
                              "N/A",
                              staffing_trend,
-                             help="5-star rating determined by federal CMS (July 2025 vs. June 2025).")
+                             help="5-star rating determined by federal CMS (September 2025 vs. June 2025).")
             
 
             
@@ -2305,9 +2305,9 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         import os
         # Try multiple possible paths
         possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-            'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+            'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
         ]
         
         file_path = None
@@ -2443,7 +2443,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         
         # Add 320 Consulting badge
         fig.add_annotation(
-            text="<b>320 Consulting</b> | Source: CMS Provider Info (July 2025)",
+            text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
             x=0.99,
             y=-0.6,
             xref="x domain",
@@ -2476,9 +2476,9 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                 import os
                 # Try multiple possible paths for provider info file
                 possible_paths = [
-                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                    'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                    'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
                 ]
                 
                 file_path = None
@@ -2991,14 +2991,14 @@ def main() -> None:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 
                 possible_paths = [
-                    os.path.join(current_dir, 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                    os.path.join(script_dir, 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                    'provider_info/NH_ProviderInfo_Jul2025.csv',  # Try relative path
+                    os.path.join(current_dir, 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                    os.path.join(script_dir, 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                    'provider_info/NH_ProviderInfo_Sep2025.csv',  # Try relative path
                     # Try parent directory in case files are in root
-                    os.path.join(os.path.dirname(current_dir), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
+                    os.path.join(os.path.dirname(current_dir), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
                     # Try common deployment paths
-                    '/app/provider_info/NH_ProviderInfo_Jul2025.csv',
-                    '/workspace/provider_info/NH_ProviderInfo_Jul2025.csv'
+                    '/app/provider_info/NH_ProviderInfo_Sep2025.csv',
+                    '/workspace/provider_info/NH_ProviderInfo_Sep2025.csv'
                 ]
                 
                 file_path = None
@@ -4327,9 +4327,9 @@ def main() -> None:
                                 import os
                                 # Try multiple possible paths for provider info file
                                 possible_paths = [
-                                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                                    'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                                    'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
                                 ]
                                 
                                 file_path = None
@@ -4453,9 +4453,9 @@ def main() -> None:
                                 import os
                                 # Try multiple possible paths for provider info file
                                 possible_paths = [
-                                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jul2025.csv'),
-                                    'provider_info/NH_ProviderInfo_Jul2025.csv'  # Try relative path
+                                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
+                                    'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
                                 ]
                                 
                                 file_path = None
@@ -4729,8 +4729,8 @@ def main() -> None:
                         # Main entity dashboard with entity ID
                         entity_name_title_case = proper_title_case(selected_value)
                         
-                        # Get the most recent data period (July 2025)
-                        most_recent_period = "July 2025"  # This could be made dynamic based on data
+                        # Get the most recent data period (September 2025)
+                        most_recent_period = "September 2025"  # This could be made dynamic based on data
                         
                         # Responsive header with mobile optimization
                         st.markdown(f'''
@@ -4885,7 +4885,7 @@ def main() -> None:
                             
                             # Add 320 Consulting badge
                             fig_pie.add_annotation(
-                                text="<b>320 Consulting</b> | Source: CMS Provider Info (July 2025)",
+                                text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
                                 x=0.99,
                                 y=-0.45,
                                 xref="x domain",
@@ -5150,7 +5150,7 @@ def main() -> None:
                             
                             # Add 320 Consulting badge
                             fig.add_annotation(
-                                text="<b>320 Consulting</b> | Source: CMS Provider Info (July 2025)",
+                                text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
                                 x=0.99,
                                 y=-0.45,
                                 xref="x domain",
@@ -5222,7 +5222,7 @@ def main() -> None:
                                     
                                     # Add 320 Consulting badge
                                     fig_ratings.add_annotation(
-                                        text="<b>320 Consulting</b> | Source: CMS Provider Info (July 2025)",
+                                        text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
                                         x=0.99,
                                         y=-0.45,
                                         xref="x domain",
