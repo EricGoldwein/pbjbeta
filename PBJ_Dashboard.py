@@ -5637,20 +5637,21 @@ def main() -> None:
                                         value = row[col]
                                         
                                         # Add data-sort attribute for sortable columns
+                                        # Add x-apple-data-detectors to prevent mobile auto-detection
                                         if col == 'Census':
                                             try:
                                                 raw_val = row['Census_raw']
                                                 sort_val = float(raw_val) if pd.notna(raw_val) else 0
                                             except:
                                                 sort_val = 0
-                                            html_table += f'<td data-sort="{int(sort_val)}">{value}</td>'
+                                            html_table += f'<td data-sort="{int(sort_val)}" x-apple-data-detectors="false">{value}</td>'
                                         elif col == 'Total Nurse HPRD':
                                             try:
                                                 raw_val = row['HPRD_raw']
                                                 sort_val = float(raw_val) if pd.notna(raw_val) else 0
                                             except:
                                                 sort_val = 0
-                                            html_table += f'<td data-sort="{sort_val:.1f}">{value}</td>'
+                                            html_table += f'<td data-sort="{sort_val:.1f}" x-apple-data-detectors="false">{value}</td>'
                                         elif col == 'Overall Rating':
                                             # Check if value is N/A - use 0 so it sorts to bottom in ascending order
                                             if str(value).strip() == 'N/A' or pd.isna(value):
@@ -5660,7 +5661,7 @@ def main() -> None:
                                                     sort_val = int(float(str(value)))
                                                 except:
                                                     sort_val = 0
-                                            html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}">{value}</td>'
+                                            html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}" x-apple-data-detectors="false">{value}</td>'
                                         elif col == 'Staffing Rating':
                                             # Check if value is N/A - use 0 so it sorts to bottom in ascending order
                                             if str(value).strip() == 'N/A' or pd.isna(value):
@@ -5670,9 +5671,9 @@ def main() -> None:
                                                     sort_val = int(float(str(value)))
                                                 except:
                                                     sort_val = 0
-                                            html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}">{value}</td>'
+                                            html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}" x-apple-data-detectors="false">{value}</td>'
                                         else:
-                                            html_table += f'<td>{value}</td>'
+                                            html_table += f'<td x-apple-data-detectors="false">{value}</td>'
                                     html_table += '</tr>\n'
                                 
                                 html_table += '</tbody>\n</table>'
