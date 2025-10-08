@@ -5689,7 +5689,18 @@ def main() -> None:
                                     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
                                     border-radius: 6px;
                                     overflow: hidden;
-                                     table-layout: fixed;
+                                    table-layout: fixed;
+                                }
+                                /* Disable mobile browser auto-detection of phone numbers, addresses, etc */
+                                .dataframe td {
+                                    -webkit-text-size-adjust: none;
+                                }
+                                .dataframe a[href^="tel:"],
+                                .dataframe a[href^="mailto:"],
+                                .dataframe a[x-apple-data-detectors] {
+                                    color: inherit !important;
+                                    text-decoration: none !important;
+                                    pointer-events: none !important;
                                 }
                                 .dataframe th {
                                     background: #f8f9fa;
@@ -5911,8 +5922,10 @@ def main() -> None:
                                         try {
                                             var table = window.parent.document.getElementById("facilities-table");
                                             if (table) {
-                                                new Tablesort(table);
-                                                console.log("Table sorting initialized with Tablesort");
+                                                var sort = new Tablesort(table, {
+                                                    descending: true
+                                                });
+                                                console.log("Table sorting initialized with Tablesort (descending first)");
                                             } else {
                                                 console.log("Table not found, skipping sort initialization");
                                             }
