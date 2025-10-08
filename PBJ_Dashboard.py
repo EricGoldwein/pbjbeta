@@ -5673,7 +5673,8 @@ def main() -> None:
                                                     sort_val = 0
                                             html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}" x-apple-data-detectors="false">{value}</td>'
                                         else:
-                                            html_table += f'<td x-apple-data-detectors="false">{value}</td>'
+                                            # Add span with special attributes to prevent Chrome address detection
+                                            html_table += f'<td x-apple-data-detectors="false"><span translate="no" class="notranslate">{value}</span></td>'
                                     html_table += '</tr>\n'
                                 
                                 html_table += '</tbody>\n</table>'
