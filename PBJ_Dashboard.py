@@ -5504,7 +5504,11 @@ def main() -> None:
                                     # Drop the duplicate PROVNUM column
                                     facilities_display = facilities_display.drop('PROVNUM', axis=1)
                                     
-                                    # Format HPRD and Census columns
+                                    # Store raw values for data-sort attributes
+                                    facilities_display['Census_raw'] = facilities_display['Census']
+                                    facilities_display['HPRD_raw'] = facilities_display['Total_Nurse_HPRD']
+                                    
+                                    # Format HPRD and Census columns for display
                                     facilities_display['Total Nurse HPRD'] = facilities_display['Total_Nurse_HPRD'].apply(
                                         lambda x: f"{x:.1f}" if pd.notna(x) else 'N/A'
                                     )
@@ -5515,6 +5519,8 @@ def main() -> None:
                                     facilities_display = facilities_display.drop('Total_Nurse_HPRD', axis=1)
                                 else:
                                     # Add empty columns if no facility metrics available
+                                    facilities_display['Census_raw'] = None
+                                    facilities_display['HPRD_raw'] = None
                                     facilities_display['Total Nurse HPRD'] = 'N/A'
                                     facilities_display['Census'] = 'N/A'
                                 
@@ -5527,11 +5533,11 @@ def main() -> None:
                                 # Clean up the data and convert ratings to integers
                                 facilities_display = facilities_display.fillna('N/A')
                                 
-                                # Convert numeric ratings to integers where possible
+                                # Store raw rating values for data-sort attributes
                                 rating_columns = ['Overall Rating', 'Staffing Rating']
                                 for col in rating_columns:
-                                    facilities_display[col] = pd.to_numeric(facilities_display[col], errors='coerce')
-                                    facilities_display[col] = facilities_display[col].apply(lambda x: int(x) if pd.notna(x) and x == int(x) else 'N/A')
+                                    facilities_display[f'{col}_raw'] = pd.to_numeric(facilities_display[col], errors='coerce')
+                                    facilities_display[col] = facilities_display[f'{col}_raw'].apply(lambda x: int(x) if pd.notna(x) and x == int(x) else 'N/A')
                                 
                                 # Apply proper capitalization to provider names and city
                                 def capitalize_name(name):
@@ -5602,30 +5608,49 @@ def main() -> None:
                                 ]
                                 facilities_display = facilities_display[column_order]
                                 
-                                # Render as HTML table for clickable links
-                                # Render with df.to_html for custom sorting + links
-                                html_table = facilities_display.to_html(
-                                    index=False,
-                                    escape=False,
-                                    classes=['dataframe', 'table', 'table-striped'],
-                                    table_id='facilities-table'
-                                )
-                                
-                                # Add data-sort-method="number" to numeric columns for proper sorting
-                                html_table = html_table.replace('<th>Census</th>', '<th data-sort-method="number">Census</th>')
-                                html_table = html_table.replace('<th>Total Nurse HPRD</th>', '<th data-sort-method="number">Total Nurse HPRD</th>')
-                                html_table = html_table.replace('<th>Overall Rating</th>', '<th data-sort-method="number">Overall Rating</th>')
-                                html_table = html_table.replace('<th>Staffing Rating</th>', '<th data-sort-method="number">Staffing Rating</th>')
-                                
-                                # Replace N/A values with a data-sort attribute to sort them last
-                                # For numeric columns, use -1 as sort value (will be lowest)
+                                # Build HTML table manually to add data-sort attributes
                                 import re
-                                # Replace N/A in table cells with sortable version
-                                html_table = re.sub(
-                                    r'<td>N/A</td>',
-                                    '<td data-sort="-1">N/A</td>',
-                                    html_table
-                                )
+                                
+                                # Start building the HTML table
+                                html_table = '<table class="dataframe table table-striped" id="facilities-table">\n<thead>\n<tr>'
+                                
+                                # Add headers with data-sort-method for numeric columns
+                                numeric_cols = ['Census', 'Total Nurse HPRD', 'Overall Rating', 'Staffing Rating']
+                                for col in column_order:
+                                    if col in numeric_cols:
+                                        html_table += f'<th data-sort-method="number">{col}</th>'
+                                    else:
+                                        html_table += f'<th>{col}</th>'
+                                html_table += '</tr>\n</thead>\n<tbody>\n'
+                                
+                                # Add rows with data-sort attributes
+                                for idx, row in facilities_display.iterrows():
+                                    html_table += '<tr>'
+                                    for col in column_order:
+                                        value = row[col]
+                                        
+                                        # Add data-sort attribute for sortable columns
+                                        if col == 'Census':
+                                            raw_val = row.get('Census_raw', 0)
+                                            sort_val = raw_val if pd.notna(raw_val) else 0
+                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                        elif col == 'Total Nurse HPRD':
+                                            raw_val = row.get('HPRD_raw', 0)
+                                            sort_val = raw_val if pd.notna(raw_val) else 0
+                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                        elif col == 'Overall Rating':
+                                            raw_val = row.get('Overall Rating_raw', 999)
+                                            sort_val = raw_val if pd.notna(raw_val) else 999
+                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                        elif col == 'Staffing Rating':
+                                            raw_val = row.get('Staffing Rating_raw', 999)
+                                            sort_val = raw_val if pd.notna(raw_val) else 999
+                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                        else:
+                                            html_table += f'<td>{value}</td>'
+                                    html_table += '</tr>\n'
+                                
+                                html_table += '</tbody>\n</table>'
                                 
                                 # Add CSS for table styling
                                 st.markdown("""
