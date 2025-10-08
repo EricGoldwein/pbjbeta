@@ -5530,14 +5530,14 @@ def main() -> None:
                                 # Special handling for Special Focus Status - replace NaN with "N"
                                 facilities_display['Special Focus Status'] = facilities_display['Special Focus Status'].fillna('N')
                                 
-                                # Clean up the data and convert ratings to integers
-                                facilities_display = facilities_display.fillna('N/A')
-                                
-                                # Store raw rating values for data-sort attributes
+                                # Store raw rating values for data-sort attributes BEFORE filling with 'N/A'
                                 rating_columns = ['Overall Rating', 'Staffing Rating']
                                 for col in rating_columns:
                                     facilities_display[f'{col}_raw'] = pd.to_numeric(facilities_display[col], errors='coerce')
                                     facilities_display[col] = facilities_display[f'{col}_raw'].apply(lambda x: int(x) if pd.notna(x) and x == int(x) else 'N/A')
+                                
+                                # Clean up the data - fill remaining NaN with 'N/A'
+                                facilities_display = facilities_display.fillna('N/A')
                                 
                                 # Apply proper capitalization to provider names and city
                                 def capitalize_name(name):
@@ -5562,7 +5562,8 @@ def main() -> None:
                                 show_high_risk_only = st.checkbox(
                                     "High-risk facilities only", 
                                     value=False,
-                                    help="Filter to show only facilities with Overall Rating '1', SFF status, SFF Candidate status, or Abuse Icon 'Y'"
+                                    key=f"high_risk_filter_{selected_value}",
+                                    help="Showing only facilities with the following: Overall Rating '1', Staffing Rating '1', SFF status, SFF Candidate status, or Abuse Icon 'Y'"
                                 )
                                 
                                 # Apply high-risk filter if selected
@@ -5570,6 +5571,7 @@ def main() -> None:
                                     total_facilities = len(facilities_display)
                                     high_risk_mask = (
                                         (facilities_display['Overall Rating'].astype(str) == '1') |
+                                        (facilities_display['Staffing Rating'].astype(str) == '1') |
                                         (facilities_display['Special Focus Status'].astype(str).str.contains('SFF', case=False, na=False)) |
                                         (facilities_display['Special Focus Status'].astype(str).str.contains('Candidate', case=False, na=False)) |
                                         (facilities_display['Abuse Icon'].astype(str) == 'Y')
@@ -5595,6 +5597,7 @@ def main() -> None:
                                 )
                                 
                                 # Reorder columns to include HPRD and Census
+                                # Keep raw columns for sorting but don't display them
                                 column_order = [
                                     'State',
                                     'Provider Name',
@@ -5606,7 +5609,10 @@ def main() -> None:
                                     'Special Focus Status',
                                     'Abuse Icon'
                                 ]
-                                facilities_display = facilities_display[column_order]
+                                # Keep the raw columns for data-sort attributes
+                                raw_columns = ['Census_raw', 'HPRD_raw', 'Overall Rating_raw', 'Staffing Rating_raw']
+                                all_columns = column_order + [col for col in raw_columns if col in facilities_display.columns]
+                                facilities_display = facilities_display[all_columns]
                                 
                                 # Build HTML table manually to add data-sort attributes
                                 import re
@@ -5615,7 +5621,8 @@ def main() -> None:
                                 html_table = '<table class="dataframe table table-striped" id="facilities-table">\n<thead>\n<tr>'
                                 
                                 # Add headers with data-sort-method for numeric columns
-                                numeric_cols = ['Census', 'Total Nurse HPRD', 'Overall Rating', 'Staffing Rating']
+                                # Don't use data-sort-method for ratings since we have N/A values with custom data-sort
+                                numeric_cols = ['Census', 'Total Nurse HPRD']
                                 for col in column_order:
                                     if col in numeric_cols:
                                         html_table += f'<th data-sort-method="number">{col}</th>'
@@ -5633,31 +5640,37 @@ def main() -> None:
                                         if col == 'Census':
                                             try:
                                                 raw_val = row['Census_raw']
-                                                sort_val = raw_val if pd.notna(raw_val) else 0
+                                                sort_val = float(raw_val) if pd.notna(raw_val) else 0
                                             except:
                                                 sort_val = 0
-                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                            html_table += f'<td data-sort="{int(sort_val)}">{value}</td>'
                                         elif col == 'Total Nurse HPRD':
                                             try:
                                                 raw_val = row['HPRD_raw']
-                                                sort_val = raw_val if pd.notna(raw_val) else 0
+                                                sort_val = float(raw_val) if pd.notna(raw_val) else 0
                                             except:
                                                 sort_val = 0
-                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                            html_table += f'<td data-sort="{sort_val:.1f}">{value}</td>'
                                         elif col == 'Overall Rating':
-                                            try:
-                                                raw_val = row['Overall Rating_raw']
-                                                sort_val = raw_val if pd.notna(raw_val) else 999
-                                            except:
-                                                sort_val = 999
-                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                            # Check if value is N/A - use 0 so it sorts to bottom in ascending order
+                                            if str(value).strip() == 'N/A' or pd.isna(value):
+                                                sort_val = 0
+                                            else:
+                                                try:
+                                                    sort_val = int(float(str(value)))
+                                                except:
+                                                    sort_val = 0
+                                            html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}">{value}</td>'
                                         elif col == 'Staffing Rating':
-                                            try:
-                                                raw_val = row['Staffing Rating_raw']
-                                                sort_val = raw_val if pd.notna(raw_val) else 999
-                                            except:
-                                                sort_val = 999
-                                            html_table += f'<td data-sort="{sort_val}">{value}</td>'
+                                            # Check if value is N/A - use 0 so it sorts to bottom in ascending order
+                                            if str(value).strip() == 'N/A' or pd.isna(value):
+                                                sort_val = 0
+                                            else:
+                                                try:
+                                                    sort_val = int(float(str(value)))
+                                                except:
+                                                    sort_val = 0
+                                            html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}">{value}</td>'
                                         else:
                                             html_table += f'<td>{value}</td>'
                                     html_table += '</tr>\n'
@@ -5893,6 +5906,7 @@ def main() -> None:
                                     from streamlit.components.v1 import html
                                     html('''
                                     <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js'></script>
+                                    <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/sorts/tablesort.number.min.js'></script>
                                     <script>
                                         try {
                                             var table = window.parent.document.getElementById("facilities-table");
