@@ -5673,8 +5673,7 @@ def main() -> None:
                                                     sort_val = 0
                                             html_table += f'<td data-sort="{sort_val}" data-sort-value="{sort_val}" x-apple-data-detectors="false">{value}</td>'
                                         else:
-                                            # Add span with special attributes to prevent Chrome address detection
-                                            html_table += f'<td x-apple-data-detectors="false"><span translate="no" class="notranslate">{value}</span></td>'
+                                            html_table += f'<td x-apple-data-detectors="false">{value}</td>'
                                     html_table += '</tr>\n'
                                 
                                 html_table += '</tbody>\n</table>'
@@ -5691,18 +5690,23 @@ def main() -> None:
                                     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
                                     border-radius: 6px;
                                     overflow: hidden;
-                                    table-layout: fixed;
+                                     table-layout: fixed;
                                 }
                                 /* Disable mobile browser auto-detection of phone numbers, addresses, etc */
                                 .dataframe td {
                                     -webkit-text-size-adjust: none;
                                 }
+                                /* Only disable auto-detected links (tel, mailto, maps), NOT facility links */
                                 .dataframe a[href^="tel:"],
                                 .dataframe a[href^="mailto:"],
+                                .dataframe a[href^="http://maps"],
+                                .dataframe a[href^="https://maps"],
+                                .dataframe a[href*="google.com/maps"],
                                 .dataframe a[x-apple-data-detectors] {
                                     color: inherit !important;
                                     text-decoration: none !important;
                                     pointer-events: none !important;
+                                    cursor: default !important;
                                 }
                                 .dataframe th {
                                     background: #f8f9fa;
