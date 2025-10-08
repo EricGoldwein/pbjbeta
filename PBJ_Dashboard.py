@@ -5611,6 +5611,22 @@ def main() -> None:
                                     table_id='facilities-table'
                                 )
                                 
+                                # Add data-sort-method="number" to numeric columns for proper sorting
+                                html_table = html_table.replace('<th>Census</th>', '<th data-sort-method="number">Census</th>')
+                                html_table = html_table.replace('<th>Total Nurse HPRD</th>', '<th data-sort-method="number">Total Nurse HPRD</th>')
+                                html_table = html_table.replace('<th>Overall Rating</th>', '<th data-sort-method="number">Overall Rating</th>')
+                                html_table = html_table.replace('<th>Staffing Rating</th>', '<th data-sort-method="number">Staffing Rating</th>')
+                                
+                                # Replace N/A values with a data-sort attribute to sort them last
+                                # For numeric columns, use -1 as sort value (will be lowest)
+                                import re
+                                # Replace N/A in table cells with sortable version
+                                html_table = re.sub(
+                                    r'<td>N/A</td>',
+                                    '<td data-sort="-1">N/A</td>',
+                                    html_table
+                                )
+                                
                                 # Add CSS for table styling
                                 st.markdown("""
                                 <style>
