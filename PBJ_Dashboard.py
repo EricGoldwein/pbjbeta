@@ -5631,20 +5631,32 @@ def main() -> None:
                                         
                                         # Add data-sort attribute for sortable columns
                                         if col == 'Census':
-                                            raw_val = row.get('Census_raw', 0)
-                                            sort_val = raw_val if pd.notna(raw_val) else 0
+                                            try:
+                                                raw_val = row['Census_raw']
+                                                sort_val = raw_val if pd.notna(raw_val) else 0
+                                            except:
+                                                sort_val = 0
                                             html_table += f'<td data-sort="{sort_val}">{value}</td>'
                                         elif col == 'Total Nurse HPRD':
-                                            raw_val = row.get('HPRD_raw', 0)
-                                            sort_val = raw_val if pd.notna(raw_val) else 0
+                                            try:
+                                                raw_val = row['HPRD_raw']
+                                                sort_val = raw_val if pd.notna(raw_val) else 0
+                                            except:
+                                                sort_val = 0
                                             html_table += f'<td data-sort="{sort_val}">{value}</td>'
                                         elif col == 'Overall Rating':
-                                            raw_val = row.get('Overall Rating_raw', 999)
-                                            sort_val = raw_val if pd.notna(raw_val) else 999
+                                            try:
+                                                raw_val = row['Overall Rating_raw']
+                                                sort_val = raw_val if pd.notna(raw_val) else 999
+                                            except:
+                                                sort_val = 999
                                             html_table += f'<td data-sort="{sort_val}">{value}</td>'
                                         elif col == 'Staffing Rating':
-                                            raw_val = row.get('Staffing Rating_raw', 999)
-                                            sort_val = raw_val if pd.notna(raw_val) else 999
+                                            try:
+                                                raw_val = row['Staffing Rating_raw']
+                                                sort_val = raw_val if pd.notna(raw_val) else 999
+                                            except:
+                                                sort_val = 999
                                             html_table += f'<td data-sort="{sort_val}">{value}</td>'
                                         else:
                                             html_table += f'<td>{value}</td>'
