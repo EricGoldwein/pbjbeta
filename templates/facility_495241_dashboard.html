@@ -1485,16 +1485,29 @@
                             const isOutlier = Math.abs(yearZScore) > 2 || Math.abs(quarterZScore) > 2 || Math.abs(dowZScore) > 2;
                             const outlierStyle = isOutlier ? 'style="color: red; font-weight: bold;"' : '';
                             
+                            // Helper function to format numbers - special handling for census row
+                            const formatNumber = (value, metricName, isTargetValue = false) => {
+                                if (value === null || value === undefined || value === '-') return '-';
+                                const num = parseFloat(value);
+                                if (isNaN(num)) return '-';
+                                // For census row: target value (first column) stays as integer, others get 2 decimals
+                                if (metricName === 'Census') {
+                                    return isTargetValue ? num.toFixed(0) : num.toFixed(2);
+                                }
+                                // All other metrics use 2 decimal places
+                                return num.toFixed(2);
+                            };
+                            
                             tableHTML += `
                                 <tr>
                                     <td>${metricNameStyle}</td>
-                                    <td ${outlierStyle}>${targetValue || '-'}</td>
-                                    <td>${quarterAvg || '-'}</td>
-                                    <td>${yearAvg || '-'}</td>
-                                    <td>${dowAvg || '-'}</td>
-                                    <td>${yearZScore || '-'}</td>
-                                    <td>${quarterZScore || '-'}</td>
-                                    <td>${dowZScore || '-'}</td>
+                                    <td ${outlierStyle}>${formatNumber(targetValue, metric.name, true)}</td>
+                                    <td>${formatNumber(quarterAvg, metric.name, false)}</td>
+                                    <td>${formatNumber(yearAvg, metric.name, false)}</td>
+                                    <td>${formatNumber(dowAvg, metric.name, false)}</td>
+                                    <td>${formatNumber(yearZScore, metric.name, false)}</td>
+                                    <td>${formatNumber(quarterZScore, metric.name, false)}</td>
+                                    <td>${formatNumber(dowZScore, metric.name, false)}</td>
                                 </tr>
                             `;
                         });

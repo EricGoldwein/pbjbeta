@@ -296,9 +296,10 @@
                                     </div>
                                 </div>
                                 <div style="flex: 0 0 20%; max-width: 20%;">
-                                    <div class="stat-card text-center p-3 bg-light rounded">
+                                    <div class="stat-card text-center p-3 bg-light rounded" 
+                                         title="Nurse Staff HPRD excluding RN Admin, RN DON, and LPN Admin hours">
                                         <h3 id="totalDirectHPRD" class="mb-1 text-dark">-</h3>
-                                        <small class="text-muted">Direct HPRD</small>
+                                        <small class="text-muted">Direct HPRD <i class="fas fa-info-circle text-info ms-1"></i></small>
                                     </div>
                                 </div>
                                 <div style="flex: 0 0 20%; max-width: 20%;">
@@ -308,9 +309,10 @@
                                     </div>
                                 </div>
                                 <div style="flex: 0 0 20%; max-width: 20%;">
-                                    <div class="stat-card text-center p-3 bg-light rounded">
+                                    <div class="stat-card text-center p-3 bg-light rounded" 
+                                         title="RN HPRD excluding RN Admin and RN DON hours">
                                         <h3 id="directRNHPRD" class="mb-1 text-dark">-</h3>
-                                        <small class="text-muted">Direct RN</small>
+                                        <small class="text-muted">Direct RN <i class="fas fa-info-circle text-info ms-1"></i></small>
                                     </div>
                                 </div>
                                 <div style="flex: 0 0 20%; max-width: 20%;">
@@ -340,6 +342,11 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <p class="text-muted mb-0" style="font-size: 0.75rem;" id="previousNames">Previous names (CCN: 495241): {{ previous_names }}</p>
                         </div>
                     </div>
                 </div>
@@ -1158,9 +1165,10 @@
                     <ul class="list-unstyled">
                         <li><strong>Total Staff:</strong> All nursing staff including RNs, LPNs, CNAs, administrators, and DON</li>
                         <li><strong>Direct Staff:</strong> Staff providing direct patient care (excludes administrators and DON)</li>
-                        <li><strong>RN (Registered Nurse):</strong> Includes direct care RNs + RN administrators + RN DON (Director of Nursing)</li>
+                        <li><strong>Total RN (Registered Nurse):</strong> Includes RNs + RN administrators + RN DON (Director of Nursing)</li>
+                        <li><strong>Direct RN:</strong> Excludes RN Admin, RN DON.</li>
                         <li><strong>LPN (Licensed Practical Nurse):</strong> Includes direct care LPNs + LPN administrators</li>
-                        <li><strong>CNA (Certified Nursing Assistant):</strong> Includes CNAs + NA trainees + Medication Aides</li>
+                        <li><strong>Nurse Aides:</strong> Includes CNAs + NA trainees + Medication Aides</li>
                         <li><strong>Contract Staff:</strong> Temporary/agency staff (marked with "_ctr" suffix)</li>
                     </ul>
                 </div>
@@ -1190,7 +1198,7 @@
                 <div class="col-12">
                     <h6><i class="fas fa-database me-2"></i>Data Sources</h6>
                     <p>This Nursing Home Staffing Dashboard uses CMS Payroll-Based Journal (PBJ) data from 2017 to 2025, covering all nursing positions, including contract staff (<a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing</a>). CMS first published PBJ data in 2017. It also uses Provider Information datasets from 2018 to 2025 (<a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">https://data.cms.gov/provider-data/dataset/4pq5-n9py</a>).</p>
-                    <p>Unlike PBJ data, which is released quarterly, provider info files are published on a rolling monthly basis without a clear reference quarter. To align them with PBJ datasets, we matched the "reported total staffing" metric, which is available in both sources, to the corresponding quarter. This approach is not exactΓÇöhealth inspection data, for example, is updated on a different scheduleΓÇöbut it offers a reasonable best-guess for quarter assignment.</p>
+                    <p>Unlike PBJ data, which is released quarterly, provider info files are published on a rolling monthly basis without a clear reference quarter. To align them with PBJ datasets, we matched the "reported total staffing" metric, which is available in both sources, to the corresponding quarter. This approach is not exact—health inspection data, for example, is updated on a different schedule—but it offers a reasonable best-guess for quarter assignment.</p>
                 </div>
             </div>
         </div>
@@ -1243,7 +1251,6 @@
             </div>
         </div>
     </div>
-
     <script>
         let currentData = [];
         let currentPage = 1;
@@ -1519,41 +1526,49 @@
                             const dowOutlier = Math.abs(dowZScore) > 2;
                             const isOutlier = yearOutlier || quarterOutlier || dowOutlier;
                             
-                            // Create outlier indicator showing which z-score triggered it
-                            let outlierIndicator = '';
+                            // Create outlier tooltip showing which z-score triggered it
+                            let outlierTooltip = '';
                             if (isOutlier) {
                                 const triggers = [];
-                                if (yearOutlier) triggers.push('Year');
-                                if (quarterOutlier) triggers.push('Quarter');
-                                if (dowOutlier) triggers.push('DOW');
-                                outlierIndicator = ` <small style="color: #dc3545; font-size: 0.7em;">(${triggers.join(', ')})</small>`;
+                                const targetYear = data.target_metrics.year;
+                                const targetQuarter = data.target_metrics.quarter;
+                                const targetDow = data.target_metrics.day_of_week;
+                                
+                                if (yearOutlier) triggers.push(`other ${targetYear} values`);
+                                if (quarterOutlier) triggers.push(`${targetQuarter} values`);
+                                if (dowOutlier) triggers.push(`${targetDow} values`);
+                                
+                                outlierTooltip = `Outlier compared to ${triggers.join('; ')}`;
                             }
                             
                             const outlierStyle = isOutlier ? 'style="color: red; font-weight: bold;"' : '';
                             
-                            // Helper function to format numbers - 0 decimals for census, 2 decimals for others
-                            const formatNumber = (value, metricName) => {
+                            // Helper function to format numbers - special handling for census row
+                            const formatNumber = (value, metricName, isTargetValue = false) => {
                                 if (value === null || value === undefined || value === '-') return '-';
                                 const num = parseFloat(value);
                                 if (isNaN(num)) return '-';
-                                // Census should be displayed as whole numbers (0 decimals)
+                                // For census row: target value (first column) stays as integer, others get 2 decimals
                                 if (metricName === 'Census') {
-                                    return num.toFixed(0);
+                                    return isTargetValue ? num.toFixed(0) : num.toFixed(2);
                                 }
                                 // All other metrics use 2 decimal places
                                 return num.toFixed(2);
                             };
                             
+                            // Create tooltip attribute for outlier values
+                            const tooltipAttr = outlierTooltip ? `title="${outlierTooltip}"` : '';
+                            
                             tableHTML += `
                                 <tr>
                                     <td>${metricNameStyle}</td>
-                                    <td ${outlierStyle}>${formatNumber(targetValue, metric.name)}${outlierIndicator}</td>
-                                    <td>${formatNumber(quarterAvg, metric.name)}</td>
-                                    <td>${formatNumber(yearAvg, metric.name)}</td>
-                                    <td>${formatNumber(dowAvg, metric.name)}</td>
-                                    <td>${formatNumber(yearZScore, metric.name)}</td>
-                                    <td>${formatNumber(quarterZScore, metric.name)}</td>
-                                    <td>${formatNumber(dowZScore, metric.name)}</td>
+                                    <td ${outlierStyle} ${tooltipAttr}>${formatNumber(targetValue, metric.name, true)}</td>
+                                    <td>${formatNumber(quarterAvg, metric.name, false)}</td>
+                                    <td>${formatNumber(yearAvg, metric.name, false)}</td>
+                                    <td>${formatNumber(dowAvg, metric.name, false)}</td>
+                                    <td>${formatNumber(yearZScore, metric.name, false)}</td>
+                                    <td>${formatNumber(quarterZScore, metric.name, false)}</td>
+                                    <td>${formatNumber(dowZScore, metric.name, false)}</td>
                                 </tr>
                             `;
                         });
@@ -1573,7 +1588,7 @@
                     note.id = 'outlierNote';
                     note.className = 'small mt-1';
                     note.style.color = '#dc3545';
-                    note.innerHTML = '<strong>Note:</strong> Red values indicate outliers (Z-Score > 2.0 or < -2.0). The text in parentheses shows which comparison(s) triggered the outlier flag (Year, Quarter, or DOW).';
+                    note.innerHTML = '<strong>Note:</strong> Red values indicate outliers (Z-Score > 2.0 or < -2.0). Hover value to learn more.';
                     reportTable.parentNode.insertBefore(note, reportTable.nextSibling);
                 })
                 .catch(error => {
@@ -1699,7 +1714,6 @@
                 }
             }
         }
-
          // Initialize the app
          document.addEventListener('DOMContentLoaded', function() {
             // Initialize window.lastFilters with default (no filters) state
@@ -2497,7 +2511,6 @@
                      })
                  }
              ];
-
             // Combined Delta Layout
             const ratioRange = calculateRatioRange();
             const combinedDeltaLayout = {
@@ -3246,6 +3259,8 @@
         }
 
         function updateSummaryStats(summary) {
+            console.log('DEBUG: updateSummaryStats called with:', summary);
+            console.log('DEBUG: total_days =', summary.total_days);
             document.getElementById('totalDays').textContent = summary.total_days.toLocaleString();
             document.getElementById('avgCensus').textContent = summary.avg_census.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             document.getElementById('totalHPRD').textContent = summary.avg_total_hprd.toFixed(3);
@@ -3260,7 +3275,6 @@
             // Update data range display dynamically
             updateDataRangeDisplay();
         }
-
         async function updateDataRangeDisplay() {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
@@ -3391,7 +3405,7 @@
                     <td>${index + 1}</td>
                     <td><a href="#" onclick="openSingleDayReport('${row.WorkDate}'); return false;" class="text-primary" style="text-decoration: none; cursor: pointer;">${workDate}</a></td>
                     <td>${dayOfWeek}</td>
-                    <td>${row.MDScensus || 0}</td>
+                    <td>${(row.MDScensus || 0).toFixed(0)}</td>
                     <td>${(row.Total_Staff_HPRD || 0).toFixed(2)}</td>
                     <td>${(row.Total_Staff_Hours || 0).toFixed(2)}</td>
                     <td>${(row.Nurse_Staff_HPRD_Excl_Admin || 0).toFixed(2)}</td>
@@ -4051,7 +4065,6 @@
                 });
             });
         }
-
         function exportCaseMixDataToCSV() {
             const table = document.getElementById('caseMixDataTable');
             if (!table) return;
@@ -4840,7 +4853,6 @@
                 document.getElementById('quarterFilterTable').value = 'all';
             }
         }
-
         function toggleExpandedView() {
             isExpanded = !isExpanded;
             const expandedCols = document.querySelectorAll('.expanded-col');
