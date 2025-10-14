@@ -1,6 +1,9 @@
 import streamlit as st
 import base64
 
+# Import dynamic date utilities
+from utils.date_utils import get_latest_data_periods, apply_dynamic_replacements
+
 # Set page configuration
 st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide")
 
@@ -50,13 +53,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Add Home button to top left
+# Add Home button to top left - single row layout
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
     st.markdown(f"""
-        <div style="margin-top: 8px; margin-bottom: 8px;">
-            <a href="/" style="display: inline-block; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; border: 1px solid #90caf9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 500; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: all 0.2s ease;">
-                <img src="data:image/png;base64,{favicon_data}" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;"> Home
+        <div style="margin-top: 8px; margin-bottom: 8px; white-space: nowrap;">
+            <a href="/" style="display: inline-flex; align-items: center; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; border: 1px solid #90caf9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 500; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: all 0.2s ease;">
+                <img src="data:image/png;base64,{favicon_data}" style="width: 16px; height: 16px; margin-right: 4px; flex-shrink: 0;"> <span>Home</span>
             </a>
         </div>
     """, unsafe_allow_html=True)
@@ -88,9 +91,9 @@ Staffing data is a key indicator of nursing home quality, revealing how much car
 | **Ownership Group** | Essential data on any chain and its facilities (e.g., **Genesis** → 215 facilities in 19 states, 2.3-star average) |
 
 ### Under the hood  
-* **Payroll-Based Journal (PBJ) Staffing Data** – 33 quarters of daily data, aggregated for clarity  
+* **Payroll-Based Journal (PBJ) Staffing Data** – {get_latest_data_periods()['quarter_count']} quarters of daily data, aggregated for clarity  
 * **CMS Provider Info** – 5-star ratings, enforcement data, and other key indicators  
-* **CMS Affiliated Entity** – Selected quality and performance metrics for groups of nursing homes sharing common owners, officers, or entities (September 2025)
+* **CMS Affiliated Entity** – Selected quality and performance metrics for groups of nursing homes sharing common owners, officers, or entities ({get_latest_data_periods()['affiliated_entity_latest']})
 * **CMS Citations (Premium)** - Citation data and inspection reports, categorized by date, type, severity, and more. 
 
 ### Quick tour  
@@ -113,26 +116,25 @@ Email **eric@320insight.com** for requests. Journalists: If you're working on a 
 st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>", unsafe_allow_html=True)
 
 # --- Styled container for Data Source through Census explanation ---
-st.markdown("""
+st.markdown(f"""
 <div style="background: #f5f8fd; border-radius: 10px; padding: 2.2rem 2.5rem 1.5rem 2.5rem; margin-bottom: 2.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
     <div>
         <h2 style='font-size:1.5em; font-weight:700; color:#1769aa; margin-bottom:0.7em;'>Methodology</h2>
         <div style='font-size:1.08em; color:#222; font-weight:400;'>
-            This Nursing Home Staffing Dashboard uses <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">CMS Payroll-Based Journal (PBJ) data</a> from 2017 to 2025, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses <a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">Provider Information</a> (September 2025, June 2025), <a href="https://data.cms.gov/quality-of-care/nursing-home-affiliated-entity-performance-measures/data" target="_blank">Affiliated Entity</a> (September 2025), and <a href="https://www.macpac.gov/publication/state-policies-related-to-nursing-facility-staffing/" target="_blank">MACPAC State Staffing Standards</a> (2022) datasets.
+            This Nursing Home Staffing Dashboard uses <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">CMS Payroll-Based Journal (PBJ) data</a> from 2017 to {get_latest_data_periods()['current_year']}, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses <a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">Provider Information</a> ({get_latest_data_periods()['provider_info_latest']}, {get_latest_data_periods()['provider_info_previous']}), <a href="https://data.cms.gov/quality-of-care/nursing-home-affiliated-entity-performance-measures/data" target="_blank">Affiliated Entity</a> ({get_latest_data_periods()['affiliated_entity_latest']}), and <a href="https://www.macpac.gov/publication/state-policies-related-to-nursing-facility-staffing/" target="_blank">MACPAC State Staffing Standards</a> (2022) datasets.
         </div>
         <hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>
-        <h2 style='font-size:1.3em; font-weight:700; color:#1769aa; margin-bottom:0.5em;'>Staffing Categories</h2>
+        <h2 style='font-size:1.3em; font-weight:700; color:#1769aa; margin-bottom:0.5em;'>Staff Categories</h2>
         <div style='font-size:1.08em; color:#222; font-weight:400;'>
-            Total nurse staff includes:
             <ul style='margin-top:0.5em; margin-bottom:0.5em;'>
-                <li>Registered Nurse (RN)</li>
-                <li>RN Director of Nursing (DON)</li>
-                <li>RN Admin</li>
-                <li>Licensed Practical Nurse (LPN)</li>
-                <li>LPN Admin</li>
-                <li>Certified Nursing Assistant (CNA)</li>
-                <li>Nurse Aide in Training</li>
-                <li>Medication Aide/Technician</li>
+                <li><strong>Total Staff:</strong> All nursing staff including RNs, LPNs, CNAs, administrators, and DON</li>
+                <li><strong>Direct Staff:</strong> Staff providing direct patient care (excludes administrators and DON)</li>
+                <li><strong>RN (Registered Nurse):</strong> Includes direct care RNs + RN administrators + RN DON (Director of Nursing)</li>
+                <li><strong>RN Direct (RN Only):</strong> Excludes RN Admin, RN DON</li>
+                <li><strong>LPN (Licensed Practical Nurse):</strong> Includes direct care LPNs + LPN administrators</li>
+                <li><strong>CNA (Certified Nursing Assistant):</strong> Includes CNAs + NA trainees + Medication Aides</li>
+                <li><strong>Contract Staff:</strong> Temporary/agency staff (marked with "_ctr" suffix)</li>
+                <li><strong>Case-mix:</strong> A CMS benchmark for staffing based on resident acuity.</li>
             </ul>
         </div>
         <hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>
@@ -142,7 +144,8 @@ st.markdown("""
             <b>Direct Care (excl. Admin, DON):</b> Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.<br>
             <b>Contract Staff Percentage:</b> Percentage of nurse staff hours provided by contract staff.<br>
             <b>Census:</b> Average number of residents in facility or state during the reporting period.<br>
-            <b>Ownership Change:</b> Indicates facility ownership changed in the last 12 months.
+            <b>Ownership Change:</b> Indicates facility ownership changed in the last 12 months.<br>
+            <b>SER (Staffing-to-Expected Ratio) or % Case-Mix:</b> Reported ÷ CMS Case-Mix. Values below 1.0 indicate staffing deficit relative to CMS benchmark expectations; values above 1.0 indicate surplus staffing. Case-mix is a CMS benchmark for staffing based on resident acuity.
         </div>
         <div style='font-size:0.95em; color:#666; font-weight:400; line-height:1.4; margin-top:1em; padding:1em; background:#f8f9fa; border-left:3px solid #1769aa; border-radius:3px;'>
             <b>* HPRD Explained:</b> This metric reflects the staffing ratio at a facility in terms of staff hours per resident. Example: A nursing home with 100 residents providing 350 staffing hours per day would have a 3.5 HPRD (350 ÷ 100).<br><br>
@@ -181,11 +184,10 @@ st.markdown("""
 # Section divider
 st.markdown("<hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>", unsafe_allow_html=True)
 
-# Footer
+# Footer - matches main dashboard
 st.markdown(f"""
-    <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
-        <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2025</a></p>
+    <div style="text-align: center; margin-top: 10px; color: #666; font-size: 0.9em;">
+        <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, {get_latest_data_periods()['data_range']}</a></p>
         <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
-        <p><a href="/About" target="_self" style="text-decoration: none;">About the Dashboard</a> | <a href="/Premium" target="_self" style="text-decoration: none;">Premium</a> | <a href="https://www.320insight.com/phoebe" target="_blank" style="text-decoration: none;">Phoebe J</a></p>
     </div>
 """, unsafe_allow_html=True) 

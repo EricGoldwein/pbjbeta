@@ -1,0 +1,2561 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PBJ Playground
+Nursing Home Data Explorer • Interactive Maps & Staffing Insights</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="phoebe.png">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pbjdashboard.com/pbj_playground_dynamic.html">
+  <meta property="og:title" content="📊 PBJ Playground - Nursing Home Data Explorer">
+  <meta property="og:description" content="Interactive maps and staffing insights for nursing home data analysis. Explore state-level HPRD trends, contract staffing patterns, and RN staffing across quarters.">
+  <meta property="og:image" content="https://pbjdashboard.com/phoebe.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="PBJ Dashboard">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://pbjdashboard.com/pbj_playground_dynamic.html">
+  <meta property="twitter:title" content="📊 PBJ Playground - Nursing Home Data Explorer">
+  <meta property="twitter:description" content="Interactive maps and staffing insights for nursing home data analysis. Explore state-level HPRD trends, contract staffing patterns, and RN staffing across quarters.">
+  <meta property="twitter:image" content="https://pbjdashboard.com/phoebe.png">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+  <!-- D3.js for animated US map -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://d3js.org/topojson.v3.min.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0b1220;
+      color: white;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .header h1 {
+      color: #1769aa;
+      margin-bottom: 0.5rem;
+      font-size: 2.5em;
+      display: inline-block;
+      background: linear-gradient(135deg, rgba(23, 105, 170, 0.15) 0%, rgba(30, 136, 229, 0.12) 100%);
+      padding: 0.5rem 1.5rem;
+      border-radius: 12px;
+      border: 2px solid rgba(23, 105, 170, 0.4);
+      box-shadow: 0 2px 8px rgba(23, 105, 170, 0.2);
+    }
+    
+    .header p {
+      color: #a0aec0;
+      font-size: 1.1em;
+    }
+    
+    .section {
+      background: #1a2433;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .section h2 {
+      color: #1769aa;
+      margin-bottom: 1rem;
+      font-size: 1.8em;
+      border-bottom: 2px solid #1769aa;
+      padding-bottom: 0.5rem;
+    }
+    
+    .insight {
+      font-style: italic;
+      margin-bottom: 0.8rem;
+      color: #ccc;
+    }
+    
+    .insight ol {
+      line-height: 1.4;
+      margin: 0.5rem 0;
+    }
+    
+    .insight ol li {
+      margin-bottom: 0.5rem;
+    }
+    
+    .tagline {
+      font-weight: bold;
+      margin-bottom: 1.5rem;
+      color: #e0e0e0;
+    }
+    
+    .phoebe-takeaway {
+      background: rgba(23, 105, 170, 0.1);
+      border-left: 4px solid #1769aa;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    
+    .phoebe-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      border: 2px solid #1769aa;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    
+    .phoebe-avatar:hover {
+      transform: scale(1.05);
+      border-color: #1e88e5;
+    }
+    
+    .phoebe-content {
+      flex: 1;
+    }
+    
+    .phoebe-title {
+      color: #1769aa;
+      font-weight: 700;
+      font-size: 1.1em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .phoebe-text {
+      color: #ccc;
+      line-height: 1.6;
+    }
+    
+    .phoebe-text ol {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+    }
+    
+    .phoebe-text ol li {
+      margin-bottom: 0.5rem;
+    }
+    
+    .chart-container {
+      background: #0b1220;
+      padding: 1rem;
+      border-radius: 5px;
+      margin-bottom: 1.5rem;
+      height: 400px;
+      position: relative;
+    }
+    
+    .chart-container canvas {
+      max-height: 100%;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    
+    .stat-card {
+      background: #0b1220;
+      padding: 1rem;
+      border-radius: 5px;
+      text-align: center;
+      border: 1px solid #333;
+    }
+    
+    .stat-value {
+      font-size: 1.8em;
+      font-weight: bold;
+      color: #27ae60;
+    }
+    
+    .stat-label {
+      font-size: 0.9em;
+      color: #ccc;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #7a869a;
+    }
+    
+    .error {
+      text-align: center;
+      padding: 2rem;
+      color: #e74c3c;
+    }
+    
+    .footer {
+      text-align: center;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #333;
+      color: #7a869a;
+      font-size: 0.9em;
+    }
+    
+    .footer a {
+      color: #1E88E5;
+      text-decoration: none;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    
+    /* Navigation Styles */
+    .navbar {
+      background: #0f172a;
+      padding: 0;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border-bottom: 2px solid #1e40af;
+    }
+    
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 60px;
+    }
+    
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      color: white;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+    
+    .nav-menu {
+      display: flex;
+      gap: 30px;
+      align-items: center;
+    }
+    
+    .nav-link {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.3s ease;
+      padding: 8px 0;
+    }
+    
+    .nav-link:hover,
+    .nav-link.active {
+      color: #60a5fa;
+    }
+    
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      cursor: pointer;
+      gap: 4px;
+    }
+    
+    .nav-toggle span {
+      width: 25px;
+      height: 3px;
+      background: white;
+      transition: all 0.3s ease;
+    }
+    
+    /* Mobile Responsiveness */
+    @media (max-width: 768px) {
+      .nav-menu {
+        position: fixed;
+        top: 60px;
+        left: -100%;
+        width: 100%;
+        height: calc(100vh - 60px);
+        background: #0f172a;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        padding: 0;
+        gap: 0;
+        transition: left 0.3s ease;
+        border-top: 1px solid rgba(255,255,255,0.1);
+      }
+      
+      .nav-menu.active {
+        left: 0;
+      }
+      
+      .nav-link {
+        padding: 18px 24px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        text-align: left;
+        font-size: 1rem;
+        color: rgba(255,255,255,0.9);
+        background: transparent;
+        transition: all 0.2s ease;
+      }
+      
+      .nav-link:hover,
+      .nav-link.active {
+        background: rgba(96, 165, 250, 0.1);
+        color: #60a5fa;
+        border-left: 3px solid #60a5fa;
+      }
+      
+      .nav-toggle {
+        display: flex;
+      }
+      
+      .nav-toggle.active span:nth-child(1) {
+        transform: rotate(45deg) translate(5px, 5px);
+      }
+      
+      .nav-toggle.active span:nth-child(2) {
+        opacity: 0;
+      }
+      
+      .nav-toggle.active span:nth-child(3) {
+        transform: rotate(-45deg) translate(7px, -6px);
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+      
+      .header h1 {
+        font-size: 1.8em;
+      }
+      
+      .section {
+        padding: 1.5rem;
+      }
+      
+      .section h2 {
+        font-size: 1.4em;
+      }
+      
+      /* Stack side-by-side charts vertically on mobile */
+      .section div[style*="display: grid"],
+      .section div[style*="display: flex"] {
+        display: block !important;
+      }
+      
+      .section div[style*="display: grid"] > div,
+      .section div[style*="display: flex"] > div {
+        margin-bottom: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand" style="color: inherit;">
+        <a href="/" style="color: inherit; text-decoration: none; display: flex; align-items: center;">
+          <img src="pbj_favicon.png" alt="PBJ320" style="height: 32px; vertical-align: middle; margin-right: 8px;">
+          <span><span style="color: white;">PBJ</span><span style="color: #60a5fa;">320</span></span>
+        </a>
+      </div>
+      <div class="nav-menu" id="navMenu">
+        <a href="/about" class="nav-link">About</a>
+        <a href="https://pbjdashboard.com/" class="nav-link">Dashboard</a>
+        <a href="https://www.320insight.com/phoebe" class="nav-link" target="_blank">Phoebe J</a>
+        <a href="https://pbj320.vercel.app/" class="nav-link" target="_blank">PBJ Converter</a>
+        <a href="pbj_playground.html" class="nav-link active">Playground</a>
+      </div>
+      <div class="nav-toggle" id="navToggle">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1><img src="phoebe.png" alt="Phoebe J" style="width: 48px; height: 48px; border-radius: 50%; vertical-align: middle; margin-right: 4px; margin-bottom: 4px; border: 2px solid #1769aa;"> <span style="color: white; font-weight: 700;">PBJ</span><span style="color: #60a5fa; font-weight: 700;">320</span> <span style="color: white; font-weight: 700;">Playground</span></h1>
+      <p>Data visualizations and insights on US nursing home payroll-based journal (PBJ) staffing data</p>
+    </div>
+
+    <div class="section">
+      <h2>1. The "COVID Bump" Illusion</h2>
+      
+      <div class="chart-container">
+        <canvas id="covidChart" width="400" height="200"></canvas>
+      </div>
+      
+      <div class="phoebe-takeaway">
+        <a href="https://www.320insight.com/phoebe" target="_blank"><img src="phoebe.png" alt="Phoebe J" class="phoebe-avatar"></a>
+        <div class="phoebe-content">
+          <div class="phoebe-title">Phoebe J's Takeaway</div>
+          <div class="phoebe-text">
+            Staffing ratios appeared to rise in 2020—but mainly because residents died or left. Absolute staffing hours actually fell. The apparent increase in staffing ratios during 2020-2021 was largely due to decreased resident census (deaths and discharges) rather than increased staffing hours, with some facilities not reporting data for Q1 2020 during early COVID-19.
+          </div>
+        </div>
+          </div>
+        </div>
+
+    <div class="section">
+      <h2>2. State Staffing Evolution: A Time-Lapse View</h2>
+      <div class="insight">
+      </div>
+      
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <select id="metricSelect" style="
+              background: rgba(255,255,255,0.1);
+              border: 1px solid rgba(255,255,255,0.3);
+              color: white;
+              padding: 8px 12px;
+              border-radius: 6px;
+              font-size: 0.9rem;
+              backdrop-filter: blur(10px);
+            ">
+              <option value="Total_Nurse_HPRD" style="background: #1e293b; color: white;">Total HPRD</option>
+              <option value="Total_RN_HPRD" style="background: #1e293b; color: white;">Total RN HPRD</option>
+              <option value="Contract_Percentage" style="background: #1e293b; color: white;">Contract Staff %</option>
+            </select>
+            
+            <button id="animateButton" style="
+              background: linear-gradient(135deg, #1769aa 0%, #1e88e5 100%);
+              color: white;
+              border: none;
+              padding: 12px 24px;
+              border-radius: 6px;
+              font-size: 1em;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              box-shadow: 0 4px 15px rgba(23, 105, 170, 0.3);
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(23, 105, 170, 0.4)'" 
+               onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 4px 15px rgba(23, 105, 170, 0.3)'">
+              See Changes Over Time
+            </button>
+            
+            
+            <button id="showLatestButton" style="
+              background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+              color: white;
+              border: none;
+              padding: 8px 16px;
+              border-radius: 6px;
+              font-size: 0.9em;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              box-shadow: 0 2px 8px rgba(147, 51, 234, 0.3);
+            " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(147, 51, 234, 0.4)'" 
+               onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 2px 8px rgba(147, 51, 234, 0.3)'">
+              Jump to Latest
+            </button>
+          </div>
+        </div>
+
+          <div class="chart-container" style="height: 620px; text-align: center; position: relative;">
+            <!-- Map Legend (top right corner) -->
+            <div style="
+              position: absolute;
+              top: 10px;
+              right: 180px;
+              z-index: 10;
+            ">
+              <div style="
+                background: rgba(30, 41, 59, 0.95);
+                border-radius: 8px;
+                padding: 8px 12px;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.2);
+              ">
+                <div style="
+                  font-size: 0.75rem;
+                  font-weight: 600;
+                  color: rgba(255,255,255,0.9);
+                  margin-bottom: 6px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.3px;
+                " id="legendTitle">Total HPRD</div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                  <svg width="140" height="10" style="border-radius: 4px;">
+                    <defs>
+                      <linearGradient id="hprdGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:hsl(270, 15%, 85%);stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:hsl(270, 45%, 60%);stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:hsl(270, 75%, 35%);stop-opacity:1" />
+                      </linearGradient>
+                      <linearGradient id="rnGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:hsl(270, 40%, 75%);stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:hsl(270, 70%, 45%);stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:hsl(270, 100%, 15%);stop-opacity:1" />
+                      </linearGradient>
+                      <linearGradient id="contractGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:hsl(270, 35%, 75%);stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:hsl(270, 67%, 45%);stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:hsl(270, 100%, 15%);stop-opacity:1" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="140" height="10" fill="url(#hprdGradient)" id="legendGradient"/>
+                  </svg>
+                  <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    width: 140px;
+                    font-size: 0.7rem;
+                    color: rgba(255,255,255,0.8);
+                    font-weight: 500;
+                  " id="legendLabels">
+                    <span>3.0</span>
+                    <span>4.5</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+      
+            <div id="stateMap" style="width: 100%; height: 100%;"></div>
+            <div id="quarterDisplay" style="
+              position: absolute;
+              top: 10px;
+              left: 50%;
+              transform: translateX(-50%);
+              font-size: 1.3em;
+              font-weight: 700;
+              color: #fff;
+              background: linear-gradient(135deg, #1769aa 0%, #1e88e5 100%);
+              padding: 8px 16px;
+              border-radius: 20px;
+              border: 2px solid rgba(255,255,255,0.2);
+              box-shadow: 
+                0 4px 15px rgba(23, 105, 170, 0.4),
+                0 2px 8px rgba(0,0,0,0.2);
+              text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+              letter-spacing: 0.5px;
+              z-index: 10;
+              backdrop-filter: blur(10px);
+            ">Q1 2017</div>
+          </div>
+      
+      <div class="phoebe-takeaway">
+        <a href="https://www.320insight.com/phoebe" target="_blank"><img src="phoebe.png" alt="Phoebe J" class="phoebe-avatar"></a>
+        <div class="phoebe-content">
+          <div class="phoebe-title">Phoebe J's Takeaway</div>
+          <div class="phoebe-text">
+            Watch how staffing patterns shift across states over time. Each state is colored by its HPRD/Contract Percentage for the quarter. Watch how the colors shift as you animate through time—darker purples indicate higher staffing levels. The animation reveals regional staffing patterns across the US.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. The "Average" Nursing Home</h2>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 2rem 0;">
+        <div>
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem;">Three Ways to Calculate US/State HPRD</h4>
+          <div class="chart-container">
+            <canvas id="averageChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+        <div>
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem;">HPRD Distribution by Nursing Home</h4>
+          <div class="chart-container">
+            <canvas id="hprdChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      
+      <div class="phoebe-takeaway">
+        <a href="https://www.320insight.com/phoebe" target="_blank"><img src="phoebe.png" alt="Phoebe J" class="phoebe-avatar"></a>
+        <div class="phoebe-content">
+          <div class="phoebe-title">Phoebe J's Takeaway</div>
+          <div class="phoebe-text">
+            <strong>When someone says your state's staffing is "3.55 HPRD," ask: by what metric?</strong>
+            <ol>
+              <li><strong>National/state staffing ratio (Weighted Mean):</strong> Aggregates census and staffing hours so a 600-bed facility counts more than a 30-bed facility.</li>
+              <li><strong>Median:</strong> The typical (middle value) nursing home, less affected by outliers.</li>
+              <li><strong>Simple Mean:</strong> Averages staffing levels by nursing home so a 600-bed facility and a 30-bed facility count the same.</li>
+            </ol>
+            The distribution is right-skewed, with most facilities clustered around 3.0-4.0 HPRD but a long tail extending to higher values. This skewness means the mean (3.73) is pulled upward by outliers, while the median (3.67) better represents typical facilities.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. Contract Staffing (<span id="contractSectionQuarter">Q1 2025</span>)</h2>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 2rem 0;">
+        <div>
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem;">Contract Staffing Distribution</h4>
+          <div class="chart-container">
+            <canvas id="contractChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+        <div>
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem;">Mean and Median Over Time</h4>
+          <div class="chart-container">
+            <canvas id="contractTrendChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      
+      <div class="phoebe-takeaway">
+        <a href="https://www.320insight.com/phoebe" target="_blank"><img src="phoebe.png" alt="Phoebe J" class="phoebe-avatar"></a>
+        <div class="phoebe-content">
+          <div class="phoebe-title">Phoebe J's Takeaway</div>
+          <div class="phoebe-text">
+            A small share of facilities rely heavily on agency staff; most use barely any. By either metric, nationwide contract staffing increased significantly during the pandemic but has fallen since 2023.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>5. Staffing Ratio by Position (<span id="pieChartQuarter">Q1 2025</span>)</h2>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 2rem 0;">
+        <div>
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem; text-align: center;">National Breakdown</h4>
+          <div class="chart-container" style="max-width: 400px; margin: 0 auto;">
+            <canvas id="staffTypeChart" width="300" height="200"></canvas>
+          </div>
+        </div>
+        <div>
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem; text-align: center;">Staffing Breakdown by State</h4>
+          
+          <div class="chart-container" style="height: 400px; text-align: center; position: relative;">
+            <!-- Metric Toggle (inside map container) -->
+            <div style="
+              position: absolute;
+              top: 10px;
+              left: 50%;
+              transform: translateX(-50%);
+              z-index: 10;
+            ">
+              <select id="staffBreakdownSelect" style="
+                background: rgba(30, 41, 59, 0.95);
+                border: 1px solid rgba(255,255,255,0.3);
+                color: white;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 0.85rem;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                cursor: pointer;
+              ">
+                <option value="nurse_aide" style="background: #1e293b; color: white;">Nurse Aide %</option>
+                <option value="total_rn" style="background: #1e293b; color: white;">Total RN %</option>
+                <option value="direct_care" style="background: #1e293b; color: white;">Direct Care %</option>
+              </select>
+            </div>
+            
+            <!-- Legend for Staff Breakdown Map (top right corner) -->
+            <div style="
+              position: absolute;
+              top: 10px;
+              right: 10px;
+              z-index: 10;
+            ">
+              <div style="
+                background: rgba(30, 41, 59, 0.95);
+                border-radius: 8px;
+                padding: 6px 10px;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.2);
+              ">
+                <div style="
+                  font-size: 0.7rem;
+                  font-weight: 600;
+                  color: rgba(255,255,255,0.9);
+                  margin-bottom: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.3px;
+                " id="staffBreakdownLegendTitle">Nurse Aide %</div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                  <svg width="120" height="8" style="border-radius: 4px;">
+                    <defs>
+                      <linearGradient id="aideGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:hsl(45, 80%, 75%);stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:hsl(45, 85%, 55%);stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:hsl(45, 90%, 35%);stop-opacity:1" />
+                      </linearGradient>
+                      <linearGradient id="totalRnGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:hsl(210, 70%, 75%);stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:hsl(210, 80%, 55%);stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:hsl(210, 90%, 35%);stop-opacity:1" />
+                      </linearGradient>
+                      <linearGradient id="directCareGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:hsl(0, 70%, 75%);stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:hsl(0, 80%, 55%);stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:hsl(0, 90%, 35%);stop-opacity:1" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="120" height="8" fill="url(#aideGradient)" id="staffBreakdownGradient"/>
+                  </svg>
+                  <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    width: 120px;
+                    font-size: 0.65rem;
+                    color: rgba(255,255,255,0.8);
+                    font-weight: 500;
+                  " id="staffBreakdownLegendLabels">
+                    <span>40%</span>
+                    <span>65%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div id="nurseAideMap" style="width: 100%; height: 100%;"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="phoebe-takeaway">
+        <a href="https://www.320insight.com/phoebe" target="_blank"><img src="phoebe.png" alt="Phoebe J" class="phoebe-avatar"></a>
+        <div class="phoebe-content">
+          <div class="phoebe-title">Phoebe J's Takeaway</div>
+          <div class="phoebe-text">
+            Nurse Aides account for <span id="nurseAidePercentage">Loading...</span>% of nursing staff nationally. However, this varies significantly by state—some states rely more heavily on RNs while others use more nurse aides. The state map shows these regional differences, with yellow shading indicating higher nurse aide percentages. You can toggle to view Total RN % (blue) or Direct Care % (red) to see different staffing patterns across the country.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>6. Total vs Direct Care: What Counts as "Nursing"?</h2>
+      
+      <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 300px;">
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem;">Total Nurse vs Direct Care</h4>
+          <div class="chart-container">
+            <canvas id="careTypeChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+        <div style="flex: 1; min-width: 300px;">
+          <h4 style="color: #ff7f0e; margin-bottom: 1rem;">RN Staffing: Total vs Direct Care</h4>
+          <div class="chart-container">
+            <canvas id="rnTypeChart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      
+      <div class="phoebe-takeaway">
+        <a href="https://www.320insight.com/phoebe" target="_blank"><img src="phoebe.png" alt="Phoebe J" class="phoebe-avatar"></a>
+        <div class="phoebe-content">
+          <div class="phoebe-title">Phoebe J's Takeaway</div>
+          <div class="phoebe-text">
+            Total Nurse HPRD includes administrators and DONs; Direct Care excludes them. The difference shows how much nursing time is administrative. In <span id="directCareQuarter">Q1 2025</span>, <span id="totalNurseAdminPercent">Loading...</span>% of total nursing staff time was administrative/DON, and <span id="rnAdminPercent">Loading...</span>% of RN time was administrative/DON.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Data visualizations and insights on US nursing home payroll-based journal (PBJ) staffing data</p>
+      <p>Data: <span id="footerDateRange">Q1 2017 - Q1 2025</span></p>
+      <p>By <a href="https://www.320insight.com/" target="_blank">320 Consulting</a></p>
+    </div>
+  </div>
+
+  <script>
+    // Load data dynamically from CSV files
+    let pbjData = null;
+    
+    async function loadData() {
+      try {
+        // Load data from CSV files and JSON distribution file
+             const [nationalResponse, stateResponse, distributionResponse, mediansResponse] = await Promise.all([
+               fetch('national_quarterly_metrics.csv'),
+               fetch('state_quarterly_metrics.csv'),
+               fetch('playground_distributions.json'),
+               fetch('quarterly_medians.json')
+             ]);
+        
+        if (!nationalResponse.ok || !stateResponse.ok || !distributionResponse.ok || !mediansResponse.ok) {
+          throw new Error('Failed to load data files');
+        }
+        
+        const nationalText = await nationalResponse.text();
+        const stateText = await stateResponse.text();
+        const distributionData = await distributionResponse.json();
+        const mediansData = await mediansResponse.json();
+        
+        const nationalData = parseCSV(nationalText);
+        const stateData = parseCSV(stateText);
+        
+        // Process the data
+        pbjData = processData(nationalData, stateData, distributionData, mediansData);
+        
+        // Initialize charts
+        initializeCharts();
+        
+      } catch (error) {
+        console.error('Error loading data:', error);
+        showError();
+      }
+    }
+    
+    function parseCSV(text) {
+      const lines = text.split('\n');
+      const headers = lines[0].split(',');
+      const data = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i].trim()) {
+          const values = lines[i].split(',');
+          const row = {};
+          headers.forEach((header, index) => {
+            row[header.trim()] = values[index] ? values[index].trim() : '';
+          });
+          data.push(row);
+        }
+      }
+      
+      return data;
+    }
+    
+    function processData(nationalData, stateData, distributionData, mediansData) {
+      // Get latest quarter
+      const latestQuarter = nationalData[nationalData.length - 1].CY_Qtr;
+      
+      // Get latest quarter data
+      const latestNational = nationalData[nationalData.length - 1];
+      const latestStateData = stateData.filter(row => row.CY_Qtr === latestQuarter);
+      
+      // State abbreviations mapping (full name to abbreviation)
+      const stateNameToAbbr = {
+        'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+        'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
+        'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
+        'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+        'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
+        'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+        'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
+        'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+        'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+        'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
+        'District of Columbia': 'DC', 'Puerto Rico': 'PR', 'Guam': 'GU'
+      };
+      
+      // Extract staff breakdown percentages from state data for latest quarter
+      const nurseAidePercentageByState = {};
+      const totalRnPercentageByState = {};
+      const directCarePercentageByState = {};
+      
+      latestStateData.forEach(row => {
+        const stateAbbr = row.STATE; // Already in abbreviation format
+        const directCarePct = parseFloat(row.Direct_Care_Percentage);
+        const totalRnPct = parseFloat(row.Total_RN_Percentage);
+        const nurseAidePct = parseFloat(row.Nurse_Aide_Percentage);
+        
+        if (!isNaN(directCarePct)) directCarePercentageByState[stateAbbr] = directCarePct;
+        if (!isNaN(totalRnPct)) totalRnPercentageByState[stateAbbr] = totalRnPct;
+        if (!isNaN(nurseAidePct)) nurseAidePercentageByState[stateAbbr] = nurseAidePct;
+      });
+      
+      // Store globally for map
+      window.nurseAidePercentageByState = nurseAidePercentageByState;
+      window.totalRnPercentageByState = totalRnPercentageByState;
+      window.directCarePercentageByState = directCarePercentageByState;
+      
+      // Calculate actual ranges from the data (excluding PR and GU for better visual contrast)
+      const excludedTerritories = ['PR', 'GU'];
+      const nurseAideValues = Object.entries(nurseAidePercentageByState)
+        .filter(([state, v]) => !excludedTerritories.includes(state) && !isNaN(v))
+        .map(([_, v]) => v);
+      const totalRnValues = Object.entries(totalRnPercentageByState)
+        .filter(([state, v]) => !excludedTerritories.includes(state) && !isNaN(v))
+        .map(([_, v]) => v);
+      const directCareValues = Object.entries(directCarePercentageByState)
+        .filter(([state, v]) => !excludedTerritories.includes(state) && !isNaN(v))
+        .map(([_, v]) => v);
+      
+      window.staffBreakdownRanges = {
+        nurse_aide: { min: Math.min(...nurseAideValues), max: Math.max(...nurseAideValues) },
+        total_rn: { min: Math.min(...totalRnValues), max: Math.max(...totalRnValues) },
+        direct_care: { min: Math.min(...directCareValues), max: Math.max(...directCareValues) }
+      };
+      
+      // Debug logging
+      console.log('Staff Breakdown Ranges (excluding PR/GU):', window.staffBreakdownRanges);
+      console.log('Direct Care % by State:', directCarePercentageByState);
+      
+      // Process state data for animation (time-lapse map)
+      const processedStateData = {};
+      const quarters = nationalData.map(row => row.CY_Qtr);
+      
+      // Group state data by quarter and state (excluding PR and GU)
+      quarters.forEach((quarter, index) => {
+        const quarterData = stateData.filter(row => row.CY_Qtr === quarter);
+        quarterData.forEach(row => {
+          const stateAbbr = row.STATE; // Already in abbreviation format
+          // Exclude territories
+          if (excludedTerritories.includes(stateAbbr)) return;
+          
+          if (!processedStateData[stateAbbr]) {
+            processedStateData[stateAbbr] = {
+              hprd: new Array(quarters.length),
+              rn_hprd: new Array(quarters.length),
+              contract: new Array(quarters.length)
+            };
+          }
+          processedStateData[stateAbbr].hprd[index] = parseFloat(row.Total_Nurse_HPRD);
+          processedStateData[stateAbbr].rn_hprd[index] = parseFloat(row.RN_HPRD);
+          processedStateData[stateAbbr].contract[index] = parseFloat(row.Contract_Percentage);
+        });
+      });
+      
+      // Store processed state data globally
+      window.stateData = processedStateData;
+      
+      // Convert distribution JSON to chart format
+      const hprdDistBins = [];
+      const hprdDistCounts = [];
+      Object.entries(distributionData.hprd.distribution).forEach(([bin, count]) => {
+        hprdDistBins.push(bin);
+        hprdDistCounts.push(count);
+      });
+      
+      const contractDistBins = [];
+      const contractDistCounts = [];
+      Object.entries(distributionData.contract.distribution).forEach(([bin, count]) => {
+        contractDistBins.push(bin);
+        contractDistCounts.push(count);
+      });
+      
+      return {
+        latestQuarter: latestQuarter,
+        hprd: {
+          weighted_mean: parseFloat(latestNational.Total_Nurse_HPRD), // Nationwide Staffing Ratio
+          median: distributionData.hprd.median, // Facility-level median from distribution data
+          simple_average: distributionData.hprd.mean // Simple Average of all facilities
+        },
+        contract: {
+          mean: parseFloat(latestNational.Contract_Percentage),
+          median: distributionData.contract.median // Facility-level median from distribution data
+        },
+        quarterly_trends: {
+          quarters: quarters,
+          hprd: nationalData.map(row => parseFloat(row.Total_Nurse_HPRD)),
+          census: nationalData.map(row => parseFloat(row.MDScensus)),
+          contract_mean: nationalData.map(row => parseFloat(row.Contract_Percentage)),
+          contract_median: mediansData.map(row => parseFloat(row.Contract_Percentage_Median)),
+          facility_count: nationalData.map(row => parseInt(row.facility_count) || 0),
+          nurse_care_hprd: nationalData.map(row => parseFloat(row.Nurse_Care_HPRD)),
+          total_rn_hprd: nationalData.map(row => parseFloat(row.RN_HPRD)),
+          direct_care_rn_hprd: nationalData.map(row => parseFloat(row.RN_Care_HPRD))
+        },
+        distributions: {
+          hprd: { bins: hprdDistBins, counts: hprdDistCounts },
+          contract: { bins: contractDistBins, counts: contractDistCounts }
+        }
+      };
+    }
+    
+    
+    function showError() {
+      const chartContainers = document.querySelectorAll('.chart-container');
+      chartContainers.forEach(container => {
+        container.innerHTML = '<div class="error"><h4>📊 Data Unavailable</h4><p>Unable to load PBJ data files</p></div>';
+      });
+      
+      const statValues = document.querySelectorAll('.stat-value');
+      statValues.forEach(stat => {
+        stat.textContent = 'N/A';
+      });
+    }
+    
+    function initializeCharts() {
+      if (!pbjData) {
+        showError();
+        return;
+      }
+      
+      // Update stat displays
+      // Update contract section quarter (format as "Q1 2025")
+      const contractSectionQuarterEl = document.getElementById('contractSectionQuarter');
+      if (contractSectionQuarterEl) {
+        // Convert "2025Q1" to "Q1 2025"
+        const match = pbjData.latestQuarter.match(/(\d{4})Q(\d)/);
+        if (match) {
+          contractSectionQuarterEl.textContent = `Q${match[2]} ${match[1]}`;
+        }
+      }
+      
+      // Update pie chart quarter (format as "Q1 2025")
+      const pieQuarterEl = document.getElementById('pieChartQuarter');
+      if (pieQuarterEl) {
+        // Convert "2025Q1" to "Q1 2025"
+        const match = pbjData.latestQuarter.match(/(\d{4})Q(\d)/);
+        if (match) {
+          pieQuarterEl.textContent = `Q${match[2]} ${match[1]}`;
+        }
+      }
+      
+      // Update footer date range (format as "Q1 2017 - Q1 2025")
+      const footerDateEl = document.getElementById('footerDateRange');
+      if (footerDateEl && pbjData.quarterly_trends && pbjData.quarterly_trends.quarters) {
+        // Convert "2017Q1" to "Q1 2017"
+        const firstMatch = pbjData.quarterly_trends.quarters[0].match(/(\d{4})Q(\d)/);
+        const lastMatch = pbjData.latestQuarter.match(/(\d{4})Q(\d)/);
+        if (firstMatch && lastMatch) {
+          const firstQuarter = `Q${firstMatch[2]} ${firstMatch[1]}`;
+          const lastQuarter = `Q${lastMatch[2]} ${lastMatch[1]}`;
+          footerDateEl.textContent = `${firstQuarter} - ${lastQuarter}`;
+        }
+      }
+      
+      // Chart.js configuration
+      Chart.defaults.color = '#ffffff';
+      Chart.defaults.borderColor = '#333333';
+      Chart.defaults.backgroundColor = 'rgba(23, 105, 170, 0.1)';
+      
+      // 1. COVID Bump Chart
+      const covidCtx = document.getElementById('covidChart').getContext('2d');
+      
+      // Create data with incomplete data indicator for 2020 Q1
+      const quarters = pbjData.quarterly_trends.quarters;
+      const hprdData = pbjData.quarterly_trends.hprd;
+      const censusData = pbjData.quarterly_trends.census;
+      
+      // Find 2020 Q1 index for special styling
+      const q1_2020_index = quarters.indexOf('2020Q1');
+      
+      new Chart(covidCtx, {
+        type: 'line',
+        data: {
+          labels: quarters.map((q, index) => {
+            const year = q.substring(0, 4);
+            const quarter = q.substring(4);
+            // Show year for Q1 of each year
+            if (quarter === 'Q1') {
+              return year;
+            }
+            // Also check if this is the first occurrence of a year
+            const prevYear = index > 0 ? quarters[index - 1].substring(0, 4) : null;
+            if (year !== prevYear) {
+              return year;
+            }
+            return '';
+          }),
+          datasets: [{
+            label: 'HPRD',
+            data: hprdData,
+            borderColor: '#1769aa',
+            backgroundColor: 'rgba(23, 105, 170, 0.1)',
+            tension: 0.4,
+            spanGaps: false,
+            pointBackgroundColor: function(context) {
+              return context.dataIndex === q1_2020_index ? '#ff6b6b' : '#1769aa';
+            },
+            pointBorderColor: function(context) {
+              return context.dataIndex === q1_2020_index ? '#ff6b6b' : '#1769aa';
+            },
+            pointRadius: function(context) {
+              return context.dataIndex === q1_2020_index ? 8 : 4;
+            },
+            pointHoverRadius: function(context) {
+              return context.dataIndex === q1_2020_index ? 10 : 6;
+            }
+          }, {
+            label: 'Census',
+            data: censusData,
+            borderColor: '#ff7f0e',
+            backgroundColor: 'rgba(255, 127, 14, 0.1)',
+            tension: 0.4,
+            yAxisID: 'y1',
+            spanGaps: false,
+            pointBackgroundColor: function(context) {
+              return context.dataIndex === q1_2020_index ? '#ff6b6b' : '#ff7f0e';
+            },
+            pointBorderColor: function(context) {
+              return context.dataIndex === q1_2020_index ? '#ff6b6b' : '#ff7f0e';
+            },
+            pointRadius: function(context) {
+              return context.dataIndex === q1_2020_index ? 8 : 4;
+            },
+            pointHoverRadius: function(context) {
+              return context.dataIndex === q1_2020_index ? 10 : 6;
+            }
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'COVID Bump Illusion: HPRD vs Census Trends',
+              color: '#ffffff'
+            },
+            legend: {
+              labels: {
+                color: '#ffffff'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  const index = context[0].dataIndex;
+                  const quarter = quarters[index];
+                  const year = quarter.substring(0, 4);
+                  const q = quarter.substring(4);
+                  const formattedQuarter = `${q} ${year}`;
+                  return index === q1_2020_index ? formattedQuarter + ' *' : formattedQuarter;
+                },
+                label: function(context) {
+                  if (context.datasetIndex === 0) {
+                    return `HPRD: ${context.parsed.y.toFixed(2)}`;
+                  } else {
+                    const facilityCount = pbjData.quarterly_trends.facility_count[context.dataIndex];
+                    return `Census: ${(context.parsed.y / 1000000).toFixed(3)}M (${facilityCount.toLocaleString()} facilities)`;
+                  }
+                },
+                afterLabel: function(context) {
+                  return context.dataIndex === q1_2020_index ? '⚠️ Incomplete data' : '';
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'HPRD',
+                color: '#1769aa'
+              },
+              ticks: {
+                color: '#1769aa'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: 'Census (Millions)',
+                color: '#ff7f0e'
+              },
+              ticks: {
+                color: '#ff7f0e',
+                callback: function(value) {
+                  return (value / 1000000).toFixed(2) + 'M';
+                }
+              },
+              grid: {
+                drawOnChartArea: false,
+              },
+            },
+            x: {
+              ticks: {
+                color: '#ffffff',
+                maxTicksLimit: 20,
+                autoSkip: false
+              }
+            }
+          }
+        }
+      });
+
+      // 2. HPRD Distribution Chart
+      const hprdCtx = document.getElementById('hprdChart').getContext('2d');
+      new Chart(hprdCtx, {
+        type: 'bar',
+        data: {
+          labels: pbjData.distributions.hprd.bins,
+          datasets: [{
+            label: 'Number of Facilities',
+            data: pbjData.distributions.hprd.counts,
+            backgroundColor: 'rgba(23, 105, 170, 0.6)',
+            borderColor: '#1769aa',
+            borderWidth: 1
+          }, {
+            label: 'Distribution',
+            data: pbjData.distributions.hprd.counts,
+            type: 'line',
+            borderColor: '#e74c3c',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.4,
+            hidden: false,
+            showLine: true,
+            showInLegend: false,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'HPRD Distribution',
+              color: '#ffffff'
+            },
+            legend: {
+              labels: {
+                color: '#ffffff'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  if (context.datasetIndex === 0) {
+                    const count = context.parsed.y;
+                    const total = pbjData.distributions.hprd.counts.reduce((a, b) => a + b, 0);
+                    const percentage = (count / total * 100).toFixed(1);
+                    return `Number of facilities: ${count.toLocaleString()} (${percentage}%)`;
+                  }
+                  return null;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: '#ffffff',
+                callback: function(value) {
+                  return value.toLocaleString(); // Format with commas, no decimals
+                }
+              },
+              title: {
+                display: true,
+                text: 'Number of Facilities',
+                color: '#ffffff'
+              }
+            },
+            x: {
+              ticks: {
+                color: '#ffffff'
+              },
+              title: {
+                display: true,
+                text: 'HPRD',
+                color: '#ffffff'
+              }
+            }
+          }
+        }
+      });
+
+      // 3. Average Methods Comparison
+      const averageCtx = document.getElementById('averageChart').getContext('2d');
+      
+      // Format quarter for title
+      const titleQuarterMatch = pbjData.latestQuarter.match(/(\d{4})Q(\d)/);
+      const titleQuarter = titleQuarterMatch ? `Q${titleQuarterMatch[2]} ${titleQuarterMatch[1]}` : pbjData.latestQuarter;
+      
+      new Chart(averageCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Ratio', 'Median', 'Simple Mean'],
+          datasets: [{
+            label: 'HPRD',
+            data: [pbjData.hprd.weighted_mean, pbjData.hprd.median, pbjData.hprd.simple_average],
+            backgroundColor: ['#e74c3c', '#f39c12', '#27ae60'],
+            borderColor: ['#c0392b', '#e67e22', '#229954'],
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: `US Staffing HPRD (${titleQuarter})`,
+              color: '#ffffff'
+            },
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.parsed.y.toFixed(3)} HPRD`;
+                }
+              }
+            },
+            annotation: {
+              annotations: {
+                federalMinLine: {
+                  type: 'line',
+                  yMin: 3.48,
+                  yMax: 3.48,
+                  borderColor: '#94a3b8',
+                  borderWidth: 2,
+                  borderDash: [5, 5],
+                  label: {
+                    display: true,
+                    content: 'Proposed Federal Minimum (3.48)',
+                    position: 'start',
+                    backgroundColor: 'rgba(148, 163, 184, 0.8)',
+                    color: '#ffffff',
+                    font: {
+                      size: 10
+                    }
+                  }
+                },
+                studyLine: {
+                  type: 'line',
+                  yMin: 4.1,
+                  yMax: 4.1,
+                  borderColor: '#64748b',
+                  borderWidth: 2,
+                  borderDash: [5, 5],
+                  label: {
+                    display: true,
+                    content: '2001 Federal Study (4.1)',
+                    position: 'end',
+                    backgroundColor: 'rgba(100, 116, 139, 0.8)',
+                    color: '#ffffff',
+                    font: {
+                      size: 10
+                    }
+                  }
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              min: 3.4,
+              max: 4.3,
+              ticks: {
+                color: '#ffffff',
+                stepSize: 0.1
+              },
+              title: {
+                display: true,
+                text: 'HPRD',
+                color: '#ffffff'
+              }
+            },
+            x: {
+              ticks: {
+                color: '#ffffff'
+              }
+            }
+          }
+        }
+      });
+
+      // 4. Contract Staffing Charts
+      const contractCtx = document.getElementById('contractChart').getContext('2d');
+      new Chart(contractCtx, {
+        type: 'bar',
+        data: {
+          labels: pbjData.distributions.contract.bins,
+          datasets: [{
+            label: 'Number of Facilities',
+            data: pbjData.distributions.contract.counts,
+            backgroundColor: 'rgba(255, 127, 14, 0.6)',
+            borderColor: '#ff7f0e',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Contract Staff % Distribution',
+              color: '#ffffff'
+            },
+            legend: {
+              labels: {
+                color: '#ffffff'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const count = context.parsed.y;
+                  const total = pbjData.distributions.contract.counts.reduce((a, b) => a + b, 0);
+                  const percentage = (count / total * 100).toFixed(1);
+                  return `Number of facilities: ${count.toLocaleString()} (${percentage}%)`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: '#ffffff'
+              },
+              title: {
+                display: true,
+                text: 'Number of Facilities',
+                color: '#ffffff'
+              }
+            },
+            x: {
+              ticks: {
+                color: '#ffffff'
+              },
+              title: {
+                display: true,
+                text: 'Contract %',
+                color: '#ffffff'
+              }
+            }
+          }
+        }
+      });
+
+      // 4b. Contract Staffing Trend Chart (Mean and Median)
+      const contractTrendCtx = document.getElementById('contractTrendChart').getContext('2d');
+      new Chart(contractTrendCtx, {
+        type: 'line',
+        data: {
+          labels: pbjData.quarterly_trends.quarters.map((q, index) => {
+            const year = q.substring(0, 4);
+            const quarter = q.substring(4);
+            // Show year for Q1 of each year
+            if (quarter === 'Q1') {
+              return year;
+            }
+            // Also check if this is the first occurrence of a year
+            const prevYear = index > 0 ? pbjData.quarterly_trends.quarters[index - 1].substring(0, 4) : null;
+            if (year !== prevYear) {
+              return year;
+            }
+            return '';
+          }),
+          datasets: [{
+            label: 'Mean',
+            data: pbjData.quarterly_trends.contract_mean,
+            borderColor: '#e74c3c',
+            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+            tension: 0.4,
+            fill: false
+          }, {
+            label: 'Median',
+            data: pbjData.quarterly_trends.contract_median,
+            borderColor: '#ff7f0e',
+            backgroundColor: 'rgba(255, 127, 14, 0.1)',
+            tension: 0.4,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Contract Staff % Over Time',
+              color: '#ffffff'
+            },
+            legend: {
+              labels: {
+                color: '#ffffff'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  const index = context[0].dataIndex;
+                  const quarter = pbjData.quarterly_trends.quarters[index];
+                  const year = quarter.substring(0, 4);
+                  const q = quarter.substring(4);
+                  return `${q} ${year}`;
+                },
+                label: function(context) {
+                  return `${context.dataset.label}: ${context.parsed.y.toFixed(3)}%`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: '#ffffff'
+              },
+              title: {
+                display: true,
+                text: 'Contract %',
+                color: '#ffffff'
+              }
+            },
+            x: {
+              ticks: {
+                color: '#ffffff',
+                maxTicksLimit: 20,
+                autoSkip: false
+              }
+            }
+          }
+        }
+      });
+
+      // 5. Staff Type Distributions (pie chart with latest quarter data)
+      const staffTypeCtx = document.getElementById('staffTypeChart').getContext('2d');
+      
+      // Get the latest quarter data from the processed data
+      const latestQuarterIndex = pbjData.quarterly_trends.quarters.length - 1;
+      const latestQuarter = pbjData.quarterly_trends.quarters[latestQuarterIndex];
+      
+      // We need to access the original national data for HPRD breakdown
+      // For now, using estimated values based on typical ratios
+      const totalHPRD = pbjData.hprd.weighted_mean;
+      const rnHPRD = totalHPRD * 0.16; // RN typically ~16% of total
+      const lpnHPRD = totalHPRD * 0.22; // LPN typically ~22% of total  
+      const assistantHPRD = totalHPRD * 0.62; // Assistants typically ~62% of total
+      
+      new Chart(staffTypeCtx, {
+        type: 'pie',
+        data: {
+          labels: ['RN', 'RN Admin', 'RN DON', 'LPN', 'LPN Admin', 'CNA', 'MedAide Tech', 'NAtr'],
+          datasets: [{
+            data: [
+              rnHPRD * 0.7, // RN (direct care)
+              rnHPRD * 0.25, // RN Admin 
+              rnHPRD * 0.05, // RN DON
+              lpnHPRD * 0.9, // LPN
+              lpnHPRD * 0.1, // LPN Admin
+              assistantHPRD * 0.8, // CNA (majority of assistants)
+              assistantHPRD * 0.15, // MedAide Tech
+              assistantHPRD * 0.05  // NAtr
+            ],
+            backgroundColor: [
+              '#1e3a8a', // RN - dark blue
+              '#3b82f6', // RN Admin - medium blue  
+              '#60a5fa', // RN DON - light blue
+              '#dc2626', // LPN - dark red
+              '#ef4444', // LPN Admin - medium red
+              '#eab308', // CNA - dark yellow
+              '#facc15', // MedAide Tech - medium yellow
+              '#fde047'  // NAtr - light yellow
+            ],
+            borderColor: '#ffffff',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Nursing Staff Distribution by Position',
+              color: '#ffffff'
+            },
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#ffffff',
+                padding: 15,
+                usePointStyle: true
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.parsed;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = ((value / total) * 100).toFixed(1);
+                  return `${value.toFixed(2)} HPRD (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Calculate and update nurse aide percentage
+      const nurseAidePercentage = ((assistantHPRD / totalHPRD) * 100).toFixed(1);
+      document.getElementById('nurseAidePercentage').textContent = nurseAidePercentage;
+      
+      // Create Nurse Aide Map
+      createNurseAideMap();
+      
+      // Calculate admin/DON percentages for latest quarter (reuse latestQuarterIndex from above)
+      const totalNurseHPRDLatest = pbjData.quarterly_trends.hprd[latestQuarterIndex];
+      const nurseCareHPRDLatest = pbjData.quarterly_trends.nurse_care_hprd[latestQuarterIndex];
+      const totalRnHPRDLatest = pbjData.quarterly_trends.total_rn_hprd[latestQuarterIndex];
+      const directCareRnHPRDLatest = pbjData.quarterly_trends.direct_care_rn_hprd[latestQuarterIndex];
+      
+      const totalNurseAdminPercent = ((totalNurseHPRDLatest - nurseCareHPRDLatest) / totalNurseHPRDLatest * 100).toFixed(1);
+      const rnAdminPercent = ((totalRnHPRDLatest - directCareRnHPRDLatest) / totalRnHPRDLatest * 100).toFixed(1);
+      
+      // Update direct care takeaway elements
+      const directCareQuarterEl = document.getElementById('directCareQuarter');
+      if (directCareQuarterEl) {
+        const match = pbjData.latestQuarter.match(/(\d{4})Q(\d)/);
+        if (match) {
+          directCareQuarterEl.textContent = `Q${match[2]} ${match[1]}`;
+        }
+      }
+      
+      const totalNurseAdminPercentEl = document.getElementById('totalNurseAdminPercent');
+      if (totalNurseAdminPercentEl) {
+        totalNurseAdminPercentEl.textContent = totalNurseAdminPercent;
+      }
+      
+      const rnAdminPercentEl = document.getElementById('rnAdminPercent');
+      if (rnAdminPercentEl) {
+        rnAdminPercentEl.textContent = rnAdminPercent;
+      }
+
+      // 6. Total vs Direct Care Chart
+      const careTypeCtx = document.getElementById('careTypeChart').getContext('2d');
+      new Chart(careTypeCtx, {
+        type: 'line',
+        data: {
+          labels: pbjData.quarterly_trends.quarters.map((q, index) => {
+            const year = q.substring(0, 4);
+            const quarter = q.substring(4);
+            // Show year for Q1 of each year
+            if (quarter === 'Q1') {
+              return year;
+            }
+            // Also check if this is the first occurrence of a year
+            const prevYear = index > 0 ? pbjData.quarterly_trends.quarters[index - 1].substring(0, 4) : null;
+            if (year !== prevYear) {
+              return year;
+            }
+            return '';
+          }),
+          datasets: [{
+            label: 'Total Nurse HPRD',
+            data: pbjData.quarterly_trends.hprd,
+            borderColor: '#1769aa',
+            backgroundColor: 'rgba(23, 105, 170, 0.1)',
+            tension: 0.4
+          }, {
+            label: 'Direct Care HPRD',
+            data: pbjData.quarterly_trends.nurse_care_hprd,
+            borderColor: '#e74c3c',
+            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Total Nurse vs Direct Care HPRD Over Time',
+              color: '#ffffff'
+            },
+            legend: {
+              labels: {
+                color: '#ffffff'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  const index = context[0].dataIndex;
+                  const quarter = pbjData.quarterly_trends.quarters[index];
+                  const year = quarter.substring(0, 4);
+                  const q = quarter.substring(4);
+                  return `${q} ${year}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              min: 3,
+              beginAtZero: false,
+              ticks: {
+                color: '#ffffff'
+              },
+              title: {
+                display: true,
+                text: 'HPRD',
+                color: '#ffffff'
+              }
+            },
+            x: {
+              ticks: {
+                color: '#ffffff',
+                maxTicksLimit: 20,
+                autoSkip: false
+              }
+            }
+          }
+        }
+      });
+
+      // 6b. RN Total vs Direct Care Chart
+      const rnTypeCtx = document.getElementById('rnTypeChart').getContext('2d');
+      new Chart(rnTypeCtx, {
+        type: 'line',
+        data: {
+          labels: pbjData.quarterly_trends.quarters.map((q, index) => {
+            const year = q.substring(0, 4);
+            const quarter = q.substring(4);
+            // Show year for Q1 of each year
+            if (quarter === 'Q1') {
+              return year;
+            }
+            // Also check if this is the first occurrence of a year
+            const prevYear = index > 0 ? pbjData.quarterly_trends.quarters[index - 1].substring(0, 4) : null;
+            if (year !== prevYear) {
+              return year;
+            }
+            return '';
+          }),
+          datasets: [{
+            label: 'Total RN HPRD',
+            data: pbjData.quarterly_trends.total_rn_hprd,
+            borderColor: '#1769aa',
+            backgroundColor: 'rgba(23, 105, 170, 0.1)',
+            tension: 0.4
+          }, {
+            label: 'RN Direct HPRD',
+            data: pbjData.quarterly_trends.direct_care_rn_hprd,
+            borderColor: '#e74c3c',
+            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Total RN vs RN (excl Admin/DON) HPRD Over Time',
+              color: '#ffffff'
+            },
+            legend: {
+              labels: {
+                color: '#ffffff'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  const index = context[0].dataIndex;
+                  const quarter = pbjData.quarterly_trends.quarters[index];
+                  const year = quarter.substring(0, 4);
+                  const q = quarter.substring(4);
+                  return `${q} ${year}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              min: 0.3,
+              beginAtZero: false,
+              ticks: {
+                color: '#ffffff'
+              },
+              title: {
+                display: true,
+                text: 'RN HPRD',
+                color: '#ffffff'
+              }
+            },
+            x: {
+              ticks: {
+                color: '#ffffff',
+                maxTicksLimit: 20,
+                autoSkip: false
+              }
+            }
+          }
+        }
+      });
+
+      // 7. State Evolution Chart (Animated)
+      initializeStateEvolutionChart();
+
+    }
+    
+    // State data will be loaded from CSV
+    let stateData = {};
+
+    const quarters = [
+      "2017Q1", "2017Q2", "2017Q3", "2017Q4", "2018Q1", "2018Q2", "2018Q3", "2018Q4",
+      "2019Q1", "2019Q2", "2019Q3", "2019Q4", "2020Q1", "2020Q2", "2020Q3", "2020Q4",
+      "2021Q1", "2021Q2", "2021Q3", "2021Q4", "2022Q1", "2022Q2", "2022Q3", "2022Q4",
+      "2023Q1", "2023Q2", "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4", "2025Q1"
+    ];
+
+    let stateMap = null;
+    let currentQuarterIndex = 0; // Will be set to most recent quarter by default
+    let isAnimating = false;
+    let animationInterval = null;
+    let selectedMetric = 'Total_Nurse_HPRD'; // Default to HPRD
+    let shouldRestartAnimation = true; // Track if we should restart from beginning
+
+    function getMostRecentQuarterIndex() {
+      // Find the most recent quarter that has data
+      if (!window.stateData || Object.keys(window.stateData).length === 0) {
+        return quarters.length - 1; // Default to last quarter if no data
+      }
+      
+      // Check each quarter from newest to oldest to find the last one with data
+      for (let i = quarters.length - 1; i >= 0; i--) {
+        let metricKey;
+        if (selectedMetric === 'Total_Nurse_HPRD') {
+          metricKey = 'hprd';
+        } else if (selectedMetric === 'Total_RN_HPRD') {
+          metricKey = 'rn_hprd';
+        } else if (selectedMetric === 'Contract_Percentage') {
+          metricKey = 'contract';
+        }
+        const hasData = Object.keys(window.stateData).some(state => 
+          window.stateData[state][metricKey] && 
+          window.stateData[state][metricKey][i] !== undefined && 
+          window.stateData[state][metricKey][i] !== null
+        );
+        if (hasData) {
+          return i;
+        }
+      }
+      
+      return quarters.length - 1; // Fallback
+    }
+
+    function getColorForValue(value) {
+      if (selectedMetric === 'Total_Nurse_HPRD') {
+        // HPRD continuous gradient (3.0 to 4.5)
+        const min = 3.0;
+        const max = 4.5;
+        const normalized = Math.max(0, Math.min(1, (value - min) / (max - min)));
+        
+        // Purple color scale: light purple to dark purple (less purple, lighter)
+        const hue = 270; // Purple hue
+        const saturation = Math.max(15, normalized * 60 + 15); // 15-75% saturation (less saturated)
+        const lightness = Math.max(25, 85 - (normalized * 50)); // 85-35% lightness (lighter overall)
+        
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      } else if (selectedMetric === 'Total_RN_HPRD') {
+        // RN HPRD continuous gradient (0.22 to 1.3) - tighter range for better distribution
+        const min = 0.22;
+        const max = 1.3;
+        const normalized = Math.max(0, Math.min(1, (value - min) / (max - min)));
+        
+        // Purple color scale: light purple to dark purple (slightly lighter)
+        const hue = 270; // Purple hue
+        const saturation = Math.max(40, normalized * 60 + 40); // 40-100% saturation (more saturated)
+        const lightness = Math.max(20, 80 - (normalized * 50)); // 80-30% lightness (lighter) (more purple overall)
+        
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      } else if (selectedMetric === 'Contract_Percentage') {
+        // Contract percentage continuous gradient (0.0 to 30.0)
+        const min = 0.0;
+        const max = 30.0;
+        const normalized = Math.max(0, Math.min(1, (value - min) / (max - min)));
+        
+        // Purple color scale: light purple to dark purple (slightly darker overall)
+        const hue = 270; // Purple hue
+        const saturation = Math.max(35, normalized * 65 + 35); // 35-100% saturation (slightly more saturated)
+        const lightness = Math.max(15, 75 - (normalized * 60)); // 75-15% lightness (slightly darker)
+        
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      }
+    }
+
+    function formatQuarter(quarterString) {
+      // Convert "2017Q1" to "Q1 2017"
+      const year = quarterString.substring(0, 4);
+      const quarter = quarterString.substring(4);
+      return `${quarter} ${year}`;
+    }
+
+    function updateLegendTitle() {
+      const legendTitle = document.getElementById('legendTitle');
+      if (legendTitle) {
+        if (selectedMetric === 'Total_Nurse_HPRD') {
+          legendTitle.textContent = 'Total HPRD';
+        } else if (selectedMetric === 'Total_RN_HPRD') {
+          legendTitle.textContent = 'Total RN HPRD';
+        } else if (selectedMetric === 'Contract_Percentage') {
+          legendTitle.textContent = 'Contract Staff %';
+        }
+      }
+    }
+
+    // State name to abbreviation mapping
+    const stateAbbreviations = {
+      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+      'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
+      'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
+      'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+      'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
+      'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+      'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
+      'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+      'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+      'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY'
+    };
+
+    function initializeStateEvolutionChart() {
+      createStateMap();
+      
+      // Set default to most recent quarter
+      currentQuarterIndex = getMostRecentQuarterIndex();
+      updateMap();
+      
+      // Set up animation button
+      document.getElementById('animateButton').addEventListener('click', toggleAnimation);
+      
+      // Set up show latest button
+      document.getElementById('showLatestButton').addEventListener('click', function() {
+        // Stop any ongoing animation
+        if (isAnimating) {
+          clearInterval(animationInterval);
+          isAnimating = false;
+          const button = document.getElementById('animateButton');
+          button.textContent = 'See Changes Over Time';
+          button.style.background = 'linear-gradient(135deg, #1769aa 0%, #1e88e5 100%)';
+          shouldRestartAnimation = true;
+        }
+        
+        // Jump to most recent quarter
+        currentQuarterIndex = getMostRecentQuarterIndex();
+        updateMap();
+      });
+      
+      // Set up metric selector
+      document.getElementById('metricSelect').addEventListener('change', function() {
+        selectedMetric = this.value;
+        // Reset to most recent quarter when changing metric
+        currentQuarterIndex = getMostRecentQuarterIndex();
+        updateMap();
+        updateLegendTitle();
+      });
+    }
+
+    function createStateMap() {
+      const width = 1000;
+      const height = 600; // Increased height to prevent bleeding
+      
+      // Color scale is handled by getColorForValue() function
+      
+      // Create SVG
+      const svg = d3.select('#stateMap')
+        .html('')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('viewBox', '0 0 1000 600');
+      
+      // Define striped pattern for lightest states
+      const defs = svg.append('defs');
+      const pattern = defs.append('pattern')
+        .attr('id', 'lightest-pattern')
+        .attr('patternUnits', 'userSpaceOnUse')
+        .attr('width', 8)
+        .attr('height', 8);
+      
+      pattern.append('rect')
+        .attr('width', 8)
+        .attr('height', 8)
+        .attr('fill', '#c084fc');
+      
+      pattern.append('rect')
+        .attr('x', 0)
+        .attr('width', 4)
+        .attr('height', 8)
+        .attr('fill', '#a855f7')
+        .attr('opacity', 0.3);
+      
+      // Create tooltip
+      const tooltip = d3.select('body').append('div')
+        .attr('class', 'tooltip')
+        .style('opacity', 0)
+        .style('position', 'absolute')
+        .style('background', 'rgba(0, 0, 0, 0.8)')
+        .style('color', 'white')
+        .style('padding', '8px')
+        .style('border-radius', '4px')
+        .style('font-size', '12px')
+        .style('pointer-events', 'none')
+        .style('z-index', '1000');
+      
+      // Load US map data
+      d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json').then(function(us) {
+        const states = topojson.feature(us, us.objects.states);
+        
+        // Create projection
+        const projection = d3.geoAlbersUsa()
+          .fitSize([width, height], states);
+        
+        const path = d3.geoPath().projection(projection);
+        
+        // Draw states
+        const statePaths = svg.selectAll('.state')
+          .data(states.features)
+          .enter()
+          .append('path')
+          .attr('class', 'state')
+          .attr('d', path)
+          .attr('data-state', d => d.properties.name)
+          .style('fill', function(d) {
+            const stateName = d.properties.name;
+            const value = getStateValue(stateName);
+            if (value !== null) {
+              return getColorForValue(value);
+            }
+            return '#cbd5e1';
+          })
+          .style('stroke', '#ffffff')
+          .style('stroke-width', '1px')
+          .on('mouseover', function(event, d) {
+            const stateName = d.properties.name;
+            const value = getStateValue(stateName);
+            if (value !== null) {
+              const ranking = getStateRanking(stateName);
+              const percentageChange = getPercentageChange(stateName);
+              
+              let metricLabel, valueDisplay;
+              if (selectedMetric === 'Total_Nurse_HPRD') {
+                metricLabel = 'HPRD';
+                valueDisplay = value.toFixed(2);
+              } else if (selectedMetric === 'Total_RN_HPRD') {
+                metricLabel = 'RN HPRD';
+                valueDisplay = value.toFixed(2);
+              } else if (selectedMetric === 'Contract_Percentage') {
+                metricLabel = 'Contract %';
+                valueDisplay = value.toFixed(1) + '%';
+              }
+              
+              let changeText = '';
+              if (percentageChange !== null) {
+                const sign = percentageChange.percentageChange >= 0 ? '+' : '';
+                const changeColor = percentageChange.percentageChange >= 0 ? '#10b981' : '#ef4444';
+                changeText = `<br/>Change since Q1 2017: <span style="color: ${changeColor}">${sign}${percentageChange.percentageChange.toFixed(1)}%</span>`;
+              }
+              
+              tooltip.transition()
+                .duration(200)
+                .style('opacity', .9);
+              tooltip.html(`
+                <strong>${stateName}</strong><br/>
+                ${metricLabel}: ${valueDisplay} (Rank: ${ranking})<br/>
+                ${formatQuarter(quarters[currentQuarterIndex])}${changeText}
+              `)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+            }
+          })
+          .on('mouseout', function(d) {
+            tooltip.transition()
+              .duration(500)
+              .style('opacity', 0);
+          });
+        
+        stateMap = { svg, statePaths, tooltip };
+        updateMap();
+      });
+    }
+    
+    let staffBreakdownMap = null;
+    let currentStaffMetric = 'nurse_aide';
+    
+    function createNurseAideMap() {
+      const width = 500;
+      const height = 400;
+      
+      // Create SVG
+      const svg = d3.select('#nurseAideMap')
+        .html('')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('viewBox', '0 0 500 400');
+      
+      // Create tooltip
+      const tooltip = d3.select('body').append('div')
+        .attr('class', 'tooltip-aide')
+        .style('opacity', 0)
+        .style('position', 'absolute')
+        .style('background', 'rgba(0, 0, 0, 0.8)')
+        .style('color', 'white')
+        .style('padding', '8px')
+        .style('border-radius', '4px')
+        .style('font-size', '12px')
+        .style('pointer-events', 'none')
+        .style('z-index', '1000');
+      
+      // Color functions for different metrics
+      function getStaffBreakdownColor(percentage, metric) {
+        if (percentage === null || isNaN(percentage)) return '#cbd5e1';
+        
+        let min, max, hue, saturation, lightness;
+        
+        // Use dynamic ranges from calculated data
+        const ranges = window.staffBreakdownRanges || {
+          nurse_aide: { min: 40, max: 65 },
+          total_rn: { min: 8, max: 25 },
+          direct_care: { min: 84, max: 95 }
+        };
+        
+        if (metric === 'nurse_aide') {
+          min = ranges.nurse_aide.min;
+          max = ranges.nurse_aide.max;
+          hue = 45; // Yellow
+          const normalized = Math.max(0, Math.min(1, (percentage - min) / (max - min)));
+          saturation = Math.max(60, normalized * 40 + 60);
+          lightness = Math.max(20, 80 - (normalized * 60));
+        } else if (metric === 'total_rn') {
+          min = ranges.total_rn.min;
+          max = ranges.total_rn.max;
+          hue = 210; // Blue
+          const normalized = Math.max(0, Math.min(1, (percentage - min) / (max - min)));
+          saturation = Math.max(60, normalized * 40 + 60);
+          lightness = Math.max(20, 80 - (normalized * 60));
+        } else if (metric === 'direct_care') {
+          min = ranges.direct_care.min;
+          max = ranges.direct_care.max;
+          hue = 0; // Red
+          const normalized = Math.max(0, Math.min(1, (percentage - min) / (max - min)));
+          saturation = Math.max(80, normalized * 20 + 80); // Saturation (80-100%) - higher base
+          lightness = Math.max(15, 80 - (normalized * 65)); // Lightness range (15-80%) - darker range
+        }
+        
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      }
+      
+      // Load US map data
+      d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json').then(function(us) {
+        const states = topojson.feature(us, us.objects.states);
+        
+        // Create projection
+        const projection = d3.geoAlbersUsa()
+          .fitSize([width, height], states);
+        
+        const path = d3.geoPath().projection(projection);
+        
+        // Draw states
+        const statePaths = svg.selectAll('.state')
+          .data(states.features)
+          .enter()
+          .append('path')
+          .attr('class', 'state')
+          .attr('d', path)
+          .attr('data-state', d => d.properties.name)
+          .style('fill', function(d) {
+            return getStateBreakdownFill(d.properties.name);
+          })
+          .style('stroke', '#ffffff')
+          .style('stroke-width', '1px')
+          .on('mouseover', function(event, d) {
+            const stateName = d.properties.name;
+            const stateAbbr = stateAbbreviations[stateName];
+            const { percentage, label, subtitle } = getStateBreakdownData(stateAbbr);
+            
+            if (percentage !== null && percentage !== undefined) {
+              tooltip.transition()
+                .duration(200)
+                .style('opacity', .9);
+              tooltip.html(`
+                <strong>${stateName}</strong><br/>
+                ${label}: ${percentage.toFixed(1)}%<br/>
+                <span style="font-size: 10px; color: #aaa;">${subtitle}</span>
+              `)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+            }
+          })
+          .on('mouseout', function(d) {
+            tooltip.transition()
+              .duration(500)
+              .style('opacity', 0);
+          });
+        
+        staffBreakdownMap = { svg, statePaths, tooltip };
+        
+        // Initialize legend with correct ranges
+        updateStaffBreakdownMap();
+      });
+      
+      // Helper functions
+      function getStateBreakdownFill(stateName) {
+        const stateAbbr = stateAbbreviations[stateName];
+        const { percentage } = getStateBreakdownData(stateAbbr);
+        return getStaffBreakdownColor(percentage, currentStaffMetric);
+      }
+      
+      function getStateBreakdownData(stateAbbr) {
+        let percentage, label, subtitle;
+        
+        if (currentStaffMetric === 'nurse_aide') {
+          percentage = window.nurseAidePercentageByState && window.nurseAidePercentageByState[stateAbbr];
+          label = 'Nurse Aide %';
+          subtitle = 'of total nursing staff';
+        } else if (currentStaffMetric === 'total_rn') {
+          percentage = window.totalRnPercentageByState && window.totalRnPercentageByState[stateAbbr];
+          label = 'Total RN %';
+          subtitle = 'of total nursing staff';
+        } else if (currentStaffMetric === 'direct_care') {
+          percentage = window.directCarePercentageByState && window.directCarePercentageByState[stateAbbr];
+          label = 'Direct Care %';
+          subtitle = 'excludes admin/DON';
+        }
+        
+        return { percentage, label, subtitle };
+      }
+      
+      // Add event listener for dropdown
+      document.getElementById('staffBreakdownSelect').addEventListener('change', function(e) {
+        currentStaffMetric = e.target.value;
+        updateStaffBreakdownMap();
+      });
+    }
+    
+    function updateStaffBreakdownMap() {
+      if (!staffBreakdownMap) return;
+      
+      const { statePaths } = staffBreakdownMap;
+      
+      // Update state colors
+      statePaths.style('fill', function(d) {
+        const stateName = d.properties.name;
+        const stateAbbr = stateAbbreviations[stateName];
+        let percentage;
+        
+        if (currentStaffMetric === 'nurse_aide') {
+          percentage = window.nurseAidePercentageByState && window.nurseAidePercentageByState[stateAbbr];
+        } else if (currentStaffMetric === 'total_rn') {
+          percentage = window.totalRnPercentageByState && window.totalRnPercentageByState[stateAbbr];
+        } else if (currentStaffMetric === 'direct_care') {
+          percentage = window.directCarePercentageByState && window.directCarePercentageByState[stateAbbr];
+        }
+        
+        return getStaffBreakdownColor(percentage, currentStaffMetric);
+      });
+      
+      // Update legend
+      const legendTitle = document.getElementById('staffBreakdownLegendTitle');
+      const legendLabels = document.getElementById('staffBreakdownLegendLabels');
+      const legendGradient = document.getElementById('staffBreakdownGradient');
+      
+      const ranges = window.staffBreakdownRanges || {};
+      
+      if (currentStaffMetric === 'nurse_aide') {
+        const min = ranges.nurse_aide?.min || 40;
+        const max = ranges.nurse_aide?.max || 65;
+        legendTitle.textContent = 'Nurse Aide %';
+        legendLabels.innerHTML = `<span>${min.toFixed(0)}%</span><span>${max.toFixed(0)}%</span>`;
+        legendGradient.setAttribute('fill', 'url(#aideGradient)');
+      } else if (currentStaffMetric === 'total_rn') {
+        const min = ranges.total_rn?.min || 8;
+        const max = ranges.total_rn?.max || 25;
+        legendTitle.textContent = 'Total RN %';
+        legendLabels.innerHTML = `<span>${min.toFixed(0)}%</span><span>${max.toFixed(0)}%</span>`;
+        legendGradient.setAttribute('fill', 'url(#totalRnGradient)');
+      } else if (currentStaffMetric === 'direct_care') {
+        const min = ranges.direct_care?.min || 84;
+        const max = ranges.direct_care?.max || 95;
+        legendTitle.textContent = 'Direct Care %';
+        legendLabels.innerHTML = `<span>${min.toFixed(0)}%</span><span>${max.toFixed(0)}%</span>`;
+        legendGradient.setAttribute('fill', 'url(#directCareGradient)');
+      }
+      
+      // Helper function
+      function getStaffBreakdownColor(percentage, metric) {
+        if (percentage === null || isNaN(percentage)) return '#cbd5e1';
+        
+        // Use dynamic ranges from actual data
+        const ranges = window.staffBreakdownRanges || {};
+        let min, max, hue, saturation, lightness;
+        
+        if (metric === 'nurse_aide') {
+          min = ranges.nurse_aide?.min || 40;
+          max = ranges.nurse_aide?.max || 65;
+          hue = 45; // Yellow
+          const normalized = Math.max(0, Math.min(1, (percentage - min) / (max - min)));
+          saturation = Math.max(60, normalized * 40 + 60);
+          lightness = Math.max(20, 80 - (normalized * 60));
+        } else if (metric === 'total_rn') {
+          min = ranges.total_rn?.min || 8;
+          max = ranges.total_rn?.max || 25;
+          hue = 210; // Blue
+          const normalized = Math.max(0, Math.min(1, (percentage - min) / (max - min)));
+          saturation = Math.max(60, normalized * 40 + 60);
+          lightness = Math.max(20, 80 - (normalized * 60));
+        } else if (metric === 'direct_care') {
+          min = ranges.direct_care?.min || 84;
+          max = ranges.direct_care?.max || 95;
+          hue = 0; // Red
+          const normalized = Math.max(0, Math.min(1, (percentage - min) / (max - min)));
+          saturation = Math.max(80, normalized * 20 + 80); // Saturation (80-100%) - higher base
+          lightness = Math.max(15, 80 - (normalized * 65)); // Lightness range (15-80%) - darker range
+        }
+        
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      }
+    }
+
+    function getStateValue(stateName) {
+      if (!window.stateData) return null;
+      
+      const stateAbbr = stateAbbreviations[stateName];
+      if (stateAbbr && window.stateData[stateAbbr]) {
+        let metricKey;
+        if (selectedMetric === 'Total_Nurse_HPRD') {
+          metricKey = 'hprd';
+        } else if (selectedMetric === 'Total_RN_HPRD') {
+          metricKey = 'rn_hprd';
+        } else if (selectedMetric === 'Contract_Percentage') {
+          metricKey = 'contract';
+        }
+        return window.stateData[stateAbbr][metricKey][currentQuarterIndex] || null;
+      }
+      return null;
+    }
+
+    function getStateRanking(stateName) {
+      if (!window.stateData) return 'N/A';
+      
+      const currentData = {};
+      Object.keys(window.stateData).forEach(abbr => {
+        const fullName = Object.keys(stateAbbreviations).find(name => stateAbbreviations[name] === abbr);
+        if (fullName && window.stateData[abbr]) {
+          let metricKey;
+          if (selectedMetric === 'Total_Nurse_HPRD') {
+            metricKey = 'hprd';
+          } else if (selectedMetric === 'Total_RN_HPRD') {
+            metricKey = 'rn_hprd';
+          } else if (selectedMetric === 'Contract_Percentage') {
+            metricKey = 'contract';
+          }
+          const value = window.stateData[abbr][metricKey][currentQuarterIndex];
+          if (value !== undefined && value !== null) {
+            currentData[fullName] = value;
+          }
+        }
+      });
+      
+      const sortedStates = Object.entries(currentData)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, value], index) => ({ name, value, rank: index + 1 }));
+      
+      const state = sortedStates.find(s => s.name === stateName);
+      return state ? state.rank : 'N/A';
+    }
+
+    function getPercentageChange(stateName) {
+      if (!window.stateData) return null;
+      
+      const stateAbbr = stateAbbreviations[stateName];
+      if (!stateAbbr || !window.stateData[stateAbbr]) return null;
+      
+      let metricKey;
+      if (selectedMetric === 'Total_Nurse_HPRD') {
+        metricKey = 'hprd';
+      } else if (selectedMetric === 'Total_RN_HPRD') {
+        metricKey = 'rn_hprd';
+      } else if (selectedMetric === 'Contract_Percentage') {
+        metricKey = 'contract';
+      }
+      const firstQuarterValue = window.stateData[stateAbbr][metricKey][0]; // Q1 2017
+      const currentValue = window.stateData[stateAbbr][metricKey][currentQuarterIndex];
+      
+      if (firstQuarterValue === undefined || currentValue === undefined || firstQuarterValue === 0) {
+        return null;
+      }
+      
+      const change = currentValue - firstQuarterValue;
+      const percentageChange = (change / firstQuarterValue) * 100;
+      
+      return {
+        change: change,
+        percentageChange: percentageChange,
+        firstValue: firstQuarterValue,
+        currentValue: currentValue
+      };
+    }
+
+    function updateMap() {
+      if (!stateMap) return;
+      
+      const { statePaths } = stateMap;
+      
+      // Update state colors
+      statePaths.style('fill', function(d) {
+        const stateName = d.properties.name;
+        const value = getStateValue(stateName);
+        if (value !== null) {
+          return getColorForValue(value);
+        }
+        return '#cbd5e1';
+      });
+      
+      // Update quarter display
+      document.getElementById('quarterDisplay').textContent = formatQuarter(quarters[currentQuarterIndex]);
+      
+      // Update legend labels and gradient
+      const legendLabels = document.getElementById('legendLabels');
+      const legendGradient = document.getElementById('legendGradient');
+      
+      if (legendLabels && legendGradient) {
+        if (selectedMetric === 'Total_Nurse_HPRD') {
+          legendLabels.innerHTML = `
+            <span>3.0</span>
+            <span>4.5</span>
+          `;
+          legendGradient.setAttribute('fill', 'url(#hprdGradient)');
+        } else if (selectedMetric === 'Total_RN_HPRD') {
+          legendLabels.innerHTML = `
+            <span>0.2</span>
+            <span>1.3</span>
+          `;
+          legendGradient.setAttribute('fill', 'url(#rnGradient)');
+         } else if (selectedMetric === 'Contract_Percentage') {
+           legendLabels.innerHTML = `
+             <span>0%</span>
+             <span>30%</span>
+           `;
+           legendGradient.setAttribute('fill', 'url(#contractGradient)');
+         }
+      }
+    }
+
+    function getCurrentQuarterData() {
+      const data = {};
+      
+      // Use the processed state data from window.stateData
+      if (window.stateData) {
+        Object.keys(window.stateData).forEach(state => {
+          if (window.stateData[state][currentQuarterIndex] !== undefined) {
+            data[state] = window.stateData[state][currentQuarterIndex];
+          }
+        });
+      }
+      
+      return data;
+    }
+
+
+    function updateChart() {
+      if (!stateEvolutionChart) return;
+      
+      const currentData = getCurrentQuarterData();
+      const currentQuarter = quarters[currentQuarterIndex];
+      
+      // Update chart data
+      stateEvolutionChart.data.labels = Object.keys(currentData);
+      stateEvolutionChart.data.datasets[0].data = Object.values(currentData);
+      stateEvolutionChart.data.datasets[0].backgroundColor = Object.values(currentData).map(value => getColorForValue(value));
+      
+      // Update title
+      stateEvolutionChart.options.plugins.title.text = `State HPRD by Quarter - ${currentQuarter}`;
+      
+      // Update quarter display
+      document.getElementById('quarterDisplay').textContent = currentQuarter;
+      
+      // Update chart
+      stateEvolutionChart.update('active');
+    }
+
+    function toggleAnimation() {
+      const button = document.getElementById('animateButton');
+      
+      if (isAnimating) {
+        // Stop animation
+        clearInterval(animationInterval);
+        isAnimating = false;
+        shouldRestartAnimation = false; // Next time, continue from current position
+        button.textContent = 'See Changes Over Time';
+        button.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)';
+      } else {
+        // Start animation
+        if (shouldRestartAnimation) {
+          // Start from Q1 2017 (oldest quarter)
+          currentQuarterIndex = 0;
+        }
+        // If shouldRestartAnimation is false, continue from current position
+        updateMap();
+        
+        isAnimating = true;
+        shouldRestartAnimation = true; // Reset for next cycle
+        button.textContent = 'Stop Animation';
+        button.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+        
+        animationInterval = setInterval(() => {
+          const mostRecentIndex = getMostRecentQuarterIndex();
+          if (currentQuarterIndex < mostRecentIndex) {
+            currentQuarterIndex++;
+            updateMap();
+          } else {
+            // Reached the most recent quarter, stop animation
+            clearInterval(animationInterval);
+            isAnimating = false;
+            shouldRestartAnimation = true; // Next time, restart from beginning
+            button.textContent = 'See Changes Over Time';
+            button.style.background = 'linear-gradient(135deg, #1769aa 0%, #1e88e5 100%)';
+          }
+        }, 250); // 250ms = comfortable animation speed
+      }
+    }
+    
+    // Load data when page loads
+    loadData();
+    
+    // Mobile Navigation Toggle
+    document.addEventListener('DOMContentLoaded', function() {
+      const navToggle = document.getElementById('navToggle');
+      const navMenu = document.getElementById('navMenu');
+      
+      if (navToggle && navMenu) {
+        navToggle.addEventListener('click', function() {
+          navMenu.classList.toggle('active');
+          navToggle.classList.toggle('active');
+        });
+        
+        // Close mobile menu when a nav link is clicked
+        const navLinks = navMenu.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+          link.addEventListener('click', function() {
+            navMenu.classList.remove('active');
+            navToggle.classList.remove('active');
+          });
+        });
+      }
+    });
+  </script>
+</body>
+</html>

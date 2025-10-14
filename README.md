@@ -59,6 +59,24 @@ Generate three main CSV files:
 - **Total Nurse HPRD** = Total Nurse Hours / MDSCENSUS
 - **Contract Percentage** = Contract Hours / Total Nurse Hours
 
+## PBJ Playground
+
+For interactive data visualization and exploration, use the PBJ Playground:
+
+**Quick Start:**
+1. Copy files from `pbj-root/` to `PBJapp/` directory
+2. Run: `python -m http.server 8080` 
+3. Open: `http://localhost:8080/pbj_playground.html`
+
+**Features:**
+- Interactive US state maps with HPRD data
+- Contract staffing distribution charts
+- RN staffing breakdowns by state
+- Animated time-lapse across quarters
+- Mobile-responsive design
+
+See `PLAYGROUND_DEPLOYMENT_GUIDE.md` for detailed setup instructions.
+
 ## Application Structure
 
 ### Main Components
@@ -126,8 +144,8 @@ python generate_metrics.py
 ```
 
 4. Place additional data files (optional):
-   - `Nursing_Home_Affiliated_Entity_Performance_Measures_Jun_2025.csv` - For affiliated entities dashboard
-   - `NH_ProviderInfo_Jun2025.csv` - For facility details and entity linking
+   - `Nursing_Home_Affiliated_Entity_Performance_Measures_<Month>_<Year>.csv` - Latest affiliated entity file (automatically detected)
+   - `NH_ProviderInfo_<Month><Year>.csv` - Latest provider info file (automatically detected)
 
 5. Launch the dashboard:
 ```bash

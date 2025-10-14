@@ -1,0 +1,266 @@
+[
+  {
+    "CY_Qtr": "2017Q1",
+    "Total_Nurse_HPRD_Median": 3.653,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.557,
+    "Nurse_Care_HPRD_Median": 3.39,
+    "facility_count": 13929
+  },
+  {
+    "CY_Qtr": "2017Q2",
+    "Total_Nurse_HPRD_Median": 3.679,
+    "Contract_Percentage_Median": 0.169,
+    "RN_HPRD_Median": 0.554,
+    "Nurse_Care_HPRD_Median": 3.415,
+    "facility_count": 13984
+  },
+  {
+    "CY_Qtr": "2017Q3",
+    "Total_Nurse_HPRD_Median": 3.667,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.548,
+    "Nurse_Care_HPRD_Median": 3.405,
+    "facility_count": 14477
+  },
+  {
+    "CY_Qtr": "2017Q4",
+    "Total_Nurse_HPRD_Median": 3.679,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.556,
+    "Nurse_Care_HPRD_Median": 3.416,
+    "facility_count": 14142
+  },
+  {
+    "CY_Qtr": "2018Q1",
+    "Total_Nurse_HPRD_Median": 3.686,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.569,
+    "Nurse_Care_HPRD_Median": 3.412,
+    "facility_count": 14677
+  },
+  {
+    "CY_Qtr": "2018Q2",
+    "Total_Nurse_HPRD_Median": 3.718,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.569,
+    "Nurse_Care_HPRD_Median": 3.443,
+    "facility_count": 14662
+  },
+  {
+    "CY_Qtr": "2018Q3",
+    "Total_Nurse_HPRD_Median": 3.709,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.565,
+    "Nurse_Care_HPRD_Median": 3.441,
+    "facility_count": 14871
+  },
+  {
+    "CY_Qtr": "2018Q4",
+    "Total_Nurse_HPRD_Median": 3.718,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.569,
+    "Nurse_Care_HPRD_Median": 3.443,
+    "facility_count": 14916
+  },
+  {
+    "CY_Qtr": "2019Q1",
+    "Total_Nurse_HPRD_Median": 3.693,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.581,
+    "Nurse_Care_HPRD_Median": 3.414,
+    "facility_count": 15058
+  },
+  {
+    "CY_Qtr": "2019Q2",
+    "Total_Nurse_HPRD_Median": 3.708,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.578,
+    "Nurse_Care_HPRD_Median": 3.428,
+    "facility_count": 15020
+  },
+  {
+    "CY_Qtr": "2019Q3",
+    "Total_Nurse_HPRD_Median": 3.708,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.58,
+    "Nurse_Care_HPRD_Median": 3.43,
+    "facility_count": 14983
+  },
+  {
+    "CY_Qtr": "2019Q4",
+    "Total_Nurse_HPRD_Median": 3.703,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.579,
+    "Nurse_Care_HPRD_Median": 3.43,
+    "facility_count": 14969
+  },
+  {
+    "CY_Qtr": "2020Q1",
+    "Total_Nurse_HPRD_Median": 3.733,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.593,
+    "Nurse_Care_HPRD_Median": 3.447,
+    "facility_count": 12134
+  },
+  {
+    "CY_Qtr": "2020Q2",
+    "Total_Nurse_HPRD_Median": 3.851,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.624,
+    "Nurse_Care_HPRD_Median": 3.555,
+    "facility_count": 14763
+  },
+  {
+    "CY_Qtr": "2020Q3",
+    "Total_Nurse_HPRD_Median": 3.838,
+    "Contract_Percentage_Median": 0.0,
+    "RN_HPRD_Median": 0.636,
+    "Nurse_Care_HPRD_Median": 3.536,
+    "facility_count": 14782
+  },
+  {
+    "CY_Qtr": "2020Q4",
+    "Total_Nurse_HPRD_Median": 3.9,
+    "Contract_Percentage_Median": 0.109,
+    "RN_HPRD_Median": 0.647,
+    "Nurse_Care_HPRD_Median": 3.6,
+    "facility_count": 14688
+  },
+  {
+    "CY_Qtr": "2021Q1",
+    "Total_Nurse_HPRD_Median": 3.892,
+    "Contract_Percentage_Median": 0.239,
+    "RN_HPRD_Median": 0.649,
+    "Nurse_Care_HPRD_Median": 3.582,
+    "facility_count": 14857
+  },
+  {
+    "CY_Qtr": "2021Q2",
+    "Total_Nurse_HPRD_Median": 3.716,
+    "Contract_Percentage_Median": 0.42,
+    "RN_HPRD_Median": 0.617,
+    "Nurse_Care_HPRD_Median": 3.409,
+    "facility_count": 14812
+  },
+  {
+    "CY_Qtr": "2021Q3",
+    "Total_Nurse_HPRD_Median": 3.609,
+    "Contract_Percentage_Median": 0.994,
+    "RN_HPRD_Median": 0.592,
+    "Nurse_Care_HPRD_Median": 3.319,
+    "facility_count": 14806
+  },
+  {
+    "CY_Qtr": "2021Q4",
+    "Total_Nurse_HPRD_Median": 3.608,
+    "Contract_Percentage_Median": 1.755,
+    "RN_HPRD_Median": 0.572,
+    "Nurse_Care_HPRD_Median": 3.329,
+    "facility_count": 14627
+  },
+  {
+    "CY_Qtr": "2022Q1",
+    "Total_Nurse_HPRD_Median": 3.61,
+    "Contract_Percentage_Median": 2.781,
+    "RN_HPRD_Median": 0.574,
+    "Nurse_Care_HPRD_Median": 3.317,
+    "facility_count": 14752
+  },
+  {
+    "CY_Qtr": "2022Q2",
+    "Total_Nurse_HPRD_Median": 3.613,
+    "Contract_Percentage_Median": 3.229,
+    "RN_HPRD_Median": 0.562,
+    "Nurse_Care_HPRD_Median": 3.332,
+    "facility_count": 14694
+  },
+  {
+    "CY_Qtr": "2022Q3",
+    "Total_Nurse_HPRD_Median": 3.594,
+    "Contract_Percentage_Median": 3.563,
+    "RN_HPRD_Median": 0.556,
+    "Nurse_Care_HPRD_Median": 3.32,
+    "facility_count": 14688
+  },
+  {
+    "CY_Qtr": "2022Q4",
+    "Total_Nurse_HPRD_Median": 3.576,
+    "Contract_Percentage_Median": 3.246,
+    "RN_HPRD_Median": 0.547,
+    "Nurse_Care_HPRD_Median": 3.308,
+    "facility_count": 14703
+  },
+  {
+    "CY_Qtr": "2023Q1",
+    "Total_Nurse_HPRD_Median": 3.592,
+    "Contract_Percentage_Median": 2.869,
+    "RN_HPRD_Median": 0.558,
+    "Nurse_Care_HPRD_Median": 3.309,
+    "facility_count": 14699
+  },
+  {
+    "CY_Qtr": "2023Q2",
+    "Total_Nurse_HPRD_Median": 3.621,
+    "Contract_Percentage_Median": 2.262,
+    "RN_HPRD_Median": 0.555,
+    "Nurse_Care_HPRD_Median": 3.348,
+    "facility_count": 14595
+  },
+  {
+    "CY_Qtr": "2023Q3",
+    "Total_Nurse_HPRD_Median": 3.621,
+    "Contract_Percentage_Median": 1.799,
+    "RN_HPRD_Median": 0.551,
+    "Nurse_Care_HPRD_Median": 3.358,
+    "facility_count": 14611
+  },
+  {
+    "CY_Qtr": "2023Q4",
+    "Total_Nurse_HPRD_Median": 3.627,
+    "Contract_Percentage_Median": 1.199,
+    "RN_HPRD_Median": 0.554,
+    "Nurse_Care_HPRD_Median": 3.373,
+    "facility_count": 14609
+  },
+  {
+    "CY_Qtr": "2024Q1",
+    "Total_Nurse_HPRD_Median": 3.626,
+    "Contract_Percentage_Median": 1.023,
+    "RN_HPRD_Median": 0.562,
+    "Nurse_Care_HPRD_Median": 3.355,
+    "facility_count": 14626
+  },
+  {
+    "CY_Qtr": "2024Q2",
+    "Total_Nurse_HPRD_Median": 3.664,
+    "Contract_Percentage_Median": 0.926,
+    "RN_HPRD_Median": 0.568,
+    "Nurse_Care_HPRD_Median": 3.394,
+    "facility_count": 14564
+  },
+  {
+    "CY_Qtr": "2024Q3",
+    "Total_Nurse_HPRD_Median": 3.68,
+    "Contract_Percentage_Median": 0.779,
+    "RN_HPRD_Median": 0.564,
+    "Nurse_Care_HPRD_Median": 3.406,
+    "facility_count": 14548
+  },
+  {
+    "CY_Qtr": "2024Q4",
+    "Total_Nurse_HPRD_Median": 3.688,
+    "Contract_Percentage_Median": 0.59,
+    "RN_HPRD_Median": 0.567,
+    "Nurse_Care_HPRD_Median": 3.416,
+    "facility_count": 14573
+  },
+  {
+    "CY_Qtr": "2025Q1",
+    "Total_Nurse_HPRD_Median": 3.669,
+    "Contract_Percentage_Median": 0.623,
+    "RN_HPRD_Median": 0.575,
+    "Nurse_Care_HPRD_Median": 3.392,
+    "facility_count": 14551
+  }
+]

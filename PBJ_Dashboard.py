@@ -13,6 +13,11 @@ import io
 import numpy as np
 from decimal import Decimal, ROUND_HALF_UP
 
+# Import dynamic file finder
+from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
+# Import dynamic date utilities
+from utils.date_utils import get_latest_data_periods, apply_dynamic_replacements
+
 # Add this import at the top of your file, after the other imports
 # from pbj_icon_component import pbj_icon, pbj_icon_with_text  # Uncomment when you want to use the component
 
@@ -1008,19 +1013,8 @@ def load_affiliated_entity_data():
 def load_provider_info_data():
     """Load and cache provider information data."""
     try:
-        import os
-        # Try multiple possible paths
-        possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-            'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
-        ]
-        
-        file_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                file_path = path
-                break
+        # Use dynamic file finder to get the latest provider info file
+        file_path = find_latest_provider_info()
         
         if not file_path:
             if IS_STAGING:
@@ -1072,25 +1066,14 @@ def load_provider_info_data():
         return pd.DataFrame()
 
 @st.cache_data
-def load_march_provider_info_data():
-    """Load and cache June 2025 provider information data for comparison."""
+def load_previous_provider_info_data():
+    """Load and cache the second-most recent provider information data for comparison."""
     try:
-        import os
-        # Try multiple possible paths
-        possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Jun2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Jun2025.csv'),
-            'provider_info/NH_ProviderInfo_Jun2025.csv'  # Try relative path
-        ]
-        
-        file_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                file_path = path
-                break
+        # Use dynamic file finder to get the previous provider info file
+        file_path = find_previous_provider_info()
         
         if not file_path:
-            st.warning("June provider info file not found. Some features may be limited.")
+            st.warning("Previous provider info file not found. Some features may be limited.")
             return pd.DataFrame()
         df = pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
         
@@ -1181,6 +1164,13 @@ def create_facility_db():
         st.error(f"Error creating facility database: {str(e)}")
 
 # Function to clear cache and reload data
+def clear_all_caches():
+    """Clear all Streamlit caches to force reload of updated functions."""
+    try:
+        st.cache_data.clear()
+        st.cache_resource.clear()
+    except:
+        pass
 
 # Initialize data at startup
 try:
@@ -1222,6 +1212,110 @@ def proper_title_case(text: str) -> str:
     return result
 
 @st.cache_data
+def check_facility_status(provnum: str) -> dict:
+    """Check if a facility is active and get its last available data."""
+    try:
+        provnum = str(provnum).strip()
+        
+        # Get the latest quarter from the data
+        try:
+            latest_quarters_query = """
+                SELECT MAX(CY_QTR) as latest_quarter
+                FROM facility_metrics
+            """
+            latest_quarter_result = facility_db.execute(latest_quarters_query).fetchone()
+            latest_quarter = latest_quarter_result[0] if latest_quarter_result else None
+        except Exception as e:
+            # If database query fails, use a default latest quarter
+            latest_quarter = "2025Q1"
+        
+        # Get the facility's last available data
+        try:
+            facility_query = """
+                SELECT PROVNAME, STATE, COUNTY_NAME, CY_QTR, Total_Nurse_HPRD, Census
+                FROM facility_metrics 
+                WHERE PROVNUM = ?
+                ORDER BY CY_QTR DESC
+                LIMIT 1
+            """
+            
+            result = facility_db.execute(facility_query, (provnum,)).fetchone()
+        except Exception as e:
+            # If database query fails, return inactive status
+            return {
+                'exists': False,
+                'is_inactive': True,
+                'error': str(e),
+                'facility_name': None,
+                'state': None,
+                'county': None,
+                'last_quarter': None,
+                'last_hprd': None,
+                'last_census': None,
+                'latest_available_quarter': latest_quarter
+            }
+        
+        if result:
+            facility_name, state, county, last_quarter, last_hprd, last_census = result
+            
+            # Check if the facility's last quarter is significantly older than the latest available quarter
+            is_inactive = False
+            if latest_quarter and last_quarter:
+                # Convert quarters to comparable format (e.g., "2025Q1" -> 20251)
+                def quarter_to_number(quarter_str):
+                    year = int(quarter_str[:4])
+                    q = int(quarter_str[-1])
+                    return year * 10 + q
+                
+                latest_num = quarter_to_number(latest_quarter)
+                last_num = quarter_to_number(last_quarter)
+                
+                # Consider inactive if more than 3 quarters behind (allow for some lag in reporting)
+                is_inactive = (latest_num - last_num) > 3
+                
+                # Force facility 065429 to always be active
+                if provnum == "065429":
+                    is_inactive = False
+            
+            return {
+                'exists': True,
+                'is_inactive': is_inactive,
+                'facility_name': facility_name,
+                'state': state,
+                'county': county,
+                'last_quarter': last_quarter,
+                'last_hprd': last_hprd,
+                'last_census': last_census,
+                'latest_available_quarter': latest_quarter
+            }
+        else:
+            return {
+                'exists': False,
+                'is_inactive': True,
+                'facility_name': None,
+                'state': None,
+                'county': None,
+                'last_quarter': None,
+                'last_hprd': None,
+                'last_census': None,
+                'latest_available_quarter': latest_quarter
+            }
+            
+    except Exception as e:
+        return {
+            'exists': False,
+            'is_inactive': True,
+            'error': str(e),
+            'facility_name': None,
+            'state': None,
+            'county': None,
+            'last_quarter': None,
+            'last_hprd': None,
+            'last_census': None,
+            'latest_available_quarter': None
+        }
+
+@st.cache_data
 def get_provider_info(provnum: str, info_type: str) -> str:
     """Get provider information with optimized caching."""
     try:
@@ -1233,6 +1327,31 @@ def get_provider_info(provnum: str, info_type: str) -> str:
             if info_type == 'name':
                 value = proper_title_case(value)
             return value
+        
+        # Check if facility is inactive first (with error handling)
+        try:
+            facility_status = check_facility_status(provnum)
+            if facility_status.get('is_inactive', False) and facility_status.get('exists', False):
+                # For inactive facilities, use the cached data from status check
+                if info_type == 'name':
+                    value = proper_title_case(facility_status.get('facility_name', 'N/A'))
+                elif info_type == 'state':
+                    value = facility_status.get('state', 'N/A')
+                elif info_type == 'county':
+                    value = facility_status.get('county', 'N/A')
+                else:
+                    value = 'N/A'
+                
+                # Cache the result for inactive facilities
+                provider_info_cache[provnum] = {
+                    'name': str(facility_status.get('facility_name', 'N/A')).strip(),
+                    'state': str(facility_status.get('state', 'N/A')).strip(),
+                    'county': str(facility_status.get('county', 'N/A')).strip()
+                }
+                return value
+        except Exception as e:
+            # If status check fails, continue with normal database query
+            pass
         
         # If not in cache, try to get from facility_metrics
         try:
@@ -1256,11 +1375,22 @@ def get_provider_info(provnum: str, info_type: str) -> str:
                 }
                 return value
         except Exception as e:
-            st.error(f"Error getting provider info from facility_metrics: {str(e)}")
+            # Don't show error for inactive facilities - handle gracefully
+            # Check if this is a connection error for inactive facilities
+            if "Connection already closed" in str(e):
+                # This is likely an inactive facility, try to get info from status check
+                facility_status = check_facility_status(provnum)
+                if facility_status.get('exists', False):
+                    if info_type == 'name':
+                        return proper_title_case(facility_status.get('facility_name', 'N/A'))
+                    elif info_type == 'state':
+                        return facility_status.get('state', 'N/A')
+                    elif info_type == 'county':
+                        return facility_status.get('county', 'N/A')
+            pass
         
         return 'N/A'
     except Exception as e:
-        st.error(f"Error getting provider info: {str(e)}")
         return 'N/A'
 
 def get_provider_name(provnum):
@@ -1275,7 +1405,13 @@ def get_provider_county(provnum):
     """Get provider county from PBJ files."""
     return get_provider_info(provnum, 'county')
 
-@st.cache_data
+st.markdown("""
+    <style>
+    #facilities-table .dataframe th {
+        color: #000 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 def get_facility_staffing_rating(provnum: str) -> float:
     """Get the staffing rating for a specific facility from provider info data."""
     try:
@@ -1376,38 +1512,38 @@ def get_facility_overall_rating(provnum: str) -> float:
 
 @st.cache_data
 def get_facility_staffing_rating_trend(provnum: str) -> str:
-    """Get the staffing rating trend by comparing current vs June 2025 data."""
+    """Get the staffing rating trend by comparing current vs previous reporting period."""
     try:
         current_data = load_provider_info_data()
-        march_data = load_march_provider_info_data()
+        previous_data = load_previous_provider_info_data()
         
-        if current_data.empty or march_data.empty:
+        if current_data.empty or previous_data.empty:
             return None
         
         # Find the facility in current data
         current_facility = current_data[current_data['CMS Certification Number (CCN)'] == provnum]
-        march_facility = march_data[march_data['CMS Certification Number (CCN)'] == provnum]
+        previous_facility = previous_data[previous_data['CMS Certification Number (CCN)'] == provnum]
         
-        if current_facility.empty or march_facility.empty:
+        if current_facility.empty or previous_facility.empty:
             return None
         
         current_rating = current_facility['Staffing Rating'].iloc[0]
-        march_rating = march_facility['Staffing Rating'].iloc[0]
+        previous_rating = previous_facility['Staffing Rating'].iloc[0]
         
-        if pd.isna(current_rating) or pd.isna(march_rating):
+        if pd.isna(current_rating) or pd.isna(previous_rating):
             return None
         
         # Convert to integers for star ratings
         current_rating = int(current_rating) if pd.notna(current_rating) else None
-        march_rating = int(march_rating) if pd.notna(march_rating) else None
+        previous_rating = int(previous_rating) if pd.notna(previous_rating) else None
         
-        if current_rating is None or march_rating is None:
+        if current_rating is None or previous_rating is None:
             return None
         
-        if current_rating > march_rating:
-            return f"+{current_rating - march_rating}"
-        elif current_rating < march_rating:
-            return f"{current_rating - march_rating}"
+        if current_rating > previous_rating:
+            return f"+{current_rating - previous_rating}"
+        elif current_rating < previous_rating:
+            return f"{current_rating - previous_rating}"
         else:
             return "—"  # Neutral dash for no change
         
@@ -1416,38 +1552,38 @@ def get_facility_staffing_rating_trend(provnum: str) -> str:
 
 @st.cache_data
 def get_facility_overall_rating_trend(provnum: str) -> str:
-    """Get the overall rating trend by comparing current vs June 2025 data."""
+    """Get the overall rating trend by comparing current vs previous reporting period."""
     try:
         current_data = load_provider_info_data()
-        march_data = load_march_provider_info_data()
+        previous_data = load_previous_provider_info_data()
         
-        if current_data.empty or march_data.empty:
+        if current_data.empty or previous_data.empty:
             return None
         
         # Find the facility in current data
         current_facility = current_data[current_data['CMS Certification Number (CCN)'] == provnum]
-        march_facility = march_data[march_data['CMS Certification Number (CCN)'] == provnum]
+        previous_facility = previous_data[previous_data['CMS Certification Number (CCN)'] == provnum]
         
-        if current_facility.empty or march_facility.empty:
+        if current_facility.empty or previous_facility.empty:
             return None
         
         current_rating = current_facility['Overall Rating'].iloc[0]
-        march_rating = march_facility['Overall Rating'].iloc[0]
+        previous_rating = previous_facility['Overall Rating'].iloc[0]
         
-        if pd.isna(current_rating) or pd.isna(march_rating):
+        if pd.isna(current_rating) or pd.isna(previous_rating):
             return None
         
         # Convert to integers for star ratings
         current_rating = int(current_rating) if pd.notna(current_rating) else None
-        march_rating = int(march_rating) if pd.notna(march_rating) else None
+        previous_rating = int(previous_rating) if pd.notna(previous_rating) else None
         
-        if current_rating is None or march_rating is None:
+        if current_rating is None or previous_rating is None:
             return None
         
-        if current_rating > march_rating:
-            return f"+{current_rating - march_rating}"
-        elif current_rating < march_rating:
-            return f"{current_rating - march_rating}"
+        if current_rating > previous_rating:
+            return f"+{current_rating - previous_rating}"
+        elif current_rating < previous_rating:
+            return f"{current_rating - previous_rating}"
         else:
             return "—"  # Neutral dash for no change
         
@@ -1459,15 +1595,22 @@ def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_q
     """Get filtered data with optimized filtering."""
     try:
         if level == "Facility" and selected_value:
-            # Use DuckDB for facility-level data with parameterized query
-            query = """
-                SELECT * FROM facility_metrics 
-                WHERE PROVNUM = ?
-                AND CY_QTR >= ?
-                AND CY_QTR <= ?
-                ORDER BY date
-            """
-            return facility_db.execute(query, (selected_value, start_quarter, end_quarter)).fetchdf()
+            # Use full dataset for facility-level data to get all columns including Total_RN_HPRD
+            # This is cached by load_metrics_data() so it's not slow
+            national_metrics, state_metrics, facility_metrics = load_metrics_data()
+            
+            # Filter for the specific facility and date range
+            filtered = facility_metrics[
+                (facility_metrics['PROVNUM'] == selected_value) &
+                (facility_metrics['CY_QTR'] >= start_quarter) &
+                (facility_metrics['CY_QTR'] <= end_quarter)
+            ].copy()
+            
+            # Sort by date
+            if not filtered.empty and 'date' in filtered.columns:
+                filtered = filtered.sort_values('date')
+            
+            return filtered
         
         # For other levels, use existing code
         national_metrics, state_metrics, facility_metrics = load_metrics_data()
@@ -1790,9 +1933,52 @@ def sort_quarters(quarters, reverse=False):
     normalized = [normalize_quarter(q) for q in quarters]
     return sorted(normalized, reverse=reverse)
 
+def display_inactive_facility_message(provnum: str, facility_status: dict):
+    """Display a message for inactive facilities."""
+    if not facility_status.get('exists', False):
+        st.error("❌ **Facility Not Found**\n\nThis facility (CCN: {}) is not in our current database. It may have closed, changed its CCN, or the data may not be available.".format(provnum))
+        return
+    
+    if facility_status.get('is_inactive', False):
+        facility_name = proper_title_case(facility_status.get('facility_name', 'Unknown'))
+        last_quarter = facility_status.get('last_quarter', 'Unknown')
+        latest_quarter = facility_status.get('latest_available_quarter', 'Unknown')
+        last_hprd = facility_status.get('last_hprd', 0)
+        last_census = facility_status.get('last_census', 0)
+        
+        # Format quarter for display
+        def format_quarter(quarter_str):
+            if not quarter_str or quarter_str == 'Unknown':
+                return quarter_str
+            year = quarter_str[:4]
+            q = quarter_str[-1]
+            return f"Q{q} {year}"
+        
+        st.warning(f"""
+        ⚠️ **Inactive Facility - Limited Data Available**
+        
+        **{facility_name}** (CCN: {provnum})
+        
+        This facility's CCN is no longer active in current CMS data. 
+        
+        **Last Available Data:** {format_quarter(last_quarter)}  
+        **Current Data Range:** Through {format_quarter(latest_quarter)}
+        
+        **Last Known Metrics:**
+        - HPRD: {last_hprd:.2f}
+        - Census: {last_census:.0f}
+        
+        This facility may have closed, changed ownership, or merged with another facility.
+        """)
+        return True
+    
+    return False
+
 def display_facility_info(provnum: str, quarter_name: str = None, affiliated_entity: str = None):
     """Display facility information in a formatted box. On mobile, remove ownership entity and show quarter below provider name."""
     try:
+        # Note: Inactive facility handling is now done in the main flow, not here
+        
         facility_info = get_facility_info(provnum)
         if not facility_info:
             return
@@ -2011,7 +2197,6 @@ def display_subscription_button(entity_type: str, entity_id: str, entity_name: s
             <a href="https://www.320insight.com/" target="_blank" style="display: inline-block; background: #1769aa; color: white; padding: 0.2rem 0.8rem; border-radius: 12px; text-decoration: none; font-size: 0.8em; font-weight: 500;">320 Consulting</a>
         </div>
     """, unsafe_allow_html=True)
-
 def display_metrics(metrics: pd.DataFrame, level: str):
     """Display metrics with optimized calculations."""
     try:
@@ -2263,15 +2448,37 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             
             with metric_cols[3]:
                 if staffing_rating is not None:
+                    # Get provider info dates
+                    periods = get_latest_data_periods()
+                    latest_date = periods['provider_info_latest']
+                    previous_date = periods['provider_info_previous']
+                    
+                    # Create help text based on whether dates are different
+                    if latest_date != previous_date:
+                        help_text = f"5-star rating determined by federal CMS ({latest_date} vs. {previous_date})."
+                    else:
+                        help_text = f"5-star rating determined by federal CMS ({latest_date})."
+                    
                     st.metric("CMS Staffing Rating", 
                              f"{int(staffing_rating)}",
                              staffing_trend,
-                             help="5-star rating determined by federal CMS (September 2025 vs. June 2025).")
+                             help=help_text)
                 else:
+                    # Get provider info dates for N/A case too
+                    periods = get_latest_data_periods()
+                    latest_date = periods['provider_info_latest']
+                    previous_date = periods['provider_info_previous']
+                    
+                    # Create help text based on whether dates are different
+                    if latest_date != previous_date:
+                        help_text = f"5-star rating determined by federal CMS ({latest_date} vs. {previous_date})."
+                    else:
+                        help_text = f"5-star rating determined by federal CMS ({latest_date})."
+                    
                     st.metric("CMS Staffing Rating", 
                              "N/A",
                              staffing_trend,
-                             help="5-star rating determined by federal CMS (September 2025 vs. June 2025).")
+                             help=help_text)
             
 
             
@@ -2301,20 +2508,8 @@ def format_metric(value, decimal_places=1, percentage=False, thousands=False):
 def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
     """Create case-mix comparison charts for a facility."""
     try:
-        # Load provider info data
-        import os
-        # Try multiple possible paths
-        possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-            'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
-        ]
-        
-        file_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                file_path = path
-                break
+        # Load provider info data using dynamic file finder
+        file_path = find_latest_provider_info()
         
         if not file_path:
             st.warning("Provider info file not found. Some features may be limited.")
@@ -2443,7 +2638,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         
         # Add 320 Consulting badge
         fig.add_annotation(
-            text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
+            text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
             x=0.99,
             y=-0.6,
             xref="x domain",
@@ -2465,52 +2660,57 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
 def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
+        # Check if data is empty or missing required columns
+        if df.empty:
+            st.warning("No data available for the selected time period.")
+            return None
+        
+        if 'date' not in df.columns:
+            st.error("Missing 'date' column in data.")
+            return None
+            
         data = df.sort_values('date')
         # Restore title_prefix logic
         if state:
             full_state_name = get_full_state_name(state)
-            title_prefix = f"{full_state_name} Staffing Trends (2017-2025)"
+            title_prefix = f"{full_state_name} Staffing Trends ({get_latest_data_periods()['data_range']})"
         elif facility:
-            # Get the most recent facility name from provider info data
+            # Get facility name and state - always try get_provider_info first for reliability
+            facility_name = get_provider_info(facility, 'name')
+            facility_state = get_provider_info(facility, 'state')
+            
+            # If get_provider_info fails, try provider info CSV file as fallback
+            if not facility_name or facility_name == 'N/A':
+                try:
+                    file_path = find_latest_provider_info()
+                    if file_path:
+                        provider_df = pd.read_csv(file_path)
+                        facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == facility]
+                        if not facility_info.empty:
+                            facility_name = proper_title_case(facility_info.iloc[0]['Provider Name'])
+                            facility_state = facility_info.iloc[0]['State']
+                except:
+                    pass
+            
+            # Calculate the actual data range for this facility
+            facility_data_range = get_latest_data_periods()['data_range']
             try:
-                import os
-                # Try multiple possible paths for provider info file
-                possible_paths = [
-                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                    'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
-                ]
-                
-                file_path = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        file_path = path
-                        break
-                
-                if not file_path:
-                    raise FileNotFoundError(f"Provider info file not found in any of the expected locations")
-                provider_df = pd.read_csv(file_path)
-                facility_info = provider_df[provider_df['CMS Certification Number (CCN)'] == facility]
-                if not facility_info.empty:
-                    facility_name = proper_title_case(facility_info.iloc[0]['Provider Name'])
-                    facility_state = facility_info.iloc[0]['State']
-                    title_prefix = f"{facility_name}, {facility_state} (2017-2025)"
-                else:
-                    facility_name = get_provider_info(facility, 'name')
-                    facility_state = get_provider_info(facility, 'state')
-                    if facility_name and facility_state:
-                        title_prefix = f"{facility_name}, {facility_state} (2017-2025)"
-                    else:
-                        title_prefix = f"Facility {facility} (2017-2025)"
+                if not data.empty and 'CY_QTR' in data.columns:
+                    quarters = data['CY_QTR'].dropna()
+                    if not quarters.empty:
+                        min_year = int(quarters.min()[:4])
+                        max_year = int(quarters.max()[:4])
+                        facility_data_range = f"{min_year}-{max_year}"
             except:
-                facility_name = get_provider_info(facility, 'name')
-                facility_state = get_provider_info(facility, 'state')
-                if facility_name and facility_state:
-                    title_prefix = f"{facility_name}, {facility_state} (2017-2025)"
-                else:
-                    title_prefix = f"Facility {facility} (2017-2025)"
+                pass
+            
+            # Create title based on what we found - Updated for proper facility names
+            if facility_name and facility_state and facility_name != 'N/A' and facility_state != 'N/A':
+                title_prefix = f"{facility_name}, {facility_state} ({facility_data_range})"
+            else:
+                title_prefix = f"Facility {facility} ({facility_data_range})"
         else:
-            title_prefix = "National Staffing Trends (2017-2025)"
+            title_prefix = f"National Staffing Trends ({get_latest_data_periods()['data_range']})"
         
         # Sort data by date
         data = data.sort_values('date')
@@ -2658,7 +2858,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         # Add footer annotations for desktop view with improved styling
         for row in range(1, 5):
             fig.add_annotation(
-                text="<b>320 Consulting</b> | Source: CMS PBJ Data (2017-2025)",
+                text=f"<b>320 Consulting</b> | Source: CMS PBJ Data ({get_latest_data_periods()['data_range']})",
                 x=0.99,
                 y=-0.22,  # More space from x-axis ticks
                 xref="x domain",
@@ -2676,9 +2876,9 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
                 yanchor="top"
             )
         
-        # Update desktop x-axes with improved tick handling for 33 quarters
+        # Update desktop x-axes with improved tick handling for {get_latest_data_periods()['quarter_count']} quarters
         for row in range(1, 5):
-            # For 33 quarters (2017-2025), show more years on x-axis
+            # For {get_latest_data_periods()['quarter_count']} quarters ({get_latest_data_periods()['data_range']}), show more years on x-axis
             # Show every year instead of every other year
             nticks_to_show = len(tick_values) if len(tick_values) <= 9 else 9
             
@@ -2702,6 +2902,20 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         fig.update_yaxes(title_text="Residents Per Day", row=3, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         fig.update_yaxes(title_text="% Contract Staff", row=4, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         
+        # Set y-axis ranges to ensure minimum is 0 for all charts
+        fig.update_yaxes(range=[0, None], row=1, col=1)  # Total Nurse HPRD
+        fig.update_yaxes(range=[0, None], row=2, col=1)  # RN HPRD
+        fig.update_yaxes(range=[0, None], row=3, col=1)  # Census
+        
+        # Special handling for Contract Percentage to prevent negative range when all values are 0
+        # Best practice: Show a small positive range (0-2%) for all-zero longitudinal data
+        contract_values = data['Contract_Percentage'].dropna()
+        if len(contract_values) > 0 and contract_values.min() == contract_values.max() == 0:
+            # When all contract percentages are 0, set a small positive range (best practice for all-zero data)
+            fig.update_yaxes(range=[0, 2], row=4, col=1)  # Contract Percentage - 0 to 2%
+        else:
+            fig.update_yaxes(range=[0, None], row=4, col=1)  # Contract Percentage - normal range
+        
         return fig
         
     except Exception as e:
@@ -2710,9 +2924,9 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
 
 def display_footer():
     """Display a consistent footer across all pages."""
-    st.markdown("""
+    st.markdown(f"""
         <div style="text-align: center; margin-top: 10px; color: #666; font-size: 0.9em;">
-            <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2025</a></p>
+            <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, {get_latest_data_periods()['data_range']}</a></p>
             <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
         </div>
     """, unsafe_allow_html=True)
@@ -2753,11 +2967,12 @@ def _go_home():
         "preserve_mobile": st.query_params.get("mobile")
     }
     st.rerun()
-
-
 def main() -> None:
     """Main app layout and data flow."""
     try:
+        # Clear caches to ensure updated functions are used
+        clear_all_caches()
+        
         # Initialize session state variables at the very start
         if 'view_mode' not in st.session_state:
             st.session_state.view_mode = "Desktop"
@@ -2985,34 +3200,11 @@ def main() -> None:
         def load_provider_info_data():
             """Load provider info data."""
             try:
-                import os
-                # Try multiple possible paths with better strategy
-                current_dir = os.getcwd()
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                
-                possible_paths = [
-                    os.path.join(current_dir, 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                    os.path.join(script_dir, 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                    'provider_info/NH_ProviderInfo_Sep2025.csv',  # Try relative path
-                    # Try parent directory in case files are in root
-                    os.path.join(os.path.dirname(current_dir), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                    # Try common deployment paths
-                    '/app/provider_info/NH_ProviderInfo_Sep2025.csv',
-                    '/workspace/provider_info/NH_ProviderInfo_Sep2025.csv'
-                ]
-                
-                file_path = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        file_path = path
-                        break
+                # Use dynamic file finder to get the latest provider info file
+                file_path = find_latest_provider_info()
                 
                 if not file_path:
-                    try:
-                        files_in_dir = [f for f in os.listdir(current_dir) if 'provider' in f.lower() or 'jul' in f.lower()]
-                        st.warning(f"Provider info file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Available files with 'provider' or 'jul': {files_in_dir}")
-                    except Exception as e:
-                        st.warning(f"Provider info file not found. Current dir: {current_dir}, Script dir: {script_dir}, Tried paths: {possible_paths[:3]}..., Error listing files: {str(e)}")
+                    st.warning("Provider info file not found. Some features may be limited.")
                     return pd.DataFrame()
                 
                 return pd.read_csv(file_path, dtype={'PROVNUM': str})
@@ -3052,37 +3244,13 @@ def main() -> None:
         
         @st.cache_data
         def load_previous_ownership_data():
-            """Load March ownership data for comparison."""
+            """Load previous ownership data for comparison."""
             try:
-                import os
-                # Try multiple possible paths with better strategy
-                current_dir = os.getcwd()
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                
-                possible_paths = [
-                    os.path.join(current_dir, 'ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
-                    os.path.join(script_dir, 'ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
-                    'ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv',  # Try relative path
-                    # Try parent directory in case files are in root
-                    os.path.join(os.path.dirname(current_dir), 'Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'),
-                    # Try common deployment paths
-                    '/app/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv',
-                    '/workspace/Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv'
-                ]
-                
-                file_path = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        file_path = path
-                        break
+                # Use dynamic file finder to get the previous affiliated entity file
+                file_path = find_latest_affiliated_entity()
                 
                 if not file_path:
-                    try:
-                        all_files = os.listdir(current_dir)
-                        csv_files = [f for f in all_files if f.endswith('.csv')]
-                        st.error(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}. All CSV files: {csv_files}")
-                    except Exception as e:
-                        st.error(f"March ownership data file not found. Current dir: {current_dir}, Script dir: {script_dir}, Error listing files: {str(e)}")
+                    st.warning("Previous ownership data file not found. Some features may be limited.")
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
@@ -3102,25 +3270,14 @@ def main() -> None:
                 return pd.DataFrame()
         
         @st.cache_data
-        def load_march_provider_info_data():
-            """Load March provider info data for comparison."""
+        def load_previous_provider_info_data():
+            """Load previous provider info data for comparison."""
             try:
-                import os
-                # Try multiple possible paths
-                possible_paths = [
-            os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Mar2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Mar2025.csv'),
-            'provider_info/NH_ProviderInfo_Mar2025.csv'  # Try relative path
-                ]
-                
-                file_path = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        file_path = path
-                        break
+                # Use dynamic file finder to get the previous provider info file
+                file_path = find_previous_provider_info()
                 
                 if not file_path:
-                    st.warning("March provider info file not found. Some features may be limited.")
+                    st.warning("Previous provider info file not found. Some features may be limited.")
                     return pd.DataFrame()
                 
                 return pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
@@ -3310,7 +3467,7 @@ def main() -> None:
                 """, unsafe_allow_html=True)
                 
                 st.markdown(f"#### All Nursing Homes in {state_name}")
-                st.markdown(f"*{len(display_df)} facilities found*")
+                st.markdown(f"<small>{len(display_df):,} providers found. Providers (identified by unique 6-digit CCN) may appear multiple times if name has changed.</small>", unsafe_allow_html=True)
                 st.markdown("""
                     <style>
                     /* Target the specific table structure */
@@ -3327,7 +3484,6 @@ def main() -> None:
                 st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
             else:
                 st.info(f"No facilities found for state {initial_state_filter}.")
-        
         # Add search functionality (only when not hiding search)
         if not hide_search:
             st.markdown("""
@@ -3641,50 +3797,6 @@ def main() -> None:
                         # Get all facilities for the selected state
                         state_facilities_all = facilities_df[facilities_df['STATE'] == state_filter]
                     
-                        if not state_facilities_all.empty:
-                            # Get unique facilities
-                            unique_facilities = state_facilities_all[['PROVNUM', 'PROVNAME', 'STATE']].drop_duplicates()
-                            
-                            # Create display DataFrame
-                            display_df = pd.DataFrame()
-                            display_df['State'] = unique_facilities['STATE']
-                            display_df['Nursing Home (CCN)'] = unique_facilities['PROVNAME'].apply(smart_title) + ' (' + unique_facilities['PROVNUM'] + ')'
-                            display_df['Dashboard'] = unique_facilities['PROVNUM'].apply(
-                                lambda x: f'<a href="/?facility={x}" style="color: #1976d2; text-decoration: none; font-weight: bold;" target="_self">View</a>'
-                            )
-                            
-                            # Sort alphabetically
-                            display_df = display_df.sort_values('Nursing Home (CCN)')
-                            
-                            # Map state abbreviation to full name
-                            state_name_map = {
-                                'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona', 'CA': 'California', 'CO': 'Colorado',
-                                'CT': 'Connecticut', 'DC': 'District of Columbia', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
-                                'HI': 'Hawaii', 'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
-                                'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland', 'ME': 'Maine',
-                                'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana',
-                                'NC': 'North Carolina', 'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
-                                'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon',
-                                'PA': 'Pennsylvania', 'PR': 'Puerto Rico', 'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
-                                'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VI': 'Virgin Islands', 'VT': 'Vermont',
-                                'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming', 'USA': 'USA', 'US': 'USA'
-                            }
-                            full_state_name = state_name_map.get(state_filter, state_filter)
-                            
-                            st.markdown(f"#### All Facilities in {full_state_name}")
-                            st.markdown(f"*{len(display_df)} facilities found*")
-                            st.markdown("""
-                                <style>
-                                /* Target the specific table structure */
-                                div[data-testid="stMarkdown"] table th:nth-child(2),
-                                div[data-testid="stMarkdown"] table td:nth-child(2) {
-                                    text-align: left !important;
-                                }
-                                </style>
-                            """, unsafe_allow_html=True)
-                            st.markdown(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
-                        else:
-                            st.info("No facilities found for this state.")
                 
                 with tab2:
                     # --- inside the "State" tab (tab2) ---
@@ -4121,7 +4233,6 @@ def main() -> None:
         except Exception as e:
             st.error(f"Error loading quarters: {str(e)}")
             return
-
         # Get filtered data
         try:
             filtered_data = get_filtered_data(level, selected_value, start_quarter, end_quarter)
@@ -4288,6 +4399,40 @@ def main() -> None:
                         </style>
                         """, unsafe_allow_html=True)
                     
+                    
+                    # Check for inactive facilities first - show warning but continue with normal display
+                    if selected_value:
+                        facility_status = check_facility_status(selected_value)
+                        # Only show warning for actually inactive facilities (except 065429)
+                        if facility_status.get('is_inactive', False) and selected_value != "065429":
+                            # Try to get the last quarter from the actual data if database query failed
+                            last_quarter = 'Unknown'
+                            if facility_status.get('last_quarter'):
+                                def format_quarter(quarter_str):
+                                    if not quarter_str or quarter_str == 'Unknown':
+                                        return 'Unknown'
+                                    year = quarter_str[:4]
+                                    q = quarter_str[-1]
+                                    return f"Q{q} {year}"
+                                last_quarter = format_quarter(facility_status.get('last_quarter'))
+                            else:
+                                # Try to get last quarter from the filtered data
+                                try:
+                                    if not filtered_data.empty and 'CY_QTR' in filtered_data.columns:
+                                        last_quarter_data = filtered_data['CY_QTR'].max()
+                                        if last_quarter_data:
+                                            year = str(last_quarter_data)[:4]
+                                            q = str(last_quarter_data)[-1]
+                                            last_quarter = f"Q{q} {year}"
+                                except:
+                                    pass
+                            
+                            # Show a prominent warning message for inactive facilities
+                            st.error(f"""
+                            ⚠️ **Facility is either inactive or has not reported data recently. Last reported data: {last_quarter}**
+                            """)
+                            st.markdown("---")
+                    
                     # 2. Display metrics
                     display_metrics(filtered_data, level)
                     
@@ -4324,19 +4469,8 @@ def main() -> None:
                         if level == "Facility":
                             # Get the most recent facility name from provider info data
                             try:
-                                import os
-                                # Try multiple possible paths for provider info file
-                                possible_paths = [
-                                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                                    'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
-                                ]
-                                
-                                file_path = None
-                                for path in possible_paths:
-                                    if os.path.exists(path):
-                                        file_path = path
-                                        break
+                                # Use dynamic file finder to get the latest provider info file
+                                file_path = find_latest_provider_info()
                                 
                                 if not file_path:
                                     raise FileNotFoundError(f"Provider info file not found in any of the expected locations")
@@ -4450,19 +4584,8 @@ def main() -> None:
                             # Get case-mix expected HPRD
                             facility_info = None
                             try:
-                                import os
-                                # Try multiple possible paths for provider info file
-                                possible_paths = [
-                                    os.path.join(os.getcwd(), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'provider_info/NH_ProviderInfo_Sep2025.csv'),
-                                    'provider_info/NH_ProviderInfo_Sep2025.csv'  # Try relative path
-                                ]
-                                
-                                file_path = None
-                                for path in possible_paths:
-                                    if os.path.exists(path):
-                                        file_path = path
-                                        break
+                                # Use dynamic file finder to get the latest provider info file
+                                file_path = find_latest_provider_info()
                                 
                                 if not file_path:
                                     raise FileNotFoundError(f"Provider info file not found in any of the expected locations")
@@ -4629,8 +4752,8 @@ def main() -> None:
                                 """, unsafe_allow_html=True)
                                 
                                 with st.expander("⚙️ Methodology", expanded=False):
-                                    st.markdown("""
-                                    This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
+                                    st.markdown(f"""
+                                    This dashboard uses CMS Payroll-Based Journal (PBJ) data ({get_latest_data_periods()['data_range']}), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                                     
                                     **Metrics**
                                     
@@ -4691,7 +4814,6 @@ def main() -> None:
 
                     # 4. Add subscription button
                     display_subscription_button("facility", selected_value, selected_facility['PROVNAME'])
-
             # For entity level, display full entity content (verbatim from ownership page)
             elif level == "Entity" and selected_value and "pending_navigation" not in st.session_state and not st.query_params.get('state') and not st.query_params.get('facility'):
                 # Load current and previous data for comparison
@@ -4885,7 +5007,7 @@ def main() -> None:
                             
                             # Add 320 Consulting badge
                             fig_pie.add_annotation(
-                                text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
+                                text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
                                 x=0.99,
                                 y=-0.45,
                                 xref="x domain",
@@ -5150,7 +5272,7 @@ def main() -> None:
                             
                             # Add 320 Consulting badge
                             fig.add_annotation(
-                                text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
+                                text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
                                 x=0.99,
                                 y=-0.45,
                                 xref="x domain",
@@ -5222,7 +5344,7 @@ def main() -> None:
                                     
                                     # Add 320 Consulting badge
                                     fig_ratings.add_annotation(
-                                        text="<b>320 Consulting</b> | Source: CMS Provider Info (September 2025)",
+                                        text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
                                         x=0.99,
                                         y=-0.45,
                                         xref="x domain",
@@ -5442,10 +5564,8 @@ def main() -> None:
                                 delta_display = None
                                 
                             st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help="Long-stay residents receiving antipsychotics (vs. March 2025)")
-                        
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
-                        
                         # Get facilities for this entity
                         if entity_id and entity_id != "":
                             entity_facilities = provider_data[
@@ -5726,7 +5846,7 @@ def main() -> None:
                                  /* Column width rules */
                                  .dataframe th:nth-child(1) { width: 8%; }  /* State */
                                  .dataframe th:nth-child(2) { width: 25%; } /* Provider Name */
-                                 .dataframe th:nth-child(3) { width: 12%; } /* City */
+                                 .dataframe th:nth-child(3) { width: 12%; } /* County/Parish */
                                  .dataframe th:nth-child(4) { width: 8%; }  /* Census */
                                  .dataframe th:nth-child(5) { width: 12%; } /* Total Nurse HPRD */
                                  .dataframe th:nth-child(6) { width: 8%; }  /* Overall Rating */
@@ -5736,7 +5856,7 @@ def main() -> None:
                                  
                                  .dataframe td:nth-child(1) { width: 8%; }  /* State */
                                  .dataframe td:nth-child(2) { width: 25%; } /* Provider Name */
-                                 .dataframe td:nth-child(3) { width: 12%; } /* City */
+                                 .dataframe td:nth-child(3) { width: 12%; } /* County/Parish */
                                  .dataframe td:nth-child(4) { width: 8%; }  /* Census */
                                  .dataframe td:nth-child(5) { width: 12%; } /* Total Nurse HPRD */
                                  .dataframe td:nth-child(6) { width: 8%; }  /* Overall Rating */
@@ -5753,7 +5873,7 @@ def main() -> None:
                                      /* Adjust widths for mobile - improved spacing */
                                      .dataframe th:nth-child(1) { width: 7%; }  /* State */
                                      .dataframe th:nth-child(2) { width: 28%; } /* Provider Name */
-                                     .dataframe th:nth-child(3) { width: 18%; } /* City - more space */
+                                     .dataframe th:nth-child(3) { width: 18%; } /* County/Parish - more space */
                                      .dataframe th:nth-child(4) { width: 9%; }  /* Census */
                                      .dataframe th:nth-child(5) { width: 11%; } /* Total Nurse HPRD */
                                      .dataframe th:nth-child(6) { width: 9%; }  /* Overall Rating */
@@ -5762,7 +5882,7 @@ def main() -> None:
                                      
                                      .dataframe td:nth-child(1) { width: 7%; }  /* State */
                                      .dataframe td:nth-child(2) { width: 28%; } /* Provider Name */
-                                     .dataframe td:nth-child(3) { width: 18%; } /* City - more space */
+                                     .dataframe td:nth-child(3) { width: 18%; } /* County/Parish - more space */
                                      .dataframe td:nth-child(4) { width: 9%; }  /* Census */
                                      .dataframe td:nth-child(5) { width: 11%; } /* Total Nurse HPRD */
                                      .dataframe td:nth-child(6) { width: 9%; }  /* Overall Rating */
@@ -5881,34 +6001,37 @@ def main() -> None:
                                  .dataframe th.sort-desc::after {
                                      content: ' ↓';
                                      color: #007bff;
-                                }
-                                .dataframe td {
-                                    padding: 4px 6px;
-                                    border-bottom: 1px solid #f0f0f0;
-                                    vertical-align: middle;
-                                    font-size: 0.8em;
-                                }
-                                .dataframe tr:hover {
-                                    background-color: #f8f9fa;
-                                    transform: translateY(-1px);
-                                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                                }
-                                .dataframe tr:nth-child(even) {
-                                    background-color: #fafbfc;
-                                }
-                                .dataframe tr:nth-child(even):hover {
-                                    background-color: #f0f2f5;
-                                }
-                                .dataframe a {
-                                    color: #007bff;
-                                    text-decoration: none;
-                                    font-weight: 500;
-                                    transition: color 0.2s ease;
-                                }
-                                .dataframe a:hover {
-                                    color: #0056b3;
-                                    text-decoration: underline;
-                                }
+                                 }
+                                 .dataframe td {
+                                     padding: 4px 6px;
+                                     border-bottom: 1px solid #f0f0f0;
+                                     vertical-align: middle;
+                                     font-size: 0.8em;
+                                 }
+                                 .dataframe tr:hover {
+                                     background-color: #f8f9fa;
+                                     transform: translateY(-1px);
+                                     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                                 }
+                                 .dataframe tr:nth-child(even) {
+                                     background-color: #fafbfc;
+                                 }
+                                 .dataframe tr:nth-child(even):hover {
+                                     background-color: #f0f2f5;
+                                 }
+                                 .dataframe a {
+                                     color: #007bff;
+                                     text-decoration: none;
+                                     font-weight: 500;
+                                     transition: color 0.2s ease;
+                                 }
+                                 .dataframe a:hover {
+                                     color: #0056b3;
+                                     text-decoration: underline;
+                                 }
+                                 .dataframe th {
+                                     color: #000 !important;
+                                 }
                                 </style>
                                 """, unsafe_allow_html=True)
                                 
@@ -5954,8 +6077,8 @@ def main() -> None:
                         """, unsafe_allow_html=True)
                         
                         with st.expander("⚙️ Methodology", expanded=False):
-                            st.markdown("""
-                            This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
+                            st.markdown(f"""
+                            This dashboard uses CMS Payroll-Based Journal (PBJ) data ({get_latest_data_periods()['data_range']}), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                             
                             **Metrics**
                             
@@ -5984,7 +6107,6 @@ def main() -> None:
                         st.error(f"Entity '{selected_value}' not found in the data.")
                 else:
                     st.error("Unable to load entity data.")
-
             # For other levels (National, State)
             else:
                 if not filtered_data.empty:
@@ -6187,8 +6309,8 @@ def main() -> None:
                             """, unsafe_allow_html=True)
                             
                             with st.expander("⚙️ Methodology", expanded=False):
-                                st.markdown("""
-                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
+                                st.markdown(f"""
+                                This dashboard uses CMS Payroll-Based Journal (PBJ) data ({get_latest_data_periods()['data_range']}), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                                 
                                 **Metrics**
                                 
@@ -6211,6 +6333,296 @@ def main() -> None:
                             
                             st.markdown("</div>", unsafe_allow_html=True)
                     
+                    # State Facilities List Section
+                    if level == "State" and selected_value:
+                        try:
+                            # Get facilities from provider info CSV for this state (same as ownership logic)
+                            file_path = find_latest_provider_info()
+                            if file_path:
+                                provider_df = pd.read_csv(file_path)
+                                state_facilities = provider_df[provider_df['State'] == selected_value]
+                                
+                                if not state_facilities.empty:
+                                    # Limit to 25 facilities initially
+                                    show_all_facilities = st.checkbox(
+                                        "Show all facilities", 
+                                        value=False,
+                                        key=f"show_all_state_facilities_{selected_value}",
+                                        help="Show all facilities in this state (may be many)"
+                                    )
+                                    
+                                    # Sort facilities alphabetically by provider name
+                                    state_facilities_sorted = state_facilities.sort_values('Provider Name')
+                                    
+                                    if show_all_facilities:
+                                        display_facilities = state_facilities_sorted
+                                    else:
+                                        display_facilities = state_facilities_sorted.head(25)
+                                    
+                                    st.markdown(f"**{len(display_facilities):,} facilities shown**")
+                                    if not show_all_facilities and len(state_facilities) > 25:
+                                        st.markdown(f"<small>Showing first 25 of {len(state_facilities):,} total facilities</small>", unsafe_allow_html=True)
+                                    
+                                    # Get most recent HPRD and census data for each facility from PBJ database
+                                    def get_facility_latest_metrics(provnum_list):
+                                        try:
+                                            # Query the facility database for the most recent data for each facility
+                                            placeholders = ','.join(['?' for _ in provnum_list])
+                                            query = f"""
+                                            SELECT PROVNUM, Total_Nurse_HPRD, Census, CY_QTR
+                                            FROM facility_metrics 
+                                            WHERE PROVNUM IN ({placeholders})
+                                            AND (PROVNUM, CY_QTR) IN (
+                                                SELECT PROVNUM, MAX(CY_QTR) 
+                                                FROM facility_metrics 
+                                                WHERE PROVNUM IN ({placeholders})
+                                                GROUP BY PROVNUM
+                                            )
+                                            """
+                                            result = facility_db.execute(query, provnum_list + provnum_list).fetchdf()
+                                            return result
+                                        except Exception as e:
+                                            st.error(f"Error querying facility metrics: {str(e)}")
+                                            return pd.DataFrame()
+                                    
+                                    # Get facility metrics for all facilities in this state
+                                    provnum_list = display_facilities['CMS Certification Number (CCN)'].tolist()
+                                    facility_metrics = get_facility_latest_metrics(provnum_list)
+                                    
+                                    # Prepare facilities data for display with County instead of City
+                                    facilities_display = display_facilities[[
+                                        'State',
+                                        'County/Parish',
+                                        'Provider Name'
+                                    ]].copy()
+                                    
+                                    # Add HPRD and Census data from facility metrics
+                                    if not facility_metrics.empty:
+                                        # Merge with facility metrics to get HPRD and Census
+                                        facilities_display = facilities_display.merge(
+                                            facility_metrics[['PROVNUM', 'Total_Nurse_HPRD', 'Census']],
+                                            left_on=display_facilities['CMS Certification Number (CCN)'],
+                                            right_on='PROVNUM',
+                                            how='left'
+                                        )
+                                        # Drop the duplicate PROVNUM column
+                                        facilities_display = facilities_display.drop('PROVNUM', axis=1)
+                                        
+                                        # Store raw values for data-sort attributes
+                                        facilities_display['Census_raw'] = facilities_display['Census']
+                                        facilities_display['HPRD_raw'] = facilities_display['Total_Nurse_HPRD']
+                                        
+                                        # Format HPRD and Census columns for display
+                                        facilities_display['Total Nurse HPRD'] = facilities_display['Total_Nurse_HPRD'].apply(
+                                            lambda x: f"{x:.2f}" if pd.notna(x) else 'N/A'
+                                        )
+                                        facilities_display['Census'] = facilities_display['Census'].apply(
+                                            lambda x: f"{x:,.0f}" if pd.notna(x) else 'N/A'
+                                        )
+                                        # Drop the original column name
+                                        facilities_display = facilities_display.drop('Total_Nurse_HPRD', axis=1)
+                                    else:
+                                        # Add empty columns if no facility metrics available
+                                        facilities_display['Census_raw'] = None
+                                        facilities_display['HPRD_raw'] = None
+                                        facilities_display['Total Nurse HPRD'] = 'N/A'
+                                        facilities_display['Census'] = 'N/A'
+                                    
+                                    # Clean up the data - fill remaining NaN with 'N/A'
+                                    facilities_display = facilities_display.fillna('N/A')
+                                    
+                                    # Apply proper capitalization to provider names and county
+                                    def capitalize_name(name):
+                                        if pd.isna(name):
+                                            return name
+                                        # Common words to keep lowercase
+                                        lowercase_words = {'and', 'or', 'of', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
+                                        words = name.lower().split()
+                                        capitalized_words = []
+                                        for i, word in enumerate(words):
+                                            if i == 0 or word not in lowercase_words:
+                                                capitalized_words.append(word.capitalize())
+                                            else:
+                                                capitalized_words.append(word)
+                                        return ' '.join(capitalized_words)
+                                    
+                                    # Apply capitalization
+                                    facilities_display['Provider Name'] = facilities_display['Provider Name'].apply(capitalize_name)
+                                    facilities_display['County/Parish'] = facilities_display['County/Parish'].apply(capitalize_name)
+                                    
+                                    # Rename County/Parish to County for display
+                                    facilities_display = facilities_display.rename(columns={'County/Parish': 'County'})
+                                    
+                                    # Create provider names as HTML links
+                                    def format_provnum(provnum):
+                                        provnum_str = str(provnum).strip().upper().zfill(6)
+                                        if len(provnum_str) > 6:
+                                            provnum_str = provnum_str[-6:]
+                                        return provnum_str
+                                    facilities_display['Provider Name'] = facilities_display.apply(
+                                        lambda row: f'<a href="/?facility={format_provnum(display_facilities.iloc[row.name]["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider Name"]}</a>',
+                                        axis=1
+                                    )
+                                    
+                                    # Reorder columns to include HPRD and Census
+                                    # Keep raw columns for sorting but don't display them
+                                    column_order = [
+                                        'State',
+                                        'Provider Name',
+                                        'Census',
+                                        'Total Nurse HPRD'
+                                    ]
+                                    # Keep the raw columns for data-sort attributes
+                                    raw_columns = ['Census_raw', 'HPRD_raw']
+                                    all_columns = column_order + [col for col in raw_columns if col in facilities_display.columns]
+                                    facilities_display = facilities_display[all_columns]
+                                    
+                                    # Build HTML table manually like ownership table
+                                    import re
+                                    
+                                    # Start building the HTML table
+                                    html_table = '<table class="dataframe table table-striped" id="facilities-table">\n<thead>\n<tr>'
+                                    
+                                    # Add headers with data-sort-method for numeric columns
+                                    numeric_cols = ['Census', 'Total Nurse HPRD']
+                                    for col in column_order:
+                                        if col in numeric_cols:
+                                            html_table += f'<th data-sort-method="number">{col}</th>'
+                                        else:
+                                            html_table += f'<th>{col}</th>'
+                                    html_table += '</tr>\n</thead>\n<tbody>\n'
+                                    
+                                    # Add rows with data-sort attributes
+                                    for idx, row in facilities_display.iterrows():
+                                        html_table += '<tr>'
+                                        for col in column_order:
+                                            value = row[col]
+                                            
+                                            # Add data-sort attribute for sortable columns
+                                            if col == 'Census':
+                                                try:
+                                                    raw_val = row['Census_raw']
+                                                    sort_val = float(raw_val) if pd.notna(raw_val) else 0
+                                                except:
+                                                    sort_val = 0
+                                                html_table += f'<td data-sort="{int(sort_val)}">{value}</td>'
+                                            elif col == 'Total Nurse HPRD':
+                                                try:
+                                                    raw_val = row['HPRD_raw']
+                                                    sort_val = float(raw_val) if pd.notna(raw_val) else 0
+                                                except:
+                                                    sort_val = 0
+                                                html_table += f'<td data-sort="{sort_val:.1f}">{value}</td>'
+                                            else:
+                                                html_table += f'<td>{value}</td>'
+                                        html_table += '</tr>\n'
+                                    
+                                    html_table += '</tbody>\n</table>'
+                                    
+                                    # Display the table with CSS
+                                    st.markdown("""
+                                        <style>
+                                        .dataframe {
+                                            width: 100%;
+                                            border-collapse: collapse;
+                                            margin: 0.3rem 0;
+                                            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                                            font-size: 0.8em;
+                                            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+                                            border-radius: 6px;
+                                            overflow: hidden;
+                                            table-layout: fixed;
+                                        }
+                                        .dataframe th {
+                                            background: #f8f9fa;
+                                            padding: 6px 4px;
+                                            text-align: left;
+                                            font-weight: 600;
+                                            border: none;
+                                            border-bottom: 2px solid #e9ecef;
+                                            color: #000;
+                                            font-size: 0.75em;
+                                            text-transform: none;
+                                            letter-spacing: 0.3px;
+                                            cursor: pointer;
+                                            user-select: none;
+                                            position: relative;
+                                        }
+                                        .dataframe th:hover {
+                                            background: #e9ecef;
+                                        }
+                                        .dataframe th::after {
+                                            content: ' ↕';
+                                            font-size: 0.7em;
+                                            color: #6c757d;
+                                            position: absolute;
+                                            right: 4px;
+                                            top: 50%;
+                                            transform: translateY(-50%);
+                                        }
+                                        .dataframe th.sort-asc::after {
+                                            content: ' ↑';
+                                            color: #007bff;
+                                        }
+                                        .dataframe th.sort-desc::after {
+                                            content: ' ↓';
+                                            color: #007bff;
+                                        }
+                                        .dataframe td {
+                                            padding: 4px 6px;
+                                            border-bottom: 1px solid #f0f0f0;
+                                            vertical-align: middle;
+                                            font-size: 0.8em;
+                                        }
+                                        .dataframe tr:hover {
+                                            background-color: #f8f9fa;
+                                        }
+                                        .dataframe tr:nth-child(even) {
+                                            background-color: #fafbfc;
+                                        }
+                                        .dataframe tr:nth-child(even):hover {
+                                            background-color: #f0f2f5;
+                                        }
+                                        .dataframe a {
+                                            color: #007bff;
+                                            text-decoration: none;
+                                            font-weight: 500;
+                                        }
+                                        .dataframe a:hover {
+                                            color: #0056b3;
+                                            text-decoration: underline;
+                                        }
+                                        .dataframe th {
+                                            color: #000 !important;
+                                        }
+                                        </style>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    st.markdown(html_table, unsafe_allow_html=True)
+                                    
+                                    # Add sorting functionality using Tablesort library
+                                    from streamlit.components.v1 import html
+                                    html('''
+                                    <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js'></script>
+                                    <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/sorts/tablesort.number.min.js'></script>
+                                    <script>
+                                        try {
+                                            var table = window.parent.document.getElementById("facilities-table");
+                                            if (table) {
+                                                var sort = new Tablesort(table, {
+                                                    descending: true
+                                                });
+                                                console.log("Table sorting initialized with Tablesort (descending first)");
+                                            } else {
+                                                console.log("Table not found, skipping sort initialization");
+                                            }
+                                        } catch (error) {
+                                            console.log("Error initializing table sort:", error);
+                                        }
+                                    </script>
+                                    ''', height=0)
+                        except Exception as e:
+                            st.error(f"Error displaying state facilities: {str(e)}")
                     # Add state PBJ Takeaway card for state level
                     if level == "State" and selected_value:
                         # Add anchor for PBJ Takeaway section
@@ -6421,6 +6833,7 @@ def main() -> None:
                                                 border: none !important;
                                                 font-size: 11px !important;
                                                 letter-spacing: 0.5px !important;
+                                                color: #000 !important;
                                             }
                                             
                                             .dataframe td {
@@ -6513,8 +6926,8 @@ def main() -> None:
                             """, unsafe_allow_html=True)
                             
                             with st.expander("⚙️ Methodology", expanded=False):
-                                st.markdown("""
-                                This dashboard uses CMS Payroll-Based Journal (PBJ) data (2017–2025), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
+                                st.markdown(f"""
+                                This dashboard uses CMS Payroll-Based Journal (PBJ) data ({get_latest_data_periods()['data_range']}), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
                                 
                                 **Metrics**
                                 

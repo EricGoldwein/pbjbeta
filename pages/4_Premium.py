@@ -48,13 +48,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Add Home button to top left
+# Add Home button to top left - single row layout
 col1, col2, col3 = st.columns([1, 8, 1])
 with col1:
     st.markdown(f"""
-        <div style="margin-top: 8px; margin-bottom: 8px;">
-            <a href="PBJ_Dashboard.py" style="display: inline-block; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; border: 1px solid #90caf9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 500; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: all 0.2s ease;">
-                <img src="data:image/png;base64,{favicon_data}" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;"> Home
+        <div style="margin-top: 8px; margin-bottom: 8px; white-space: nowrap;">
+            <a href="/" style="display: inline-flex; align-items: center; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; border: 1px solid #90caf9; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 500; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: all 0.2s ease;">
+                <img src="data:image/png;base64,{favicon_data}" style="width: 16px; height: 16px; margin-right: 4px; flex-shrink: 0;"> <span>Home</span>
             </a>
         </div>
     """, unsafe_allow_html=True)
@@ -206,11 +206,13 @@ st.markdown("""
 
 def display_footer():
     """Display a consistent footer across all pages."""
+    # Import dynamic date utilities
+    from utils.date_utils import get_latest_data_periods
+    
     st.markdown(f"""
-        <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
-            <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, 2017-2025</a></p>
+        <div style="text-align: center; margin-top: 10px; color: #666; font-size: 0.9em;">
+            <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, {get_latest_data_periods()['data_range']}</a></p>
             <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
-            <p><a href="/About" target="_self" style="text-decoration: none;">About the Dashboard</a> | <a href="/Premium" target="_self" style="text-decoration: none;">Premium</a> | <a href="https://www.320insight.com/phoebe" target="_blank" style="text-decoration: none;">Phoebe J</a></p>
         </div>
     """, unsafe_allow_html=True)
 

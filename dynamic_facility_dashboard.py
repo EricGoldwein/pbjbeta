@@ -501,7 +501,7 @@ def load_facility_data(provnum):
     if missing_cols:
         print(f"❌ MISSING CRITICAL COLUMNS: {missing_cols}")
     else:
-        print(f"✓ All critical columns present")
+        print(f"All critical columns present")
     
     return global_df
 
@@ -759,17 +759,43 @@ def get_provider_info_charts():
         # Format quarter labels for x-axis (Q1 2021 instead of 2021Q1)
         chart_data['quarter_label'] = chart_data['quarter'].apply(lambda x: f"Q{x[-1]} {x[:4]}" if pd.notna(x) and len(str(x)) == 6 else str(x) if pd.notna(x) else None)
         
+        # Add PBJ-calculated direct care values (excludes admin/DON) by matching quarters
+        if global_df is not None and len(global_df) > 0:
+            pbj_direct_data = []
+            for quarter in chart_data['quarter']:
+                pbj_quarter = global_df[global_df['CY_Qtr'] == quarter]
+                if len(pbj_quarter) > 0:
+                    total_census = pbj_quarter['MDScensus'].sum()
+                    # Direct Total (excludes RN Admin, RN DON, LPN Admin)
+                    direct_hours = pbj_quarter['Nurse_Staff_Hours_Excl_Admin'].sum()
+                    direct_hprd = (direct_hours / total_census) if total_census > 0 else 0
+                    # RN Direct (excludes RN Admin and RN DON)
+                    rn_direct_hours = pbj_quarter['Hrs_RN'].sum()
+                    rn_direct_hprd = (rn_direct_hours / total_census) if total_census > 0 else 0
+                    pbj_direct_data.append({'quarter': quarter, 'pbj_direct_total': direct_hprd, 'pbj_rn_direct': rn_direct_hprd})
+                else:
+                    pbj_direct_data.append({'quarter': quarter, 'pbj_direct_total': 0, 'pbj_rn_direct': 0})
+            
+            pbj_direct_df = pd.DataFrame(pbj_direct_data)
+            chart_data = chart_data.merge(pbj_direct_df, on='quarter', how='left')
+        else:
+            chart_data['pbj_direct_total'] = 0
+            chart_data['pbj_rn_direct'] = 0
+        
         # Prepare data for charts
         charts = {
             'total_staffing': {
                 'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
                 'reported_total': chart_data['reported_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
+                'reported_direct': chart_data['pbj_direct_total'].fillna(0).tolist(),  # Use PBJ-calculated direct
                 'case_mix_total': chart_data['case_mix_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
                 'adjusted_total': chart_data['adjusted_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist()
             },
             'rn_staffing': {
                 'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
                 'reported_rn': chart_data['reported_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['reported_rn_hrs_per_resident_per_day']), None).tolist(),
+                'reported_rn_total': chart_data['reported_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['reported_rn_hrs_per_resident_per_day']), None).tolist(),
+                'reported_rn_direct': chart_data['pbj_rn_direct'].where(pd.notna(chart_data['pbj_rn_direct']), None).tolist(),  # Use PBJ-calculated RN direct
                 'case_mix_rn': chart_data['case_mix_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['case_mix_rn_hrs_per_resident_per_day']), None).tolist(),
                 'adjusted_rn': chart_data['adjusted_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['adjusted_rn_hrs_per_resident_per_day']), None).tolist()
             },
@@ -777,6 +803,7 @@ def get_provider_info_charts():
                 'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
                 'reported_cna': chart_data['reported_na_hrs_per_resident_per_day'].where(pd.notna(chart_data['reported_na_hrs_per_resident_per_day']), None).tolist(),
                 'case_mix_cna': chart_data['case_mix_na_hrs_per_resident_per_day'].where(pd.notna(chart_data['case_mix_na_hrs_per_resident_per_day']), None).tolist(),
+                'case_mix_lpn': chart_data['case_mix_lpn_hrs_per_resident_per_day'].where(pd.notna(chart_data['case_mix_lpn_hrs_per_resident_per_day']), None).tolist(),
                 'adjusted_cna': chart_data['adjusted_na_hrs_per_resident_per_day'].where(pd.notna(chart_data['adjusted_na_hrs_per_resident_per_day']), None).tolist()
             },
             'census': {
@@ -2154,31 +2181,52 @@ def api_single_day_report():
             'is_holiday': bool(target_row['IsHoliday'])
         }
         
-        # Calculate comparison averages
+        # Calculate comparison averages with weighted HPRD calculations
         def calculate_comparison_metrics(data, label):
             if data.empty:
                 return None
+            
+            # Calculate weighted HPRD (sum of hours / sum of census)
+            total_census = data['MDScensus'].sum()
+            total_rn_hours = data['Hrs_RN'].sum()
+            total_lpn_hours = data['Hrs_LPN'].sum()
+            total_cna_hours = data['Hrs_CNA'].sum()
+            total_rn_all_hours = data['Total_RN_Hours'].sum()
+            total_lpn_all_hours = data['Total_LPN_Hours'].sum()
+            total_nurse_aide_hours = data['Total_Nurse_Aide_Hours'].sum()
+            nurse_staff_hours_excl_admin = data['Nurse_Staff_Hours_Excl_Admin'].sum()
+            total_staff_hours = data['Total_Staff_Hours'].sum()
+            
+            # Calculate weighted HPRD values
+            rn_hprd_weighted = (total_rn_hours / total_census) if total_census > 0 else 0
+            lpn_hprd_weighted = (total_lpn_hours / total_census) if total_census > 0 else 0
+            cna_hprd_weighted = (total_cna_hours / total_census) if total_census > 0 else 0
+            total_rn_hprd_weighted = (total_rn_all_hours / total_census) if total_census > 0 else 0
+            total_lpn_hprd_weighted = (total_lpn_all_hours / total_census) if total_census > 0 else 0
+            total_nurse_aide_hprd_weighted = (total_nurse_aide_hours / total_census) if total_census > 0 else 0
+            nurse_staff_hprd_excl_admin_weighted = (nurse_staff_hours_excl_admin / total_census) if total_census > 0 else 0
+            total_staff_hprd_weighted = (total_staff_hours / total_census) if total_census > 0 else 0
             
             return {
                 'label': label,
                 'count': len(data),
                 'census': round_financial(data['MDScensus'].mean()),
                 'rn_hours': round_financial(data['Hrs_RN'].mean()),
-                'rn_hprd': round_financial(data['RN_HPRD'].mean()),
+                'rn_hprd': round_financial(rn_hprd_weighted),
                 'lpn_hours': round_financial(data['Hrs_LPN'].mean()),
-                'lpn_hprd': round_financial(data['LPN_HPRD'].mean()),
+                'lpn_hprd': round_financial(lpn_hprd_weighted),
                 'cna_hours': round_financial(data['Hrs_CNA'].mean()),
-                'cna_hprd': round_financial(data['CNA_HPRD'].mean()),
+                'cna_hprd': round_financial(cna_hprd_weighted),
                 'total_rn_hours': round_financial(data['Total_RN_Hours'].mean()),
-                'total_rn_hprd': round_financial(data['Total_RN_HPRD'].mean()),
+                'total_rn_hprd': round_financial(total_rn_hprd_weighted),
                 'total_lpn_hours': round_financial(data['Total_LPN_Hours'].mean()),
-                'total_lpn_hprd': round_financial(data['Total_LPN_HPRD'].mean()),
+                'total_lpn_hprd': round_financial(total_lpn_hprd_weighted),
                 'total_nurse_aide_hours': round_financial(data['Total_Nurse_Aide_Hours'].mean()),
-                'total_nurse_aide_hprd': round_financial(data['Total_Nurse_Aide_HPRD'].mean()),
+                'total_nurse_aide_hprd': round_financial(total_nurse_aide_hprd_weighted),
                 'nurse_staff_hours_excl_admin': round_financial(data['Nurse_Staff_Hours_Excl_Admin'].mean()),
-                'nurse_staff_hprd_excl_admin': round_financial(data['Nurse_Staff_HPRD_Excl_Admin'].mean()),
+                'nurse_staff_hprd_excl_admin': round_financial(nurse_staff_hprd_excl_admin_weighted),
                 'total_staff_hours': round_financial(data['Total_Staff_Hours'].mean()),
-                'total_staff_hprd': round_financial(data['Total_Staff_HPRD'].mean()),
+                'total_staff_hprd': round_financial(total_staff_hprd_weighted),
                 'rn_contract_pct': round_financial(data['RN_Contract_Pct'].mean()),
                 'lpn_contract_pct': round_financial(data['LPN_Contract_Pct'].mean()),
                 'cna_contract_pct': round_financial(data['CNA_Contract_Pct'].mean()),
@@ -2897,49 +2945,199 @@ def get_quarterly_stats():
 def get_quarterly_data():
     """Get quarterly data for all quarters with HPRD and hours"""
     try:
-        # Group data by quarter and calculate quarterly averages (hours per day)
-        quarterly_data = global_df.groupby('CY_Qtr').agg({
-            'MDScensus': 'mean',
-            'Total_Staff_Hours': 'mean',  # Average hours per day
-            'Total_Staff_HPRD': 'mean',
-            'Nurse_Staff_Hours_Excl_Admin': 'mean',  # Average hours per day
-            'Nurse_Staff_HPRD_Excl_Admin': 'mean',
-            'Total_RN_Hours': 'mean',  # Average hours per day
-            'Total_RN_HPRD': 'mean',
-            'Hrs_RN': 'mean',  # Average hours per day
-            'RN_HPRD': 'mean',
-            'Hrs_RNadmin': 'mean',  # Average hours per day
-            'Hrs_RNDON': 'mean'  # Average hours per day
-        }).round(2)
+        # Calculate weighted HPRD (sum of hours / sum of census) for each quarter
+        quarterly_data = {}
         
-        # Calculate HPRD for admin and DON (they don't have pre-calculated HPRD)
-        quarterly_data['RN_Admin_HPRD'] = (quarterly_data['Hrs_RNadmin'] / quarterly_data['MDScensus']).round(2)
-        quarterly_data['RN_DON_HPRD'] = (quarterly_data['Hrs_RNDON'] / quarterly_data['MDScensus']).round(2)
-        
-        # Structure the response
-        quarterly_data_dict = {}
-        
-        for quarter, row in quarterly_data.iterrows():
-            quarterly_data_dict[quarter] = {
-                'census': float(row['MDScensus']),
-                'total_hprd': float(row['Total_Staff_HPRD']),
-                'total_hours': float(row['Total_Staff_Hours']),
-                'direct_hprd': float(row['Nurse_Staff_HPRD_Excl_Admin']),
-                'direct_hours': float(row['Nurse_Staff_Hours_Excl_Admin']),
-                'total_rn_hprd': float(row['Total_RN_HPRD']),
-                'total_rn_hours': float(row['Total_RN_Hours']),
-                'rn_hprd': float(row['RN_HPRD']),
-                'rn_hours': float(row['Hrs_RN']),
-                'rn_admin_hprd': float(row['RN_Admin_HPRD']),
-                'rn_admin_hours': float(row['Hrs_RNadmin']),
-                'rn_don_hprd': float(row['RN_DON_HPRD']),
-                'rn_don_hours': float(row['Hrs_RNDON'])
+        for quarter in global_df['CY_Qtr'].unique():
+            quarter_df = global_df[global_df['CY_Qtr'] == quarter]
+            
+            # Calculate weighted HPRD (correct method)
+            total_census = quarter_df['MDScensus'].sum()
+            total_staff_hours = quarter_df['Total_Staff_Hours'].sum()
+            total_rn_hours = quarter_df['Total_RN_Hours'].sum()
+            nurse_staff_hours = quarter_df['Nurse_Staff_Hours_Excl_Admin'].sum()
+            rn_hours = quarter_df['Hrs_RN'].sum()
+            rn_admin_hours = quarter_df['Hrs_RNadmin'].sum()
+            rn_don_hours = quarter_df['Hrs_RNDON'].sum()
+            
+            # Calculate weighted HPRD values
+            total_hprd = (total_staff_hours / total_census) if total_census > 0 else 0
+            total_rn_hprd = (total_rn_hours / total_census) if total_census > 0 else 0
+            nurse_staff_hprd = (nurse_staff_hours / total_census) if total_census > 0 else 0
+            rn_hprd = (rn_hours / total_census) if total_census > 0 else 0
+            rn_admin_hprd = (rn_admin_hours / total_census) if total_census > 0 else 0
+            rn_don_hprd = (rn_don_hours / total_census) if total_census > 0 else 0
+            
+            # Calculate average hours per day (for display) - keep original precision
+            avg_census = quarter_df['MDScensus'].mean()
+            avg_staff_hours = quarter_df['Total_Staff_Hours'].mean()
+            avg_rn_hours = quarter_df['Total_RN_Hours'].mean()
+            avg_nurse_staff_hours = quarter_df['Nurse_Staff_Hours_Excl_Admin'].mean()
+            avg_rn_direct_hours = quarter_df['Hrs_RN'].mean()
+            avg_rn_admin_hours = quarter_df['Hrs_RNadmin'].mean()
+            avg_rn_don_hours = quarter_df['Hrs_RNDON'].mean()
+            
+            quarterly_data[quarter] = {
+                'census': round(avg_census, 2),  # Keep 2 decimal places for census too
+                'total_hprd': round(total_hprd, 2),
+                'total_hours': round(avg_staff_hours, 2),  # Keep 2 decimal places for hours
+                'direct_hprd': round(nurse_staff_hprd, 2),
+                'direct_hours': round(avg_nurse_staff_hours, 2),  # Keep 2 decimal places for hours
+                'total_rn_hprd': round(total_rn_hprd, 2),
+                'total_rn_hours': round(avg_rn_hours, 2),  # Keep 2 decimal places for hours
+                'rn_hprd': round(rn_hprd, 2),
+                'rn_hours': round(avg_rn_direct_hours, 2),  # Keep 2 decimal places for hours
+                'rn_admin_hprd': round(rn_admin_hprd, 2),
+                'rn_admin_hours': round(avg_rn_admin_hours, 2),  # Keep 2 decimal places for hours
+                'rn_don_hprd': round(rn_don_hprd, 2),
+                'rn_don_hours': round(avg_rn_don_hours, 2)  # Keep 2 decimal places for hours
             }
         
-        return jsonify({'quarterly_data': quarterly_data_dict})
+        return jsonify({'quarterly_data': quarterly_data})
         
     except Exception as e:
         return jsonify({'error': str(e)})
+
+@app.route('/api/case-mix-data')
+def get_case_mix_data():
+    """Get case-mix acuity data by quarter from both Provider Info and PBJ calculations"""
+    try:
+        case_mix_data = {}
+        
+        # Get all unique quarters from both sources
+        all_quarters = set()
+        
+        # Get quarters from PBJ data
+        if global_df is not None and len(global_df) > 0:
+            all_quarters.update(global_df['CY_Qtr'].unique())
+        
+        # Get quarters from Provider Info
+        if provider_info_df is not None and len(provider_info_df) > 0:
+            quarters_df = provider_info_df[provider_info_df['quarter'].notna()].copy()
+            all_quarters.update(quarters_df['quarter'].unique())
+        
+        if len(all_quarters) == 0:
+            return jsonify({'error': 'No data available', 'case_mix_data': {}})
+        
+        for quarter in all_quarters:
+            quarter_info = {
+                'quarter': quarter
+            }
+            
+            # === PROVIDER INFO DATA ===
+            if provider_info_df is not None and len(provider_info_df) > 0:
+                prov_quarter_data = provider_info_df[provider_info_df['quarter'] == quarter]
+                if len(prov_quarter_data) > 0:
+                    prov_data = prov_quarter_data.iloc[0]
+                    
+                    # Reported values from Provider Info
+                    quarter_info['prov_reported_total'] = float(prov_data.get('reported_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_total_nurse_hrs_per_resident_per_day')) else None
+                    quarter_info['prov_reported_rn'] = float(prov_data.get('reported_rn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_rn_hrs_per_resident_per_day')) else None
+                    quarter_info['prov_reported_lpn'] = float(prov_data.get('reported_lpn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_lpn_hrs_per_resident_per_day')) else None
+                    quarter_info['prov_reported_na'] = float(prov_data.get('reported_na_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_na_hrs_per_resident_per_day')) else None
+                    
+                    # Case-mix values from Provider Info
+                    quarter_info['case_mix_total'] = float(prov_data.get('case_mix_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_total_nurse_hrs_per_resident_per_day')) else None
+                    quarter_info['case_mix_rn'] = float(prov_data.get('case_mix_rn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_rn_hrs_per_resident_per_day')) else None
+                    quarter_info['case_mix_lpn'] = float(prov_data.get('case_mix_lpn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_lpn_hrs_per_resident_per_day')) else None
+                    quarter_info['case_mix_na'] = float(prov_data.get('case_mix_na_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_na_hrs_per_resident_per_day')) else None
+            
+            # === PBJ DATA (calculated from daily records) ===
+            if global_df is not None and len(global_df) > 0:
+                pbj_quarter_df = global_df[global_df['CY_Qtr'] == quarter]
+                if len(pbj_quarter_df) > 0:
+                    total_census = pbj_quarter_df['MDScensus'].sum()
+                    
+                    # Total Staff (all nursing staff)
+                    total_staff_hours = pbj_quarter_df['Total_Staff_Hours'].sum()
+                    quarter_info['pbj_reported_total'] = (total_staff_hours / total_census) if total_census > 0 else None
+                    
+                    # Direct Staff (excludes RN admin, RN DON, LPN admin)
+                    direct_staff_hours = pbj_quarter_df['Nurse_Staff_Hours_Excl_Admin'].sum()
+                    quarter_info['pbj_reported_direct'] = (direct_staff_hours / total_census) if total_census > 0 else None
+                    
+                    # Total RN (includes RN + RN admin + RN DON)
+                    total_rn_hours = pbj_quarter_df['Total_RN_Hours'].sum()
+                    quarter_info['pbj_reported_total_rn'] = (total_rn_hours / total_census) if total_census > 0 else None
+                    
+                    # Direct RN (excludes RN admin and RN DON)
+                    rn_hours = pbj_quarter_df['Hrs_RN'].sum()
+                    quarter_info['pbj_reported_direct_rn'] = (rn_hours / total_census) if total_census > 0 else None
+                    
+                    # Total LPN (includes LPN + LPN admin)
+                    total_lpn_hours = pbj_quarter_df['Total_LPN_Hours'].sum()
+                    quarter_info['pbj_reported_total_lpn'] = (total_lpn_hours / total_census) if total_census > 0 else None
+                    
+                    # Direct LPN (excludes LPN admin)
+                    lpn_hours = pbj_quarter_df['Hrs_LPN'].sum()
+                    quarter_info['pbj_reported_direct_lpn'] = (lpn_hours / total_census) if total_census > 0 else None
+                    
+                    # Nurse Aide (CNA + Med Aide + NA Trainee)
+                    na_hours = pbj_quarter_df['Total_Nurse_Aide_Hours'].sum()
+                    quarter_info['pbj_reported_na'] = (na_hours / total_census) if total_census > 0 else None
+            
+            # === CALCULATE % CASE-MIX ===
+            # Total CMI
+            if quarter_info.get('prov_reported_total') and quarter_info.get('case_mix_total') and quarter_info['case_mix_total'] > 0:
+                quarter_info['pct_cmi_total'] = (quarter_info['prov_reported_total'] / quarter_info['case_mix_total'] * 100)
+            else:
+                quarter_info['pct_cmi_total'] = None
+            
+            # Direct CMI (use PBJ direct, case-mix direct = RN+LPN+NA case-mix)
+            if quarter_info.get('pbj_reported_direct') and quarter_info.get('case_mix_rn') and quarter_info.get('case_mix_lpn') and quarter_info.get('case_mix_na'):
+                case_mix_direct = quarter_info['case_mix_rn'] + quarter_info['case_mix_lpn'] + quarter_info['case_mix_na']
+                if case_mix_direct > 0:
+                    quarter_info['pct_cmi_direct'] = (quarter_info['pbj_reported_direct'] / case_mix_direct * 100)
+                else:
+                    quarter_info['pct_cmi_direct'] = None
+            else:
+                quarter_info['pct_cmi_direct'] = None
+            
+            # Total RN CMI
+            if quarter_info.get('pbj_reported_total_rn') and quarter_info.get('case_mix_rn') and quarter_info['case_mix_rn'] > 0:
+                quarter_info['pct_cmi_total_rn'] = (quarter_info['pbj_reported_total_rn'] / quarter_info['case_mix_rn'] * 100)
+            else:
+                quarter_info['pct_cmi_total_rn'] = None
+            
+            # Direct RN CMI
+            if quarter_info.get('pbj_reported_direct_rn') and quarter_info.get('case_mix_rn') and quarter_info['case_mix_rn'] > 0:
+                quarter_info['pct_cmi_direct_rn'] = (quarter_info['pbj_reported_direct_rn'] / quarter_info['case_mix_rn'] * 100)
+            else:
+                quarter_info['pct_cmi_direct_rn'] = None
+            
+            # Total LPN CMI
+            if quarter_info.get('pbj_reported_total_lpn') and quarter_info.get('case_mix_lpn') and quarter_info['case_mix_lpn'] > 0:
+                quarter_info['pct_cmi_total_lpn'] = (quarter_info['pbj_reported_total_lpn'] / quarter_info['case_mix_lpn'] * 100)
+            else:
+                quarter_info['pct_cmi_total_lpn'] = None
+            
+            # Direct LPN CMI
+            if quarter_info.get('pbj_reported_direct_lpn') and quarter_info.get('case_mix_lpn') and quarter_info['case_mix_lpn'] > 0:
+                quarter_info['pct_cmi_direct_lpn'] = (quarter_info['pbj_reported_direct_lpn'] / quarter_info['case_mix_lpn'] * 100)
+            else:
+                quarter_info['pct_cmi_direct_lpn'] = None
+            
+            # Nurse Aide CMI
+            if quarter_info.get('pbj_reported_na') and quarter_info.get('case_mix_na') and quarter_info['case_mix_na'] > 0:
+                quarter_info['pct_cmi_na'] = (quarter_info['pbj_reported_na'] / quarter_info['case_mix_na'] * 100)
+            else:
+                quarter_info['pct_cmi_na'] = None
+            
+            # Round all values with appropriate precision
+            for key, value in quarter_info.items():
+                if key != 'quarter' and value is not None:
+                    # Round % CMI values to 1 decimal, others to 3 decimals
+                    if key.startswith('pct_'):
+                        quarter_info[key] = round(value, 1)
+                    else:
+                        quarter_info[key] = round(value, 3)
+            
+            case_mix_data[quarter] = quarter_info
+        
+        return jsonify({'case_mix_data': case_mix_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e), 'case_mix_data': {}})
 
 # Dynamic dashboard - no initialization needed
 
