@@ -1,53 +1,25 @@
-# Ignore all Python files by default
-*.py
+# Ignore Python cache files
+__pycache__
+*.py[cod]
 
-# But keep these specific Python files
-!PBJ_Dashboard.py
-!setup_database.py
-!pbj_icon_component.py
+# Ignore virtual environments
+venv
+ENV
 
-# Keep only these Streamlit page files
-!pages/4_Premium.py
-!pages/1_About.py
-
-# Ignore all CSV files by default
+# Data files
 *.csv
 
-# But keep these specific CSVs
-!national_lite_metrics.csv
-!state_lite_metrics.csv
-!facility_lite_metrics.csv
-!NH_ProviderInfo_Mar2025.csv
-!NH_ProviderInfo_Jun2025.csv
-!NH_ProviderInfo_Jul2025.csv
-!NH_ProviderInfo_Sep2025.csv
-!Nursing_Home_Affiliated_Entity_Performance_Measures_Jun_2025.csv
-!Nursing_Home_Affiliated_Entity_Performance_Measures_Mar_2025.csv
-!Nursing_Home_Chain_Performance_Measures_Jul_2025.csv
-!macpac_state_standards_clean.csv
+# Ignore log files
+*.log
 
-# Keep these pngs
-!pbj_favicon.png
+# Ignore unwanted specific files and directories
+Archive
+.CURSOR
+deployment_test.py
 
-# Keep requirements files
-!requirements.txt
-!dev-requirements.txt
+# Ignore image files
+*.png
 
-# keep this
-config.toml
-
-# Ignore everything in data/mapping folders
-PBJcsv/
-NonNursecsv/
-standardized_PBJ/
-standardized_NonNurse/
-column_mapping_reports/
-
-# Ignore streamlit-extras (separate git repository)
-streamlit-extras/
-
-# Ignore virtual environments and system files
-venv/
-__pycache__/
-.DS_Store
-*.pyc
+# Ignore temporary files
+*.tmp
+*.bak
