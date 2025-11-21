@@ -4,7 +4,7 @@ services:
     env: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run PBJ_Dashboard.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    startCommand: streamlit run PBJ_Dashboard.py --server.port $PORT --server.address 0.0.0.0
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
