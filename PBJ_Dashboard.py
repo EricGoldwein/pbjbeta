@@ -272,18 +272,24 @@ def load_macpac_standards():
     try:
         import os
         # Try multiple possible paths for the file
-        def find_file(filename):
-            possible_paths = [
-                os.path.join(os.getcwd(), filename),
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
-                filename  # Try relative path
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    return path
-            return None
+        possible_paths = [
+            os.path.join(os.getcwd(), 'macpac', 'macpac_state_standards_clean.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'macpac', 'macpac_state_standards_clean.csv'),
+            os.path.join('macpac', 'macpac_state_standards_clean.csv'),  # Try relative path
+            'macpac/macpac_state_standards_clean.csv',  # Also try with forward slash for compatibility
+            os.path.join(os.getcwd(), 'pbj_lite', 'macpac_state_standards_clean.csv'),  # Try pbj_lite directory
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_lite', 'macpac_state_standards_clean.csv'),
+            os.path.join('pbj_lite', 'macpac_state_standards_clean.csv'),
+            os.path.join(os.getcwd(), 'macpac_state_standards_clean.csv'),  # Try root directory
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'macpac_state_standards_clean.csv'),
+            'macpac_state_standards_clean.csv',  # Try current directory
+        ]
         
-        macpac_path = find_file('macpac/macpac_state_standards_clean.csv')
+        macpac_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                macpac_path = path
+                break
         
         if not macpac_path:
             st.warning("MACPAC state standards data not found. State requirements will not be displayed.")
