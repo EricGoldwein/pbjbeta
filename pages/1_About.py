@@ -93,7 +93,7 @@ Staffing data is a key indicator of nursing home quality, revealing how much car
 ### Under the hood  
 * **Payroll-Based Journal (PBJ) Staffing Data** – {get_latest_data_periods()['quarter_count']} quarters of daily data, aggregated for clarity  
 * **CMS Provider Info** – 5-star ratings, enforcement data, and other key indicators  
-* **CMS Chain Performance Measures** – Selected quality and performance metrics for nursing home chains ({get_latest_data_periods()['chain_latest']})
+* **CMS Affiliated Entity** – Selected quality and performance metrics for groups of nursing homes sharing common owners, officers, or entities ({get_latest_data_periods()['affiliated_entity_latest']})  
 * **CMS Citations (Premium)** - Citation data and inspection reports, categorized by date, type, severity, and more. 
 
 ### Quick tour  
@@ -121,7 +121,7 @@ st.markdown(f"""
     <div>
         <h2 style='font-size:1.5em; font-weight:700; color:#1769aa; margin-bottom:0.7em;'>Methodology</h2>
         <div style='font-size:1.08em; color:#222; font-weight:400;'>
-            This Nursing Home Staffing Dashboard uses <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">CMS Payroll-Based Journal (PBJ) data</a> from 2017 to {get_latest_data_periods()['current_year']}, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses <a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">Provider Information</a> ({get_latest_data_periods()['provider_info_latest']}, {get_latest_data_periods()['provider_info_previous']}), <a href="https://data.cms.gov/quality-of-care/nursing-home-chain-performance-measures/data" target="_blank">Chain Performance Measures</a> ({get_latest_data_periods()['chain_latest']}), and <a href="https://www.macpac.gov/publication/state-policies-related-to-nursing-facility-staffing/" target="_blank">MACPAC State Staffing Standards</a> (2022) datasets.
+            This Nursing Home Staffing Dashboard uses <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">CMS Payroll-Based Journal (PBJ) data</a> from 2017 to {get_latest_data_periods()['current_year']}, covering all nursing positions, including contract staff. CMS first published PBJ data in 2017. It also uses <a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">Provider Information</a> ({get_latest_data_periods()['provider_info_latest']}, {get_latest_data_periods()['provider_info_previous']}), <a href="https://data.cms.gov/quality-of-care/nursing-home-affiliated-entity-performance-measures/data" target="_blank">Affiliated Entity</a> ({get_latest_data_periods()['affiliated_entity_latest']}), and <a href="https://www.macpac.gov/publication/state-policies-related-to-nursing-facility-staffing/" target="_blank">MACPAC State Staffing Standards</a> (2022) datasets.
         </div>
         <hr style='margin: 2.2em 0 1.5em 0; border: none; border-top: 1.5px solid #e3e8f0;'>
         <h2 style='font-size:1.3em; font-weight:700; color:#1769aa; margin-bottom:0.5em;'>Staff Categories</h2>
@@ -189,7 +189,7 @@ st.markdown(f"""
     <div class="footer" style="margin-top: 40px;">
         <p style="color: #94a3b8; margin: 0 auto; font-style: italic; line-height: 1.6; text-align: center; max-width: 800px;">The <strong>PBJ Dashboard</strong> is a free public resource providing consumers with longitudinal data at 15,000 US nursing homes. It has been featured in <a href="https://www.publichealth.columbia.edu/news/alumni-make-data-shine-public-health-dashboards" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Columbia Public Health</a>, <a href="https://www.retirementlivingsourcebook.com/videos/why-nursing-home-staffing-data-matters-for-1-2-million-residents-and-beyond" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Positive Aging</a>, and <a href="https://aginginamerica.news/2025/09/16/crunching-the-nursing-home-data/" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Aging in America News</a>.</p>
         <div class="footer-divider" style="margin-top: 20px;">
-            <p style="margin: 0; color: #6b7280; font-style: italic; font-size: 0.9rem; text-align: center;"><a href="https://www.320insight.com/" style="color: #6b7280; text-decoration: none;">320 Consulting — Turning Spreadsheets into Stories</a></p>
+            <p style="margin: 0; color: #6b7280; font-style: italic; font-size: 0.9rem; text-align: center;">Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #6b7280; text-decoration: none;">CMS Payroll-Based Journal Data, {get_latest_data_periods()['data_range']}</a> | <a href="https://www.320insight.com/" style="color: #6b7280; text-decoration: none;">320 Consulting — Turning Spreadsheets into Stories</a></p>
         </div>
     </div>
 """, unsafe_allow_html=True) 

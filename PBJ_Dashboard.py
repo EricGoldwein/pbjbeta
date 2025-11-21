@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-# type: ignore
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportOptionalSubscript=false
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -195,8 +191,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Initialize DuckDB connection for facility data
-# This connection is global and shared across functions
-# Note: Connection may close during Streamlit reloads - this is handled gracefully
 facility_db = duckdb.connect(':memory:')
 
 # Initialize provider info cache
@@ -420,15 +414,15 @@ def pbj_takeaway_card(
     casemix_hprd: float,
     census: str = "—",
     contract: str = "—",
-    trend_delta: Optional[float] = None,  # Change from previous quarter
-    census_trend: Optional[float] = None,  # Change in census from previous quarter
-    previous_year: Optional[str] = None,  # Previous year quarter for comparison (4 quarters behind)
+    trend_delta: float = None,  # Change from previous quarter
+    census_trend: float = None,  # Change in census from previous quarter
+    previous_year: str = None,  # Previous year quarter for comparison (4 quarters behind)
     aide_share: float = 0.60,  # or compute from PBJ if you have it
     floor_beds: int = 30,
-    ownership_type: Optional[str] = None,  # Ownership type (For Profit, Non Profit, Government)
-    affiliated_entity: Optional[str] = None,  # Affiliated entity name
-    affiliated_entity_id: Optional[str] = None,  # Affiliated entity ID
-    high_risk_indicators: Optional[dict] = None,  # High-risk indicators
+    ownership_type: str = None,  # Ownership type (For Profit, Non Profit, Government)
+    affiliated_entity: str = None,  # Affiliated entity name
+    affiliated_entity_id: str = None,  # Affiliated entity ID
+    high_risk_indicators: dict = None,  # High-risk indicators
     ownership_change: bool = False  # Whether facility changed ownership in last 12 months
 ):
     # Calculate previous year quarter if not provided
@@ -511,7 +505,7 @@ def pbj_takeaway_card(
             (f"""<span style="display:inline-block;padding:2px 8px;border-radius:999px;
                  background:#dc2626;color:#ffffff;font-weight:600;font-size:0.85rem;margin-right:6px;border:1px solid #b91c1c;">
                  High Risk</span>""" if high_risk_indicators and high_risk_indicators.get('is_high_risk', False) else "") +
-            chip("Total HPRD", f"{_fmt(reported_hprd)}{'*' if reported_hprd and reported_hprd < 0.5 else ''} {trend_emoji}") +
+            chip("Total HPRD", f"{_fmt(reported_hprd)} {trend_emoji}") +
             chip(f"{state_name} HPRD", f"{_fmt(state_hprd)}", tone_state) +
             chip("Census", census_int) +
             chip("Contract", contract) +
@@ -565,8 +559,6 @@ def pbj_takeaway_card(
             )
         
         st.markdown(para)
-        if reported_hprd and reported_hprd < 0.5:
-            st.markdown("<small style='color: #dc2626;'>*Suspected reporting error</small>", unsafe_allow_html=True)
         st.markdown(f"**Put another way...** On a typical **30-bed floor** at {facility} you'd see about **{_fmt(floor_staff_total,1)} staff members**, including ~{_fmt(floor_staff_aides,1)} nurse aides. For the entire {census_int}-resident facility, that's about {_fmt(census_int * reported_hprd / 24.0,1)} total staff, including ~{_fmt(census_int * reported_hprd / 24.0 * aide_share,1)} nurse aides.")
 
         # Note
@@ -629,8 +621,8 @@ def state_pbj_takeaway_card(
     national_hprd: float,
     state_rank: int,
     total_states: int,
-    trend_delta: Optional[float] = None,  # Change from previous quarter
-    previous_year: Optional[str] = None,  # Previous year quarter for comparison (4 quarters behind)
+    trend_delta: float = None,  # Change from previous quarter
+    previous_year: str = None,  # Previous year quarter for comparison (4 quarters behind)
     aide_share: float = 0.60,  # or compute from PBJ if you have it
     floor_beds: int = 30,
     avg_facility_size: float = 100  # Average facility size for the state
@@ -815,7 +807,7 @@ def state_pbj_takeaway_card(
 
 
 @st.cache_data(ttl=300, max_entries=1)  # Cache for 5 minutes, limit cache entries
-def load_metrics_data(cache_version="v2025_10_02"):
+def load_metrics_data(cache_version="v2024_12_15"):
     """Load and cache all metrics data with memory optimization."""
     try:
         import os
@@ -912,10 +904,19 @@ def load_metrics_data(cache_version="v2025_10_02"):
 def load_affiliated_entity_data():
     """Load and cache chain performance measures data."""
     try:
-        from utils.file_finder import find_latest_chain_performance
+        import os
+        # Try multiple possible paths
+        possible_paths = [
+            os.path.join(os.getcwd(), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
+        ]
         
-        # Use dynamic file finder to get the latest chain performance file
-        file_path = find_latest_chain_performance()
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
         
         if not file_path:
             if IS_STAGING:
@@ -1097,21 +1098,8 @@ def load_previous_provider_info_data():
         return pd.DataFrame()
 
 @st.cache_data
-def create_facility_db(cache_version="v2025_10_03"):
+def create_facility_db():
     """Create an optimized DuckDB database for facility data."""
-    global facility_db
-    
-    try:
-        # Test if connection is open, if not reopen it
-        try:
-            facility_db.execute("SELECT 1").fetchone()
-        except Exception:
-            # Connection is closed, reopen it
-            facility_db = duckdb.connect(':memory:')
-    except Exception:
-        # If we can't test connection, reopen it
-        facility_db = duckdb.connect(':memory:')
-    
     try:
         # Load facility metrics into DuckDB
         facility_path = find_file('facility_lite_metrics.csv')
@@ -1139,12 +1127,7 @@ def create_facility_db(cache_version="v2025_10_03"):
                                                 '-01')
         
         # Drop the table if it exists
-        try:
-            facility_db.execute("DROP TABLE IF EXISTS facility_metrics")
-        except Exception:
-            # Connection might be closed, reopen and try again
-            facility_db = duckdb.connect(':memory:')
-            facility_db.execute("DROP TABLE IF EXISTS facility_metrics")
+        facility_db.execute("DROP TABLE IF EXISTS facility_metrics")
         
         # Create the table with explicit schema
         facility_db.execute("""
@@ -1178,13 +1161,7 @@ def create_facility_db(cache_version="v2025_10_03"):
         result = facility_db.execute("SELECT COUNT(*) FROM facility_metrics").fetchone()
         
     except Exception as e:
-        # Don't show error to user - connection errors can happen during Streamlit reloads
-        # The database will be initialized on next app startup or when data is loaded
-        error_msg = str(e)
-        # Silently handle connection closed errors - they're expected during app reload
-        if "Connection" not in error_msg or "closed" not in error_msg:
-            # Only log unexpected errors, don't show to user to avoid spam
-            pass
+        st.error(f"Error creating facility database: {str(e)}")
 
 # Function to clear cache and reload data
 def clear_all_caches():
@@ -1198,16 +1175,7 @@ def clear_all_caches():
 # Initialize data at startup
 try:
     national_metrics, state_metrics, facility_metrics = load_metrics_data()
-    # Initialize database - handle connection errors gracefully
-    try:
-        create_facility_db()
-    except Exception as db_error:
-        # Connection errors during startup are OK - database will be initialized when needed
-        # Don't show error if it's just a connection issue
-        error_msg = str(db_error)
-        if "Connection" not in error_msg or "closed" not in error_msg:
-            # Only show non-connection errors
-            st.warning(f"Facility database will initialize when needed: {error_msg}")
+    create_facility_db()
 except Exception as e:
     st.error(f"Error during initialization: {str(e)}")
     national_metrics = pd.DataFrame()
@@ -1244,59 +1212,48 @@ def proper_title_case(text: str) -> str:
     return result
 
 @st.cache_data
-def check_facility_status(provnum: str, cache_version="v2025_10_05") -> dict:
+def check_facility_status(provnum: str) -> dict:
     """Check if a facility is active and get its last available data."""
     try:
         provnum = str(provnum).strip()
         
-        # Get the latest quarter from the data - use date column for reliable ordering
-        # Don't call create_facility_db() here - it should already be initialized
-        # If connection is closed, handle gracefully
-        latest_quarter = None
+        # Get the latest quarter from the data
         try:
-            # Test if connection is still open by checking if we can query
-            test_query = "SELECT 1"
-            facility_db.execute(test_query).fetchone()
-            
             latest_quarters_query = """
-                SELECT CY_QTR 
+                SELECT MAX(CY_QTR) as latest_quarter
                 FROM facility_metrics
-                WHERE date = (SELECT MAX(date) FROM facility_metrics)
-                LIMIT 1
             """
             latest_quarter_result = facility_db.execute(latest_quarters_query).fetchone()
             latest_quarter = latest_quarter_result[0] if latest_quarter_result else None
-            
-            # Fallback: if query returns None, try a different query
-            if not latest_quarter:
-                fallback_query = """
-                    SELECT CY_QTR 
-                    FROM facility_metrics
-                    ORDER BY date DESC
-                    LIMIT 1
-                """
-                fallback_result = facility_db.execute(fallback_query).fetchone()
-                latest_quarter = fallback_result[0] if fallback_result else None
-        except Exception:
-            # Connection is closed or table doesn't exist - use default
+        except Exception as e:
+            # If database query fails, use a default latest quarter
             latest_quarter = "2025Q2"
         
-        # Get the facility's last available data - use date column for reliable ordering
-        result = None
+        # Get the facility's last available data
         try:
             facility_query = """
                 SELECT PROVNAME, STATE, COUNTY_NAME, CY_QTR, Total_Nurse_HPRD, Census
                 FROM facility_metrics 
                 WHERE PROVNUM = ?
-                ORDER BY date DESC
+                ORDER BY CY_QTR DESC
                 LIMIT 1
             """
             
             result = facility_db.execute(facility_query, (provnum,)).fetchone()
-        except Exception:
-            # If database query fails (connection closed, etc), return inactive status
-            # Don't show error message to user, just mark as inactive
-            result = None
+        except Exception as e:
+            # If database query fails, return inactive status
+            return {
+                'exists': False,
+                'is_inactive': True,
+                'error': str(e),
+                'facility_name': None,
+                'state': None,
+                'county': None,
+                'last_quarter': None,
+                'last_hprd': None,
+                'last_census': None,
+                'latest_available_quarter': latest_quarter
+            }
         
         if result:
             facility_name, state, county, last_quarter, last_hprd, last_census = result
@@ -1304,97 +1261,31 @@ def check_facility_status(provnum: str, cache_version="v2025_10_05") -> dict:
             # Check if the facility's last quarter is significantly older than the latest available quarter
             is_inactive = False
             if latest_quarter and last_quarter:
-                # Convert quarters to comparable format - handle multiple formats robustly
+                # Convert quarters to comparable format (e.g., "2025Q1" -> 20251)
                 def quarter_to_number(quarter_str):
-                    """Convert quarter string to numeric format for comparison.
-                    
-                    Handles formats: "2025Q2", "2025 Q2", "Q2 2025"
-                    Returns: year * 10 + quarter (e.g., 2025Q2 -> 20252)
-                    """
                     if not quarter_str:
                         return 0
-                    
-                    quarter_str = str(quarter_str).strip()
-                    
-                    # Handle "2025Q2" format (year first, no space) - most common
-                    if len(quarter_str) >= 6 and quarter_str[4] == 'Q':
-                        try:
-                            year = int(quarter_str[:4])
-                            q = int(quarter_str[-1])
-                            return year * 10 + q
-                        except (ValueError, IndexError):
-                            pass
-                    
-                    # Handle "2025 Q2" format (year first, with space)
-                    if ' ' in quarter_str and len(quarter_str) >= 7:
-                        parts = quarter_str.split()
-                        if len(parts) == 2:
-                            try:
-                                if parts[0].isdigit() and len(parts[0]) == 4 and parts[1].startswith('Q'):
-                                    year = int(parts[0])
-                                    q = int(parts[1][1])
-                                    return year * 10 + q
-                            except (ValueError, IndexError):
-                                pass
-                    
-                    # Handle "Q2 2025" format (quarter first)
-                    if quarter_str.startswith('Q'):
-                        parts = quarter_str.split()
-                        if len(parts) == 2:
-                            try:
-                                if parts[0].startswith('Q') and parts[1].isdigit() and len(parts[1]) == 4:
-                                    year = int(parts[1])
-                                    q = int(parts[0][1])
-                                    return year * 10 + q
-                            except (ValueError, IndexError):
-                                pass
-                    
-                    # Fallback: try to extract year (4 digits) and quarter (Q followed by digit) from anywhere
-                    year_match = re.search(r'\b(20\d{2})\b', quarter_str)
-                    q_match = re.search(r'Q([1-4])', quarter_str)
-                    
-                    if year_match and q_match:
-                        try:
-                            year = int(year_match.group(1))
-                            q = int(q_match.group(1))
-                            return year * 10 + q
-                        except (ValueError, IndexError):
-                            pass
-                    
-                    # If we can't parse it, return 0 (will mark as inactive)
-                    return 0
+                    try:
+                        year = int(str(quarter_str)[:4])
+                        q = int(str(quarter_str)[-1])
+                        return year * 10 + q
+                    except (ValueError, IndexError):
+                        return 0
                 
-                # Calculate actual quarter difference properly
-                # Convert to numeric format first
                 latest_num = quarter_to_number(latest_quarter)
                 last_num = quarter_to_number(last_quarter)
                 
-                if latest_num == 0 or last_num == 0:
-                    # Can't parse quarters, mark as inactive for safety
-                    is_inactive = True
-                else:
-                    # Extract year and quarter from numeric format
-                    # Format: year * 10 + q, so year = num // 10, q = num % 10
-                    year1 = last_num // 10
-                    q1 = last_num % 10
-                    year2 = latest_num // 10
-                    q2 = latest_num % 10
-                    
-                    # Calculate total quarters since year 0: (year * 4) + quarter
-                    total_q1 = year1 * 4 + q1
-                    total_q2 = year2 * 4 + q2
-                    
-                    # Calculate quarter difference
-                    quarter_diff = total_q2 - total_q1
-                    
+                # Only mark as inactive if:
+                # 1. We can parse both quarters successfully
+                # 2. The facility is more than 3 quarters behind the latest available quarter
+                # 3. The facility is not the special case 065429
+                if latest_num > 0 and last_num > 0:
+                    quarter_diff = latest_num - last_num
                     # Consider inactive if more than 3 quarters behind (allow for some lag in reporting)
-                    # Examples:
-                    #   Q2 2025 vs Q2 2025 = 0 quarters (same, active)
-                    #   Q1 2025 vs Q2 2025 = 1 quarter (active)
-                    #   Q4 2024 vs Q2 2025 = 2 quarters (active)
-                    #   Q3 2024 vs Q2 2025 = 3 quarters (active)
-                    #   Q2 2024 vs Q2 2025 = 4 quarters (inactive)
                     is_inactive = quarter_diff > 3
+                else:
+                    # If we can't parse quarters, don't mark as inactive (assume active)
+                    is_inactive = False
                 
                 # Force facility 065429 to always be active
                 if provnum == "065429":
@@ -1535,7 +1426,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-def get_facility_staffing_rating(provnum: str) -> Optional[float]:
+def get_facility_staffing_rating(provnum: str) -> float:
     """Get the staffing rating for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1558,7 +1449,7 @@ def get_facility_staffing_rating(provnum: str) -> Optional[float]:
         return None
 
 @st.cache_data
-def get_facility_affiliated_entity(provnum: str) -> Optional[str]:
+def get_facility_affiliated_entity(provnum: str) -> str:
     """Get the chain name for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1583,7 +1474,7 @@ def get_facility_affiliated_entity(provnum: str) -> Optional[str]:
         return None
 
 @st.cache_data
-def get_facility_affiliated_entity_id(provnum: str) -> Optional[str]:
+def get_facility_affiliated_entity_id(provnum: str) -> str:
     """Get the chain ID for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1608,7 +1499,7 @@ def get_facility_affiliated_entity_id(provnum: str) -> Optional[str]:
         return None
 
 @st.cache_data
-def get_facility_overall_rating(provnum: str) -> Optional[float]:
+def get_facility_overall_rating(provnum: str) -> float:
     """Get the overall rating for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1634,7 +1525,7 @@ def get_facility_overall_rating(provnum: str) -> Optional[float]:
         return None
 
 @st.cache_data
-def get_facility_staffing_rating_trend(provnum: str) -> Optional[str]:
+def get_facility_staffing_rating_trend(provnum: str) -> str:
     """Get the staffing rating trend by comparing current vs previous reporting period."""
     try:
         current_data = load_provider_info_data()
@@ -1650,8 +1541,8 @@ def get_facility_staffing_rating_trend(provnum: str) -> Optional[str]:
         if current_facility.empty or previous_facility.empty:
             return None
         
-        current_rating = current_facility['Staffing Rating'].iloc[0]  # type: ignore
-        previous_rating = previous_facility['Staffing Rating'].iloc[0]  # type: ignore
+        current_rating = current_facility['Staffing Rating'].iloc[0]
+        previous_rating = previous_facility['Staffing Rating'].iloc[0]
         
         if pd.isna(current_rating) or pd.isna(previous_rating):
             return None
@@ -1674,7 +1565,7 @@ def get_facility_staffing_rating_trend(provnum: str) -> Optional[str]:
         return None
 
 @st.cache_data
-def get_facility_overall_rating_trend(provnum: str) -> Optional[str]:
+def get_facility_overall_rating_trend(provnum: str) -> str:
     """Get the overall rating trend by comparing current vs previous reporting period."""
     try:
         current_data = load_provider_info_data()
@@ -1690,8 +1581,8 @@ def get_facility_overall_rating_trend(provnum: str) -> Optional[str]:
         if current_facility.empty or previous_facility.empty:
             return None
         
-        current_rating = current_facility['Overall Rating'].iloc[0]  # type: ignore
-        previous_rating = previous_facility['Overall Rating'].iloc[0]  # type: ignore
+        current_rating = current_facility['Overall Rating'].iloc[0]
+        previous_rating = previous_facility['Overall Rating'].iloc[0]
         
         if pd.isna(current_rating) or pd.isna(previous_rating):
             return None
@@ -1714,7 +1605,7 @@ def get_facility_overall_rating_trend(provnum: str) -> Optional[str]:
         return None
 
 @st.cache_data
-def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_quarter: str, cache_version="v2025_10_01"):
+def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_quarter: str):
     """Get filtered data with optimized filtering."""
     try:
         if level == "Facility" and selected_value:
@@ -1731,7 +1622,7 @@ def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_q
             
             # Sort by date
             if not filtered.empty and 'date' in filtered.columns:
-                filtered = filtered.sort_values('date')  # type: ignore
+                filtered = filtered.sort_values('date')
             
             return filtered
         
@@ -1767,7 +1658,7 @@ def get_filtered_data(level: str, selected_value: str, start_quarter: str, end_q
         return pd.DataFrame()  # Return empty DataFrame on error
 
 @st.cache_data
-def search_facilities(search_term: str, cache_version="v2025_10_01") -> List[Dict[str, str]]:
+def search_facilities(search_term: str) -> List[Dict[str, str]]:
     """Search facilities with lazy loading and caching."""
     try:
         # Sanitize search term to prevent SQL injection
@@ -1799,7 +1690,7 @@ def search_facilities(search_term: str, cache_version="v2025_10_01") -> List[Dic
         return []
 
 @st.cache_data
-def get_facility_info(provnum: str, cache_version="v2025_10_01") -> Optional[dict]:
+def get_facility_info(provnum: str) -> dict:
     """Get facility information from the database."""
     try:
         conn = get_db_connection()
@@ -1833,7 +1724,7 @@ def get_facility_info(provnum: str, cache_version="v2025_10_01") -> Optional[dic
         return None
 
 @st.cache_data
-def get_facility_ownership_type(provnum: str) -> Optional[str]:
+def get_facility_ownership_type(provnum: str) -> str:
     """Get ownership type for a facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1891,7 +1782,7 @@ def get_facility_ownership_change(provnum: str) -> bool:
         return False
 
 @st.cache_data
-def get_facility_high_risk_indicators(provnum: str) -> Optional[dict]:
+def get_facility_high_risk_indicators(provnum: str) -> dict:
     """Get high-risk indicators for a facility."""
     try:
         provider_data = load_provider_info_data()
@@ -1928,7 +1819,7 @@ def get_facility_high_risk_indicators(provnum: str) -> Optional[dict]:
     except Exception as e:
         return None
 
-def get_quarterly_metrics(provnum: str, quarter: str) -> Optional[dict]:
+def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
     """Get quarterly metrics for a facility."""
     try:
         conn = get_db_connection()
@@ -2097,7 +1988,7 @@ def display_inactive_facility_message(provnum: str, facility_status: dict):
     
     return False
 
-def display_facility_info(provnum: str, quarter_name: Optional[str] = None, affiliated_entity: Optional[str] = None):
+def display_facility_info(provnum: str, quarter_name: str = None, affiliated_entity: str = None):
     """Display facility information in a formatted box. On mobile, remove ownership entity and show quarter below provider name."""
     try:
         # Note: Inactive facility handling is now done in the main flow, not here
@@ -2492,7 +2383,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             with col1:
                 st.metric("Nursing Homes", 
                          format_metric(facility_count, decimal_places=0, thousands=True),
-                         format_metric(facility_count - prev_facility_count, decimal_places=0, thousands=True) if prev_facility_count is not None and facility_count is not None else None,
+                         format_metric(facility_count - prev_facility_count, decimal_places=0, thousands=True) if prev_facility_count is not None else None,
                         help="Total number of nursing homes during the reporting period. Arrow compares to previous quarter.")
             # Adjust column indices for other metrics
             metric_cols = [col2, col3, col4]
@@ -2676,13 +2567,13 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
             if has_reported or has_case_mix:
                 available_categories.append(category)
                 # Calculate values
-                delta = (reported_val - case_mix_val) if has_reported and has_case_mix and reported_val is not None and case_mix_val is not None else 0
-                delta_pct = ((reported_val / case_mix_val - 1) * 100) if has_reported and has_case_mix and case_mix_val is not None and case_mix_val > 0 and reported_val is not None else 0
+                delta = reported_val - case_mix_val if has_reported and has_case_mix else 0
+                delta_pct = ((reported_val / case_mix_val - 1) * 100) if has_reported and has_case_mix and case_mix_val > 0 else 0
                 
                 deltas.append(delta)
                 delta_percentages.append(delta_pct)
-                reported_values.append(reported_val if has_reported and reported_val is not None else 0)
-                case_mix_values.append(case_mix_val if has_case_mix and case_mix_val is not None else 0)
+                reported_values.append(reported_val if has_reported else 0)
+                case_mix_values.append(case_mix_val if has_case_mix else 0)
         
         # If no case-mix data available at all, return None
         if not any(case_mix_values):
@@ -2780,7 +2671,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         return None, None
 
 
-def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facility: Optional[str] = None):
+def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
     """Plot quarterly trends with optimized data processing."""
     try:
         # Check if data is empty or missing required columns
@@ -2873,18 +2764,18 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
         hprd_display = data['Total_Nurse_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
         
         # Check if Nurse_Care_HPRD column exists, otherwise use Total_Nurse_HPRD
-        if 'Nurse_Care_HPRD' in data.columns and len(data[data['Nurse_Care_HPRD'].notna()]) > 0:  # type: ignore
+        if 'Nurse_Care_HPRD' in data.columns and not data['Nurse_Care_HPRD'].isna().all():
             nurse_care_hprd_display = data['Nurse_Care_HPRD'].apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
         else:
             # Fallback should be different from total nurse to show the issue
             nurse_care_hprd_display = hprd_display * 0.9  # Make it slightly different so we can see the problem
         
         # Pre-round RN HPRD data (with error handling for missing columns and NaN values)
-        if 'Total_RN_HPRD' in data.columns and len(data[data['Total_RN_HPRD'].notna()]) > 0:  # type: ignore
-            total_rn_hprd_display = data['Total_RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))  # type: ignore
-        elif 'RN_HPRD' in data.columns and len(data[data['RN_HPRD'].notna()]) > 0:  # type: ignore
+        if 'Total_RN_HPRD' in data.columns and not data['Total_RN_HPRD'].isna().all():
+            total_rn_hprd_display = data['Total_RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        elif 'RN_HPRD' in data.columns and not data['RN_HPRD'].isna().all():
             # Fallback to RN_HPRD if Total_RN_HPRD doesn't exist
-            total_rn_hprd_display = data['RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))  # type: ignore
+            total_rn_hprd_display = data['RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
         else:
             total_rn_hprd_display = pd.Series([0.0] * len(data))
             
@@ -2955,7 +2846,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
         )
         
         # Move subplot titles up slightly for better spacing
-        for annotation in fig.layout.annotations:  # type: ignore
+        for annotation in fig.layout.annotations:
             if annotation.text and 'HPRD' in annotation.text:
                 annotation.y = annotation.y + 0.008
         
@@ -3048,9 +2939,11 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
 def display_footer():
     """Display a consistent footer across all pages."""
     st.markdown(f"""
-        <div style="text-align: center; margin-top: 10px; color: #666; font-size: 0.9em;">
-            <p>Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #1E88E5; text-decoration: none;">CMS Payroll-Based Journal Data, {get_latest_data_periods()['data_range']}</a></p>
-            <p>By <a href="https://www.320insight.com/" target="_blank" style="color: #1E88E5; text-decoration: none; font-weight: 500;">320 Consulting LLC</a></p>
+        <div class="footer" style="margin-top: 40px;">
+            <p style="color: #94a3b8; margin: 0 auto; font-style: italic; line-height: 1.6; text-align: center; max-width: 800px;">The <strong>PBJ Dashboard</strong> is a free public resource providing consumers with longitudinal data at 15,000 US nursing homes. It has been featured in <a href="https://www.publichealth.columbia.edu/news/alumni-make-data-shine-public-health-dashboards" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Columbia Public Health</a>, <a href="https://www.retirementlivingsourcebook.com/videos/why-nursing-home-staffing-data-matters-for-1-2-million-residents-and-beyond" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Positive Aging</a>, and <a href="https://aginginamerica.news/2025/09/16/crunching-the-nursing-home-data/" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Aging in America News</a>.</p>
+            <div class="footer-divider" style="margin-top: 20px;">
+                <p style="margin: 0; color: #6b7280; font-style: italic; font-size: 0.9rem; text-align: center;">Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #6b7280; text-decoration: none;">CMS Payroll-Based Journal Data, {get_latest_data_periods()['data_range']}</a> | <a href="https://www.320insight.com/" style="color: #6b7280; text-decoration: none;">320 Consulting — Turning Spreadsheets into Stories</a></p>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -4523,50 +4416,49 @@ def main() -> None:
                         """, unsafe_allow_html=True)
                     
                     
-                    # Check if facility is truly inactive - simple check based on actual data
-                    if selected_value and not filtered_data.empty and 'CY_QTR' in filtered_data.columns:
-                        # Get the facility's latest quarter from actual data (sorted chronologically)
-                        facility_quarters = sort_quarters(filtered_data['CY_QTR'].unique(), reverse=False)
-                        if facility_quarters:
-                            facility_latest_quarter = normalize_quarter(facility_quarters[-1])
-                            latest_available_quarter = normalize_quarter(end_quarter)
+                    # Check for inactive facilities first - show warning but continue with normal display
+                    if selected_value:
+                        facility_status = check_facility_status(selected_value)
+                        # Only show warning for actually inactive facilities (except 065429)
+                        # Make sure the facility exists and is truly inactive (more than 3 quarters behind)
+                        if (facility_status.get('is_inactive', False) and 
+                            facility_status.get('exists', False) and 
+                            selected_value != "065429"):
                             
-                            # Compare quarters: format is YYYYQ# (e.g., 2025Q2)
-                            try:
-                                facility_year = int(facility_latest_quarter[:4])
-                                facility_q = int(facility_latest_quarter[-1])
-                                latest_year = int(latest_available_quarter[:4])
-                                latest_q = int(latest_available_quarter[-1])
-                                
-                                # Calculate quarters difference
-                                facility_total_q = facility_year * 4 + facility_q
-                                latest_total_q = latest_year * 4 + latest_q
-                                quarter_diff = latest_total_q - facility_total_q
-                                
-                                # Only show warning if more than 3 quarters behind (allowing for reporting lag)
-                                if quarter_diff > 3:
-                                    def format_quarter_display(quarter_str):
-                                        """Format quarter like '2025Q2' to 'Q2 2025'"""
-                                        if not quarter_str or len(quarter_str) < 6:
-                                            return str(quarter_str)
-                                        year = quarter_str[:4]
-                                        q = quarter_str[-1]
-                                        return f"Q{q} {year}"
+                            # Double-check by comparing quarters from actual data
+                            last_quarter_str = facility_status.get('last_quarter')
+                            latest_quarter_str = facility_status.get('latest_available_quarter')
+                            
+                            # Only show warning if we have valid quarter data and facility is truly behind
+                            if last_quarter_str and latest_quarter_str:
+                                try:
+                                    def quarter_to_number(quarter_str):
+                                        year = int(str(quarter_str)[:4])
+                                        q = int(str(quarter_str)[-1])
+                                        return year * 10 + q
                                     
-                                    facility_quarter_display = format_quarter_display(facility_latest_quarter)
-                                    latest_quarter_display = format_quarter_display(latest_available_quarter)
+                                    latest_num = quarter_to_number(latest_quarter_str)
+                                    last_num = quarter_to_number(last_quarter_str)
+                                    quarter_diff = latest_num - last_num
                                     
-                                    st.warning(f"""
-                                    ⚠️ **Facility has not reported data recently**
-                                    
-                                    Last reported data: **{facility_quarter_display}**  
-                                    Current data range: Through **{latest_quarter_display}**
-                                    
-                                    This facility may have closed, changed ownership, or merged with another facility.
-                                    """)
-                            except (ValueError, IndexError):
-                                # If we can't parse quarters, silently skip the warning
-                                pass
+                                    # Only show warning if more than 3 quarters behind
+                                    if quarter_diff > 3:
+                                        def format_quarter(quarter_str):
+                                            year = str(quarter_str)[:4]
+                                            q = str(quarter_str)[-1]
+                                            return f"Q{q} {year}"
+                                        
+                                        last_quarter = format_quarter(last_quarter_str)
+                                        latest_quarter = format_quarter(latest_quarter_str)
+                                        
+                                        # Show a prominent warning message for inactive facilities
+                                        st.error(f"""
+                                        ⚠️ **Facility has not reported data recently. Last reported data: {last_quarter} (Current data range: Through {latest_quarter})**
+                                        """)
+                                        st.markdown("---")
+                                except (ValueError, IndexError):
+                                    # If we can't parse quarters, don't show warning
+                                    pass
                     
                     # 2. Display metrics
                     display_metrics(filtered_data, level)
@@ -4986,8 +4878,8 @@ def main() -> None:
                         # Main entity dashboard with entity ID
                         entity_name_title_case = proper_title_case(selected_value)
                         
-                        # Get the most recent data period dynamically from chain performance file
-                        most_recent_period = get_latest_data_periods()['chain_latest']
+                        # Get the most recent data period dynamically
+                        most_recent_period = get_latest_data_periods()['affiliated_entity_latest']
                         
                         # Responsive header with mobile optimization
                         st.markdown(f'''
@@ -5764,9 +5656,8 @@ def main() -> None:
                                     facilities_display['HPRD_raw'] = facilities_display['Total_Nurse_HPRD']
                                     
                                     # Format HPRD and Census columns for display
-                                    facilities_display['Total Nurse HPRD'] = facilities_display.apply(
-                                        lambda row: f"{row['Total_Nurse_HPRD']:.1f}{'*' if pd.notna(row['Total_Nurse_HPRD']) and row['Total_Nurse_HPRD'] < 0.5 else ''}" if pd.notna(row['Total_Nurse_HPRD']) else 'N/A',
-                                        axis=1
+                                    facilities_display['Total Nurse HPRD'] = facilities_display['Total_Nurse_HPRD'].apply(
+                                        lambda x: f"{x:.1f}" if pd.notna(x) else 'N/A'
                                     )
                                     facilities_display['Census'] = facilities_display['Census'].apply(
                                         lambda x: f"{x:,.0f}" if pd.notna(x) else 'N/A'
@@ -6172,10 +6063,6 @@ def main() -> None:
                                 """, unsafe_allow_html=True)
                                 
                                 st.markdown(html_table, unsafe_allow_html=True)
-                                
-                                # Add note about asterisk if any facilities have low HPRD
-                                if facilities_display['HPRD_raw'].notna().any() and (facilities_display['HPRD_raw'] < 0.5).any():
-                                    st.markdown("<small style='color: #dc2626;'>*Suspected reporting error (HPRD < 0.5)</small>", unsafe_allow_html=True)
                                 
                                 # Add sorting functionality using Tablesort library - only when actually on entity page
                                 if (level == "Entity" and selected_value and 
@@ -6739,10 +6626,6 @@ def main() -> None:
                                     """, unsafe_allow_html=True)
                                     
                                     st.markdown(html_table, unsafe_allow_html=True)
-                                
-                                # Add note about asterisk if any facilities have low HPRD
-                                if facilities_display['HPRD_raw'].notna().any() and (facilities_display['HPRD_raw'] < 0.5).any():
-                                    st.markdown("<small style='color: #dc2626;'>*Suspected reporting error (HPRD < 0.5)</small>", unsafe_allow_html=True)
                                     
                                     # Add sorting functionality using Tablesort library
                                     from streamlit.components.v1 import html

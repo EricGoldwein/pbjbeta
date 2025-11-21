@@ -211,11 +211,14 @@ st.markdown("""
 
 def display_footer():
     """Display a consistent footer across all pages."""
+    # Import dynamic date utilities
+    from utils.date_utils import get_latest_data_periods
+    
     st.markdown(f"""
         <div class="footer" style="margin-top: 40px;">
             <p style="color: #94a3b8; margin: 0 auto; font-style: italic; line-height: 1.6; text-align: center; max-width: 800px;">The <strong>PBJ Dashboard</strong> is a free public resource providing consumers with longitudinal data at 15,000 US nursing homes. It has been featured in <a href="https://www.publichealth.columbia.edu/news/alumni-make-data-shine-public-health-dashboards" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Columbia Public Health</a>, <a href="https://www.retirementlivingsourcebook.com/videos/why-nursing-home-staffing-data-matters-for-1-2-million-residents-and-beyond" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Positive Aging</a>, and <a href="https://aginginamerica.news/2025/09/16/crunching-the-nursing-home-data/" target="_blank" style="color: #7c8fa3; text-decoration: none; font-weight: 450;">Aging in America News</a>.</p>
             <div class="footer-divider" style="margin-top: 20px;">
-                <p style="margin: 0; color: #6b7280; font-style: italic; font-size: 0.9rem; text-align: center;"><a href="https://www.320insight.com/" style="color: #6b7280; text-decoration: none;">320 Consulting — Turning Spreadsheets into Stories</a></p>
+                <p style="margin: 0; color: #6b7280; font-style: italic; font-size: 0.9rem; text-align: center;">Source: <a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" style="color: #6b7280; text-decoration: none;">CMS Payroll-Based Journal Data, {get_latest_data_periods()['data_range']}</a> | <a href="https://www.320insight.com/" style="color: #6b7280; text-decoration: none;">320 Consulting — Turning Spreadsheets into Stories</a></p>
             </div>
         </div>
     """, unsafe_allow_html=True)
