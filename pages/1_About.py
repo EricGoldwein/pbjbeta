@@ -11,14 +11,30 @@ st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 32
 def load_pbj_favicon():
     """Load PBJ favicon data for use in footer"""
     try:
-        with open('pbj_favicon.png', 'rb') as f:
-            return base64.b64encode(f.read()).decode()
-    except FileNotFoundError:
-        print("Warning: pbj_favicon.png not found")
-        return ""
+        import os
+        # Try multiple possible paths for favicon
+        possible_paths = [
+            os.path.join(os.getcwd(), 'pbj_images', 'pbj_favicon.png'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pbj_images', 'pbj_favicon.png'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images', 'pbj_favicon.png'),
+            os.path.join('pbj_images', 'pbj_favicon.png'),  # Try relative path
+            'pbj_favicon.png',  # Try root directory
+            os.path.join(os.getcwd(), 'pbj_favicon.png'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pbj_favicon.png'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                with open(path, 'rb') as f:
+                    return base64.b64encode(f.read()).decode()
+        
+        # Fallback to hardcoded base64 if file not found
+        return "iVBORw0KGgoAAAANSUhEUgAABAAAAAQACAYAAAB/HSuDAADZUWNhQlgAANlRanVtYgAAAB5qdW1kYzJwYQARABCAAACqADibcQNjMnBhAAAANxNqdW1iAAAAR2p1bWRjMm1hABEAEIAAAKoAOJtxA3VybjpjMnBhOjAzNTc4YTlkLTlkOTctNGEyZi1iNzg2LTU4ZGRhMTU0MzUzNgAAAAHhanVtYgAAAClqdW1kYzJhcwA"
     except Exception as e:
         print(f"Warning: Error loading favicon: {e}")
-        return ""
+        # Fallback to hardcoded base64 on any error
+        return "iVBORw0KGgoAAAANSUhEUgAABAAAAAQACAYAAAB/HSuDAADZUWNhQlgAANlRanVtYgAAAB5qdW1kYzJwYQARABCAAACqADibcQNjMnBhAAAANxNqdW1iAAAAR2p1bWRjMm1hABEAEIAAAKoAOJtxA3VybjpjMnBhOjAzNTc4YTlkLTlkOTctNGEyZi1iNzg2LTU4ZGRhMTU0MzUzNgAAAAHhanVtYgAAAClqdW1kYzJhcwA"
 
 favicon_data = load_pbj_favicon()
 

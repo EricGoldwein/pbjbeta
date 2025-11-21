@@ -39,10 +39,27 @@ def find_file(filename):
 def load_pbj_favicon():
     """Load PBJ favicon data for use in floating action button"""
     try:
-        with open('pbj_images/pbj_favicon.png', 'rb') as f:
-            return base64.b64encode(f.read()).decode()
+        import os
+        # Try multiple possible paths for favicon
+        possible_paths = [
+            os.path.join(os.getcwd(), 'pbj_images', 'pbj_favicon.png'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images', 'pbj_favicon.png'),
+            os.path.join('pbj_images', 'pbj_favicon.png'),  # Try relative path
+            'pbj_favicon.png',  # Try root directory
+            os.path.join(os.getcwd(), 'pbj_favicon.png'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                with open(path, 'rb') as f:
+                    return base64.b64encode(f.read()).decode()
+        
+        # Fallback to hardcoded base64 if file not found
+        return "iVBORw0KGgoAAAANSUhEUgAABAAAAAQACAYAAAB/HSuDAADZUWNhQlgAANlRanVtYgAAAB5qdW1kYzJwYQARABCAAACqADibcQNjMnBhAAAANxNqdW1iAAAAR2p1bWRjMm1hABEAEIAAAKoAOJtxA3VybjpjMnBhOjAzNTc4YTlkLTlkOTctNGEyZi1iNzg2LTU4ZGRhMTU0MzUzNgAAAAHhanVtYgAAAClqdW1kYzJhcwA"
     except:
-        return ""
+        # Fallback to hardcoded base64 on any error
+        return "iVBORw0KGgoAAAANSUhEUgAABAAAAAQACAYAAAB/HSuDAADZUWNhQlgAANlRanVtYgAAAB5qdW1kYzJwYQARABCAAACqADibcQNjMnBhAAAANxNqdW1iAAAAR2p1bWRjMm1hABEAEIAAAKoAOJtxA3VybjpjMnBhOjAzNTc4YTlkLTlkOTctNGEyZi1iNzg2LTU4ZGRhMTU0MzUzNgAAAAHhanVtYgAAAClqdW1kYzJhcwA"
 
 # Set page config early for Render deployment
 # Trigger deployment
@@ -454,39 +471,16 @@ def pbj_takeaway_card(
 
     with st.container(border=True):
         # Add PBJ icon to the container - more compact
-        try:
-            import os
-            # Try multiple possible paths for favicon
-            possible_paths = [
-                os.path.join(os.getcwd(), 'pbj_images/pbj_favicon.png'),
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images/pbj_favicon.png'),
-                'pbj_images/pbj_favicon.png'  # Try relative path
-            ]
-            
-            favicon_path = None
-            for path in possible_paths:
-                if os.path.exists(path):
-                    favicon_path = path
-                    break
-            
-            if favicon_path:
-                with open(favicon_path, 'rb') as f:
-                    favicon_data = base64.b64encode(f.read()).decode()
-                st.markdown(f"""
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
-                    <strong style="font-size: 16px;">PBJ Takeaway: {facility}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                # Fallback without favicon if file can't be found
-                st.markdown(f"""
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <strong style="font-size: 16px;">PBJ Takeaway: {facility}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-        except Exception as e:
-            # Fallback without favicon if file can't be read
+        favicon_data = load_pbj_favicon()
+        if favicon_data:
+            st.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
+                <strong style="font-size: 16px;">PBJ Takeaway: {facility}</strong>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Fallback without favicon if file can't be found
             st.markdown(f"""
             <div style="display: flex; align-items: center; margin-bottom: 10px;">
                 <strong style="font-size: 16px;">PBJ Takeaway: {facility}</strong>
@@ -684,39 +678,16 @@ def state_pbj_takeaway_card(
 
     with st.container(border=True):
         # Add PBJ icon to the container - more compact
-        try:
-            import os
-            # Try multiple possible paths for favicon
-            possible_paths = [
-                os.path.join(os.getcwd(), 'pbj_images/pbj_favicon.png'),
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images/pbj_favicon.png'),
-                'pbj_images/pbj_favicon.png'  # Try relative path
-            ]
-            
-            favicon_path = None
-            for path in possible_paths:
-                if os.path.exists(path):
-                    favicon_path = path
-                    break
-            
-            if favicon_path:
-                with open(favicon_path, 'rb') as f:
-                    favicon_data = base64.b64encode(f.read()).decode()
-                st.markdown(f"""
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
-                    <strong style="font-size: 16px;">PBJ Takeaway: {state_name}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                # Fallback without favicon if file can't be found
-                st.markdown(f"""
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <strong style="font-size: 16px;">PBJ Takeaway: {state_name}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-        except Exception as e:
-            # Fallback without favicon if file can't be read
+        favicon_data = load_pbj_favicon()
+        if favicon_data:
+            st.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <img src="data:image/png;base64,{favicon_data}" style="width: 24px; height: 24px; margin-right: 8px;">
+                <strong style="font-size: 16px;">PBJ Takeaway: {state_name}</strong>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Fallback without favicon if file can't be found
             st.markdown(f"""
             <div style="display: flex; align-items: center; margin-bottom: 10px;">
                 <strong style="font-size: 16px;">PBJ Takeaway: {state_name}</strong>
@@ -911,6 +882,9 @@ def load_affiliated_entity_data():
             os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
             os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try relative path
             'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Also try with forward slash for compatibility
+            os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root directory
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root relative to script
+            'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Try current directory
         ]
         
         file_path = None
@@ -3240,6 +3214,9 @@ def main() -> None:
                     os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
                     os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try relative path
                     'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Also try with forward slash for compatibility
+                    os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root directory
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root relative to script
+                    'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Try current directory
                 ]
                 
                 file_path = None
