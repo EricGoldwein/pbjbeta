@@ -3,10 +3,12 @@ services:
     name: pbj-dashboard
     env: python
     plan: starter
-    pythonVersion: "3.12.10"
     buildCommand: pip install -r requirements.txt
     startCommand: streamlit run main_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
     healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"
   - type: static
     name: pbjdashboard-root
     buildCommand: ""
