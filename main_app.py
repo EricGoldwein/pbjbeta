@@ -1,40 +1,18 @@
 import streamlit as st
 import base64
 
-def find_favicon():
-    """Find favicon in multiple possible locations."""
-    import os
-    possible_paths = [
-        'pbj_favicon.png',  # Root directory
-        'pbj_images/pbj_favicon.png',  # pbj_images subdirectory
-        os.path.join(os.getcwd(), 'pbj_favicon.png'),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_favicon.png'),
-        os.path.join(os.getcwd(), 'pbj_images', 'pbj_favicon.png'),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images', 'pbj_favicon.png'),
-    ]
-    for path in possible_paths:
-        if os.path.exists(path):
-            return path
-    return None
-
 def load_pbj_favicon():
     """Load PBJ favicon data for use in floating action button"""
-    favicon_path = find_favicon()
-    if favicon_path:
-        try:
-            with open(favicon_path, 'rb') as f:
-                return base64.b64encode(f.read()).decode()
-        except:
-            return ""
-    return ""
-
-# Find favicon path for page config
-favicon_path = find_favicon() or 'pbj_favicon.png'  # Fallback to default path
+    try:
+        with open('pbj_images/pbj_favicon.png', 'rb') as f:
+            return base64.b64encode(f.read()).decode()
+    except:
+        return ""
 
 # Set page config early for Render deployment
 st.set_page_config(
     page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-    page_icon=favicon_path, 
+    page_icon="pbj_images/pbj_favicon.png", 
     layout="wide"
 )
 

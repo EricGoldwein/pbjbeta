@@ -920,22 +920,6 @@ def load_affiliated_entity_data():
                 break
         
         if not file_path:
-            # Try using find_file pattern as fallback
-            chain_file = find_file('ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
-            if chain_file:
-                file_path = chain_file
-            else:
-                # Try just the filename in ownership folder
-                alt_paths = [
-                    os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                    'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'
-                ]
-                for alt_path in alt_paths:
-                    if os.path.exists(alt_path):
-                        file_path = alt_path
-                        break
-        
-        if not file_path:
             if IS_STAGING:
                 st.warning("🚧 **STAGING MODE** - Using test ownership data")
                 return pd.DataFrame({
@@ -3263,22 +3247,6 @@ def main() -> None:
                     if os.path.exists(path):
                         file_path = path
                         break
-                
-                if not file_path:
-                    # Try using find_file pattern as fallback
-                    chain_file = find_file('ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
-                    if chain_file:
-                        file_path = chain_file
-                    else:
-                        # Try just the filename in ownership folder
-                        alt_paths = [
-                            os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                            'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'
-                        ]
-                        for alt_path in alt_paths:
-                            if os.path.exists(alt_path):
-                                file_path = alt_path
-                                break
                 
                 if not file_path:
                     st.warning("⚠️ No ownership data found. Looking for: ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv")
