@@ -5,7 +5,7 @@ import base64
 from utils.date_utils import get_latest_data_periods, apply_dynamic_replacements
 
 # Set page configuration
-st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_favicon.png", layout="wide")
+st.set_page_config(page_title="About | PBJ Nursing Home Staffing Dashboard by 320", page_icon="pbj_images/pbj_favicon.png", layout="wide")
 
 # Load favicon data
 def load_pbj_favicon():
