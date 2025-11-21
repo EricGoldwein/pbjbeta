@@ -905,11 +905,12 @@ def load_affiliated_entity_data():
     """Load and cache chain performance measures data."""
     try:
         import os
-        # Try multiple possible paths
+        # Try multiple possible paths - use proper os.path.join for all components
         possible_paths = [
-            os.path.join(os.getcwd(), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-            'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
+            os.path.join(os.getcwd(), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+            os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try relative path
+            'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Also try with forward slash for compatibility
         ]
         
         file_path = None
@@ -917,6 +918,22 @@ def load_affiliated_entity_data():
             if os.path.exists(path):
                 file_path = path
                 break
+        
+        if not file_path:
+            # Try using find_file pattern as fallback
+            chain_file = find_file('ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+            if chain_file:
+                file_path = chain_file
+            else:
+                # Try just the filename in ownership folder
+                alt_paths = [
+                    os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                    'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'
+                ]
+                for alt_path in alt_paths:
+                    if os.path.exists(alt_path):
+                        file_path = alt_path
+                        break
         
         if not file_path:
             if IS_STAGING:
@@ -929,7 +946,7 @@ def load_affiliated_entity_data():
                     'Entity_Type': ['For-Profit', 'Non-Profit', 'Government']
                 })
             else:
-                st.warning("Affiliated entity data file not found. Some features may be limited.")
+                st.warning("⚠️ Affiliated entity data file not found. Looking for: ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv")
                 return pd.DataFrame()
         df = pd.read_csv(file_path)
         
@@ -3233,11 +3250,12 @@ def main() -> None:
             """Load ownership data."""
             try:
                 import os
-                # Try multiple possible paths
+                # Try multiple possible paths - use proper os.path.join for all components
                 possible_paths = [
-                    os.path.join(os.getcwd(), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                    'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'  # Try relative path
+                    os.path.join(os.getcwd(), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                    os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try relative path
+                    'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Also try with forward slash for compatibility
                 ]
                 
                 file_path = None
@@ -3247,12 +3265,33 @@ def main() -> None:
                         break
                 
                 if not file_path:
-                    st.warning("Ownership data file not found. Some features may be limited.")
+                    # Try using find_file pattern as fallback
+                    chain_file = find_file('ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv')
+                    if chain_file:
+                        file_path = chain_file
+                    else:
+                        # Try just the filename in ownership folder
+                        alt_paths = [
+                            os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                            'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'
+                        ]
+                        for alt_path in alt_paths:
+                            if os.path.exists(alt_path):
+                                file_path = alt_path
+                                break
+                
+                if not file_path:
+                    st.warning("⚠️ No ownership data found. Looking for: ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv")
                     return pd.DataFrame()
                 
-                return pd.read_csv(file_path)
+                df = pd.read_csv(file_path)
+                if df.empty:
+                    st.warning("⚠️ Ownership data file is empty.")
+                    return pd.DataFrame()
+                
+                return df
             except FileNotFoundError:
-                st.warning("Ownership data file not found. Some features may be limited.")
+                st.warning("⚠️ No ownership data found. Looking for: ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv")
                 return pd.DataFrame()
             except Exception as e:
                 st.error(f"Error loading ownership data: {str(e)}")
