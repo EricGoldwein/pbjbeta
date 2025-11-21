@@ -11,10 +11,10 @@ from typing import Tuple, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
+    from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity, find_latest_chain_performance
 except ImportError:
     # Fallback for direct execution
-    from file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
+    from file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity, find_latest_chain_performance
 
 
 def get_latest_data_periods() -> dict:
@@ -28,16 +28,19 @@ def get_latest_data_periods() -> dict:
     latest_provider_file = find_latest_provider_info()
     previous_provider_file = find_previous_provider_info()
     latest_entity_file = find_latest_affiliated_entity()
+    latest_chain_file = find_latest_chain_performance()
     
     # Parse dates from filenames
     provider_latest_date = _parse_date_from_filename(latest_provider_file) if latest_provider_file else None
     provider_previous_date = _parse_date_from_filename(previous_provider_file) if previous_provider_file else None
     entity_latest_date = _parse_date_from_filename(latest_entity_file) if latest_entity_file else None
+    chain_latest_date = _parse_date_from_filename(latest_chain_file) if latest_chain_file else None
     
     # Format dates for display
     provider_latest_str = _format_date_for_display(provider_latest_date) if provider_latest_date else "Latest Available"
     provider_previous_str = _format_date_for_display(provider_previous_date) if provider_previous_date else "Previous Available"
     entity_latest_str = _format_date_for_display(entity_latest_date) if entity_latest_date else "Latest Available"
+    chain_latest_str = _format_date_for_display(chain_latest_date) if chain_latest_date else "Latest Available"
     
     # Calculate dynamic data range and quarter count
     data_range, quarter_count = _calculate_data_range_and_quarters()
@@ -46,6 +49,7 @@ def get_latest_data_periods() -> dict:
         'provider_info_latest': provider_latest_str,
         'provider_info_previous': provider_previous_str,
         'affiliated_entity_latest': entity_latest_str,
+        'chain_latest': chain_latest_str,
         'data_range': data_range,
         'quarter_count': quarter_count,
         'current_year': datetime.now().year
@@ -56,6 +60,7 @@ def _calculate_data_range_and_quarters() -> tuple:
     """Calculate the data range and quarter count from available PBJ files."""
     import glob
     import os
+    import re
     
     # Look for PBJ files in standardized_PBJ directory
     pbj_files = glob.glob('standardized_PBJ/PBJ_dailynursestaffing_*.csv')
@@ -68,24 +73,28 @@ def _calculate_data_range_and_quarters() -> tuple:
         # Default fallback
         return "2017-2025", 33
     
-    # Extract years from filenames
+    # Extract actual quarters from filenames (e.g., "CY2025Q2")
+    quarters = set()
     years = set()
     for file_path in pbj_files:
         filename = os.path.basename(file_path)
-        # Extract year from filename like "PBJ_dailynursestaffing_CY2025Q1.csv"
-        import re
-        match = re.search(r'CY(\d{4})Q', filename)
+        # Extract quarter from filename like "PBJ_dailynursestaffing_CY2025Q1.csv"
+        match = re.search(r'CY(\d{4})Q(\d)', filename)
         if match:
-            years.add(int(match.group(1)))
+            year = int(match.group(1))
+            quarter = match.group(0)  # e.g., "CY2025Q1"
+            quarters.add(quarter)
+            years.add(year)
     
-    if not years:
+    if not quarters:
         return "2017-2025", 33
     
+    # Count actual quarters
+    quarter_count = len(quarters)
+    
+    # Get year range
     min_year = min(years)
     max_year = max(years)
-    
-    # Calculate quarter count (4 quarters per year)
-    quarter_count = (max_year - min_year + 1) * 4
     
     return f"{min_year}-{max_year}", quarter_count
 

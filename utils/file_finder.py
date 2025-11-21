@@ -211,6 +211,15 @@ def find_latest_affiliated_entity() -> Optional[str]:
     return file_path
 
 
+def find_latest_chain_performance() -> Optional[str]:
+    """Find the latest Chain Performance Measures file."""
+    # Try ownership directory first, then root
+    file_path = find_latest_file('ownership', 'Nursing_Home_Chain_Performance_Measures_*.csv')
+    if not file_path:
+        file_path = find_latest_file('.', 'Nursing_Home_Chain_Performance_Measures_*.csv')
+    return file_path
+
+
 if __name__ == "__main__":
     # Test the file finder
     print("Testing file finder...")

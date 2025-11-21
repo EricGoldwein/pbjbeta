@@ -1,0 +1,15 @@
+# Track large CSV files with Git LFS
+pbj_lite/facility_lite_metrics.csv filter=lfs diff=lfs merge=lfs -text
+provider_info/*.csv filter=lfs diff=lfs merge=lfs -text
+
+# Track massive files with LFS
+Admin_Dashboard/admin_data/*.csv filter=lfs diff=lfs merge=lfs -text
+NonNursecsv/*.csv filter=lfs diff=lfs merge=lfs -text
+PBJcsv/*.csv filter=lfs diff=lfs merge=lfs -text
+standardized_PBJ/*.csv filter=lfs diff=lfs merge=lfs -text
+standardized_PBJ_NonNurse/*.csv filter=lfs diff=lfs merge=lfs -text
+
+# Small files stay as regular git objects
+\!pbj_lite/national_lite_metrics.csv filter= diff= merge= -text
+\!pbj_lite/state_lite_metrics.csv filter= diff= merge= -text
+
