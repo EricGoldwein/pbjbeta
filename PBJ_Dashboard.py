@@ -2725,20 +2725,35 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         hover_census = "<b>%{customdata}</b><br>%{y:,.0f}<extra></extra>"
         hover_contract = "<b>%{customdata}</b><br>%{y:.2f}%<extra></extra>"
         
-        # Desktop figure (4 charts)
+        # Desktop figure (4 charts) - titles wrap to two rows
         if state:
             full_state_name = get_full_state_name(state)
             fig = make_subplots(rows=4, cols=1,
-                  subplot_titles=(f'<span style="color: #333333;">Nursing Home Staff HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Total RN HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Resident Census - {full_state_name}</span>', f'<span style="color: #333333;">Contract Staff Percentage - {full_state_name}</span>'),
-                          vertical_spacing=0.12)
+                  subplot_titles=(
+                      f'<span style="color: #333333;">Nursing Home Staff HPRD<br>{full_state_name}</span>', 
+                      f'<span style="color: #333333;">Total RN HPRD<br>{full_state_name}</span>', 
+                      f'<span style="color: #333333;">Resident Census<br>{full_state_name}</span>', 
+                      f'<span style="color: #333333;">Contract Staff Percentage<br>{full_state_name}</span>'
+                  ),
+                  vertical_spacing=0.12)
         elif facility:
             fig = make_subplots(rows=4, cols=1,
-                  subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD</span>', '<span style="color: #333333;">Total RN HPRD</span>', '<span style="color: #333333;">Resident Census</span>', '<span style="color: #333333;">Contract Staff Percentage</span>'),
-                          vertical_spacing=0.10)
+                  subplot_titles=(
+                      '<span style="color: #333333;">Nursing Home<br>Staff HPRD</span>', 
+                      '<span style="color: #333333;">Total RN<br>HPRD</span>', 
+                      '<span style="color: #333333;">Resident<br>Census</span>', 
+                      '<span style="color: #333333;">Contract Staff<br>Percentage</span>'
+                  ),
+                  vertical_spacing=0.10)
         else:
             fig = make_subplots(rows=4, cols=1,
-                  subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD - National</span>', '<span style="color: #333333;">Total RN HPRD - National</span>', '<span style="color: #333333;">Resident Census - National</span>', '<span style="color: #333333;">Contract Staff Percentage - National</span>'),
-                          vertical_spacing=0.10)
+                  subplot_titles=(
+                      '<span style="color: #333333;">Nursing Home Staff HPRD<br>National</span>', 
+                      '<span style="color: #333333;">Total RN HPRD<br>National</span>', 
+                      '<span style="color: #333333;">Resident Census<br>National</span>', 
+                      '<span style="color: #333333;">Contract Staff Percentage<br>National</span>'
+                  ),
+                  vertical_spacing=0.10)
 
 
         # Pre-round HPRD using ROUND_HALF_UP for consistent tooltip display
@@ -2816,13 +2831,13 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
             col=1
         )
 
-        # Update desktop layout
+        # Update desktop layout - increased bottom margin for source badge
         fig.update_layout(
             height=1800,  # Increased height to make charts taller
             width=1200,
             title_text=title_prefix,
             showlegend=False,  # We'll add individual legends per subplot
-            margin=dict(l=50, r=50, t=100, b=100),  # Normal margins
+            margin=dict(l=50, r=50, t=100, b=120),  # Increased bottom margin for source badge
             hovermode='closest'
         )
         
@@ -2850,23 +2865,23 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         
         
         
-        # Add footer annotations for desktop view with improved styling
+        # Add footer annotations for desktop view - moved below x-axis
         for row in range(1, 5):
             fig.add_annotation(
                 text=f"<b>320 Consulting</b> | Source: CMS PBJ Data ({get_latest_data_periods()['data_range']})",
                 x=0.99,
-                y=-0.22,  # More space from x-axis ticks
+                y=-0.35,  # Moved further below x-axis to prevent overlap
                 xref="x domain",
                 yref="y domain",
                 showarrow=False,
-                font=dict(size=10, color="#666666"),
+                font=dict(size=9, color="#666666"),
                 align="right",
                 row=row,
                 col=1,
                 bgcolor="rgba(240,248,255,0.9)",  # Light blue background
                 bordercolor="rgba(0,0,0,0.1)",
                 borderwidth=1,
-                borderpad=4,  # Reduced vertical padding
+                borderpad=3,  # Reduced vertical padding
                 xanchor="right",
                 yanchor="top"
             )
