@@ -28,6 +28,19 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         
+        /* Responsive chart sizing for smaller laptops */
+        @media (max-width: 1366px) {
+            .chart-container {
+                padding: 15px;
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            .chart-container {
+                padding: 10px;
+            }
+        }
+        
         .sortable {
             position: relative;
             user-select: none;
@@ -226,101 +239,6 @@
             background-color: #212529 !important;
         }
         
-        /* Responsive chart container */
-        .chart-container {
-            width: 100%;
-            overflow-x: auto;
-        }
-        
-        /* Ensure Plotly charts are responsive */
-        .js-plotly-plot {
-            width: 100% !important;
-            max-width: 100% !important;
-        }
-        
-        /* Adjust chart containers for better fit */
-        #providerInfoTotalChart,
-        #providerInfoRNChart,
-        #providerInfoCNAChart,
-        #providerInfoCombinedDeltaChart,
-        #providerInfoDirectDeltaChart,
-        #providerInfoRatingsChart {
-            width: 100%;
-            min-height: 300px;
-        }
-        
-        /* Laptop/Tablet screens (768px - 991px) - Medium devices */
-        @media (min-width: 768px) and (max-width: 991px) {
-            /* Stack charts vertically on medium screens */
-            .row .col-lg-4.col-md-6 {
-                flex: 0 0 100%;
-                max-width: 100%;
-            }
-            /* Reduce card padding */
-            .card-body {
-                padding: 15px;
-            }
-            /* Smaller chart headers */
-            .card-header h6 {
-                font-size: 0.9rem;
-            }
-            /* Smaller header text in card titles */
-            .card-header small {
-                font-size: 0.75rem;
-            }
-            /* Ensure charts use full width */
-            .chart-container {
-                padding: 0;
-            }
-            /* Smaller legend on medium screens */
-            .js-plotly-plot .legend {
-                font-size: 9px !important;
-            }
-        }
-        
-        /* Large laptop screens (992px - 1399px) */
-        @media (min-width: 992px) and (max-width: 1399px) {
-            /* Make charts 2 per row instead of 3 on large laptops */
-            .row .col-lg-4 {
-                flex: 0 0 50%;
-                max-width: 50%;
-            }
-            /* Slightly reduce card padding */
-            .card-body {
-                padding: 18px;
-            }
-            /* Adjust chart header font size */
-            .card-header h6 {
-                font-size: 0.95rem;
-                line-height: 1.3;
-            }
-            /* Make header text smaller on laptops */
-            .card-header small {
-                font-size: 0.8rem;
-            }
-            /* Reduce legend font size on laptops */
-            .js-plotly-plot .legend {
-                font-size: 10px !important;
-            }
-            /* Tighter margins for chart containers */
-            .chart-container {
-                padding: 0 5px;
-            }
-            /* Reduce main container padding on laptops */
-            .main-container {
-                padding: 20px;
-            }
-        }
-        
-        /* Extra large screens (1400px+) */
-        @media (min-width: 1400px) {
-            /* Keep 3 columns on very large screens */
-            .row .col-lg-4 {
-                flex: 0 0 33.333333%;
-                max-width: 33.333333%;
-            }
-        }
-        
         /* Enhance mobile presentation */
         @media (max-width: 768px) {
             /* Optimize image display */
@@ -463,7 +381,7 @@
                     </div>
                     <div class="row mt-3">
                         <div class="col-12">
-                            <p class="text-muted mb-0" style="font-size: 0.75rem;" id="previousNames">Previous names (CCN: {{ provnum }}): {{ previous_names }}</p>
+                            <p class="text-muted mb-0" style="font-size: 0.75rem;" id="previousNames">Previous names (CCN: 495241): {{ previous_names }}</p>
                         </div>
                     </div>
                 </div>
@@ -643,13 +561,9 @@
                                     <th rowspan="2" class="text-center align-middle">Position</th>
                                     <th colspan="3" class="text-center">HPRD Ratios</th>
                                     <th colspan="3" class="text-center">Total Hours</th>
-                                    <th colspan="3" class="text-center">Census</th>
                                     <th rowspan="2" class="text-center align-middle">Zero Count</th>
                                 </tr>
                                 <tr>
-                                    <th class="text-center">Mean</th>
-                                    <th class="text-center">Median</th>
-                                    <th class="text-center">Std Dev</th>
                                     <th class="text-center">Mean</th>
                                     <th class="text-center">Median</th>
                                     <th class="text-center">Std Dev</th>
@@ -679,18 +593,24 @@
                     <div class="chart-container">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">Nursing Staff HPRD Trends</h5>
-                        <div class="btn-group btn-group-sm" role="group" aria-label="HPRD view toggle" style="font-size: 0.75rem;">
-                            <input type="radio" class="btn-check" name="hprdView" id="hprdDaily" value="daily" checked>
-                            <label class="btn btn-outline-secondary" for="hprdDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
-                            
-                            <input type="radio" class="btn-check" name="hprdView" id="hprdMonthly" value="month">
-                            <label class="btn btn-outline-secondary" for="hprdMonthly" style="box-shadow: none !important; border-color: #6c757d;">Monthly</label>
-                            
-                            <input type="radio" class="btn-check" name="hprdView" id="hprdQuarterly" value="quarter">
-                            <label class="btn btn-outline-secondary" for="hprdQuarterly" style="box-shadow: none !important; border-color: #6c757d;">Quarterly</label>
-                            
-                            <input type="radio" class="btn-check" name="hprdView" id="hprdYearly" value="year">
-                            <label class="btn btn-outline-secondary" for="hprdYearly" style="box-shadow: none !important; border-color: #6c757d;">Annually</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="excludeAdminHPRD" onchange="toggleAdminExclusionMain()">
+                                <label class="form-check-label" for="excludeAdminHPRD" style="font-size: 0.75rem;">Exclude Admin/DON</label>
+                            </div>
+                            <div class="btn-group btn-group-sm" role="group" aria-label="HPRD view toggle" style="font-size: 0.75rem;">
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdDaily" value="daily">
+                                <label class="btn btn-outline-secondary" for="hprdDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
+                                
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdMonthly" value="month" checked>
+                                <label class="btn btn-outline-secondary" for="hprdMonthly" style="box-shadow: none !important; border-color: #6c757d;">Monthly</label>
+                                
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdQuarterly" value="quarter">
+                                <label class="btn btn-outline-secondary" for="hprdQuarterly" style="box-shadow: none !important; border-color: #6c757d;">Quarterly</label>
+                                
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdYearly" value="year">
+                                <label class="btn btn-outline-secondary" for="hprdYearly" style="box-shadow: none !important; border-color: #6c757d;">Annually</label>
+                            </div>
                         </div>
                     </div>
                         <div id="hprdTrendChart"></div>
@@ -699,45 +619,48 @@
             </div>
 
             <div class="row">
-                <div class="col-md-12">
+                <div class="col-md-6">
                     <div class="chart-container">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="mb-0">Total Nursing Staff Hours</h6>
-                            <div class="btn-group btn-group-sm" role="group" aria-label="Hours view toggle" style="font-size: 0.7rem;">
-                                <input type="radio" class="btn-check" name="hoursView" id="hoursDaily" value="daily" checked>
-                                <label class="btn btn-outline-secondary" for="hoursDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
-                                
-                                <input type="radio" class="btn-check" name="hoursView" id="hoursMonthly" value="month">
-                                <label class="btn btn-outline-secondary" for="hoursMonthly" style="box-shadow: none !important; border-color: #6c757d;">Monthly</label>
-                                
-                                <input type="radio" class="btn-check" name="hoursView" id="hoursQuarterly" value="quarter">
-                                <label class="btn btn-outline-secondary" for="hoursQuarterly" style="box-shadow: none !important; border-color: #6c757d;">Quarterly</label>
-                                
-                                <input type="radio" class="btn-check" name="hoursView" id="hoursYearly" value="year">
-                                <label class="btn btn-outline-secondary" for="hoursYearly" style="box-shadow: none !important; border-color: #6c757d;">Annually</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="excludeAdminHours" onchange="toggleAdminExclusionMain()">
+                                    <label class="form-check-label" for="excludeAdminHours" style="font-size: 0.7rem;">Exclude Admin/DON</label>
+                                </div>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Hours view toggle" style="font-size: 0.7rem;">
+                                    <input type="radio" class="btn-check" name="hoursView" id="hoursDaily" value="daily">
+                                    <label class="btn btn-outline-secondary" for="hoursDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
+                                    
+                                    <input type="radio" class="btn-check" name="hoursView" id="hoursMonthly" value="month" checked>
+                                    <label class="btn btn-outline-secondary" for="hoursMonthly" style="box-shadow: none !important; border-color: #6c757d;">Monthly</label>
+                                    
+                                    <input type="radio" class="btn-check" name="hoursView" id="hoursQuarterly" value="quarter">
+                                    <label class="btn btn-outline-secondary" for="hoursQuarterly" style="box-shadow: none !important; border-color: #6c757d;">Quarterly</label>
+                                    
+                                    <input type="radio" class="btn-check" name="hoursView" id="hoursYearly" value="year">
+                                    <label class="btn btn-outline-secondary" for="hoursYearly" style="box-shadow: none !important; border-color: #6c757d;">Annually</label>
+                                </div>
                             </div>
                         </div>
                         <div class="mb-2">
                             <small class="text-muted">
                                 <i class="fas fa-info-circle"></i> 
-                                Click on legend items to show/hide specific metrics. Double-click to isolate one metric.
+                                Click legend items to show/hide metrics. Double-click to isolate one metric.
                             </small>
                         </div>
                         <div id="hoursTrendChart"></div>
                     </div>
                 </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-12">
+                <div class="col-md-6">
                     <div class="chart-container">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="mb-0">Resident Census</h6>
                             <div class="btn-group btn-group-sm" role="group" aria-label="Census view toggle" style="font-size: 0.7rem;">
-                                <input type="radio" class="btn-check" name="censusView" id="censusDaily" value="daily" checked>
+                                <input type="radio" class="btn-check" name="censusView" id="censusDaily" value="daily">
                                 <label class="btn btn-outline-secondary" for="censusDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
                                 
-                                <input type="radio" class="btn-check" name="censusView" id="censusMonthly" value="month">
+                                <input type="radio" class="btn-check" name="censusView" id="censusMonthly" value="month" checked>
                                 <label class="btn btn-outline-secondary" for="censusMonthly" style="box-shadow: none !important; border-color: #6c757d;">Monthly</label>
                                 
                                 <input type="radio" class="btn-check" name="censusView" id="censusQuarterly" value="quarter">
@@ -753,30 +676,39 @@
             </div>
 
             <div class="row">
-                <div class="col-md-12">
+                <div class="col-md-6">
                     <div class="chart-container">
+                        <div class="d-flex justify-content-end align-items-center mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="excludeAdminDOW" onchange="toggleAdminExclusionMain()">
+                                <label class="form-check-label" for="excludeAdminDOW" style="font-size: 0.7rem;">Exclude Admin/DON</label>
+                            </div>
+                        </div>
                         <div id="dowComparisonChart"></div>
                     </div>
                 </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-12">
+                <div class="col-md-6">
                     <div class="chart-container">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">Contract Staffing %</h6>
-                            <div class="btn-group btn-group-sm" role="group" aria-label="Contract view toggle" style="font-size: 0.7rem;">
-                                <input type="radio" class="btn-check" name="contractView" id="contractDaily" value="daily" checked>
-                                <label class="btn btn-outline-secondary" for="contractDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
-                                
-                                <input type="radio" class="btn-check" name="contractView" id="contractMonthly" value="month">
-                                <label class="btn btn-outline-secondary" for="contractMonthly" style="box-shadow: none !important; border-color: #6c757d;">Monthly</label>
-                                
-                                <input type="radio" class="btn-check" name="contractView" id="contractQuarterly" value="quarter">
-                                <label class="btn btn-outline-secondary" for="contractQuarterly" style="box-shadow: none !important; border-color: #6c757d;">Quarterly</label>
-                                
-                                <input type="radio" class="btn-check" name="contractView" id="contractYearly" value="year">
-                                <label class="btn btn-outline-secondary" for="contractYearly" style="box-shadow: none !important; border-color: #6c757d;">Annually</label>
+                            <h6 class="mb-0">Contract Staff %</h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="excludeAdminContract" onchange="toggleAdminExclusionMain()">
+                                    <label class="form-check-label" for="excludeAdminContract" style="font-size: 0.7rem;">Exclude Admin/DON</label>
+                                </div>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Contract view toggle" style="font-size: 0.7rem;">
+                                    <input type="radio" class="btn-check" name="contractView" id="contractDaily" value="daily">
+                                    <label class="btn btn-outline-secondary" for="contractDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
+                                    
+                                    <input type="radio" class="btn-check" name="contractView" id="contractMonthly" value="month" checked>
+                                    <label class="btn btn-outline-secondary" for="contractMonthly" style="box-shadow: none !important; border-color: #6c757d;">Monthly</label>
+                                    
+                                    <input type="radio" class="btn-check" name="contractView" id="contractQuarterly" value="quarter">
+                                    <label class="btn btn-outline-secondary" for="contractQuarterly" style="box-shadow: none !important; border-color: #6c757d;">Quarterly</label>
+                                    
+                                    <input type="radio" class="btn-check" name="contractView" id="contractYearly" value="year">
+                                    <label class="btn btn-outline-secondary" for="contractYearly" style="box-shadow: none !important; border-color: #6c757d;">Annually</label>
+                                </div>
                             </div>
                         </div>
                         <div id="contractTrendChart"></div>
@@ -844,13 +776,33 @@
                         </div>
                     </div>
                     
+                    <!-- SFF History Table -->
+                    <div class="card mt-3 mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Red Flag History</h6>
+                            <small class="text-muted">SFF Status, 1-Star Ratings, Abuse Icons, Ownership Changes, and other quality concerns</small>
+                        </div>
+                        <div class="card-body">
+                            <div id="sffHistoryTable">
+                                <p class="text-muted mb-0">Loading red flag history...</p>
+                            </div>
+                            <div class="mt-3 pt-3 border-top">
+                                <small class="text-muted">
+                                    <strong>Red Flag Criteria:</strong><br/>
+                                    • <strong>SFF Status:</strong> Special Focus Facility or SFF Candidate designation<br/>
+                                    • <strong>1-Star Overall Rating:</strong> Overall quality rating of 1.0<br/>
+                                    • <strong>1-Star Staffing Rating:</strong> Staffing quality rating of 1.0<br/>
+                                    • <strong>Abuse Icon:</strong> CMS abuse icon indicator (Yes/True)<br/>
+                                    • <strong>Ownership Change:</strong> Facility changed ownership in the last 12 months
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Data Matching Disclaimer -->
                     <div class="alert alert-info mt-3">
                         <p class="mb-0">
-                            <strong>Data Matching Note:</strong> Provider Info staffing data (reported, case-mix, adjusted, ratings, turnover) is matched to quarter based on payroll-based journal data. Case-Mix data from Q3 2020 and Q4 2023 is not available.
-                        </p>
-                        <p class="mb-0">
-                            Other info such as overall rating, health inspection does not update quarterly but is linked to the quarter matched by PBJ.
+                            <strong>Data Matching Note:</strong> The Provider Info staffing data (reported, case-mix, adjusted, ratings, turnover) is matched to quarter based on payroll-based journal data. Other info such as overall rating, health inspection does not update quarterly but is linked to the quarter matched by PBJ.
                         </p>
                     </div>
                     
@@ -858,69 +810,84 @@
                     
                     <!-- Row 1: Total, RN, and CNA (Split into thirds) -->
                     <div class="row">
-                        <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0">Total Staffing: <span style="color: #0066cc;">Reported Total</span> vs. <span style="color: #808080;">Reported Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">Total Staffing: <span style="color: #0066cc;">Reported Total</span> vs. <span style="color: #808080;">Reported Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="excludeAdminTotal" onchange="toggleAdminExclusion('total')">
+                                            <label class="form-check-label" for="excludeAdminTotal" style="font-size: 0.85rem;">Exclude Admin/DON</label>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="card-body chart-container">
+                                <div class="card-body">
                                     <div id="providerInfoTotalChart"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0">RN Staffing: <span style="color: #0066cc;">Reported</span> vs. <span style="color: #808080;">Reported Direct (RN only)</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">RN Staffing: <span style="color: #0066cc;">Reported</span> vs. <span style="color: #808080;">Reported Direct (RN only)</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="excludeAdminRN" onchange="toggleAdminExclusion('rn')">
+                                            <label class="form-check-label" for="excludeAdminRN" style="font-size: 0.85rem;">Exclude Admin/DON</label>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="card-body chart-container">
+                                <div class="card-body">
                                     <div id="providerInfoRNChart"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header">
                                     <h6 class="mb-0">Nurse Aide Staffing: <span style="color: #0066cc;">Reported</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
                                 </div>
-                                <div class="card-body chart-container">
+                                <div class="card-body">
                                     <div id="providerInfoCNAChart"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Row 2: SER Charts and Ratings (Split into thirds) -->
+                    <!-- Row 2: SER Charts (3 rows of 2 charts each) -->
                     <div class="row">
-                        <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="col-lg-6 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0" id="deltaChartTitle">Staffing-to-Expected Ratio (SER) - RN and RN Direct</h6>
+                                    <h6 class="mb-0" id="deltaChartTitle" style="line-height: 1.3;"><span style="display: block;">Staffing-to-Expected Ratio (SER)</span><span style="display: block; font-size: 0.9em; font-weight: normal;">Total and Direct Staff</span></h6>
                                     <small class="text-muted">Total Staff and Direct Staff (excl. admin/DON) divided by Case-Mix. Values below 1.0 indicate staffing deficit; above 1.0 indicate surplus.</small>
                                 </div>
-                                <div class="card-body chart-container">
+                                <div class="card-body">
                                     <div id="providerInfoCombinedDeltaChart"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="col-lg-6 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0" id="directDeltaChartTitle">SER - Total RN & RN Direct</h6>
+                                    <h6 class="mb-0" id="directDeltaChartTitle" style="line-height: 1.3;"><span style="display: block;">SER - Total RN & RN Direct</span></h6>
                                     <small class="text-muted">Total RN and RN Direct (excl. admin/DON) divided by Case-Mix. Values below 1.0 indicate staffing deficit; above 1.0 indicate surplus.</small>
                                 </div>
-                                <div class="card-body chart-container">
+                                <div class="card-body">
                                     <div id="providerInfoDirectDeltaChart"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-6 mb-4">
+                    </div>
+                    <!-- Row 3: Ratings Chart (full width) -->
+                    <div class="row">
+                        <div class="col-lg-12 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0">Ratings over Time: Overall, Staffing, Health Inspection</h6>
+                                    <h6 class="mb-0" style="line-height: 1.3;"><span style="display: block;">Ratings over Time</span><span style="display: block; font-size: 0.9em; font-weight: normal;">Overall, Staffing, Health Inspection</span></h6>
                                     <small class="text-muted">Provider Info quarters estimated based on matching staffing data in PBJ dataset. Quarters for non-staffing metrics may not be exact.</small>
                                 </div>
-                                <div class="card-body chart-container">
+                                <div class="card-body">
                                     <div id="providerInfoRatingsChart"></div>
                                 </div>
                             </div>
@@ -953,7 +920,7 @@
                                <option value="census">Census</option>
                                <option value="total_staff_hprd">Total Staff HPRD</option>
                                <option value="total_hours">Total Staff Hours</option>
-                               <option value="nurse_staff_hprd_excl_admin">Nurse Staff HPRD (excl. Admin & DON)</option>
+                               <option value="nurse_staff_hprd_excl_admin">Direct Staff HPRD</option>
                                <option value="total_rn_hprd">Total RN HPRD</option>
                                <option value="total_rn_hours">Total RN Hours</option>
                                <option value="rn_hprd">RN HPRD (Direct Care Only)</option>
@@ -1106,16 +1073,16 @@
                                 <th class="sortable" data-column="MDScensus" onclick="sortTable('MDScensus')">Census</th>
                                 <th class="sortable" data-column="Total_Staff_HPRD" onclick="sortTable('Total_Staff_HPRD')">Total Staff HPRD</th>
                                 <th class="sortable" data-column="Total_Staff_Hours" onclick="sortTable('Total_Staff_Hours')">Total Staff Hours</th>
-                                <th class="sortable" data-column="Nurse_Staff_HPRD_Excl_Admin" onclick="sortTable('Nurse_Staff_HPRD_Excl_Admin')">Nurse Staff HPRD (excl. Admin & DON)</th>
+                                <th class="sortable" data-column="Nurse_Staff_HPRD_Excl_Admin" onclick="sortTable('Nurse_Staff_HPRD_Excl_Admin')">Direct Staff HPRD</th>
                                 <th class="sortable" data-column="Total_RN_HPRD" onclick="sortTable('Total_RN_HPRD')">Total RN HPRD</th>
                                 <th class="sortable" data-column="Total_RN_Hours" onclick="sortTable('Total_RN_Hours')">Total RN Hours</th>
                                 <th class="sortable" data-column="Total_LPN_HPRD" onclick="sortTable('Total_LPN_HPRD')">Total LPN HPRD</th>
                                 <th class="sortable" data-column="Total_LPN_Hours" onclick="sortTable('Total_LPN_Hours')">Total LPN Hours</th>
                                 <th class="sortable" data-column="Total_Nurse_Aide_HPRD" onclick="sortTable('Total_Nurse_Aide_HPRD')">Nurse Aide HPRD</th>
                                 <th class="sortable" data-column="Total_Nurse_Aide_Hours" onclick="sortTable('Total_Nurse_Aide_Hours')">Nurse Aide Hours</th>
-                                <th class="sortable" data-column="RN_Contract_Pct" onclick="sortTable('RN_Contract_Pct')">RN Direct Contract %</th>
-                                <th class="sortable" data-column="LPN_Contract_Pct" onclick="sortTable('LPN_Contract_Pct')">LPN Direct Contract %</th>
-                                <th class="sortable" data-column="CNA_Contract_Pct" onclick="sortTable('CNA_Contract_Pct')">Nurse Aide Contract %</th>
+                                <th class="sortable" data-column="RN_Contract_Pct" onclick="sortTable('RN_Contract_Pct')">RN Contract %</th>
+                                <th class="sortable" data-column="LPN_Contract_Pct" onclick="sortTable('LPN_Contract_Pct')">LPN Contract %</th>
+                                <th class="sortable" data-column="CNA_Contract_Pct" onclick="sortTable('CNA_Contract_Pct')">Aide Contract %</th>
                                 <th class="sortable" data-column="IsHoliday" onclick="sortTable('IsHoliday')">Holiday</th>
                                 <!-- Expanded columns (hidden by default) - Position Breakdown -->
                                 <th class="expanded-col sortable" style="display: none;" data-column="Hrs_RN" onclick="sortTable('Hrs_RN')">RN (Direct Care) Hrs <i class="fas fa-sort"></i></th>
@@ -1191,59 +1158,6 @@
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
                         All values rounded to 2 decimal places. Hours shown are average hours per day.
-                    </small>
-                </div>
-            </div>
-        </div>
-
-        <!-- State Comparison Table -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i>State Comparison - {{ state }} Facilities</h5>
-                </div>
-            </div>
-            <div class="card-body p-2">
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered table-striped table-hover mb-0" id="stateComparisonTable">
-                        <thead class="table-dark">
-                            <tr>
-                                <th class="text-center sortable" style="width: 8%;" data-sort="quarter">Quarter</th>
-                                <th colspan="2" class="text-center">Census</th>
-                                <th colspan="2" class="text-center">Total HPRD</th>
-                                <th colspan="2" class="text-center">Direct HPRD</th>
-                                <th colspan="2" class="text-center">Total RN HPRD</th>
-                                <th colspan="2" class="text-center">RN HPRD</th>
-                                <th colspan="2" class="text-center">RN Admin HPRD</th>
-                                <th colspan="2" class="text-center">RN DON HPRD</th>
-                            </tr>
-                            <tr>
-                                <th></th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%;">Facility</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%; background-color: #e9ecef; color: #212529;">State</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%;">Facility</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%; background-color: #e9ecef; color: #212529;">State</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%;">Facility</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%; background-color: #e9ecef; color: #212529;">State</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%;">Facility</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%; background-color: #e9ecef; color: #212529;">State</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%;">Facility</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%; background-color: #e9ecef; color: #212529;">State</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%;">Facility</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%; background-color: #e9ecef; color: #212529;">State</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%;">Facility</th>
-                                <th class="text-center" style="font-size: 0.7em; width: 4%; background-color: #e9ecef; color: #212529;">State</th>
-                            </tr>
-                        </thead>
-                        <tbody id="stateComparisonBody">
-                            <!-- State comparison data will be populated here -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="mt-2">
-                    <small class="text-muted">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Comparing facility metrics to state averages for {{ state }}. State data does not include separate RN Admin/DON metrics.
                     </small>
                 </div>
             </div>
@@ -1380,7 +1294,7 @@
                 <div class="col-12">
                     <h6><i class="fas fa-database me-2"></i>Data Sources</h6>
                     <p>This Nursing Home Staffing Dashboard uses CMS Payroll-Based Journal (PBJ) data from 2017 to 2025, covering all nursing positions, including contract staff (<a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing</a>). CMS first published PBJ data in 2017. It also uses Provider Information datasets from 2018 to 2025 (<a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">https://data.cms.gov/provider-data/dataset/4pq5-n9py</a>).</p>
-                    <p>Unlike PBJ data, which is released quarterly, provider info files are published on a rolling monthly basis without a clear reference quarter. To align them with PBJ datasets, we matched the "reported total staffing" metric, which is available in both sources, to the corresponding quarter. This approach is not exact—health inspection data, for example, is updated on a different schedule—but it offers a reasonable best-guess for quarter assignment. Note: Case-Mix data from Q4 2023 is not available.</p>
+                    <p>Unlike PBJ data, which is released quarterly, provider info files are published on a rolling monthly basis without a clear reference quarter. To align them with PBJ datasets, we matched the "reported total staffing" metric, which is available in both sources, to the corresponding quarter. This approach is not exact—health inspection data, for example, is updated on a different schedule—but it offers a reasonable best-guess for quarter assignment.</p>
                 </div>
             </div>
         </div>
@@ -1670,8 +1584,8 @@
                             { key: 'census', name: 'Census' },
                             { key: 'total_staff_hours', name: 'Total Staff Hours' },
                             { key: 'total_staff_hprd', name: 'Total Staff HPRD' },
-                            { key: 'nurse_staff_hours_excl_admin', name: 'Nurse Staff Hours (excl. Admin)' },
-                            { key: 'nurse_staff_hprd_excl_admin', name: 'Nurse Staff HPRD (excl. Admin)' },
+                            { key: 'nurse_staff_hours_excl_admin', name: 'Direct Care Hours' },
+                            { key: 'nurse_staff_hprd_excl_admin', name: 'Direct Care HPRD' },
                             { key: 'total_rn_hours', name: 'Total RN Hours' },
                             { key: 'total_rn_hprd', name: 'Total RN HPRD' },
                             { key: 'rn_hours', name: 'Direct RN Hours' },
@@ -1684,9 +1598,9 @@
                             { key: 'total_nurse_aide_hprd', name: 'Total Nurse Aide HPRD' },
                             { key: 'cna_hours', name: 'Direct CNA Hours' },
                             { key: 'cna_hprd', name: 'Direct CNA HPRD' },
-                            { key: 'rn_contract_pct', name: 'RN Direct Contract %' },
-                            { key: 'lpn_contract_pct', name: 'LPN Direct Contract %' },
-                            { key: 'cna_contract_pct', name: 'Nurse Aide Contract %' }
+                            { key: 'rn_contract_pct', name: 'RN Contract %' },
+                            { key: 'lpn_contract_pct', name: 'LPN Contract %' },
+                            { key: 'cna_contract_pct', name: 'CNA Contract %' }
                         ];
 
                         metricsToShow.forEach(metric => {
@@ -1699,7 +1613,7 @@
                             const quarterZScore = data.aberrations[metric.key]?.quarter?.z_score || 0;
                             const dowZScore = data.aberrations[metric.key]?.dow?.z_score || 0;
                             
-                            const isFirstFive = ['Census', 'Total Staff HPRD', 'Nurse Staff HPRD (excl. Admin)', 'Total RN HPRD', 'Direct RN HPRD'].includes(metric.name);
+                            const isFirstFive = ['Census', 'Total Staff HPRD', 'Direct Care HPRD', 'Total RN HPRD', 'Direct RN HPRD'].includes(metric.name);
                             const metricNameStyle = isFirstFive ? '<strong>' + metric.name + '</strong>' : metric.name;
                             
                             // Check for outliers (z-score > 2 or < -2) and determine which triggered it
@@ -1914,7 +1828,6 @@
              updateAnalysis(); // Load initial data
              loadQuarterlyStats(); // Load quarterly stats table with all data
              loadQuarterlyData(); // Load quarterly data table
-             loadStateComparison(); // Load state comparison table
              loadCaseMixData(); // Load case-mix acuity table
              checkDataCompletenessAndShowAlert(); // Check for missing quarters
              handleSharedReport(); // Check for shared report parameters
@@ -2053,7 +1966,7 @@
                      document.getElementById('sffStatus').textContent = data.sff_status || '-';
                      document.getElementById('ownershipChange').textContent = data.ownership_change_last_12_months || '-';
                      
-                     // Load SFF history for tooltip
+                     // Load SFF history for tooltip and table
                      loadSFFHistory();
                      
                      // Update delta chart title with facility name
@@ -2080,18 +1993,322 @@
          }
 
          function loadSFFHistory() {
-             // SFF data is not available in current provider info dataset
-             // This would need to be added to the data source in the future
-             updateSFFTooltip("SFF data not available in current dataset");
+             // Get provnum from URL or facility identifier
+             const urlParams = new URLSearchParams(window.location.search);
+             const provnum = urlParams.get('provnum') || urlParams.get('facility') || '{{ provnum }}' || '';
+             
+             console.log('Loading SFF history for provnum:', provnum);
+             
+             if (!provnum) {
+                 console.error('No provnum available for SFF history');
+                 updateSFFTooltip("Facility identifier not available");
+                 updateSFFHistoryTable([]);
+                 return;
+             }
+             
+             // Fetch SFF history from API
+             fetch(`/api/sff_history?provnum=${encodeURIComponent(provnum)}`)
+                 .then(response => {
+                     console.log('SFF history API response status:', response.status);
+                     if (!response.ok) {
+                         throw new Error(`HTTP error! status: ${response.status}`);
+                     }
+                     return response.json();
+                 })
+                 .then(data => {
+                     console.log('SFF history API data:', data);
+                     if (data.error) {
+                         console.error('SFF history API error:', data.error);
+                         updateSFFTooltip("Error loading SFF history: " + data.error);
+                         updateSFFHistoryTable([]);
+                         return;
+                     }
+                     
+                    // Always update the table, even if empty
+                    updateSFFHistoryTable(data.history || []);
+                    
+                    if (!data.history || data.history.length === 0) {
+                        const message = data.message || "No SFF history found for this facility";
+                        updateSFFTooltip(message);
+                        return;
+                    }
+                    
+                    // Format history for tooltip
+                    let historyHtml = "<strong>SFF History:</strong><br/><br/>";
+                    data.history.forEach((item, index) => {
+                        historyHtml += `<strong>Status: ${item.sff_status || item.status || 'Unknown'}</strong><br/>`;
+                        historyHtml += `Processing Date: ${item.processing_date || 'Unknown'}<br/>`;
+                        historyHtml += `Quarter: ${item.quarter || 'Unknown'}<br/>`;
+                        if (item.source_file) {
+                            historyHtml += `Source: ${item.source_file}<br/>`;
+                        }
+                        if (index < data.history.length - 1) {
+                            historyHtml += "<br/>";
+                        }
+                    });
+                    
+                    updateSFFTooltip(historyHtml);
+                 })
+                 .catch(error => {
+                     console.error('Error loading SFF history:', error);
+                     console.error('Error details:', error);
+                     updateSFFTooltip("Error loading SFF history: " + error.message);
+                     updateSFFHistoryTable([]);
+                 });
          }
+         
+         function updateSFFHistoryTable(history) {
+             const tableContainer = document.getElementById('sffHistoryTable');
+             if (!tableContainer) {
+                 console.error('SFF history table container not found');
+                 return;
+             }
+             
+             console.log('Updating SFF history table with:', history);
+             
+            if (!history || history.length === 0) {
+                tableContainer.innerHTML = '<p class="text-muted mb-0">No red flag history found for this facility.</p>';
+                return;
+            }
+            
+            let tableHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-hover mb-0">';
+            tableHtml += '<thead class="table-light"><tr><th style="width: 12%;">Quarter</th><th>Red Flags</th><th style="width: 25%;">Date & Source</th></tr></thead>';
+            tableHtml += '<tbody>';
+            
+            history.forEach((item, index) => {
+                const status = item.sff_status || item.status || 'Unknown';
+                const quarter = item.quarter || 'Unknown';
+                const redFlags = item.red_flags || [];
+                const procDate = item.processing_date || 'Unknown';
+                const sourceFile = item.source_file || 'Provider Info Data';
+                const note = item.note || '';
+                const recordCount = item.record_count || 1;
+                const records = item.records || null;
+                const hasMultipleRecords = records && records.length > 1;
+                const rowId = `quarter-row-${index}`;
+                const expandId = `expand-${index}`;
+                
+                // Color code based on red flags
+                let statusClass = '';
+                let statusHtml = '';
+                
+                if (redFlags.length > 0) {
+                    // Build HTML for red flags with badges
+                    const flagBadges = redFlags.map(flag => {
+                        let badgeClass = 'badge bg-warning';
+                        if (flag.includes('SFF')) {
+                            badgeClass = 'badge bg-danger';
+                        } else if (flag.includes('1-Star')) {
+                            badgeClass = 'badge bg-warning text-dark';
+                        } else if (flag.includes('Abuse')) {
+                            badgeClass = 'badge bg-danger';
+                        }
+                        return `<span class="${badgeClass} me-1">${flag}</span>`;
+                    }).join(' ');
+                    statusHtml = statusHtml || flagBadges;
+                    statusClass = 'table-warning';
+                } else {
+                    statusHtml = `<strong>${status}</strong>`;
+                }
+                
+                if (status.toUpperCase().includes('SFF')) {
+                    statusClass = 'table-danger';
+                } else if (status.toUpperCase().includes('1-STAR') || status.toUpperCase().includes('ABUSE')) {
+                    statusClass = 'table-warning';
+                }
+                
+                // Add expand/collapse indicator if multiple records
+                const expandIcon = hasMultipleRecords 
+                    ? `<i class="fas fa-chevron-down ms-2" id="${expandId}" style="cursor: pointer;" onclick="toggleQuarterDetails('${expandId}', '${rowId}-details')" title="Click to ${recordCount} record(s) in this quarter"></i>`
+                    : '';
+                const recordCountBadge = hasMultipleRecords
+                    ? `<span class="badge bg-secondary ms-2">${recordCount} records</span>`
+                    : '';
+                
+                // Combine date and source in smaller text
+                const dateSourceHtml = `<div style="font-size: 0.75rem; line-height: 1.2;"><div>${procDate}</div><div class="text-muted" style="font-size: 0.7rem;">${sourceFile}</div></div>`;
+                
+                tableHtml += `<tr class="${statusClass}" id="${rowId}">`;
+                tableHtml += `<td>${quarter}${expandIcon}</td>`;
+                tableHtml += `<td>${statusHtml}${recordCountBadge}${note ? '<br/><small class="text-muted">' + note + '</small>' : ''}</td>`;
+                tableHtml += `<td>${dateSourceHtml}</td>`;
+                tableHtml += '</tr>';
+                
+                // Add expandable detail rows if multiple records
+                if (hasMultipleRecords) {
+                    tableHtml += `<tr id="${rowId}-details" style="display: none;" class="table-light">`;
+                    tableHtml += `<td colspan="3" class="p-2">`;
+                    tableHtml += `<div class="ms-4"><strong>Individual Records:</strong><ul class="mb-0 mt-2">`;
+                    records.forEach(record => {
+                        const recordFlags = record.red_flags || [];
+                        const recordFlagBadges = recordFlags.map(flag => {
+                            let badgeClass = 'badge bg-warning';
+                            if (flag.includes('SFF')) {
+                                badgeClass = 'badge bg-danger';
+                            } else if (flag.includes('1-Star')) {
+                                badgeClass = 'badge bg-warning text-dark';
+                            } else if (flag.includes('Abuse')) {
+                                badgeClass = 'badge bg-danger';
+                            }
+                            return `<span class="${badgeClass} me-1">${flag}</span>`;
+                        }).join(' ');
+                        tableHtml += `<li class="mb-2">`;
+                        tableHtml += `<strong>${record.processing_date}</strong>: ${recordFlagBadges || 'No flags'} `;
+                        tableHtml += `<small class="text-muted">(${record.source_file})</small>`;
+                        tableHtml += `</li>`;
+                    });
+                    tableHtml += `</ul></div>`;
+                    tableHtml += `</td></tr>`;
+                }
+            });
+             
+            tableHtml += '</tbody></table></div>';
+            tableContainer.innerHTML = tableHtml;
+        }
+        
+        function toggleQuarterDetails(expandIconId, detailsRowId) {
+            const icon = document.getElementById(expandIconId);
+            const detailsRow = document.getElementById(detailsRowId);
+            if (detailsRow) {
+                if (detailsRow.style.display === 'none') {
+                    detailsRow.style.display = '';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    detailsRow.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            }
+        }
+        
+        function makeLegendClickable(chartId, chartData, seriesNames) {
+            const chartDiv = document.getElementById(chartId);
+            if (!chartDiv) return;
+            
+            // Wait for chart to fully render
+            setTimeout(() => {
+                // Find the legend annotation
+                const annotationTexts = chartDiv.querySelectorAll('.annotation-text');
+                annotationTexts.forEach(annotationText => {
+                    const textContent = annotationText.textContent || '';
+                    if (textContent.includes('●') && (textContent.includes('Reported') || textContent.includes('Case-Mix') || textContent.includes('Adjusted'))) {
+                        // This is the legend annotation - make the entire annotation clickable
+                        const annotationGroup = annotationText.closest('.annotation');
+                        if (annotationGroup) {
+                            // Parse the legend text to map to series indices
+                            const legendMap = {
+                                'Reported Total': 0,
+                                'Reported Direct': 1,
+                                'Case-Mix': 2,
+                                'Adjusted': 3,
+                                'Reported': 0  // For RN and CNA charts
+                            };
+                            
+                            // Create clickable areas for each legend item
+                            const parts = textContent.split('|').map(p => p.trim());
+                            parts.forEach((part, partIndex) => {
+                                // Determine series index
+                                let seriesIndex = -1;
+                                for (const [key, index] of Object.entries(legendMap)) {
+                                    if (part.includes(key)) {
+                                        // For charts with "Reported" only, need to check context
+                                        if (key === 'Reported' && seriesNames.length === 3) {
+                                            seriesIndex = 0; // First series
+                                        } else {
+                                            seriesIndex = seriesNames.indexOf(key);
+                                        }
+                                        break;
+                                    }
+                                }
+                                
+                                // If not found, try to match by position
+                                if (seriesIndex === -1) {
+                                    seriesIndex = partIndex < seriesNames.length ? partIndex : -1;
+                                }
+                                
+                                if (seriesIndex >= 0 && seriesIndex < chartData.length) {
+                                    // Find the tspan elements for this part
+                                    const tspans = Array.from(annotationText.querySelectorAll('tspan'));
+                                    let partStart = -1;
+                                    let partEnd = -1;
+                                    
+                                    // Find where this part starts and ends in the tspan array
+                                    let accumulatedText = '';
+                                    for (let i = 0; i < tspans.length; i++) {
+                                        accumulatedText += tspans[i].textContent;
+                                        if (partStart === -1 && accumulatedText.includes(part.split(' ')[0])) {
+                                            partStart = i;
+                                        }
+                                        if (partStart >= 0 && (accumulatedText.includes(part) || i === tspans.length - 1)) {
+                                            partEnd = i;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (partStart >= 0 && partEnd >= 0) {
+                                        // Make the relevant tspans clickable
+                                        for (let i = partStart; i <= partEnd; i++) {
+                                            const tspan = tspans[i];
+                                            const textGroup = tspan.closest('g');
+                                            if (textGroup) {
+                                                textGroup.style.cursor = 'pointer';
+                                                textGroup.style.userSelect = 'none';
+                                                
+                                                // Add click handler (only once per group)
+                                                if (!textGroup.dataset.clickHandlerAdded) {
+                                                    textGroup.dataset.clickHandlerAdded = 'true';
+                                                    textGroup.dataset.seriesIndex = seriesIndex;
+                                                    
+                                                    textGroup.addEventListener('click', (e) => {
+                                                        e.stopPropagation();
+                                                        const idx = parseInt(textGroup.dataset.seriesIndex);
+                                                        if (idx >= 0 && idx < chartData.length) {
+                                                            // Toggle visibility
+                                                            const currentVisible = chartData[idx].visible !== false;
+                                                            Plotly.restyle(chartId, {
+                                                                visible: !currentVisible
+                                                            }, [idx]);
+                                                        }
+                                                    });
+                                                    
+                                                    // Add hover effect
+                                                    textGroup.addEventListener('mouseenter', () => {
+                                                        textGroup.style.opacity = '0.7';
+                                                    });
+                                                    textGroup.addEventListener('mouseleave', () => {
+                                                        textGroup.style.opacity = '1';
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            }, 500);
+        }
 
          function updateSFFTooltip(content) {
              const tooltip = document.getElementById('sffTooltip');
              if (tooltip) {
-                 tooltip.setAttribute('title', `<strong>SFF History:</strong><br/>${content}`);
+                 tooltip.setAttribute('data-bs-html', 'true');
+                 tooltip.setAttribute('title', content);
                  // Reinitialize tooltip if Bootstrap tooltips are being used
                  if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-                     new bootstrap.Tooltip(tooltip);
+                     // Destroy existing tooltip if it exists
+                     const existingTooltip = bootstrap.Tooltip.getInstance(tooltip);
+                     if (existingTooltip) {
+                         existingTooltip.dispose();
+                     }
+                    new bootstrap.Tooltip(tooltip, {
+                        html: true,
+                        placement: 'top',
+                        trigger: 'hover focus',
+                        container: 'body'
+                    });
                  }
              }
          }
@@ -2104,15 +2321,44 @@
              }
          }
 
-         function renderProviderInfoCharts(chartData) {
-            console.log('Chart data received:', chartData);
-            
-            // Filter out zero HPRD data points for total staffing only
-            const filterZeroData = (data) => data.map((value, index) => value > 0 ? value : null);
-            
-            // For RN and CNA, only filter out null/undefined values, not zeros
-            // This creates proper gaps in the line chart for missing data
-            const filterNullData = (data) => data.map((value, index) => value != null ? value : undefined);
+         // Store original chart data for toggle functionality
+         let originalChartData = null;
+         
+         function toggleAdminExclusion(chartType) {
+             if (!originalChartData) {
+                 originalChartData = JSON.parse(JSON.stringify(window.providerChartData || {}));
+             }
+             
+             const excludeTotal = document.getElementById('excludeAdminTotal')?.checked || false;
+             const excludeRN = document.getElementById('excludeAdminRN')?.checked || false;
+             
+             // Re-render charts with updated data
+             renderProviderInfoCharts(originalChartData, { excludeTotal, excludeRN });
+         }
+         
+         function renderProviderInfoCharts(chartData, options = {}) {
+             // Store original data if not already stored
+             if (!originalChartData) {
+                 originalChartData = JSON.parse(JSON.stringify(chartData));
+             }
+             
+             // Store in global for toggle function
+             window.providerChartData = chartData;
+             
+             // Apply admin/DON exclusion if requested
+             const excludeTotal = options.excludeTotal || false;
+             const excludeRN = options.excludeRN || false;
+             
+             // Filter out zero HPRD data points for total staffing only
+             const filterZeroData = (data) => data.map((value, index) => value > 0 ? value : null);
+             
+             // For RN and CNA, only filter out null/undefined values, not zeros
+             // This creates proper gaps in the line chart for missing data
+             const filterNullData = (data) => data.map((value, index) => value != null ? value : undefined);
+             
+             // Prepare data with admin/DON exclusion
+             const totalReportedData = excludeTotal ? chartData.total_staffing.reported_direct : chartData.total_staffing.reported_total;
+             const rnReportedData = excludeRN ? chartData.rn_staffing.reported_rn_direct : chartData.rn_staffing.reported_rn;
 
             // Calculate dynamic y-axis range for ratio chart (Total Staff + Direct Staff)
             const calculateRatioRange = () => {
@@ -2126,8 +2372,11 @@
                 
                 // Get all ratio values from Direct Staff
                 chartData.total_staffing.reported_direct.forEach((reported, i) => {
-                    const caseMix = chartData.total_staffing.case_mix_total[i];
-                    if (caseMix > 0) allRatios.push(reported / caseMix);
+                    const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
+                    const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
+                    const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
+                    const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
+                    if (caseMixDirect > 0) allRatios.push(reported / caseMixDirect);
                 });
                 
                 if (allRatios.length === 0) return [0, 2];
@@ -2147,7 +2396,7 @@
                 const allRatios = [];
                 
                 // Get all ratio values from Total RN and RN direct data
-                chartData.rn_staffing.reported_rn_total.forEach((reported, i) => {
+                chartData.rn_staffing.reported_rn.forEach((reported, i) => {
                     const caseMix = chartData.rn_staffing.case_mix_rn[i];
                     if (caseMix > 0) allRatios.push(reported / caseMix);
                 });
@@ -2178,35 +2427,35 @@
                 const rangeSize = yMax - yMin;
                 const minSpacing = 0.15;
                 
-                // Show Expected line reference text - position to avoid legend overlap
+                // Show Expected line reference text in top-left corner
                 annotations.push({
                     text: '1.0 = Meets CMS Case-Mix',
                     showarrow: false,
-                    x: 1.08, // Moved further right
-                    y: 0.50, // Moved down to avoid overlap
+                    x: 1.02,
+                    y: 0.55,
                     xref: 'paper',
                     yref: 'paper',
                     xanchor: 'left',
                     yanchor: 'top',
-                    font: { size: 8, color: '#28a745', family: 'Arial, sans-serif' },
+                    font: { size: 9, color: '#28a745', family: 'Arial, sans-serif' },
                     bgcolor: '#d4edda',
                     bordercolor: '#28a745',
                     borderwidth: 1,
-                    borderpad: 2
+                    borderpad: 3
                 });
                 
                 // Below Case-Mix (0.8-1.0) - show if zone is relevant to visible range
                 if (yMin < 1.0 && yMax > 0.8) {
                     annotations.push({
-                        text: '<b>Below Case-Mix<br>(0.8-1.0)</b>', // Added line break
+                        text: '<b>Below Case-Mix (0.8-1.0)</b>',
                         showarrow: false,
-                        x: 1.08, // Moved further right
-                        y: Math.max(yMin + 0.05, Math.min(0.9, yMax - 0.05)), // Adjusted spacing
+                        x: 1.02,
+                        y: Math.max(yMin, Math.min(0.9, yMax)),
                         xref: 'paper',
                         yref: 'y',
                         xanchor: 'left',
                         yanchor: 'middle',
-                        font: { size: 8, color: '#856404' }, // Smaller font
+                        font: { size: 9, color: '#856404' },
                         bgcolor: '#fff3cd',
                         bordercolor: '#ffeaa7',
                         borderwidth: 1,
@@ -2217,15 +2466,15 @@
                 // Severe (0.5-0.8) - show if zone is relevant to visible range
                 if (yMin < 0.8 && yMax > 0.5) {
                     annotations.push({
-                        text: '<b>Severe<br>(0.5-0.8)</b>', // Added line break
+                        text: '<b>Severe (0.5-0.8)</b>',
                         showarrow: false,
-                        x: 1.08, // Moved further right
-                        y: Math.max(yMin + 0.05, Math.min(0.65, yMax - 0.05)), // Adjusted spacing
+                        x: 1.02,
+                        y: Math.max(yMin, Math.min(0.65, yMax)),
                         xref: 'paper',
                         yref: 'y',
                         xanchor: 'left',
                         yanchor: 'middle',
-                        font: { size: 8, color: '#721c24' }, // Smaller font
+                        font: { size: 9, color: '#721c24' },
                         bgcolor: '#f8d7da',
                         bordercolor: '#f5c6cb',
                         borderwidth: 1,
@@ -2236,15 +2485,15 @@
                 // Critical (<0.5) - show if zone is relevant to visible range
                 if (yMin < 0.5) {
                     annotations.push({
-                        text: '<b>Critical<br>(<0.5)</b>', // Added line break
+                        text: '<b>Critical (<0.5)</b>',
                         showarrow: false,
-                        x: 1.08, // Moved further right
-                        y: Math.max(yMin + 0.05, Math.min(0.4, yMax - 0.05)), // Adjusted spacing
+                        x: 1.02,
+                        y: Math.max(yMin, Math.min(0.4, yMax)),
                         xref: 'paper',
                         yref: 'y',
                         xanchor: 'left',
                         yanchor: 'middle',
-                        font: { size: 8, color: '#dc3545' }, // Smaller font
+                        font: { size: 9, color: '#dc3545' },
                         bgcolor: '#f8d7da',
                         bordercolor: '#dc3545',
                         borderwidth: 1,
@@ -2255,146 +2504,58 @@
                 return annotations;
             };
 
-            // Detect screen width for responsive sizing
-            const screenWidth = window.innerWidth;
-            const isLaptop = screenWidth >= 768 && screenWidth <= 1399;
-            const isMobile = screenWidth < 768;
-            
-            // Responsive chart dimensions
-            let chartHeight = 350;
-            let bottomMargin = 120;
-            let leftMargin = 60;
-            let rightMargin = 40;
-            let nTicks = 8;
-            let serRightMargin = 160; // Extra margin for SER charts to accommodate legend and annotations
-            
-            if (isLaptop) {
-                chartHeight = 320;
-                bottomMargin = 100;
-                leftMargin = 55;
-                rightMargin = 30;
-                nTicks = 6;
-                serRightMargin = 140;
-            } else if (isMobile) {
-                chartHeight = 300;
-                bottomMargin = 90;
-                leftMargin = 50;
-                rightMargin = 20;
-                nTicks = 4;
-                serRightMargin = 120;
-            }
-            
-            // Helper function to insert Q4 2023 gap in quarterly data
-            // This ensures missing Q4 2023 shows as a gap in the chart rather than connecting Q3 2023 to Q1 2024
-            function insertQ42023Gap(quarters, ...dataArrays) {
-                const q42023 = 'Q4 2023';
-                
-                // Check if Q4 2023 is already in the quarters array
-                const hasQ42023 = quarters.includes(q42023);
-                
-                // If Q4 2023 is missing, find where to insert it (between Q3 2023 and Q1 2024)
-                if (!hasQ42023) {
-                    // Find index where Q4 2023 should be inserted
-                    let insertIndex = -1;
-                    for (let i = 0; i < quarters.length; i++) {
-                        const q = quarters[i];
-                        if (q === 'Q3 2023') {
-                            insertIndex = i + 1;
-                            break;
-                        } else if (q === 'Q1 2024') {
-                            insertIndex = i;
-                            break;
-                        }
-                        // Handle 2023Q3 format
-                        if (q && q.includes('2023') && q.includes('Q3')) {
-                            insertIndex = i + 1;
-                            break;
-                        }
-                        // Handle 2024Q1 format
-                        if (q && q.includes('2024') && q.includes('Q1')) {
-                            insertIndex = i;
-                            break;
-                        }
-                    }
-                    
-                    // If we found where to insert, add Q4 2023 with null values
-                    if (insertIndex >= 0) {
-                        quarters.splice(insertIndex, 0, q42023);
-                        // Insert null for all data arrays at the same position
-                        dataArrays.forEach(arr => {
-                            if (Array.isArray(arr)) {
-                                arr.splice(insertIndex, 0, null);
-                            }
-                        });
-                    }
-                }
-                
-                return { quarters, dataArrays };
-            }
-            
-            // Smart x-axis formatting for quarterly data - show all quarters, just adjust angle/spacing
-            const quarterData = chartData.total_staffing.quarters;
-            const dataCount = quarterData ? quarterData.length : 0;
-            
-            // For quarterly data, show all quarters but adjust formatting based on count
-            let xaxisConfig = { 
-                title: '', 
-                tickangle: -45,
-                type: 'category' // Use category to show all quarter labels
+            // Calculate responsive chart height based on screen size
+            const getChartHeight = () => {
+                const width = window.innerWidth;
+                if (width < 1024) return 350;  // Small laptops
+                if (width < 1366) return 400;  // Medium laptops
+                return 450;  // Large screens
             };
             
-            // Adjust number of visible ticks based on data density
-            if (dataCount > 30) {
-                // Many quarters - still show all but rotate more and reduce font size
-                xaxisConfig.tickangle = -90;
-                xaxisConfig.tickfont = { size: 9 };
-            } else if (dataCount > 20) {
-                // Moderate number - rotate and adjust spacing
-                xaxisConfig.tickangle = -60;
-                xaxisConfig.tickfont = { size: 10 };
-            } else {
-                // Few quarters - standard formatting
-                xaxisConfig.tickangle = -45;
-                xaxisConfig.tickfont = { size: 11 };
-            }
-            
-            // Insert Q4 2023 gap for all provider info chart data
-            // Total Staffing
-            const totalQuarters = [...chartData.total_staffing.quarters];
-            const totalReported = [...chartData.total_staffing.reported_total];
-            const totalDirect = [...chartData.total_staffing.reported_direct];
-            const totalCaseMix = [...chartData.total_staffing.case_mix_total];
-            const totalAdjusted = [...chartData.total_staffing.adjusted_total];
-            insertQ42023Gap(totalQuarters, totalReported, totalDirect, totalCaseMix, totalAdjusted);
-            
-            // RN Staffing
-            const rnQuarters = [...chartData.rn_staffing.quarters];
-            const rnReported = [...chartData.rn_staffing.reported_rn_total];
-            const rnDirect = [...chartData.rn_staffing.reported_rn_direct];
-            const rnCaseMix = [...chartData.rn_staffing.case_mix_rn];
-            const rnAdjusted = [...chartData.rn_staffing.adjusted_rn];
-            insertQ42023Gap(rnQuarters, rnReported, rnDirect, rnCaseMix, rnAdjusted);
-            
-            // CNA Staffing
-            const cnaQuarters = [...chartData.cna_staffing.quarters];
-            const cnaReported = [...chartData.cna_staffing.reported_cna];
-            const cnaCaseMix = [...chartData.cna_staffing.case_mix_cna];
-            const cnaAdjusted = [...chartData.cna_staffing.adjusted_cna];
-            insertQ42023Gap(cnaQuarters, cnaReported, cnaCaseMix, cnaAdjusted);
+            const chartHeight = getChartHeight();
             
             // Total Staffing Chart
+            const isMobile = window.innerWidth < 768;
             const totalLayout = {
-                xaxis: xaxisConfig,
-                yaxis: { title: 'Hours per Resident Day' },
+                xaxis: { 
+                    title: '', 
+                    nticks: 8, 
+                    tickangle: -45,
+                    tickfont: { size: 10 },
+                    ticklen: 5,
+                    tickwidth: 1,
+                    showgrid: true
+                },
+                yaxis: { 
+                    title: 'Hours per Resident Day',
+                    titlefont: { size: 12 },
+                    tickfont: { size: 10 }
+                },
                 height: chartHeight,
-                autosize: true,
-                margin: { b: bottomMargin, l: leftMargin, r: rightMargin, t: 60 },
+                margin: { b: 150, l: 70, r: 40, t: 20 },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    y: -0.45,
+                    yanchor: 'top',
+                    x: 0.5,
+                    xanchor: 'center',
+                    font: { size: 8 },
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    bordercolor: '#ccc',
+                    borderwidth: 1,
+                    itemclick: 'toggle',
+                    itemdoubleclick: 'toggleothers',
+                    traceorder: 'normal',
+                    itemsizing: 'constant',
+                    itemwidth: 20
+                },
                 annotations: [
                     {
                         text: '<b>Source:</b> CMS Provider Info/PBJ • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.30, // Moved further down
+                        y: isMobile ? -0.25 : -0.35,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
@@ -2410,66 +2571,86 @@
             
             const totalData = [
                 {
-                    x: totalQuarters,
-                    y: filterZeroData(totalReported),
+                    x: chartData.total_staffing.quarters,
+                    y: filterZeroData(totalReportedData),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: 'Reported Total',
+                    name: excludeTotal ? 'Reported Direct' : 'Reported Total',
                     line: { color: 'blue', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false, // Show gaps for missing data (like Q4 2023)
-                    hovertemplate: '<b>%{x}</b><br><b>Reported Total:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: totalQuarters,
-                    y: filterZeroData(totalDirect),
+                    x: chartData.total_staffing.quarters,
+                    y: filterZeroData(chartData.total_staffing.reported_direct),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Reported Direct',
                     line: { color: 'gray', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Reported Direct:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: totalQuarters,
-                    y: filterZeroData(totalCaseMix),
+                    x: chartData.total_staffing.quarters,
+                    y: filterZeroData(chartData.total_staffing.case_mix_total),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Case-Mix',
                     line: { color: 'red', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Case-Mix:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: totalQuarters,
-                    y: filterZeroData(totalAdjusted),
+                    x: chartData.total_staffing.quarters,
+                    y: filterZeroData(chartData.total_staffing.adjusted_total),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Adjusted',
                     line: { color: 'green', width: 2, dash: 'dash' },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Adjusted:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 }
             ];
             
-            Plotly.newPlot('providerInfoTotalChart', totalData, totalLayout, {responsive: true});
+            Plotly.newPlot('providerInfoTotalChart', totalData, totalLayout);
             
             // RN Staffing Chart
             const rnLayout = {
-                xaxis: xaxisConfig,
-                yaxis: { title: 'Hours per Resident Day' },
+                xaxis: { 
+                    title: '', 
+                    nticks: 8, 
+                    tickangle: -45,
+                    tickfont: { size: 10 },
+                    ticklen: 5,
+                    tickwidth: 1,
+                    showgrid: true
+                },
+                yaxis: { 
+                    title: 'Hours per Resident Day',
+                    titlefont: { size: 12 },
+                    tickfont: { size: 10 }
+                },
                 height: chartHeight,
-                autosize: true,
-                margin: { b: bottomMargin, l: leftMargin, r: rightMargin, t: 60 },
+                margin: { b: 150, l: 70, r: 40, t: 20 },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    y: -0.45,
+                    yanchor: 'top',
+                    x: 0.5,
+                    xanchor: 'center',
+                    font: { size: 8 },
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    bordercolor: '#ccc',
+                    borderwidth: 1,
+                    itemclick: 'toggle',
+                    itemdoubleclick: 'toggleothers',
+                    traceorder: 'normal',
+                    itemsizing: 'constant',
+                    itemwidth: 20
+                },
                 annotations: [
                     {
                         text: '<b>Source:</b> CMS Provider Info/PBJ • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.30, // Moved further down
+                        y: isMobile ? -0.25 : -0.35,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
@@ -2485,66 +2666,86 @@
             
             const rnData = [
                 {
-                    x: rnQuarters,
-                    y: filterNullData(rnReported),
+                    x: chartData.rn_staffing.quarters,
+                    y: filterNullData(rnReportedData),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: 'Reported',
+                    name: excludeRN ? 'Reported Direct' : 'Reported',
                     line: { color: 'blue', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Reported:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: rnQuarters,
-                    y: filterZeroData(rnDirect),
+                    x: chartData.rn_staffing.quarters,
+                    y: filterZeroData(chartData.rn_staffing.reported_rn_direct),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: 'Reported Direct (RN only)',
+                    name: 'Reported Direct',
                     line: { color: 'gray', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Reported Direct (RN only):</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: rnQuarters,
-                    y: filterNullData(rnCaseMix),
+                    x: chartData.rn_staffing.quarters,
+                    y: filterNullData(chartData.rn_staffing.case_mix_rn),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Case-Mix',
                     line: { color: 'red', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Case-Mix:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: rnQuarters,
-                    y: filterNullData(rnAdjusted),
+                    x: chartData.rn_staffing.quarters,
+                    y: filterNullData(chartData.rn_staffing.adjusted_rn),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Adjusted',
                     line: { color: 'green', width: 2, dash: 'dash' },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Adjusted:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 }
             ];
             
-            Plotly.newPlot('providerInfoRNChart', rnData, rnLayout, {responsive: true});
+            Plotly.newPlot('providerInfoRNChart', rnData, rnLayout);
             
             // Nurse Aide Staffing Chart
             const cnaLayout = {
-                xaxis: xaxisConfig,
-                yaxis: { title: 'Hours per Resident Day' },
+                xaxis: { 
+                    title: '', 
+                    nticks: 8, 
+                    tickangle: -45,
+                    tickfont: { size: 10 },
+                    ticklen: 5,
+                    tickwidth: 1,
+                    showgrid: true
+                },
+                yaxis: { 
+                    title: 'Hours per Resident Day',
+                    titlefont: { size: 12 },
+                    tickfont: { size: 10 }
+                },
                 height: chartHeight,
-                autosize: true,
-                margin: { b: bottomMargin, l: leftMargin, r: rightMargin, t: 60 },
+                margin: { b: 150, l: 70, r: 40, t: 20 },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    y: -0.45,
+                    yanchor: 'top',
+                    x: 0.5,
+                    xanchor: 'center',
+                    font: { size: 8 },
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    bordercolor: '#ccc',
+                    borderwidth: 1,
+                    itemclick: 'toggle',
+                    itemdoubleclick: 'toggleothers',
+                    traceorder: 'normal',
+                    itemsizing: 'constant',
+                    itemwidth: 20
+                },
                 annotations: [
                     {
                         text: '<b>Source:</b> CMS Provider Info/PBJ • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.30, // Moved further down
+                        y: isMobile ? -0.25 : -0.35,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
@@ -2560,63 +2761,60 @@
             
             const cnaData = [
                 {
-                    x: cnaQuarters,
-                    y: filterNullData(cnaReported),
+                    x: chartData.cna_staffing.quarters,
+                    y: filterNullData(chartData.cna_staffing.reported_cna),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Reported',
                     line: { color: 'blue', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Reported:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: cnaQuarters,
-                    y: filterNullData(cnaCaseMix),
+                    x: chartData.cna_staffing.quarters,
+                    y: filterNullData(chartData.cna_staffing.case_mix_cna),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Case-Mix',
                     line: { color: 'red', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Case-Mix:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 },
                 {
-                    x: cnaQuarters,
-                    y: filterNullData(cnaAdjusted),
+                    x: chartData.cna_staffing.quarters,
+                    y: filterNullData(chartData.cna_staffing.adjusted_cna),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Adjusted',
                     line: { color: 'green', width: 2, dash: 'dash' },
-                    marker: { size: 6 },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br><b>Adjusted:</b> %{y:.3f} HPRD<extra></extra>'
+                    marker: { size: 6 }
                 }
             ];
             
-            Plotly.newPlot('providerInfoCNAChart', cnaData, cnaLayout, {responsive: true});
-            
-            // Insert Q4 2023 gap for ratings data
-            const ratingsQuarters = [...chartData.ratings.quarters];
-            const ratingsOverall = [...chartData.ratings.overall];
-            const ratingsStaffing = [...chartData.ratings.staffing];
-            const ratingsHealth = [...chartData.ratings.health_inspection];
-            insertQ42023Gap(ratingsQuarters, ratingsOverall, ratingsStaffing, ratingsHealth);
+            Plotly.newPlot('providerInfoCNAChart', cnaData, cnaLayout);
             
             // Ratings Chart
             const ratingsLayout = {
-                showlegend: true,
-                xaxis: xaxisConfig,
+                xaxis: { title: '', nticks: 8, tickangle: -45 },
                 yaxis: { title: 'Rating (1-5)', range: [0, 5] },
                 height: chartHeight,
-                autosize: true,
-                margin: { b: bottomMargin, l: leftMargin, r: rightMargin, t: 60 },
+                margin: { b: 150, l: 70, r: 40, t: 20 },
+                showlegend: true,
+                legend: {
+                    bgcolor: 'white',
+                    bordercolor: '#ccc',
+                    borderwidth: 1,
+                    font: { size: 9 },
+                    y: 0.98,
+                    yanchor: 'top',
+                    x: 1.02,
+                    xanchor: 'left',
+                    orientation: 'v'
+                },
                 annotations: [
                     {
                         text: '<b>Source:</b> CMS Provider Info/PBJ • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.30, // Moved further down
+                        y: isMobile ? -0.25 : -0.35,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
@@ -2630,45 +2828,10 @@
                 ]
             };
             
-            const ratingsData = [
-                {
-                    x: ratingsQuarters,
-                    y: ratingsOverall,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    name: 'Overall Rating',
-                    line: { color: '#1f77b4', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false
-                },
-                {
-                    x: ratingsQuarters,
-                    y: ratingsStaffing,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    name: 'Staffing Rating',
-                    line: { color: '#2ca02c', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false
-                },
-                {
-                    x: ratingsQuarters,
-                    y: ratingsHealth,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    name: 'Health Inspection Rating',
-                    line: { color: '#ff7f0e', width: 2 },
-                    marker: { size: 6 },
-                    connectgaps: false
-                }
-            ];
-            
-            Plotly.newPlot('providerInfoRatingsChart', ratingsData, ratingsLayout, {responsive: true});
-            
             // Delta Total Nurse Layout (Percentage Only)
             const deltaTotalLayout = {
                 showlegend: false,
-                xaxis: { title: '', nticks: nTicks, tickangle: -45 },
+                xaxis: { title: '', nticks: 8, tickangle: -45 },
                 yaxis: { 
                     title: 'Percentage Difference (%)',
                     zeroline: true,
@@ -2676,8 +2839,7 @@
                     zerolinewidth: 1
                 },
                 height: chartHeight,
-                autosize: true,
-                margin: { b: bottomMargin, l: isLaptop ? 70 : 80, r: rightMargin, t: 20 },
+                margin: { b: 120, l: 70, r: 40, t: 20 },
                 annotations: [
                     {
                         text: '<b>SER = </b> ((Reported - Case-Mix) / Case-Mix) ├ù 100%',
@@ -2722,8 +2884,8 @@
                     zerolinecolor: '#ccc',
                     zerolinewidth: 1
                 },
-                height: 350,
-                margin: { b: 120, l: 80, r: 40, t: 20 },
+                height: chartHeight,
+                margin: { b: 120, l: 70, r: 40, t: 20 },
                 annotations: [
                     {
                         text: '<b>Calculation:</b> ((Reported - Case-Mix) / Case-Mix) ├ù 100%',
@@ -2757,6 +2919,38 @@
                     }
                 ]
             };
+            
+            const ratingsData = [
+                {
+                    x: chartData.ratings.quarters,
+                    y: chartData.ratings.overall,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Overall Rating',
+                    line: { color: '#1f77b4', width: 2 },
+                    marker: { size: 6 }
+                },
+                {
+                    x: chartData.ratings.quarters,
+                    y: chartData.ratings.staffing,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Staffing Rating',
+                    line: { color: '#2ca02c', width: 2 },
+                    marker: { size: 6 }
+                },
+                {
+                    x: chartData.ratings.quarters,
+                    y: chartData.ratings.health_inspection,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Health Inspection Rating',
+                    line: { color: '#ff7f0e', width: 2 },
+                    marker: { size: 6 }
+                }
+            ];
+            
+            Plotly.newPlot('providerInfoRatingsChart', ratingsData, ratingsLayout);
 
             // Delta Total Nurse Chart (Dual Y-Axis)
             const deltaTotalData = [
@@ -2786,126 +2980,102 @@
             ];
 
              // Combined Delta Chart (Total + Direct Total) - Ratio based (reported/case-mix)
-            console.log('Creating combined delta chart data...');
-            
-            // Calculate ratios using updated data with Q4 2023 gap
-            const totalRatios = totalReported.map((reported, i) => {
-                const caseMix = totalCaseMix[i];
-                return caseMix > 0 && reported !== null ? reported / caseMix : null;
-            });
-            
-            const directRatios = totalDirect.map((reported, i) => {
-                const caseMix = totalCaseMix[i];
-                return caseMix > 0 && reported !== null ? reported / caseMix : null;
-            });
-            
-            console.log('Total ratios:', totalRatios.slice(0, 5));
-            console.log('Direct ratios:', directRatios.slice(0, 5));
-            
-            const combinedDeltaData = [
-                {
-                    x: totalQuarters,
-                    y: totalRatios,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    name: 'Total Staff SER',
-                    line: { color: '#0066cc', width: 3 },
-                    marker: { 
-                        size: 6,
-                        color: 'rgba(0, 102, 204, 0.6)',
-                        line: { color: '#0066cc', width: 2 }
-                    },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br>' +
-                                  '<b>Total Staff:</b><br>' +
-                                  'Reported: %{customdata[0]:.3f} HPRD<br>' +
-                                  'Case-Mix: %{customdata[1]:.3f} HPRD<br>' +
-                                  'Ratio: %{y:.3f}<br>' +
-                                  '<b>Status:</b> %{customdata[3]}<br>' +
-                                  '<extra></extra>',
-                    customdata: totalReported.map((reported, i) => {
-                        const caseMix = totalCaseMix[i];
-                        if (reported === null || caseMix === null || caseMix === 0) return [null, null, null, 'No Data'];
-                        const ratio = caseMix > 0 ? reported / caseMix : 1;
-                        let status = 'Meets Case-Mix';
-                        if (ratio < 0.5) status = 'Super Severe (<0.5)';
-                        else if (ratio < 0.8) status = 'Severe (<0.8)';
-                        else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
-                        return [reported, caseMix, ratio, status];
-                    })
-                },
-                {
-                    x: totalQuarters,
-                    y: directRatios,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    name: 'Direct Staff SER',
-                    line: { color: '#808080', width: 3 },
-                    marker: { 
-                        size: 6,
-                        color: 'rgba(128, 128, 128, 0.6)',
-                        line: { color: '#808080', width: 2 }
-                    },
-                    connectgaps: false,
-                    hovertemplate: '<b>%{x}</b><br>' +
-                                  '<b>Direct Staff (excl. admin/DON):</b><br>' +
-                                  'Reported: %{customdata[0]:.3f} HPRD<br>' +
-                                  'Case-Mix: %{customdata[1]:.3f} HPRD<br>' +
-                                  'Ratio: %{y:.3f}<br>' +
-                                  '<b>Status:</b> %{customdata[3]}<br>' +
-                                  '<extra></extra>',
-                    customdata: totalDirect.map((reported, i) => {
-                        const caseMix = totalCaseMix[i];
-                        if (reported === null || caseMix === null || caseMix === 0) return [null, null, null, 'No Data'];
-                        const ratio = caseMix > 0 ? reported / caseMix : 1;
-                        let status = 'Meets Case-Mix';
-                        if (ratio < 0.5) status = 'Super Severe (<0.5)';
-                        else if (ratio < 0.8) status = 'Severe (<0.8)';
-                        else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
-                        return [reported, caseMix, ratio, status];
-                    })
-                }
-            ];
+             const combinedDeltaData = [
+                 {
+                     x: chartData.total_staffing.quarters,
+                     y: chartData.total_staffing.reported_total.map((reported, i) => {
+                         const caseMix = chartData.total_staffing.case_mix_total[i];
+                         return caseMix > 0 ? reported / caseMix : null;
+                     }),
+                     type: 'scatter',
+                     mode: 'lines+markers',
+                     name: 'Total Staff SER',
+                     line: { color: '#0066cc', width: 3 },
+                     marker: { 
+                         size: 6,
+                         color: 'rgba(0, 102, 204, 0.6)',
+                         line: { color: '#0066cc', width: 2 }
+                     },
+                     hovertemplate: '<b>%{x}</b><br>' +
+                                   '<b>Total Staff:</b><br>' +
+                                   'Reported: %{customdata[0]:.2f} HPRD<br>' +
+                                   'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
+                                   'Ratio: %{y:.2f}<br>' +
+                                   '<b>Status:</b> %{customdata[3]}<br>' +
+                                   '<extra></extra>',
+                     customdata: chartData.total_staffing.reported_total.map((reported, i) => {
+                         const caseMix = chartData.total_staffing.case_mix_total[i];
+                         const ratio = caseMix > 0 ? reported / caseMix : 1;
+                         let status = 'Meets Case-Mix';
+                         if (ratio < 0.5) status = 'Super Severe (<0.5)';
+                         else if (ratio < 0.8) status = 'Severe (<0.8)';
+                         else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
+                         return [reported, caseMix, ratio, status];
+                     })
+                 },
+                 {
+                     x: chartData.total_staffing.quarters,
+                     y: chartData.total_staffing.reported_direct.map((reported, i) => {
+                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
+                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
+                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
+                         const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
+                         return caseMixDirect > 0 ? reported / caseMixDirect : null;
+                     }),
+                     type: 'scatter',
+                     mode: 'lines+markers',
+                     name: 'Direct Staff SER',
+                     line: { color: '#808080', width: 3 },
+                     marker: { 
+                         size: 6,
+                         color: 'rgba(128, 128, 128, 0.6)',
+                         line: { color: '#808080', width: 2 }
+                     },
+                     hovertemplate: '<b>%{x}</b><br>' +
+                                   '<b>Direct Staff (excl. admin/DON):</b><br>' +
+                                   'Reported: %{customdata[0]:.2f} HPRD<br>' +
+                                   'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
+                                   'Ratio: %{y:.2f}<br>' +
+                                   '<b>Status:</b> %{customdata[3]}<br>' +
+                                   '<extra></extra>',
+                     customdata: chartData.total_staffing.reported_direct.map((reported, i) => {
+                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
+                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
+                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
+                         const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
+                         const ratio = caseMixDirect > 0 ? reported / caseMixDirect : 1;
+                         let status = 'Meets Case-Mix';
+                         if (ratio < 0.5) status = 'Super Severe (<0.5)';
+                         else if (ratio < 0.8) status = 'Severe (<0.8)';
+                         else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
+                         return [reported, caseMixDirect, ratio, status];
+                     })
+                 }
+             ];
             // Combined Delta Layout
             const ratioRange = calculateRatioRange();
-            let deltaChartHeight = 400;
-            let deltaLeftMargin = 100;
-            let deltaRightMargin = 200;
-            let deltaBottomMargin = 140; // Extra bottom margin for SER charts to accommodate source text and SER info
-            if (isLaptop) {
-                deltaChartHeight = 380;
-                deltaLeftMargin = 80;
-                deltaRightMargin = 140;
-                deltaBottomMargin = 120;
-            } else if (isMobile) {
-                deltaChartHeight = 350;
-                deltaLeftMargin = 65;
-                deltaRightMargin = 90;
-                deltaBottomMargin = 100;
-            }
-            
             const combinedDeltaLayout = {
                 showlegend: true,
                 legend: {
                     bgcolor: 'white',
                     bordercolor: '#ccc',
                     borderwidth: 1,
-                    font: { size: isLaptop ? 8 : 9 }, // Smaller font
-                    y: 0.98, // Moved up slightly
+                    font: { size: 9 },
+                    y: 0.98,
                     yanchor: 'top',
-                    x: 1.0, // Moved left to make room for annotations
-                    xanchor: 'left'
+                    x: 1.02,
+                    xanchor: 'left',
+                    orientation: 'v'
                 },
-                xaxis: xaxisConfig,
+                xaxis: { title: '', nticks: 8, tickangle: -45 },
                 yaxis: { 
                     title: 'Staffing-to-Expected Ratio (SER)',
                     range: ratioRange,
                     zeroline: false,
                     gridcolor: '#f0f0f0'
                 },
-                height: deltaChartHeight,
-                autosize: true,
-                margin: { b: deltaBottomMargin, l: deltaLeftMargin, r: serRightMargin, t: 20 }, // Use deltaBottomMargin for SER charts
+                height: Math.max(chartHeight, 350),  // Delta charts need slightly more height
+                margin: { b: 150, l: 70, r: 120, t: 20 },
                 shapes: [
                     // Reference line at 1.0 (expected)
                     {
@@ -2966,7 +3136,7 @@
                     {
                         type: 'line',
                         x0: 1.0,
-                        x1: 1.08, // Extended to match annotation position
+                        x1: 1.02,
                         y0: 0.9,
                         y1: 0.9,
                         xref: 'paper',
@@ -2981,7 +3151,7 @@
                     {
                         type: 'line',
                         x0: 1.0,
-                        x1: 1.08, // Extended to match annotation position
+                        x1: 1.02,
                         y0: 0.65,
                         y1: 0.65,
                         xref: 'paper',
@@ -2996,7 +3166,7 @@
                     {
                         type: 'line',
                         x0: 1.0,
-                        x1: 1.08, // Extended to match annotation position
+                        x1: 1.02,
                         y0: 0.4,
                         y1: 0.4,
                         xref: 'paper',
@@ -3011,65 +3181,48 @@
                 annotations: [
                     ...generateZoneAnnotations(ratioRange),
                     {
-                        text: '<b>Staffing-to-Expected Ratio (SER) =</b> Reported ÷ Case-Mix (1.0 = Meets Case-Mix)',
+                        text: '<b>Source:</b> CMS Provider Info/PBJ • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.25, // Positioned above source text
+                        y: isMobile ? -0.25 : -0.35,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
                         yanchor: 'top',
-                        font: { size: 9, color: '#004085' }, // Smaller font
-                        bgcolor: '#d1ecf1',
-                        bordercolor: '#bee5eb',
+                        font: { size: 9, color: '#333' },
+                        bgcolor: '#f8f9fa',
+                        bordercolor: '#dee2e6',
                         borderwidth: 1,
                         borderpad: 3
                     },
                     {
-                        text: '<b>Source:</b> CMS Provider Info Data • Chart by <b>320 Consulting</b>',
+                        text: '<b>Staffing-to-Expected Ratio (SER) =</b> Reported ÷ Case-Mix (1.0 = Meets Case-Mix)',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.32, // Positioned below SER info with proper spacing
+                        y: -0.45,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
                         yanchor: 'top',
-                        font: { size: 8, color: '#333' }, // Smaller font
-                        bgcolor: '#f8f9fa',
-                        bordercolor: '#dee2e6',
+                        font: { size: 10, color: '#004085' },
+                        bgcolor: '#d1ecf1',
+                        bordercolor: '#bee5eb',
                         borderwidth: 1,
-                        borderpad: 2
+                        borderpad: 4
                     }
                 ]
             };
 
-            console.log('Creating combined delta chart with data:', combinedDeltaData);
-            console.log('Chart layout:', combinedDeltaLayout);
-            Plotly.newPlot('providerInfoCombinedDeltaChart', combinedDeltaData, combinedDeltaLayout, {responsive: true}).then(() => {
-                console.log('Combined delta chart created successfully');
-            });
+            Plotly.newPlot('providerInfoCombinedDeltaChart', combinedDeltaData, combinedDeltaLayout);
             
             // Direct SER Chart (Total RN + RN Direct) - Ratio based (reported/case-mix)
-            console.log('Creating RN direct delta chart data...');
-            
-            // Calculate RN ratios using updated data with Q4 2023 gap
-            const rnTotalRatios = rnReported.map((reported, i) => {
-                const caseMix = rnCaseMix[i];
-                return caseMix > 0 && reported !== null ? reported / caseMix : null;
-            });
-            
-            const rnDirectRatios = rnDirect.map((reported, i) => {
-                const caseMix = rnCaseMix[i];
-                return caseMix > 0 && reported !== null ? reported / caseMix : null;
-            });
-            
-            console.log('RN Total ratios:', rnTotalRatios.slice(0, 5));
-            console.log('RN Direct ratios:', rnDirectRatios.slice(0, 5));
-            
             const directDeltaData = [
                 {
-                    x: rnQuarters,
-                    y: rnTotalRatios,
+                    x: chartData.rn_staffing.quarters,
+                    y: chartData.rn_staffing.reported_rn.map((reported, i) => {
+                        const caseMix = chartData.rn_staffing.case_mix_rn[i];
+                        return caseMix > 0 ? reported / caseMix : null;
+                    }),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Total RN SER',
@@ -3079,17 +3232,15 @@
                         color: 'rgba(0, 102, 204, 0.6)',
                         line: { color: '#0066cc', width: 2 }
                     },
-                    connectgaps: false,
                     hovertemplate: '<b>%{x}</b><br>' +
                                   '<b>Total RN:</b><br>' +
-                                  'Reported: %{customdata[0]:.3f} HPRD<br>' +
-                                  'Case-Mix: %{customdata[1]:.3f} HPRD<br>' +
-                                  'Ratio: %{y:.3f}<br>' +
+                                  'Reported: %{customdata[0]:.2f} HPRD<br>' +
+                                  'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
+                                  'Ratio: %{y:.2f}<br>' +
                                   '<b>Status:</b> %{customdata[3]}<br>' +
                                   '<extra></extra>',
-                    customdata: rnReported.map((reported, i) => {
-                        const caseMix = rnCaseMix[i];
-                        if (reported === null || caseMix === null || caseMix === 0) return [null, null, null, 'No Data'];
+                    customdata: chartData.rn_staffing.reported_rn.map((reported, i) => {
+                        const caseMix = chartData.rn_staffing.case_mix_rn[i];
                         const ratio = caseMix > 0 ? reported / caseMix : 1;
                         let status = 'Meets Case-Mix';
                         if (ratio < 0.5) status = 'Super Severe (<0.5)';
@@ -3099,8 +3250,11 @@
                     })
                 },
                 {
-                    x: rnQuarters,
-                    y: rnDirectRatios,
+                    x: chartData.rn_staffing.quarters,
+                    y: chartData.rn_staffing.reported_rn_direct.map((reported, i) => {
+                        const caseMix = chartData.rn_staffing.case_mix_rn[i];
+                        return caseMix > 0 ? reported / caseMix : null;
+                    }),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'RN Direct SER',
@@ -3110,17 +3264,15 @@
                         color: 'rgba(255, 140, 0, 0.6)',
                         line: { color: '#ff8c00', width: 2 }
                     },
-                    connectgaps: false,
                     hovertemplate: '<b>%{x}</b><br>' +
                                   '<b>RN Direct (excl. admin/DON):</b><br>' +
-                                  'Reported: %{customdata[0]:.3f} HPRD<br>' +
-                                  'Case-Mix: %{customdata[1]:.3f} HPRD<br>' +
-                                  'Ratio: %{y:.3f}<br>' +
+                                  'Reported: %{customdata[0]:.2f} HPRD<br>' +
+                                  'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
+                                  'Ratio: %{y:.2f}<br>' +
                                   '<b>Status:</b> %{customdata[3]}<br>' +
                                   '<extra></extra>',
-                    customdata: rnDirect.map((reported, i) => {
-                        const caseMix = rnCaseMix[i];
-                        if (reported === null || caseMix === null || caseMix === 0) return [null, null, null, 'No Data'];
+                    customdata: chartData.rn_staffing.reported_rn_direct.map((reported, i) => {
+                        const caseMix = chartData.rn_staffing.case_mix_rn[i];
                         const ratio = caseMix > 0 ? reported / caseMix : 1;
                         let status = 'Meets Case-Mix';
                         if (ratio < 0.5) status = 'Super Severe (<0.5)';
@@ -3139,22 +3291,22 @@
                     bgcolor: 'white',
                     bordercolor: '#ccc',
                     borderwidth: 1,
-                    font: { size: isLaptop ? 8 : 9 }, // Smaller font
-                    y: 0.98, // Moved up slightly
+                    font: { size: 9 },
+                    y: 0.98,
                     yanchor: 'top',
-                    x: 1.0, // Moved left to make room for annotations
-                    xanchor: 'left'
+                    x: 1.02,
+                    xanchor: 'left',
+                    orientation: 'v'
                 },
-                xaxis: xaxisConfig,
+                xaxis: { title: '', nticks: 8, tickangle: -45 },
                 yaxis: { 
                     title: 'Staffing-to-Expected Ratio (SER)',
                     range: directRatioRange,
                     zeroline: false,
                     gridcolor: '#f0f0f0'
                 },
-                height: deltaChartHeight,
-                autosize: true,
-                margin: { b: deltaBottomMargin, l: deltaLeftMargin, r: serRightMargin, t: 20 }, // Use deltaBottomMargin for SER charts
+                height: Math.max(chartHeight, 350),  // Delta charts need slightly more height
+                margin: { b: 150, l: 70, r: 120, t: 20 },
                 shapes: [
                     {
                         type: 'line',
@@ -3210,43 +3362,39 @@
                 annotations: [
                     ...generateZoneAnnotations(directRatioRange),
                     {
-                        text: '<b>Staffing-to-Expected Ratio (SER) =</b> Reported ÷ Case-Mix (1.0 = Meets Case-Mix)',
+                        text: '<b>Source:</b> CMS Provider Info/PBJ • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.25, // Positioned above source text
+                        y: isMobile ? -0.25 : -0.35,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
                         yanchor: 'top',
-                        font: { size: 9, color: '#004085' }, // Smaller font
-                        bgcolor: '#d1ecf1',
-                        bordercolor: '#bee5eb',
+                        font: { size: 9, color: '#333' },
+                        bgcolor: '#f8f9fa',
+                        bordercolor: '#dee2e6',
                         borderwidth: 1,
                         borderpad: 3
                     },
                     {
-                        text: '<b>Source:</b> CMS Provider Info/PBJ • Chart by <b>320 Consulting</b>',
+                        text: '<b>Staffing-to-Expected Ratio (SER) =</b> Reported ÷ Case-Mix (1.0 = Meets Case-Mix)',
                         showarrow: false,
                         x: 0.5,
-                        y: -0.32, // Positioned below SER info with proper spacing
+                        y: -0.45,
                         xref: 'paper',
                         yref: 'paper',
                         xanchor: 'center',
                         yanchor: 'top',
-                        font: { size: 8, color: '#333' }, // Smaller font
-                        bgcolor: '#f8f9fa',
-                        bordercolor: '#dee2e6',
+                        font: { size: 10, color: '#004085' },
+                        bgcolor: '#d1ecf1',
+                        bordercolor: '#bee5eb',
                         borderwidth: 1,
-                        borderpad: 2
+                        borderpad: 4
                     }
                 ]
             };
             
-            console.log('Creating direct delta chart with data:', directDeltaData);
-            console.log('Chart layout:', directDeltaLayout);
-            Plotly.newPlot('providerInfoDirectDeltaChart', directDeltaData, directDeltaLayout, {responsive: true}).then(() => {
-                console.log('Direct delta chart created successfully');
-            });
+            Plotly.newPlot('providerInfoDirectDeltaChart', directDeltaData, directDeltaLayout);
          }
 
          function formatQuarter(quarter) {
@@ -3371,7 +3519,8 @@
                      }
                  })
                  .catch(error => {
-                     console.error('Error checking data completeness:', error);
+                     // Silently fail - this is not critical functionality
+                     console.log('Data completeness check failed (non-critical):', error.message);
                  });
          }
 
@@ -3587,11 +3736,11 @@
                  const dayOfWeek = document.getElementById('dayOfWeek').value;
                  const holidaysOnly = document.getElementById('holidaysOnly').value;
                  
-                 // Get selected view modes
-                 const hprdView = document.querySelector('input[name="hprdView"]:checked')?.value || 'daily';
-                 const hoursView = document.querySelector('input[name="hoursView"]:checked')?.value || 'daily';
-                 const censusView = document.querySelector('input[name="censusView"]:checked')?.value || 'daily';
-                 const contractView = document.querySelector('input[name="contractView"]:checked')?.value || 'daily';
+                // Get selected view modes
+                const hprdView = document.querySelector('input[name="hprdView"]:checked')?.value || 'month';
+                const hoursView = document.querySelector('input[name="hoursView"]:checked')?.value || 'month';
+                const censusView = document.querySelector('input[name="censusView"]:checked')?.value || 'month';
+                const contractView = document.querySelector('input[name="contractView"]:checked')?.value || 'month';
                  
                  // Build query parameters
                  const params = new URLSearchParams();
@@ -3956,28 +4105,8 @@
             tbody.innerHTML = '';
             
             if (!stats || Object.keys(stats).length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No quarterly statistics available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No quarterly statistics available</td></tr>';
                 return;
-            }
-            
-            // Add Census row first
-            if (stats.census) {
-                const censusRow = document.createElement('tr');
-                censusRow.className = 'table-info';
-                censusRow.innerHTML = `
-                    <td class="fw-bold">Census</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">${formatNumber(stats.census.mean, 2)}</td>
-                    <td class="text-center">${formatNumber(stats.census.median, 2)}</td>
-                    <td class="text-center">${formatNumber(stats.census.std_dev, 2)}</td>
-                    <td class="text-center">-</td>
-                `;
-                tbody.appendChild(censusRow);
             }
             
             // Define position categories in the specified order
@@ -4015,9 +4144,6 @@
                     <td class="text-center">${formatNumber(positionStats.total_hours?.mean)}</td>
                     <td class="text-center">${formatNumber(positionStats.total_hours?.median)}</td>
                     <td class="text-center">${formatNumber(positionStats.total_hours?.std_dev)}</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
-                    <td class="text-center">-</td>
                     <td class="text-center">${positionStats.zero_count || 0}</td>
                 `;
                 tbody.appendChild(row);
@@ -4036,107 +4162,6 @@
             // All other metrics use 2 decimal places
             return num.toFixed(2);
         };
-
-        async function loadStateComparison() {
-            try {
-                const response = await fetch('/api/state-comparison');
-                const data = await response.json();
-                
-                if (data.error) {
-                    console.error('Error loading state comparison:', data.error);
-                    // Hide the table if there's an error
-                    const tableCard = document.querySelector('#stateComparisonTable').closest('.card');
-                    if (tableCard) {
-                        tableCard.style.display = 'none';
-                    }
-                    return;
-                }
-                
-                populateStateComparisonTable(data.comparison_data, data.state);
-            } catch (error) {
-                console.error('Error fetching state comparison:', error);
-                // Hide the table if there's an error
-                const tableCard = document.querySelector('#stateComparisonTable').closest('.card');
-                if (tableCard) {
-                    tableCard.style.display = 'none';
-                }
-            }
-        }
-
-        function populateStateComparisonTable(data, state) {
-            const tbody = document.getElementById('stateComparisonBody');
-            tbody.innerHTML = '';
-            
-            if (!data || Object.keys(data).length === 0) {
-                tbody.innerHTML = '<tr><td colspan="15" class="text-center text-muted">No state comparison data available</td></tr>';
-                return;
-            }
-            
-            // Sort quarters chronologically
-            const sortedQuarters = Object.keys(data).sort((a, b) => {
-                const yearA = parseInt(a.substring(0, 4));
-                const quarterA = parseInt(a.substring(4));
-                const yearB = parseInt(b.substring(0, 4));
-                const quarterB = parseInt(b.substring(4));
-                
-                if (yearA !== yearB) return yearA - yearB;
-                return quarterA - quarterB;
-            });
-            
-            sortedQuarters.forEach(quarter => {
-                const comparison = data[quarter];
-                const facility = comparison.facility;
-                const stateData = comparison.state;
-                
-                const row = document.createElement('tr');
-                
-                // Format quarter display (e.g., "2024Q3" -> "2024 Q3")
-                const year = quarter.substring(0, 4);
-                const q = quarter.substring(4);
-                const quarterDisplay = `${year} ${q}`;
-                
-                // Helper function to format comparison cell
-                const formatCell = (facilityVal, stateVal) => {
-                    const formatNum = (val) => {
-                        if (val === null || val === undefined || isNaN(val)) return '-';
-                        const num = parseFloat(val);
-                        const fixed = num.toFixed(2);
-                        // Add comma separators for thousands
-                        const parts = fixed.split('.');
-                        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                        return parts.join('.');
-                    };
-                    
-                    const facDisplay = formatNum(facilityVal);
-                    const stateDisplay = formatNum(stateVal);
-                    const diff = facilityVal - stateVal;
-                    const diffPercent = stateVal > 0 ? ((diff / stateVal) * 100) : 0;
-                    
-                    // Color code facility value based on difference
-                    let facilityColorClass = '';
-                    if (Math.abs(diffPercent) >= 5) {
-                        facilityColorClass = diff > 0 ? 'text-success' : 'text-danger';
-                    }
-                    
-                    return `
-                        <td class="text-center ${facilityColorClass}" style="font-size: 0.85em;">${facDisplay}</td>
-                        <td class="text-center" style="font-size: 0.85em; background-color: #f8f9fa;">${stateDisplay}</td>
-                    `;
-                };
-                
-                row.innerHTML = `
-                    <td class="fw-bold text-center" style="font-size: 0.85em;" data-quarter="${quarter}">${quarterDisplay}</td>
-                    ${formatCell(facility.census, stateData.census)}
-                    ${formatCell(facility.total_hprd, stateData.total_hprd)}
-                    ${formatCell(facility.direct_hprd, stateData.direct_hprd)}
-                    ${formatCell(facility.total_rn_hprd, stateData.total_rn_hprd)}
-                    ${formatCell(facility.rn_hprd, stateData.rn_hprd)}
-                    ${formatCell(facility.rn_admin_hprd, stateData.rn_admin_hprd)}
-                    ${formatCell(facility.rn_don_hprd, stateData.rn_don_hprd)}
-                `;
-                tbody.appendChild(row);
-            });
-        }
 
         async function loadQuarterlyData() {
             try {
@@ -4223,7 +4248,7 @@
                     <td class="fw-bold text-center" data-quarter="${quarter}">
                         <a href="${cmsUrl}" target="_blank" class="text-decoration-none">${quarterDisplay}</a>
                     </td>
-                    <td class="text-center" data-census="${quarterData.census}">${formatNumber(quarterData.census, 'Census', false)}</td>
+                    <td class="text-center" data-census="${quarterData.census}">${formatNumber(quarterData.census, 'Census', true)}</td>
                     ${formatCell(quarterData.total_hprd, quarterData.total_hours, 'total_hprd', quarter)}
                     ${formatCell(quarterData.direct_hprd, quarterData.direct_hours, 'direct_hprd', quarter)}
                     ${formatCell(quarterData.total_rn_hprd, quarterData.total_rn_hours, 'total_rn_hprd', quarter)}
@@ -4662,6 +4687,19 @@
             quarterlyStatsHeader.textContent = `Quarterly Staffing, ${providerName}, ${quarterRange}`;
         }
 
+        // Store original charts data for toggle functionality
+        let originalChartsData = null;
+        
+        function toggleAdminExclusionMain() {
+            // Re-render charts with updated data
+            if (originalChartsData) {
+                updateCharts(originalChartsData, window.lastTotalDays || 0);
+            } else {
+                // If we don't have stored data, trigger a refresh
+                updateAnalysis();
+            }
+        }
+        
         // Update chart titles with correct capitalization and placement
         function updateCharts(response, totalDays) {
             // Check if response has the expected structure
@@ -4670,28 +4708,11 @@
                 return;
             }
             
-            // Detect screen width for responsive sizing
-            const screenWidth = window.innerWidth;
-            const isLaptop = screenWidth >= 768 && screenWidth <= 1399;
-            const isMobile = screenWidth < 768;
-            
-            // Responsive chart dimensions
-            let chartHeight = 450;
-            let bottomMargin = 100;
-            let leftMargin = 80;
-            let rightMargin = 40;
-            
-            if (isLaptop) {
-                chartHeight = 400;
-                bottomMargin = 85;
-                leftMargin = 70;
-                rightMargin = 30;
-            } else if (isMobile) {
-                chartHeight = 350;
-                bottomMargin = 75;
-                leftMargin = 60;
-                rightMargin = 20;
+            // Store original data for toggle functionality
+            if (!originalChartsData) {
+                originalChartsData = JSON.parse(JSON.stringify(response));
             }
+            window.lastTotalDays = totalDays;
             
             const charts = response.charts;
             let filterInfo = response.filter_info || 'No filter info';
@@ -4704,274 +4725,32 @@
             const providerName = "{{ facility_name }}";
             const formattedProviderName = capitalizeProviderName(providerName);
             
-            // Helper function to convert date strings to Date objects for Plotly
-            // Handles MM-DD-YYYY format from backend
-            function convertDatesToDateObjects(chartData, currentView) {
-                // Only convert for daily view - other views use category strings
-                if (currentView !== 'daily' || !chartData || !chartData.data || chartData.data.length === 0) {
-                    return chartData;
-                }
-                
-                // Clone the data to avoid modifying the original
-                const convertedData = JSON.parse(JSON.stringify(chartData));
-                
-                // Convert x-values in each trace
-                for (let trace of convertedData.data) {
-                    if (trace.x && Array.isArray(trace.x)) {
-                        trace.x = trace.x.map(d => {
-                            if (d instanceof Date) {
-                                return d;
-                            } else if (typeof d === 'string') {
-                                // Parse MM-DD-YYYY format
-                                const parts = d.split('-');
-                                if (parts.length === 3) {
-                                    const month = parseInt(parts[0], 10) - 1; // Month is 0-indexed
-                                    const day = parseInt(parts[1], 10);
-                                    const year = parseInt(parts[2], 10);
-                                    const date = new Date(year, month, day);
-                                    // Validate date
-                                    if (!isNaN(date.getTime()) && date.getFullYear() >= 2010 && date.getFullYear() <= 2030) {
-                                        return date;
-                                    }
-                                }
-                                // Fallback: try standard Date parsing
-                                const date = new Date(d);
-                                if (!isNaN(date.getTime()) && date.getFullYear() >= 2010 && date.getFullYear() <= 2030) {
-                                    return date;
-                                }
-                            }
-                            return d; // Return original if can't parse
-                        });
-                    }
-                }
-                
-                return convertedData;
-            }
-            
-            // Helper function to add custom hovertemplates that show full date regardless of x-axis formatting
-            function addDetailedHoverTemplates(chartData, currentView) {
-                if (!chartData || !chartData.data || chartData.data.length === 0) {
-                    return chartData;
-                }
-                
-                // Clone the data properly, preserving Date objects
-                const dataWithHover = {
-                    data: chartData.data.map(trace => ({
-                        ...trace,
-                        x: trace.x ? [...trace.x] : trace.x, // Preserve Date objects
-                        y: trace.y ? [...trace.y] : trace.y
-                    }))
-                };
-                
-                // Determine date format based on view mode
-                let dateFormat;
-                if (currentView === 'daily') {
-                    // For daily view with Date objects, use full date format
-                    // Use Plotly's date format syntax to show full date even when axis shows only years
-                    dateFormat = '%B %d, %Y'; // e.g., "July 7, 2022"
-                } else if (currentView === 'month') {
-                    // For monthly view, dates are already formatted as "Jul 2022"
-                    dateFormat = null; // Use x value as-is
-                } else if (currentView === 'quarter') {
-                    // For quarterly view, dates are already formatted as "Q1 2024"
-                    dateFormat = null; // Use x value as-is
-                } else if (currentView === 'year') {
-                    // For yearly view, dates are already formatted as "2024"
-                    dateFormat = null; // Use x value as-is
-                } else {
-                    dateFormat = null;
-                }
-                
-                // Add hovertemplate to each trace
-                for (let trace of dataWithHover.data) {
-                    // Skip holiday markers - they can keep default hover behavior
-                    if (trace.name && trace.name.includes('Holiday')) {
-                        continue;
-                    }
-                    
-                    // Get the metric name for the tooltip
-                    const metricName = trace.name || 'Value';
-                    
-                    // Build hovertemplate based on view mode
-                    if (currentView === 'daily' && dateFormat) {
-                        // For daily view, always use date formatting syntax
-                        // This will format Date objects properly and override x-axis tick format
-                        // Check if y values are numbers
-                        const hasNumericY = trace.y && trace.y.length > 0 && typeof trace.y[0] === 'number';
-                        const yFormat = hasNumericY ? '%{y:.2f}' : '%{y}';
-                        
-                        trace.hovertemplate = `<b>%{x|${dateFormat}}</b><br>` +
-                                            `<b>${metricName}:</b> ${yFormat}<br>` +
-                                            `<extra></extra>`;
-                    } else {
-                        // Other views or string dates - show x value as-is, format y value
-                        // Check if y values are numbers
-                        const hasNumericY = trace.y && trace.y.length > 0 && typeof trace.y[0] === 'number';
-                        const yFormat = hasNumericY ? '%{y:.2f}' : '%{y}';
-                        
-                        trace.hovertemplate = `<b>%{x}</b><br>` +
-                                            `<b>${metricName}:</b> ${yFormat}<br>` +
-                                            `<extra></extra>`;
-                    }
-                }
-                
-                return dataWithHover;
-            }
-            
-            // Helper function to configure smart x-axis formatting for daily data
-            // When daily view has too many points, show years/quarters instead of individual days
-            function configureSmartXAxis(chartData, currentView, layout) {
-                // Only apply smart formatting for daily view
-                if (currentView !== 'daily' || !chartData || !chartData.data || chartData.data.length === 0) {
-                    return layout;
-                }
-                
-                // Get the first trace to check data points
-                const firstTrace = chartData.data[0];
-                if (!firstTrace || !firstTrace.x || firstTrace.x.length === 0) {
-                    return layout;
-                }
-                
-                const dataPointCount = firstTrace.x.length;
-                
-                // Initialize xaxis if not exists
-                if (!layout.xaxis) {
-                    layout.xaxis = {};
-                }
-                
-                // For large datasets (>365 days), use smart date formatting
-                // Show years when data spans multiple years, or quarters when within a year but many points
-                if (dataPointCount > 365) {
-                    // Calculate date range - parse dates more carefully
-                    let validDates = [];
-                    try {
-                        // Parse dates from x values - handle MM-DD-YYYY format from backend
-                        for (let d of firstTrace.x) {
-                            let date;
-                            if (d instanceof Date) {
-                                date = d;
-                            } else if (typeof d === 'string') {
-                                // Backend sends dates as MM-DD-YYYY format
-                                // Parse this format correctly
-                                const parts = d.split('-');
-                                if (parts.length === 3) {
-                                    // Assume MM-DD-YYYY format
-                                    const month = parseInt(parts[0], 10) - 1; // Month is 0-indexed
-                                    const day = parseInt(parts[1], 10);
-                                    const year = parseInt(parts[2], 10);
-                                    date = new Date(year, month, day);
-                                } else {
-                                    // Fallback to standard Date parsing
-                                    date = new Date(d);
-                                }
-                            } else {
-                                continue;
-                            }
-                            
-                            // Validate date is reasonable (between 2010 and 2030)
-                            if (!isNaN(date.getTime()) && date.getFullYear() >= 2010 && date.getFullYear() <= 2030) {
-                                validDates.push(date);
-                            }
-                        }
-                        
-                        if (validDates.length === 0) {
-                            // No valid dates found - don't modify layout
-                            return layout;
-                        }
-                        
-                        const minDate = new Date(Math.min(...validDates.map(d => d.getTime())));
-                        const maxDate = new Date(Math.max(...validDates.map(d => d.getTime())));
-                        
-                        const daysDiff = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24));
-                        const yearsDiff = (maxDate.getFullYear() - minDate.getFullYear());
-                        
-                        // Configure tick formatting based on date range
-                        // Don't set restrictive range - let Plotly auto-range based on data
-                        if (yearsDiff >= 2) {
-                            // Multiple years: show years
-                            layout.xaxis.type = 'date';
-                            layout.xaxis.tickformat = '%Y';
-                            layout.xaxis.dtick = 'M12'; // One tick per year (12 months)
-                            layout.xaxis.tickangle = 0;
-                            layout.xaxis.nticks = Math.min(yearsDiff + 1, 10); // Max 10 year ticks
-                        } else if (daysDiff > 365) {
-                            // More than a year but less than 2 years: show months
-                            layout.xaxis.type = 'date';
-                            layout.xaxis.tickformat = '%b %Y';
-                            layout.xaxis.dtick = 'M3'; // One tick per quarter (3 months)
-                            layout.xaxis.tickangle = -45;
-                            layout.xaxis.nticks = Math.min(Math.ceil(daysDiff / 90), 8); // Max 8 ticks
-                        } else if (dataPointCount > 180) {
-                            // 6+ months of daily data: show months
-                            layout.xaxis.type = 'date';
-                            layout.xaxis.tickformat = '%b %Y';
-                            layout.xaxis.dtick = 'M1'; // One tick per month
-                            layout.xaxis.tickangle = -45;
-                            layout.xaxis.nticks = Math.min(Math.ceil(daysDiff / 30), 12); // Max 12 month ticks
-                        }
-                    } catch (e) {
-                        // If date parsing fails, use default formatting
-                        console.debug('Date parsing failed in configureSmartXAxis:', e);
-                        return layout;
-                    }
-                } else {
-                    // For smaller datasets, ensure axis is configured as date type
-                    // but don't apply restrictive formatting
-                    layout.xaxis.type = 'date';
-                }
-                
-                return layout;
-            }
-            
-            // Get current view modes
-            const hprdView = document.querySelector('input[name="hprdView"]:checked')?.value || 'daily';
-            const hoursView = document.querySelector('input[name="hoursView"]:checked')?.value || 'daily';
-            const censusView = document.querySelector('input[name="censusView"]:checked')?.value || 'daily';
-            const contractView = document.querySelector('input[name="contractView"]:checked')?.value || 'daily';
+            // Get toggle states
+            const excludeAdminHPRD = document.getElementById('excludeAdminHPRD')?.checked || false;
+            const excludeAdminHours = document.getElementById('excludeAdminHours')?.checked || false;
+            const excludeAdminContract = document.getElementById('excludeAdminContract')?.checked || false;
+            const excludeAdminDOW = document.getElementById('excludeAdminDOW')?.checked || false;
             
             if (charts.hprd_trend && charts.hprd_trend.data && charts.hprd_trend.layout) {
-                // Convert date strings to Date objects for daily view
-                const convertedHprdData = convertDatesToDateObjects(charts.hprd_trend, hprdView);
-                // Add detailed hovertemplates that show full date regardless of x-axis formatting
-                const hprdDataWithHover = addDetailedHoverTemplates(convertedHprdData, hprdView);
-                
                 const layout = { ...charts.hprd_trend.layout };
                 
-                // Apply responsive sizing
-                layout.height = chartHeight;
-                layout.autosize = true;
-                if (layout.margin) {
-                    layout.margin.b = bottomMargin;
-                    layout.margin.l = leftMargin;
-                    layout.margin.r = rightMargin;
-                    layout.margin.t = 60; // Increased top margin for title
-                }
-                
-                // Apply smart x-axis formatting for daily data
-                configureSmartXAxis(hprdDataWithHover, hprdView, layout);
-                
-                // For daily view, set hover format to show full date even when axis shows only years
-                if (hprdView === 'daily' && layout.xaxis) {
-                    layout.xaxis.hoverformat = '%B %d, %Y'; // e.g., "July 7, 2022"
-                }
-                
-                // For non-daily views, ensure axis type is category
-                if (hprdView !== 'daily' && (!layout.xaxis || !layout.xaxis.type)) {
-                    if (!layout.xaxis) layout.xaxis = {};
-                    layout.xaxis.type = 'category';
+                // Apply responsive height - make taller
+                const width = window.innerWidth;
+                if (width < 1024) {
+                    layout.height = 400;
+                } else if (width < 1366) {
+                    layout.height = 450;
+                } else {
+                    layout.height = layout.height || 500;
                 }
                 
                 // Remove n= part and "Quarters:" prefix from filterInfo for title
                 let cleanFilterInfo = filterInfo.replace(/\s*\(n = [\d,]+\)/, '').replace(/^Quarters:\s*/, '');
                 
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Nursing Staff HPRD: ${formattedProviderName}</span></b><br>${cleanFilterInfo}`,
+                   text: `<b><span style="color: #1f4e79;">Nursing Staff HPRD</span></b><br><span style="font-size: 0.9em; font-weight: normal;">${formattedProviderName} • ${cleanFilterInfo}</span>`,
                     x: 0.5,
-                    xanchor: 'center',
-                    font: { size: 14 },
-                    pad: { b: 10 },
-                    width: 0.95, // Limit width to 95% of chart area for wrapping
-                    xref: 'paper'
+                    xanchor: 'center'
                 };
                 
                 // Ensure legend is enabled for toggles
@@ -4983,67 +4762,84 @@
                        text: '<b>Source:</b> CMS Payroll-Based Journal Data • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                        x: 0.5,
-                       y: -0.30, // Moved further down to avoid x-axis labels
+                       y: -0.35,
                         xref: 'paper',
-                        yref: 'paper',
+                       yref: 'paper',
                        xanchor: 'center',
                         yanchor: 'top',
                         font: {
-                            size: 9, // Smaller font
+                            size: 9,
                            color: '#333'
                        },
                        bgcolor: '#f8f9fa',
                        bordercolor: '#dee2e6',
                        borderwidth: 1,
-                       borderpad: 3
+                       borderpad: 3,
+                       xshift: 0
                     }
                 ];
                 
-                Plotly.newPlot('hprdTrendChart', hprdDataWithHover.data, layout, {responsive: true});
+                // Increase bottom margin to accommodate source badge
+                layout.margin = layout.margin || {};
+                layout.margin.b = 150;
+                layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
+                
+                // Apply admin/DON exclusion for HPRD chart
+                let hprdData = [...charts.hprd_trend.data];
+                if (excludeAdminHPRD) {
+                    hprdData = hprdData.map(trace => {
+                        if (trace.name && (trace.name.includes('Total Nurse') || trace.name === 'Total_Nurse_HPRD' || trace.name === 'Total Staff HPRD')) {
+                            // Find the corresponding Direct Care trace
+                            const directTrace = hprdData.find(t => 
+                                t.name && (t.name.includes('Direct') || t.name === 'Nurse_Staff_HPRD_Excl_Admin' || t.name === 'Nurse Staff HPRD (excl. Admin & DON)')
+                            );
+                            if (directTrace) {
+                                return {
+                                    ...directTrace,
+                                    name: excludeAdminHPRD ? 'Total' : trace.name.replace('Total Nurse', 'Total').replace('Total Staff', 'Total')
+                                };
+                            }
+                        }
+                        // Shorten legend labels
+                        if (trace.name && excludeAdminHPRD) {
+                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
+                        } else if (trace.name && !excludeAdminHPRD) {
+                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
+                        }
+                        return trace;
+                    });
+                } else {
+                    // Shorten legend labels when not excluding
+                    hprdData = hprdData.map(trace => {
+                        if (trace.name) {
+                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
+                        }
+                        return trace;
+                    });
+                }
+                
+                Plotly.newPlot('hprdTrendChart', hprdData, layout);
             }
             if (charts.hours_trend && charts.hours_trend.data && charts.hours_trend.layout) {
-                // Convert date strings to Date objects for daily view
-                const convertedHoursData = convertDatesToDateObjects(charts.hours_trend, hoursView);
-                // Add detailed hovertemplates that show full date regardless of x-axis formatting
-                const hoursDataWithHover = addDetailedHoverTemplates(convertedHoursData, hoursView);
-                
                 const layout = { ...charts.hours_trend.layout };
                 
-                // Apply responsive sizing
-                layout.height = chartHeight;
-                layout.autosize = true;
-                if (layout.margin) {
-                    layout.margin.b = bottomMargin;
-                    layout.margin.l = leftMargin;
-                    layout.margin.r = rightMargin;
-                    layout.margin.t = 60; // Increased top margin for title
-                }
-                
-                // Apply smart x-axis formatting for daily data
-                configureSmartXAxis(hoursDataWithHover, hoursView, layout);
-                
-                // For daily view, set hover format to show full date even when axis shows only years
-                if (hoursView === 'daily' && layout.xaxis) {
-                    layout.xaxis.hoverformat = '%B %d, %Y'; // e.g., "July 7, 2022"
-                }
-                
-                // For non-daily views, ensure axis type is category
-                if (hoursView !== 'daily' && (!layout.xaxis || !layout.xaxis.type)) {
-                    if (!layout.xaxis) layout.xaxis = {};
-                    layout.xaxis.type = 'category';
+                // Apply responsive height - make taller
+                const width = window.innerWidth;
+                if (width < 1024) {
+                    layout.height = 400;
+                } else if (width < 1366) {
+                    layout.height = 450;
+                } else {
+                    layout.height = layout.height || 500;
                 }
                 
                 // Remove n= part and "Quarters:" prefix from filterInfo for title
                 let cleanFilterInfo = filterInfo.replace(/\s*\(n = [\d,]+\)/, '').replace(/^Quarters:\s*/, '');
                 
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Total Nursing Staff Hours: ${formattedProviderName}</span></b><br>${cleanFilterInfo}`,
+                   text: `<b><span style="color: #1f4e79;">Total Nursing Staff Hours</span></b><br><span style="font-size: 0.9em; font-weight: normal;">${formattedProviderName} • ${cleanFilterInfo}</span>`,
                     x: 0.5,
-                    xanchor: 'center',
-                    font: { size: 14 },
-                    pad: { b: 10 },
-                    width: 0.95, // Limit width to 95% of chart area for wrapping
-                    xref: 'paper'
+                    xanchor: 'center'
                 };
                 
                 // Ensure legend is enabled for toggles
@@ -5055,13 +4851,13 @@
                        text: '<b>Source:</b> CMS Payroll-Based Journal Data • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                        x: 0.5,
-                       y: -0.30, // Moved further down to avoid x-axis labels
+                       y: -0.35,
                         xref: 'paper',
                         yref: 'paper',
                        xanchor: 'center',
                         yanchor: 'top',
                         font: {
-                            size: 9, // Smaller font
+                            size: 9,
                            color: '#333'
                        },
                        bgcolor: '#f8f9fa',
@@ -5070,6 +4866,11 @@
                        borderpad: 3
                     }
                 ];
+                
+                // Increase bottom margin to accommodate source badge
+                layout.margin = layout.margin || {};
+                layout.margin.b = 150;
+                layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
                 
                 // Configure plot with interactive legend
                 const config = {
@@ -5085,51 +4886,57 @@
                     itemdoubleclick: 'toggleothers'  // Double click shows only that trace
                 };
                 
-                Plotly.newPlot('hoursTrendChart', hoursDataWithHover.data, layout, {...config, responsive: true});
+                // Apply admin/DON exclusion for Hours chart
+                let hoursData = charts.hours_trend.data.map(trace => ({...trace}));
+                if (excludeAdminHours) {
+                    hoursData = hoursData.map(trace => {
+                        // Find and replace Total Nurse Hours with Direct Care
+                        if (trace.name && (trace.name.includes('Total Nurse Hours') || trace.name === 'Total_Nurse_Hours' || trace.name === 'Total Staff Hours' || trace.name.includes('Total Staff'))) {
+                            const directTrace = charts.hours_trend.data.find(t => 
+                                t.name && (t.name.includes('Direct') || t.name === 'Nurse_Staff_Hours_Excl_Admin' || t.name.includes('Excl. Admin'))
+                            );
+                            if (directTrace) {
+                                return {...directTrace, name: 'Total'};
+                            }
+                        }
+                        // Shorten other legend labels
+                        if (trace.name) {
+                            trace.name = trace.name.replace('Total Nurse Hours', 'Total').replace('Total Staff Hours', 'Total');
+                        }
+                        return trace;
+                    });
+                } else {
+                    // Shorten legend labels when not excluding
+                    hoursData = hoursData.map(trace => {
+                        if (trace.name) {
+                            trace.name = trace.name.replace('Total Nurse Hours', 'Total').replace('Total Staff Hours', 'Total');
+                        }
+                        return trace;
+                    });
+                }
+                
+                Plotly.newPlot('hoursTrendChart', hoursData, layout, config);
             }
             if (charts.census_trend && charts.census_trend.data && charts.census_trend.layout) {
-                // Convert date strings to Date objects for daily view
-                const convertedCensusData = convertDatesToDateObjects(charts.census_trend, censusView);
-                // Add detailed hovertemplates that show full date regardless of x-axis formatting
-                const censusDataWithHover = addDetailedHoverTemplates(convertedCensusData, censusView);
-                
                 const layout = { ...charts.census_trend.layout };
                 
-                // Apply responsive sizing
-                layout.height = chartHeight;
-                layout.autosize = true;
-                if (layout.margin) {
-                    layout.margin.b = bottomMargin;
-                    layout.margin.l = leftMargin;
-                    layout.margin.r = rightMargin;
-                    layout.margin.t = 60; // Increased top margin for title
-                }
-                
-                // Apply smart x-axis formatting for daily data
-                configureSmartXAxis(censusDataWithHover, censusView, layout);
-                
-                // For daily view, set hover format to show full date even when axis shows only years
-                if (censusView === 'daily' && layout.xaxis) {
-                    layout.xaxis.hoverformat = '%B %d, %Y'; // e.g., "July 7, 2022"
-                }
-                
-                // For non-daily views, ensure axis type is category
-                if (censusView !== 'daily' && (!layout.xaxis || !layout.xaxis.type)) {
-                    if (!layout.xaxis) layout.xaxis = {};
-                    layout.xaxis.type = 'category';
+                // Apply responsive height - make taller
+                const width = window.innerWidth;
+                if (width < 1024) {
+                    layout.height = 400;
+                } else if (width < 1366) {
+                    layout.height = 450;
+                } else {
+                    layout.height = layout.height || 500;
                 }
                 
                 // Remove n= part and "Quarters:" prefix from filterInfo for title
                 let cleanFilterInfo = filterInfo.replace(/\s*\(n = [\d,]+\)/, '').replace(/^Quarters:\s*/, '');
                 
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Resident Census: ${formattedProviderName}</span></b><br>${cleanFilterInfo}`,
+                   text: `<b><span style="color: #1f4e79;">Resident Census</span></b><br><span style="font-size: 0.9em; font-weight: normal;">${formattedProviderName} • ${cleanFilterInfo}</span>`,
                     x: 0.5,
-                    xanchor: 'center',
-                    font: { size: 14 },
-                    pad: { b: 10 },
-                    width: 0.95, // Limit width to 95% of chart area for wrapping
-                    xref: 'paper'
+                    xanchor: 'center'
                 };
                 
                 // Ensure legend is enabled for toggles
@@ -5141,13 +4948,13 @@
                        text: '<b>Source:</b> CMS Payroll-Based Journal Data • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                        x: 0.5,
-                       y: -0.30, // Moved further down to avoid x-axis labels
+                       y: -0.35,
                         xref: 'paper',
                         yref: 'paper',
                        xanchor: 'center',
                         yanchor: 'top',
                         font: {
-                            size: 9, // Smaller font
+                            size: 9,
                            color: '#333'
                        },
                        bgcolor: '#f8f9fa',
@@ -5157,10 +4964,15 @@
                     }
                 ];
                 
-                // Make y-axis range sample-sensitive (exclude holiday markers from range calculation)
+                // Increase bottom margin to accommodate source badge
+                layout.margin = layout.margin || {};
+                layout.margin.b = 150;
+                layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
+                
+                // Make y-axis range sample-sensitive (exclude 0 values and holiday markers)
                 if (charts.census_trend.data && charts.census_trend.data.length > 0) {
                     const allValues = charts.census_trend.data.flatMap(trace => {
-                        // Skip holiday markers (visual indicators only, already represented in main data traces)
+                        // Skip holiday markers (they have 0 values)
                         if (trace.name && trace.name.includes('Holiday')) {
                             return [];
                         }
@@ -5180,35 +4992,26 @@
                     }
                 }
                 
-                Plotly.newPlot('censusTrendChart', censusDataWithHover.data, layout, {responsive: true});
+                Plotly.newPlot('censusTrendChart', charts.census_trend.data, layout);
             }
             if (charts.dow_comparison && charts.dow_comparison.data && charts.dow_comparison.layout) {
-                // Add hovertemplates with 2 decimals for Day of Week chart
-                const dowDataWithHover = {
-                    data: charts.dow_comparison.data.map(trace => ({
-                        ...trace,
-                        hovertemplate: `<b>%{x}</b><br>` +
-                                      `<b>${trace.name}:</b> %{y:.2f}<br>` +
-                                      `<extra></extra>`
-                    }))
-                };
-                
                 const layout = { ...charts.dow_comparison.layout };
                 
-                // Apply responsive sizing
-                layout.height = chartHeight;
-                layout.autosize = true;
-                if (layout.margin) {
-                    layout.margin.b = bottomMargin;
-                    layout.margin.l = leftMargin;
-                    layout.margin.r = rightMargin;
+                // Apply responsive height - make taller
+                const width = window.innerWidth;
+                if (width < 1024) {
+                    layout.height = 400;
+                } else if (width < 1366) {
+                    layout.height = 450;
+                } else {
+                    layout.height = layout.height || 500;
                 }
                 
                 // Remove n= part and "Quarters:" prefix from filterInfo for title
                 let cleanFilterInfo = filterInfo.replace(/\s*\(n = [\d,]+\)/, '').replace(/^Quarters:\s*/, '');
                 
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Staffing HPRD by Day of Week: ${formattedProviderName}</span></b><br>${cleanFilterInfo}`,
+                   text: `<b><span style="color: #1f4e79;">Staffing HPRD by Day of Week</span></b><br><span style="font-size: 0.9em; font-weight: normal;">${formattedProviderName} • ${cleanFilterInfo}</span>`,
                     x: 0.5,
                     xanchor: 'center'
                 };
@@ -5222,13 +5025,13 @@
                        text: '<b>Source:</b> CMS Payroll-Based Journal Data • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                        x: 0.5,
-                       y: -0.30, // Moved further down to avoid x-axis labels
+                       y: -0.35,
                         xref: 'paper',
                         yref: 'paper',
                        xanchor: 'center',
                         yanchor: 'top',
                         font: {
-                            size: 9, // Smaller font
+                            size: 9,
                            color: '#333'
                        },
                        bgcolor: '#f8f9fa',
@@ -5238,44 +5041,60 @@
                     }
                 ];
                 
-                Plotly.newPlot('dowComparisonChart', dowDataWithHover.data, layout, {responsive: true});
+                // Increase bottom margin to accommodate source badge
+                layout.margin = layout.margin || {};
+                layout.margin.b = 150;
+                layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
+                
+                // Apply admin/DON exclusion for DOW chart
+                let dowData = charts.dow_comparison.data.map(trace => ({...trace}));
+                if (excludeAdminDOW) {
+                    dowData = dowData.map(trace => {
+                        // Find and replace Total Nurse HPRD with Direct Care
+                        if (trace.name && (trace.name.includes('Total Nurse') || trace.name === 'Total_Nurse_HPRD' || trace.name === 'Total Staff HPRD' || trace.name.includes('Total Staff'))) {
+                            const directTrace = charts.dow_comparison.data.find(t => 
+                                t.name && (t.name.includes('Direct') || t.name === 'Nurse_Staff_HPRD_Excl_Admin' || t.name.includes('Excl. Admin'))
+                            );
+                            if (directTrace) {
+                                return {...directTrace, name: 'Total'};
+                            }
+                        }
+                        // Shorten other legend labels
+                        if (trace.name) {
+                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
+                        }
+                        return trace;
+                    });
+                } else {
+                    // Shorten legend labels when not excluding
+                    dowData = dowData.map(trace => {
+                        if (trace.name) {
+                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
+                        }
+                        return trace;
+                    });
+                }
+                
+                Plotly.newPlot('dowComparisonChart', dowData, layout);
             }
             if (charts.contract_trend && charts.contract_trend.data && charts.contract_trend.layout) {
-                // Convert date strings to Date objects for daily view
-                const convertedContractData = convertDatesToDateObjects(charts.contract_trend, contractView);
-                // Add detailed hovertemplates that show full date regardless of x-axis formatting
-                const contractDataWithHover = addDetailedHoverTemplates(convertedContractData, contractView);
-                
                 const layout = { ...charts.contract_trend.layout };
                 
-                // Apply responsive sizing
-                layout.height = chartHeight;
-                layout.autosize = true;
-                if (layout.margin) {
-                    layout.margin.b = bottomMargin;
-                    layout.margin.l = leftMargin;
-                    layout.margin.r = rightMargin;
-                }
-                
-                // Apply smart x-axis formatting for daily data
-                configureSmartXAxis(contractDataWithHover, contractView, layout);
-                
-                // For daily view, set hover format to show full date even when axis shows only years
-                if (contractView === 'daily' && layout.xaxis) {
-                    layout.xaxis.hoverformat = '%B %d, %Y'; // e.g., "July 7, 2022"
-                }
-                
-                // For non-daily views, ensure axis type is category
-                if (contractView !== 'daily' && (!layout.xaxis || !layout.xaxis.type)) {
-                    if (!layout.xaxis) layout.xaxis = {};
-                    layout.xaxis.type = 'category';
+                // Apply responsive height - make taller
+                const width = window.innerWidth;
+                if (width < 1024) {
+                    layout.height = 400;
+                } else if (width < 1366) {
+                    layout.height = 450;
+                } else {
+                    layout.height = layout.height || 500;
                 }
                 
                 // Remove n= part and "Quarters:" prefix from filterInfo for title
                 let cleanFilterInfo = filterInfo.replace(/\s*\(n = [\d,]+\)/, '').replace(/^Quarters:\s*/, '');
                 
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Contract Staffing Percentage: ${formattedProviderName}</span></b><br>${cleanFilterInfo}`,
+                   text: `<b><span style="color: #1f4e79;">Contract Staffing Percentage</span></b><br><span style="font-size: 0.9em; font-weight: normal;">${formattedProviderName} • ${cleanFilterInfo}</span>`,
                     x: 0.5,
                     xanchor: 'center'
                 };
@@ -5289,13 +5108,13 @@
                        text: '<b>Source:</b> CMS Payroll-Based Journal Data • Chart by <b>320 Consulting</b>',
                         showarrow: false,
                        x: 0.5,
-                       y: -0.30, // Moved further down to avoid x-axis labels
+                       y: -0.35,
                         xref: 'paper',
                         yref: 'paper',
                        xanchor: 'center',
                         yanchor: 'top',
                         font: {
-                            size: 9, // Smaller font
+                            size: 9,
                            color: '#333'
                        },
                        bgcolor: '#f8f9fa',
@@ -5305,46 +5124,46 @@
                     }
                 ];
                 
-                Plotly.newPlot('contractTrendChart', contractDataWithHover.data, layout, {responsive: true});
+                // Increase bottom margin to accommodate source badge
+                layout.margin = layout.margin || {};
+                layout.margin.b = 150;
+                layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
+                
+                // Apply admin/DON exclusion for Contract chart (affects Total Nurse contract %)
+                let contractData = charts.contract_trend.data.map(trace => ({...trace}));
+                if (excludeAdminContract) {
+                    contractData = contractData.map(trace => {
+                        // Find and replace Total Nurse contract with Direct Care
+                        if (trace.name && (trace.name.includes('Total Nurse') || trace.name.includes('Total Staff'))) {
+                            const directTrace = charts.contract_trend.data.find(t => 
+                                t.name && (t.name.includes('Direct') || t.name.includes('Excl. Admin'))
+                            );
+                            if (directTrace) {
+                                return {...directTrace, name: 'Total'};
+                            }
+                        }
+                        // Shorten other legend labels
+                        if (trace.name) {
+                            trace.name = trace.name.replace('Total Nurse', 'Total').replace('Total Staff', 'Total');
+                        }
+                        return trace;
+                    });
+                } else {
+                    // Shorten legend labels when not excluding
+                    contractData = contractData.map(trace => {
+                        if (trace.name) {
+                            trace.name = trace.name.replace('Total Nurse', 'Total').replace('Total Staff', 'Total');
+                        }
+                        return trace;
+                    });
+                }
+                
+                Plotly.newPlot('contractTrendChart', contractData, layout);
             }
         }
 
         // Initialize isExpanded before use
         let isExpanded = false;
-        
-        // Handle window resize for responsive charts
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                // Resize all Plotly charts when window is resized
-                const chartIds = [
-                    'providerInfoTotalChart',
-                    'providerInfoRNChart',
-                    'providerInfoCNAChart',
-                    'providerInfoCombinedDeltaChart',
-                    'providerInfoDirectDeltaChart',
-                    'providerInfoRatingsChart',
-                    'hprdTrendChart',
-                    'hoursTrendChart',
-                    'censusTrendChart',
-                    'dowComparisonChart',
-                    'contractTrendChart'
-                ];
-                
-                chartIds.forEach(function(chartId) {
-                    const chartDiv = document.getElementById(chartId);
-                    if (chartDiv) {
-                        try {
-                            Plotly.Plots.resize(chartId);
-                        } catch (e) {
-                            // Chart might not be initialized yet, ignore error
-                            console.debug('Chart resize skipped for', chartId);
-                        }
-                    }
-                });
-            }, 250); // Debounce resize events
-        });
         
         // Function to properly capitalize provider names
         function capitalizeProviderName(name) {
@@ -5941,7 +5760,7 @@
                  'census': 'Census',
                  'total_staff_hprd': 'Total Staff HPRD',
                  'total_hours': 'Total Staff Hours',
-                 'nurse_staff_hprd_excl_admin': 'Nurse Staff HPRD (excl. Admin & DON)',
+                 'nurse_staff_hprd_excl_admin': 'Direct Staff HPRD',
                  'total_rn_hprd': 'Total RN HPRD',
                  'total_rn_hours': 'Total RN Hours',
                  'rn_hprd': 'RN HPRD (Direct Care Only)',
@@ -6113,9 +5932,9 @@
                 { header: 'Total LPN Hours', key: 'Total_LPN_Hours' },
                 { header: 'Total Nurse Aide HPRD', key: 'Total_Nurse_Aide_HPRD' },
                 { header: 'Total Nurse Aide Hours', key: 'Total_Nurse_Aide_Hours' },
-                { header: 'RN Direct Contract %', key: 'RN_Contract_Pct' },
-                { header: 'LPN Direct Contract %', key: 'LPN_Contract_Pct' },
-                { header: 'Nurse Aide Contract %', key: 'CNA_Contract_Pct' },
+                { header: 'RN Contract %', key: 'RN_Contract_Pct' },
+                { header: 'LPN Contract %', key: 'LPN_Contract_Pct' },
+                { header: 'CNA Contract %', key: 'CNA_Contract_Pct' },
                 { header: 'Holiday', key: 'IsHoliday' }
             ];
 
@@ -6197,7 +6016,7 @@
                 </div>
                 <div class="row mt-3">
                     <div class="col-md-6">
-                        <h6>Contract Staffing</h6>
+                        <h6>Contract Staff</h6>
                         <ul class="list-unstyled">
                             <li><strong>Avg Contract %:</strong> ${stats.avgContractPercent}%</li>
                             <li><strong>Max Contract %:</strong> ${stats.maxContractPercent}%</li>
@@ -6496,10 +6315,11 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p><strong>Current Name:</strong> {{ facility_name }}</p>
+                    <p><strong>Current Name:</strong> Thalia Gardens Rehabilitation and Nursing</p>
                     <p><strong>Previous Names:</strong></p>
-                    <ul id="facilityHistoryList">
-                        <li>{{ previous_names }}</li>
+                    <ul>
+                        <li>Concordia Transitional Care and Rehab-River Pointe</li>
+                        <li>Accordius Health at River Pointe LLC</li>
                     </ul>
                 </div>
                 <div class="modal-footer">

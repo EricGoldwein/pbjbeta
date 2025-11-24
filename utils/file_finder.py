@@ -176,8 +176,8 @@ def find_latest_provider_info() -> Optional[str]:
 
 
 def find_previous_provider_info() -> Optional[str]:
-    """Find the second-most recent Provider Info file (for comparisons)."""
-    # Get all files and find the second most recent unique file
+    """Find the most recent Provider Info file from a different quarter (for comparisons)."""
+    # Get all files and find the most recent file from a different quarter
     files = find_files_with_pattern('provider_info', 'NH_ProviderInfo_*.csv')
     
     if len(files) < 2:
@@ -190,25 +190,91 @@ def find_previous_provider_info() -> Optional[str]:
         if filename not in unique_files:
             unique_files[filename] = (file_path, date)
     
-    # Sort by date and get the second most recent
+    # Sort by date (newest first)
     unique_file_list = list(unique_files.values())
     unique_file_list.sort(key=lambda x: x[1], reverse=True)
     
-    if len(unique_file_list) >= 2:
-        second_latest_file, second_latest_date = unique_file_list[1]
-        print(f"Using previous file: {os.path.basename(second_latest_file)} (dated {second_latest_date.strftime('%B %Y')})")
-        return second_latest_file
+    if len(unique_file_list) < 2:
+        return None
     
-    return None
+    # Get the latest file and its quarter
+    latest_file, latest_date = unique_file_list[0]
+    latest_quarter = (latest_date.year, (latest_date.month - 1) // 3 + 1)
+    
+    # Find the most recent file from a different quarter
+    for file_path, file_date in unique_file_list[1:]:
+        file_quarter = (file_date.year, (file_date.month - 1) // 3 + 1)
+        if file_quarter != latest_quarter:
+            print(f"Using previous quarter file: {os.path.basename(file_path)} (dated {file_date.strftime('%B %Y')}, Q{file_quarter[1]} {file_quarter[0]})")
+            return file_path
+    
+    # If no different quarter found, fall back to second most recent
+    second_latest_file, second_latest_date = unique_file_list[1]
+    print(f"Using previous file (same quarter): {os.path.basename(second_latest_file)} (dated {second_latest_date.strftime('%B %Y')})")
+    return second_latest_file
 
 
 def find_latest_affiliated_entity() -> Optional[str]:
     """Find the latest Affiliated Entity file."""
-    # Try ownership directory first, then root
-    file_path = find_latest_file('ownership', 'Nursing_Home_Affiliated_Entity_Performance_Measures_*.csv')
+    # Try ownership directory first with both naming patterns
+    # Pattern 1: Nursing_Home_Chain_Performance_Measures_*.csv (newer format)
+    file_path = find_latest_file('ownership', 'Nursing_Home_Chain_Performance_Measures_*.csv')
+    if not file_path:
+        # Pattern 2: Nursing_Home_Affiliated_Entity_Performance_Measures_*.csv (older format)
+        file_path = find_latest_file('ownership', 'Nursing_Home_Affiliated_Entity_Performance_Measures_*.csv')
+    if not file_path:
+        # Try root directory
+        file_path = find_latest_file('.', 'Nursing_Home_Chain_Performance_Measures_*.csv')
     if not file_path:
         file_path = find_latest_file('.', 'Nursing_Home_Affiliated_Entity_Performance_Measures_*.csv')
     return file_path
+
+
+def find_previous_affiliated_entity() -> Optional[str]:
+    """Find the most recent Affiliated Entity file from a different quarter (for comparisons)."""
+    # Get all files matching both patterns
+    files_chain = find_files_with_pattern('ownership', 'Nursing_Home_Chain_Performance_Measures_*.csv')
+    files_affiliated = find_files_with_pattern('ownership', 'Nursing_Home_Affiliated_Entity_Performance_Measures_*.csv')
+    
+    # Also try root directory
+    files_chain_root = find_files_with_pattern('.', 'Nursing_Home_Chain_Performance_Measures_*.csv')
+    files_affiliated_root = find_files_with_pattern('.', 'Nursing_Home_Affiliated_Entity_Performance_Measures_*.csv')
+    
+    # Combine all files
+    all_files = files_chain + files_affiliated + files_chain_root + files_affiliated_root
+    
+    if len(all_files) < 2:
+        return None
+    
+    # Remove duplicates by filename
+    unique_files = {}
+    for file_path, date in all_files:
+        filename = os.path.basename(file_path)
+        if filename not in unique_files:
+            unique_files[filename] = (file_path, date)
+    
+    # Sort by date (newest first)
+    unique_file_list = list(unique_files.values())
+    unique_file_list.sort(key=lambda x: x[1], reverse=True)
+    
+    if len(unique_file_list) < 2:
+        return None
+    
+    # Get the latest file and its quarter
+    latest_file, latest_date = unique_file_list[0]
+    latest_quarter = (latest_date.year, (latest_date.month - 1) // 3 + 1)
+    
+    # Find the most recent file from a different quarter
+    for file_path, file_date in unique_file_list[1:]:
+        file_quarter = (file_date.year, (file_date.month - 1) // 3 + 1)
+        if file_quarter != latest_quarter:
+            print(f"Using previous quarter ownership file: {os.path.basename(file_path)} (dated {file_date.strftime('%B %Y')}, Q{file_quarter[1]} {file_quarter[0]})")
+            return file_path
+    
+    # If no different quarter found, fall back to second most recent
+    second_latest_file, second_latest_date = unique_file_list[1]
+    print(f"Using previous ownership file (same quarter): {os.path.basename(second_latest_file)} (dated {second_latest_date.strftime('%B %Y')})")
+    return second_latest_file
 
 
 if __name__ == "__main__":

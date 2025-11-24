@@ -11,10 +11,10 @@ from typing import Tuple, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
+    from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity, find_previous_affiliated_entity
 except ImportError:
     # Fallback for direct execution
-    from file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
+    from file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity, find_previous_affiliated_entity
 
 
 def get_latest_data_periods() -> dict:
@@ -28,16 +28,19 @@ def get_latest_data_periods() -> dict:
     latest_provider_file = find_latest_provider_info()
     previous_provider_file = find_previous_provider_info()
     latest_entity_file = find_latest_affiliated_entity()
+    previous_entity_file = find_previous_affiliated_entity()
     
     # Parse dates from filenames
     provider_latest_date = _parse_date_from_filename(latest_provider_file) if latest_provider_file else None
     provider_previous_date = _parse_date_from_filename(previous_provider_file) if previous_provider_file else None
     entity_latest_date = _parse_date_from_filename(latest_entity_file) if latest_entity_file else None
+    entity_previous_date = _parse_date_from_filename(previous_entity_file) if previous_entity_file else None
     
     # Format dates for display
     provider_latest_str = _format_date_for_display(provider_latest_date) if provider_latest_date else "Latest Available"
     provider_previous_str = _format_date_for_display(provider_previous_date) if provider_previous_date else "Previous Available"
     entity_latest_str = _format_date_for_display(entity_latest_date) if entity_latest_date else "Latest Available"
+    entity_previous_str = _format_date_for_display(entity_previous_date) if entity_previous_date else "Previous Available"
     
     # Calculate dynamic data range and quarter count
     data_range, quarter_count = _calculate_data_range_and_quarters()
@@ -46,6 +49,7 @@ def get_latest_data_periods() -> dict:
         'provider_info_latest': provider_latest_str,
         'provider_info_previous': provider_previous_str,
         'affiliated_entity_latest': entity_latest_str,
+        'affiliated_entity_previous': entity_previous_str,
         'data_range': data_range,
         'quarter_count': quarter_count,
         'current_year': datetime.now().year

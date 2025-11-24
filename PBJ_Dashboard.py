@@ -14,7 +14,7 @@ import numpy as np
 from decimal import Decimal, ROUND_HALF_UP
 
 # Import dynamic file finder
-from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
+from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity, find_previous_affiliated_entity
 # Import dynamic date utilities
 from utils.date_utils import get_latest_data_periods, apply_dynamic_replacements
 
@@ -2450,7 +2450,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     
                     # Create help text based on whether dates are different
                     if latest_date != previous_date:
-                        help_text = f"5-star rating determined by federal CMS ({latest_date} vs. {previous_date})."
+                        help_text = f"5-star rating from most recent CMS Provider Info ({latest_date}) compared to most recent prior quarter ({previous_date})."
                     else:
                         help_text = f"5-star rating determined by federal CMS ({latest_date})."
                     
@@ -2466,7 +2466,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     
                     # Create help text based on whether dates are different
                     if latest_date != previous_date:
-                        help_text = f"5-star rating determined by federal CMS ({latest_date} vs. {previous_date})."
+                        help_text = f"5-star rating from most recent CMS Provider Info ({latest_date}) compared to most recent prior quarter ({previous_date})."
                     else:
                         help_text = f"5-star rating determined by federal CMS ({latest_date})."
                     
@@ -2725,35 +2725,20 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         hover_census = "<b>%{customdata}</b><br>%{y:,.0f}<extra></extra>"
         hover_contract = "<b>%{customdata}</b><br>%{y:.2f}%<extra></extra>"
         
-        # Desktop figure (4 charts) - titles wrap to two rows
+        # Desktop figure (4 charts)
         if state:
             full_state_name = get_full_state_name(state)
             fig = make_subplots(rows=4, cols=1,
-                  subplot_titles=(
-                      f'<span style="color: #333333;">Nursing Home Staff HPRD<br>{full_state_name}</span>', 
-                      f'<span style="color: #333333;">Total RN HPRD<br>{full_state_name}</span>', 
-                      f'<span style="color: #333333;">Resident Census<br>{full_state_name}</span>', 
-                      f'<span style="color: #333333;">Contract Staff Percentage<br>{full_state_name}</span>'
-                  ),
-                  vertical_spacing=0.12)
+                  subplot_titles=(f'<span style="color: #333333;">Nursing Home Staff HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Total RN HPRD - {full_state_name}</span>', f'<span style="color: #333333;">Resident Census - {full_state_name}</span>', f'<span style="color: #333333;">Contract Staff Percentage - {full_state_name}</span>'),
+                          vertical_spacing=0.12)
         elif facility:
             fig = make_subplots(rows=4, cols=1,
-                  subplot_titles=(
-                      '<span style="color: #333333;">Nursing Home<br>Staff HPRD</span>', 
-                      '<span style="color: #333333;">Total RN<br>HPRD</span>', 
-                      '<span style="color: #333333;">Resident<br>Census</span>', 
-                      '<span style="color: #333333;">Contract Staff<br>Percentage</span>'
-                  ),
-                  vertical_spacing=0.10)
+                  subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD</span>', '<span style="color: #333333;">Total RN HPRD</span>', '<span style="color: #333333;">Resident Census</span>', '<span style="color: #333333;">Contract Staff Percentage</span>'),
+                          vertical_spacing=0.10)
         else:
             fig = make_subplots(rows=4, cols=1,
-                  subplot_titles=(
-                      '<span style="color: #333333;">Nursing Home Staff HPRD<br>National</span>', 
-                      '<span style="color: #333333;">Total RN HPRD<br>National</span>', 
-                      '<span style="color: #333333;">Resident Census<br>National</span>', 
-                      '<span style="color: #333333;">Contract Staff Percentage<br>National</span>'
-                  ),
-                  vertical_spacing=0.10)
+                  subplot_titles=('<span style="color: #333333;">Nursing Home Staff HPRD - National</span>', '<span style="color: #333333;">Total RN HPRD - National</span>', '<span style="color: #333333;">Resident Census - National</span>', '<span style="color: #333333;">Contract Staff Percentage - National</span>'),
+                          vertical_spacing=0.10)
 
 
         # Pre-round HPRD using ROUND_HALF_UP for consistent tooltip display
@@ -2831,13 +2816,13 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
             col=1
         )
 
-        # Update desktop layout - increased bottom margin for source badge
+        # Update desktop layout
         fig.update_layout(
             height=1800,  # Increased height to make charts taller
             width=1200,
             title_text=title_prefix,
             showlegend=False,  # We'll add individual legends per subplot
-            margin=dict(l=50, r=50, t=100, b=120),  # Increased bottom margin for source badge
+            margin=dict(l=50, r=50, t=100, b=100),  # Normal margins
             hovermode='closest'
         )
         
@@ -2865,23 +2850,23 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         
         
         
-        # Add footer annotations for desktop view - moved below x-axis
+        # Add footer annotations for desktop view with improved styling
         for row in range(1, 5):
             fig.add_annotation(
                 text=f"<b>320 Consulting</b> | Source: CMS PBJ Data ({get_latest_data_periods()['data_range']})",
                 x=0.99,
-                y=-0.35,  # Moved further below x-axis to prevent overlap
+                y=-0.22,  # More space from x-axis ticks
                 xref="x domain",
                 yref="y domain",
                 showarrow=False,
-                font=dict(size=9, color="#666666"),
+                font=dict(size=10, color="#666666"),
                 align="right",
                 row=row,
                 col=1,
                 bgcolor="rgba(240,248,255,0.9)",  # Light blue background
                 bordercolor="rgba(0,0,0,0.1)",
                 borderwidth=1,
-                borderpad=3,  # Reduced vertical padding
+                borderpad=4,  # Reduced vertical padding
                 xanchor="right",
                 yanchor="top"
             )
@@ -3265,17 +3250,17 @@ def main() -> None:
         
         @st.cache_data
         def load_previous_ownership_data():
-            """Load previous ownership data for comparison."""
+            """Load previous ownership data for comparison (most recent prior quarter)."""
             try:
-                # Use dynamic file finder to get the previous affiliated entity file
-                file_path = find_latest_affiliated_entity()
+                # Use dynamic file finder to get the previous affiliated entity file from a different quarter
+                file_path = find_previous_affiliated_entity()
                 
                 if not file_path:
                     st.warning("Previous ownership data file not found. Some features may be limited.")
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
-                # Map March column names to July column names for comparison
+                # Map older column names to newer column names for comparison
                 column_mapping = {
                     'Affiliated entity': 'Chain',
                     'Affiliated entity ID': 'Chain ID'
@@ -3287,7 +3272,7 @@ def main() -> None:
                     df = df.rename(columns=rename_dict)
                 return df
             except Exception as e:
-                st.error(f"Error loading March ownership data: {str(e)}")
+                st.error(f"Error loading previous ownership data: {str(e)}")
                 return pd.DataFrame()
         
         @st.cache_data
@@ -4884,12 +4869,14 @@ def main() -> None:
                         entity_name_title_case = proper_title_case(selected_value)
                         
                         # Get the most recent data period dynamically
-                        most_recent_period = get_latest_data_periods()['affiliated_entity_latest']
+                        periods = get_latest_data_periods()
+                        most_recent_period = periods['affiliated_entity_latest']
+                        previous_period = periods.get('affiliated_entity_previous', 'previous period')
                         
                         # Responsive header with mobile optimization
                         st.markdown(f'''
                                 <h2 style="margin-bottom: 0.1em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233; line-height: 1.0;">{entity_name_title_case} <span class="desktop-id" style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>
-                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS, {most_recent_period}</div>
+                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS, {most_recent_period}.</div>
                                 <style>
                                     @media (max-width: 768px) {{
                                         .desktop-id {{ display: none !important; }}
@@ -4917,7 +4904,7 @@ def main() -> None:
                             st.metric("Total Facilities", 
                                      format_metric(current_facilities, decimal_places=0, thousands=True),
                                      delta_display,
-                                     help="Total number of nursing homes owned by this entity (vs. March 2025)")
+                                     help=f"Total number of nursing homes owned by this entity (vs. {previous_period})")
                         with col2:
                             current_states = entity_row['Number of states and territories with operations']
                             prev_states = previous_row['Number of states and territories with operations'] if previous_row is not None else None
@@ -4934,7 +4921,7 @@ def main() -> None:
                             st.metric("States of Operation", 
                                      format_metric(current_states, decimal_places=0),
                                      delta_display,
-                                     help="Number of states where this entity operates nursing homes (vs. March 2025)")
+                                     help=f"Number of states where this entity operates nursing homes (vs. {previous_period})")
                         with col3:
                             current_rating = entity_row['Average overall 5-star rating']
                             prev_rating = previous_row['Average overall 5-star rating'] if previous_row is not None else None
@@ -4951,7 +4938,7 @@ def main() -> None:
                             st.metric("Overall Rating", 
                                      format_metric(current_rating, decimal_places=1),
                                      delta_display,
-                                     help="Average CMS 5-star overall rating across all facilities (vs. March 2025)")
+                                     help=f"Average CMS 5-star overall rating across all facilities (vs. {previous_period})")
                         with col4:
                             current_fines = entity_row['Total amount of fines in dollars']
                             prev_fines = previous_row['Total amount of fines in dollars'] if previous_row is not None else None
@@ -4976,7 +4963,7 @@ def main() -> None:
                             st.metric("Total Fines", 
                                      format_fines_display(current_fines),
                                      delta_display,
-                                     help="Total amount of fines in dollars across all facilities (vs. March 2025)")
+                                     help=f"Total amount of fines in dollars across all facilities (vs. {previous_period})")
                         with col5:
                             # Add spacing before ownership chart on desktop only
                             if not st.session_state.get('is_mobile', False):
@@ -5078,7 +5065,7 @@ def main() -> None:
                             st.metric("Special Focus Facilities (SFFs)", 
                                      format_metric(current_sff, decimal_places=0),
                                      delta_display,
-                                     help="Special Focus Facilities are nursing homes with serious quality issues under CMS oversight (vs. March 2025)")
+                                     help=f"Special Focus Facilities are nursing homes with serious quality issues under CMS oversight (vs. {previous_period})")
                         with risk_col2:
                             current_sff_candidate = entity_row['Number of SFF candidates']
                             prev_sff_candidate = previous_row['Number of SFF candidates'] if previous_row is not None else None
@@ -5095,7 +5082,7 @@ def main() -> None:
                             st.metric("SFF Candidates", 
                                      format_metric(current_sff_candidate, decimal_places=0),
                                      delta_display,
-                                     help="Facilities monitored for potential SFF designation (vs. March 2025)")
+                                     help=f"Facilities monitored for potential SFF designation (vs. {previous_period})")
                         with risk_col3:
                             current_abuse = entity_row['Number of facilities with an abuse icon']
                             prev_abuse = previous_row['Number of facilities with an abuse icon'] if previous_row is not None else None
@@ -5117,7 +5104,7 @@ def main() -> None:
                             st.metric("Facilited Cited for Abuse", 
                                      abuse_display,
                                      delta_display,
-                                     help="Facilities cited for abuse (vs. March 2025)")
+                                     help=f"Facilities cited for abuse (vs. {previous_period})")
                         with risk_col4:
                             # Calculate 1-star comparison from previous data
                             prev_1star = 0
@@ -5153,7 +5140,7 @@ def main() -> None:
                             st.metric("1-Star Rating Facilities", 
                                      one_star_display,
                                      delta_display,
-                                     help="Facilities with the lowest CMS overall rating (vs. March 2025)")
+                                     help=f"Facilities with the lowest CMS overall rating (vs. {previous_period})")
                         
 
                         
@@ -5218,7 +5205,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Overall", f"{current_overall:.1f}", delta_display, help="Average overall 5-star rating (vs. March 2025)")
+                            st.metric("Overall", f"{current_overall:.1f}", delta_display, help=f"Average overall 5-star rating (vs. {previous_period})")
                         with qual_col2:
                             # Health inspection rating delta
                             current_health = entity_row['Average health inspection rating']
@@ -5232,7 +5219,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Health Inspection", f"{current_health:.1f}", delta_display, help="Average health inspection rating (vs. March 2025)")
+                            st.metric("Health Inspection", f"{current_health:.1f}", delta_display, help=f"Average health inspection rating (vs. {previous_period})")
                         with qual_col3:
                             # Staffing rating delta
                             current_staffing = entity_row['Average staffing rating']
@@ -5246,7 +5233,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Staffing", f"{current_staffing:.1f}", delta_display, help="Average staffing rating (vs. March 2025)")
+                            st.metric("Staffing", f"{current_staffing:.1f}", delta_display, help=f"Average staffing rating (vs. {previous_period})")
                         with qual_col4:
                             # Quality rating delta
                             current_quality = entity_row['Average quality rating']
@@ -5260,7 +5247,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Quality", f"{current_quality:.1f}", delta_display, help="Average quality rating (vs. March 2025)")
+                            st.metric("Quality", f"{current_quality:.1f}", delta_display, help=f"Average quality rating (vs. {previous_period})")
                         # Quality ratings chart and distribution chart side by side
                         # Add spacing before charts to prevent overlap with metrics above
                         st.markdown('<div style="margin-top: 30px;"></div>', unsafe_allow_html=True)
@@ -5411,7 +5398,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Nurse HPRD", f"{current_total_hprd:.1f}", delta_display, help="Average total nurse hours per resident day (vs. March 2025)")
+                            st.metric("Total Nurse HPRD", f"{current_total_hprd:.1f}", delta_display, help=f"Average total nurse hours per resident day (vs. {previous_period})")
                         with staff_col2:
                             # RN HPRD delta
                             current_rn_hprd = entity_row['Average total Registered Nurse hours per resident day']
@@ -5425,7 +5412,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN HPRD", f"{current_rn_hprd:.1f}", delta_display, help="Average RN hours per resident day (vs. March 2025)")
+                            st.metric("RN HPRD", f"{current_rn_hprd:.1f}", delta_display, help=f"Average RN hours per resident day (vs. {previous_period})")
                         with staff_col3:
                             # Weekend HPRD delta
                             current_weekend_hprd = entity_row['Average total weekend nurse hours per resident day']
@@ -5453,7 +5440,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Admin Turnover", f"{current_admin_turnover:.1f}", delta_display, help="Number of administrators that stopped working at the nursing home over a 12-month period (vs March 2025)")
+                            st.metric("Admin Turnover", f"{current_admin_turnover:.1f}", delta_display, help=f"Number of administrators that stopped working at the nursing home over a 12-month period (vs. {previous_period})")
                         
                         # Turnover metrics
                         turn_col1, turn_col2 = st.columns(2)
@@ -5475,7 +5462,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help="The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
+                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help=f"The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. {previous_period})")
                         with turn_col2:
                             # RN Turnover delta
                             current_rn_turnover = entity_row['Average Registered Nurse turnover percentage']
@@ -5489,7 +5476,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help="The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
+                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help=f"The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. {previous_period})")
                         
                         # Compliance metrics
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5515,7 +5502,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Fines", format_fines_display(current_total_fines), delta_display, help="Total amount of fines in dollars (vs. March 2025)")
+                            st.metric("Total Fines", format_fines_display(current_total_fines), delta_display, help=f"Total amount of fines in dollars (vs. {previous_period})")
                         with comp_col2:
                             # Avg Fines per Facility delta
                             current_avg_fines = entity_row['Average amount of fines in dollars']
@@ -5529,7 +5516,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Avg Fines per Facility", f"${current_avg_fines:,.0f}", delta_display, help="Average fines per facility (vs. March 2025)")
+                            st.metric("Avg Fines per Facility", f"${current_avg_fines:,.0f}", delta_display, help=f"Average fines per facility (vs. {previous_period})")
                         with comp_col3:
                             # Total Payment Denials delta
                             current_denials = entity_row['Total number of payment denials']
@@ -5543,7 +5530,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Payment Denials", f"{current_denials:,.0f}", delta_display, help="Total number of payment denials (vs. March 2025)")
+                            st.metric("Total Payment Denials", f"{current_denials:,.0f}", delta_display, help=f"Total number of payment denials (vs. {previous_period})")
                         with comp_col4:
                             # Avg Payment Denials delta
                             current_avg_denials = entity_row['Average number of payment denials']
@@ -5557,7 +5544,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Avg Payment Denials", f"{current_avg_denials:.1f}", delta_display, help="Average number of payment denials (vs. March 2025)")
+                            st.metric("Avg Payment Denials", f"{current_avg_denials:.1f}", delta_display, help=f"Average number of payment denials (vs. {previous_period})")
                         
                         # Antipsychotic usage
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Antipsychotics - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5581,7 +5568,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Short-Stay Antipsychotic", format_antipsychotic_pct(current_short_stay), delta_display, help="Short-stay residents receiving antipsychotics (vs. March 2025)")
+                            st.metric("Short-Stay Antipsychotic", format_antipsychotic_pct(current_short_stay), delta_display, help=f"Short-stay residents receiving antipsychotics (vs. {previous_period})")
                         with anti_col2:
                             # Long-Stay Antipsychotic delta
                             current_long_stay = entity_row['Average percentage of long-stay residents who received an antipsychotic medication']
@@ -5595,7 +5582,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help="Long-stay residents receiving antipsychotics (vs. March 2025)")
+                            st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help=f"Long-stay residents receiving antipsychotics (vs. {previous_period})")
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
                         # Get facilities for this entity

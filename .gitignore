@@ -6,16 +6,8 @@ __pycache__
 venv
 ENV
 
-# Data files
-*.csv
-
-# Ignore log files
+# Exclude unnecessary logs and other files
 *.log
-
-# Ignore unwanted specific files and directories
-Archive
-.CURSOR
-deployment_test.py
 
 # Ignore image files
 *.png

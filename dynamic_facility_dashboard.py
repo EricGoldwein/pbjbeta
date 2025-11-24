@@ -88,10 +88,44 @@ def create_facility_complete_csv(provnum):
     return combined_data
 
 def create_facility_provider_info_csv(provnum):
-    """Extract provider info data for facility"""
+    """Extract provider info data for facility from provider_info_combined.csv"""
     print(f"Creating provider info CSV for facility {provnum}...")
     
-    # Load all provider info files
+    # Try to load from combined file first (has quarter matching column)
+    combined_file = 'provider_info_combined.csv'
+    if os.path.exists(combined_file):
+        try:
+            print(f"Loading from {combined_file}...")
+            df = pd.read_csv(combined_file, low_memory=False, dtype={'ccn': str})
+            
+            # Format CCN to ensure it's a string and handle both numeric and alphanumeric formats
+            df['ccn'] = df['ccn'].astype(str)
+            # Only zero-pad if all digits, otherwise keep as-is
+            df['ccn'] = df['ccn'].apply(lambda x: x.zfill(6) if x.isdigit() else x.upper())
+            
+            # Filter for the specific facility (handle different CCN formats)
+            # Create variations of the search provnum
+            search_variants = [provnum.upper()]
+            if provnum.isdigit():
+                # For numeric provnums, also try with leading zeros
+                search_variants.extend([provnum.zfill(6), provnum.lstrip('0')])
+            
+            facility_data = df[df['ccn'].isin(search_variants)].copy()
+            
+            if len(facility_data) > 0:
+                print(f"✅ Found {len(facility_data)} provider info records for {provnum} in combined file")
+                # Sort by processing_date
+                if 'processing_date' in facility_data.columns:
+                    facility_data['processing_date'] = pd.to_datetime(facility_data['processing_date'], errors='coerce')
+                    facility_data = facility_data.sort_values('processing_date')
+                return facility_data
+            else:
+                print(f"  No provider info records found for {provnum} in combined file")
+        except Exception as e:
+            print(f"Error loading from combined file: {e}")
+            print("Falling back to individual normalized files...")
+    
+    # Fallback to individual normalized files if combined file doesn't exist or fails
     provider_files = glob.glob('provider_info_normalized/ProviderInfoNorm_*.csv')
     provider_files.sort()
     
@@ -139,7 +173,7 @@ def create_facility_provider_info_csv(provnum):
     print(f"✅ Combined {total_provider_records} provider info records for facility {provnum}")
     
     # Sort by processing_date
-    combined_provider_df['processing_date'] = pd.to_datetime(combined_provider_df['processing_date'])
+    combined_provider_df['processing_date'] = pd.to_datetime(combined_provider_df['processing_date'], errors='coerce')
     combined_provider_df = combined_provider_df.sort_values('processing_date')
     
     return combined_provider_df
@@ -170,11 +204,19 @@ def create_dynamic_dashboard(provnum):
     global provider_info_df
     if os.path.exists(provider_csv_file):
         try:
-            provider_info_df = pd.read_csv(provider_csv_file, low_memory=False)
-            provider_info_df['processing_date'] = pd.to_datetime(provider_info_df['processing_date'])
+            provider_info_df = pd.read_csv(provider_csv_file, low_memory=False, dtype={'ccn': str})
+            # Format CCN to ensure consistency
+            provider_info_df['ccn'] = provider_info_df['ccn'].astype(str).str.zfill(6)
+            provider_info_df['processing_date'] = pd.to_datetime(provider_info_df['processing_date'], errors='coerce')
             print(f"✅ Loaded {len(provider_info_df)} provider info records")
+            print(f"   CCN values: {provider_info_df['ccn'].unique()[:5]}")
+            if 'sff_status' in provider_info_df.columns:
+                sff_count = provider_info_df['sff_status'].notna().sum()
+                print(f"   Records with SFF status: {sff_count}")
         except Exception as e:
             print(f"Error loading provider info data: {e}")
+            import traceback
+            traceback.print_exc()
             provider_info_df = None
     else:
         provider_info_df = None
@@ -187,8 +229,9 @@ def create_dynamic_dashboard(provnum):
 
 def initialize_data():
     """Initialize the global data variable"""
-    global df
-    load_data()  # load_data() already sets the global df variable
+    global global_df
+    # This function is not used in the current implementation
+    # Data is loaded in create_dynamic_dashboard()
     return global_df
 
 def round_financial(value, decimals=2):
@@ -290,7 +333,7 @@ def format_pbj_source_link(quarter, date, provnum="225500", data_type="nurse"):
     # Format date for display (YYYYMMDD -> MM-DD-YYYY)
     if isinstance(date, str) and len(date) == 8:
         display_date = f"{date[4:6]}-{date[6:8]}-{date[:4]}"
-    elif hasattr(date, 'strftime'):
+    elif hasattr(date, 'strftime') and not isinstance(date, str):
         display_date = date.strftime('%m-%d-%Y')
     else:
         display_date = str(date)
@@ -550,6 +593,9 @@ def get_data():
         
         # Filter data
         global global_df
+        if global_df is None or len(global_df) == 0:
+            return jsonify({'error': 'No data loaded', 'data': []})
+        
         filtered_df = global_df.copy()
         
         if start_date:
@@ -733,7 +779,7 @@ def get_provider_info_summary():
             'latest_case_mix_total_hprd': float(latest.get('case_mix_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('case_mix_total_nurse_hrs_per_resident_per_day')) else 0,
             'latest_adjusted_total_hprd': float(latest.get('adjusted_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('adjusted_total_nurse_hrs_per_resident_per_day')) else 0,
             'ownership_change_last_12_months': str(latest.get('provider_changed_ownership_in_last_12_months', 'Unknown')) if pd.notna(latest.get('provider_changed_ownership_in_last_12_months')) else 'Unknown',
-            'sff_status': 'N/A',  # Not available in current data
+            'sff_status': _get_latest_sff_status(),
             'total_records': len(provider_info_df),
             'quarters_covered': provider_info_df['quarter'].nunique() if 'quarter' in provider_info_df.columns else 0
         }
@@ -741,6 +787,357 @@ def get_provider_info_summary():
         return jsonify(summary)
         
     except Exception as e:
+        return jsonify({'error': str(e)})
+
+def _get_latest_sff_status():
+    """Get the most recent SFF status from provider info data."""
+    try:
+        global provider_info_df
+        if provider_info_df is None or len(provider_info_df) == 0:
+            return 'N/A'
+        
+        # Try different possible column names for SFF status
+        sff_col = None
+        for col in ['sff_status', 'special_focus_status', 'Special Focus Status', 'Special Focus Facility Status']:
+            if col in provider_info_df.columns:
+                sff_col = col
+                break
+        
+        if not sff_col:
+            print("SFF status column not found in provider_info_df")
+            print(f"Available columns: {list(provider_info_df.columns)}")
+            return 'N/A'
+        
+        print(f"Using SFF column: {sff_col}")
+        
+        # Sort by processing date (newest first) and find the most recent record with SFF status
+        sorted_df = provider_info_df.sort_values('processing_date', ascending=False)
+        print(f"Total records: {len(sorted_df)}")
+        print(f"Sample SFF values: {sorted_df[sff_col].value_counts().head(10).to_dict()}")
+        
+        for _, row in sorted_df.iterrows():
+            sff_value = row.get(sff_col)
+            if pd.notna(sff_value):
+                sff_value = str(sff_value).strip()
+                if sff_value and sff_value.upper() not in ['N/A', 'NAN', 'NONE', '']:
+                    # If it's "N", return "No" for display, otherwise return the actual value
+                    if sff_value.upper() == 'N':
+                        print(f"Found SFF status: No (N) from {row.get('processing_date')}")
+                        return 'No'
+                    print(f"Found SFF status: {sff_value} from {row.get('processing_date')}")
+                    return sff_value
+        
+        print("No SFF status found in any provider info records")
+        return 'N/A'
+    except Exception as e:
+        print(f"Error getting SFF status: {e}")
+        import traceback
+        traceback.print_exc()
+        return 'N/A'
+
+@app.route('/api/sff_history')
+def get_sff_history():
+    """Get Red Flag History for a facility (SFF, 1-star ratings, Abuse, etc.)"""
+    try:
+        global provider_info_df
+        if provider_info_df is None:
+            return jsonify({'error': 'Provider info data not loaded'})
+        
+        # Get provnum from request
+        provnum = request.args.get('provnum')
+        if not provnum:
+            return jsonify({'error': 'Missing provnum parameter'})
+        
+        # Format provnum
+        provnum = str(provnum).upper().strip()
+        if provnum.isdigit():
+            provnum = provnum.zfill(6)
+        
+        # Ensure CCN column is formatted consistently (make a copy to avoid modifying global)
+        provider_info_df_copy = provider_info_df.copy()
+        if 'ccn' in provider_info_df_copy.columns:
+            provider_info_df_copy['ccn'] = provider_info_df_copy['ccn'].astype(str).str.zfill(6)
+        
+        # Filter for this facility - try multiple formats
+        search_variants = [provnum]
+        if provnum.isdigit():
+            search_variants.extend([provnum.lstrip('0'), provnum.zfill(6)])
+        
+        facility_data = provider_info_df_copy[provider_info_df_copy['ccn'].isin(search_variants)].copy()
+        
+        if facility_data.empty:
+            return jsonify({'history': []})
+        
+        # Sort by processing date
+        facility_data = facility_data.sort_values('processing_date')
+        
+        # Find column names
+        sff_col = None
+        for col in ['sff_status', 'special_focus_status', 'Special Focus Status']:
+            if col in facility_data.columns:
+                sff_col = col
+                break
+        
+        overall_rating_col = None
+        for col in ['overall_rating', 'Overall Rating']:
+            if col in facility_data.columns:
+                overall_rating_col = col
+                break
+        
+        staffing_rating_col = None
+        for col in ['staffing_rating', 'Staffing Rating']:
+            if col in facility_data.columns:
+                staffing_rating_col = col
+                break
+        
+        abuse_col = None
+        for col in ['abuse_icon', 'Abuse Icon', 'abuse']:
+            if col in facility_data.columns:
+                abuse_col = col
+                break
+        
+        # Build red flag history - group by quarter
+        history_dict = {}  # key: quarter_str, value: dict with combined info
+        
+        for _, row in facility_data.iterrows():
+            red_flags = []
+            
+            # Check SFF status (only show if SFF or SFF Candidate, not "N")
+            if sff_col and sff_col in row.index:
+                sff_value = str(row[sff_col]).strip() if pd.notna(row[sff_col]) else ''
+                if sff_value and sff_value.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
+                    if 'SFF' in sff_value.upper():
+                        red_flags.append(f"SFF: {sff_value}")
+            
+            # Check 1-star overall rating
+            if overall_rating_col and overall_rating_col in row.index:
+                overall_rating = row[overall_rating_col]
+                if pd.notna(overall_rating):
+                    try:
+                        rating = float(overall_rating)
+                        if rating == 1.0:
+                            red_flags.append("1-Star Overall Rating")
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Check 1-star staffing rating
+            if staffing_rating_col and staffing_rating_col in row.index:
+                staffing_rating = row[staffing_rating_col]
+                if pd.notna(staffing_rating):
+                    try:
+                        rating = float(staffing_rating)
+                        if rating == 1.0:
+                            red_flags.append("1-Star Staffing Rating")
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Check Abuse - check multiple possible values
+            if abuse_col and abuse_col in row.index:
+                abuse_value = str(row[abuse_col]).strip() if pd.notna(row[abuse_col]) else ''
+                abuse_upper = abuse_value.upper()
+                if abuse_upper in ['Y', 'YES', 'TRUE', '1', 'TRUE', 'Y']:
+                    red_flags.append("Abuse Icon: Yes")
+            
+            # Check Ownership Change
+            ownership_change = False
+            ownership_col = None
+            for col in ['provider_changed_ownership_in_last_12_months', 'Provider Changed Ownership In Last 12 Months', 'ownership_change']:
+                if col in row.index:
+                    ownership_col = col
+                    ownership_value = str(row[col]).strip() if pd.notna(row[col]) else ''
+                    ownership_upper = ownership_value.upper()
+                    if ownership_upper in ['Y', 'YES', 'TRUE', '1']:
+                        ownership_change = True
+                        break
+            
+            # Include ownership change even if no other red flags
+            if ownership_change:
+                red_flags.append("Ownership Change (Last 12 Months)")
+            
+            # Only process if there are red flags or ownership change
+            if red_flags:
+                # Get processing date and format it
+                proc_date = row.get('processing_date')
+                if pd.notna(proc_date):
+                    if isinstance(proc_date, str):
+                        proc_date = pd.to_datetime(proc_date, errors='coerce')
+                    proc_date_str = proc_date.strftime('%Y-%m-%d') if pd.notna(proc_date) else 'Unknown'
+                else:
+                    proc_date_str = 'Unknown'
+                
+                # Get quarter - try from column first, then derive from date
+                quarter = row.get('quarter', '')
+                if pd.notna(quarter) and str(quarter).strip():
+                    quarter_str = str(quarter).strip()
+                    if len(quarter_str) == 6 and 'Q' in quarter_str:
+                        quarter_str = f"Q{quarter_str[-1]} {quarter_str[:4]}"
+                elif pd.notna(proc_date) and isinstance(proc_date, pd.Timestamp):
+                    # Derive quarter from processing date
+                    year = proc_date.year
+                    month = proc_date.month
+                    if month <= 3:
+                        q = 1
+                    elif month <= 6:
+                        q = 2
+                    elif month <= 9:
+                        q = 3
+                    else:
+                        q = 4
+                    quarter_str = f"Q{q} {year}"
+                else:
+                    quarter_str = 'Unknown'
+                
+                # Get source file name
+                source_file = f"NH_ProviderInfo_{proc_date.strftime('%b%Y')}.csv" if pd.notna(proc_date) and isinstance(proc_date, pd.Timestamp) else 'Provider Info Data'
+                
+                # Group by quarter - combine red flags and track multiple dates
+                if quarter_str not in history_dict:
+                    history_dict[quarter_str] = {
+                        'quarter': quarter_str,
+                        'red_flags_set': set(),  # Use set to avoid duplicates
+                        'dates': [],
+                        'source_files': [],
+                        'records': []  # Store individual records for expansion
+                    }
+                
+                # Add red flags to set (automatically handles duplicates)
+                history_dict[quarter_str]['red_flags_set'].update(red_flags)
+                history_dict[quarter_str]['dates'].append(proc_date_str)
+                history_dict[quarter_str]['source_files'].append(source_file)
+                history_dict[quarter_str]['records'].append({
+                    'processing_date': proc_date_str,
+                    'source_file': source_file,
+                    'red_flags': red_flags
+                })
+        
+        # Convert to list format, sorted by date
+        history = []
+        for quarter_str, quarter_data in history_dict.items():
+            # Sort records by date
+            quarter_data['records'].sort(key=lambda x: x['processing_date'])
+            
+            # Get earliest and latest dates
+            dates = sorted(quarter_data['dates'])
+            earliest_date = dates[0] if dates else 'Unknown'
+            latest_date = dates[-1] if dates else 'Unknown'
+            
+            # Combine all unique red flags
+            all_red_flags = sorted(list(quarter_data['red_flags_set']))
+            status_text = " | ".join(all_red_flags)
+            
+            # Use earliest date for display, but note if there are multiple
+            date_display = earliest_date
+            if len(dates) > 1 and earliest_date != latest_date:
+                date_display = f"{earliest_date} to {latest_date}"
+            
+            history.append({
+                'status': status_text,
+                'sff_status': status_text,  # For compatibility
+                'processing_date': date_display,
+                'quarter': quarter_str,
+                'source_file': quarter_data['source_files'][0] if quarter_data['source_files'] else 'Provider Info Data',
+                'red_flags': all_red_flags,
+                'record_count': len(quarter_data['records']),
+                'records': quarter_data['records'] if len(quarter_data['records']) > 1 else None  # Only include if multiple
+            })
+        
+        # Sort history by date
+        history.sort(key=lambda x: x['processing_date'])
+        
+        # Add current status if latest record has red flags
+        if not facility_data.empty:
+            latest_record = facility_data.iloc[-1]
+            latest_red_flags = []
+            
+            if sff_col and sff_col in latest_record.index:
+                sff_value = str(latest_record[sff_col]).strip() if pd.notna(latest_record[sff_col]) else ''
+                if sff_value and sff_value.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
+                    if 'SFF' in sff_value.upper():
+                        latest_red_flags.append(f"SFF: {sff_value}")
+            
+            if overall_rating_col and overall_rating_col in latest_record.index:
+                overall_rating = latest_record[overall_rating_col]
+                if pd.notna(overall_rating):
+                    try:
+                        if float(overall_rating) == 1.0:
+                            latest_red_flags.append("1-Star Overall Rating")
+                    except (ValueError, TypeError):
+                        pass
+            
+            if staffing_rating_col and staffing_rating_col in latest_record.index:
+                staffing_rating = latest_record[staffing_rating_col]
+                if pd.notna(staffing_rating):
+                    try:
+                        if float(staffing_rating) == 1.0:
+                            latest_red_flags.append("1-Star Staffing Rating")
+                    except (ValueError, TypeError):
+                        pass
+            
+            if abuse_col and abuse_col in latest_record.index:
+                abuse_value = str(latest_record[abuse_col]).strip() if pd.notna(latest_record[abuse_col]) else ''
+                if abuse_value.upper() in ['Y', 'YES', 'TRUE', '1']:
+                    latest_red_flags.append("Abuse Icon: Yes")
+            
+            # Check Ownership Change for latest record
+            for col in ['provider_changed_ownership_in_last_12_months', 'Provider Changed Ownership In Last 12 Months', 'ownership_change']:
+                if col in latest_record.index:
+                    ownership_value = str(latest_record[col]).strip() if pd.notna(latest_record[col]) else ''
+                    ownership_upper = ownership_value.upper()
+                    if ownership_upper in ['Y', 'YES', 'TRUE', '1']:
+                        latest_red_flags.append("Ownership Change (Last 12 Months)")
+                        break
+            
+            # If latest record has red flags but not in history, add it
+            if latest_red_flags:
+                latest_date = latest_record.get('processing_date')
+                if pd.notna(latest_date):
+                    if isinstance(latest_date, str):
+                        latest_date = pd.to_datetime(latest_date, errors='coerce')
+                    latest_date_str = latest_date.strftime('%Y-%m-%d') if pd.notna(latest_date) else 'Unknown'
+                    
+                    # Derive quarter from date
+                    quarter = latest_record.get('quarter', '')
+                    if pd.notna(quarter) and str(quarter).strip():
+                        quarter_str = str(quarter).strip()
+                        if len(quarter_str) == 6 and 'Q' in quarter_str:
+                            quarter_str = f"Q{quarter_str[-1]} {quarter_str[:4]}"
+                    elif pd.notna(latest_date) and isinstance(latest_date, pd.Timestamp):
+                        year = latest_date.year
+                        month = latest_date.month
+                        if month <= 3:
+                            q = 1
+                        elif month <= 6:
+                            q = 2
+                        elif month <= 9:
+                            q = 3
+                        else:
+                            q = 4
+                        quarter_str = f"Q{q} {year}"
+                    else:
+                        quarter_str = 'Present'
+                    
+                    status_text = " | ".join(latest_red_flags)
+                    
+                    # Check if this quarter is already in history
+                    quarter_in_history = any(h['quarter'] == quarter_str for h in history)
+                    if not quarter_in_history:
+                        history.append({
+                            'status': status_text,
+                            'sff_status': status_text,
+                            'processing_date': latest_date_str,
+                            'quarter': quarter_str,
+                            'source_file': 'Current Data',
+                            'red_flags': latest_red_flags,
+                            'record_count': 1,
+                            'records': None
+                        })
+        
+        return jsonify({'history': history})
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in get_sff_history: {str(e)}")
+        traceback.print_exc()
         return jsonify({'error': str(e)})
 
 @app.route('/api/provider_info_charts')
@@ -1105,7 +1502,7 @@ def get_charts():
                     'y': hprd_df['Total_Nurse_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total HPRD (All Staff)',
+                    'name': 'Total HPRD',
                     'line': {'color': '#d62728', 'width': 3}
                 },
                 {
@@ -1113,7 +1510,7 @@ def get_charts():
                     'y': hprd_df['Nurse_Staff_HPRD_Excl_Admin'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Staff HPRD (excl. Admin & DON)',
+                    'name': 'Direct Staff HPRD',
                     'line': {'color': '#9467bd'}
                 },
                 {
@@ -1121,7 +1518,7 @@ def get_charts():
                     'y': hprd_df['Total_RN_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'RN HPRD (Total)',
+                    'name': 'Total RN HPRD',
                     'line': {'color': '#1f77b4'}
                 },
                 {
@@ -1137,7 +1534,7 @@ def get_charts():
                     'y': hprd_df['Total_Nurse_Aide_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Aide HPRD (Total)',
+                    'name': 'Nurse Aide HPRD',
                     'line': {'color': '#2ca02c'}
                 }
             ] + hprd_holiday_markers,
@@ -1177,35 +1574,35 @@ def get_charts():
                     'x': dow_summary['DayOfWeek'].tolist(),
                     'y': dow_summary['Total_Nurse_HPRD'].tolist(),
                     'type': 'bar',
-                    'name': 'Total HPRD (All Staff)',
+                    'name': 'Total HPRD',
                     'marker': {'color': '#d62728'}
                 },
                 {
                     'x': dow_summary['DayOfWeek'].tolist(),
                     'y': dow_summary['Nurse_Staff_HPRD_Excl_Admin'].tolist(),
                     'type': 'bar',
-                    'name': 'Nurse Staff HPRD (excl. Admin & DON)',
+                    'name': 'Direct Staff HPRD',
                     'marker': {'color': '#9467bd'}
                 },
                 {
                     'x': dow_summary['DayOfWeek'].tolist(),
                     'y': dow_summary['Total_RN_HPRD'].tolist(),
                     'type': 'bar',
-                    'name': 'RN HPRD (Total)',
+                    'name': 'Total RN HPRD',
                     'marker': {'color': '#1f77b4'}
                 },
                 {
                     'x': dow_summary['DayOfWeek'].tolist(),
                     'y': dow_summary['Total_LPN_HPRD'].tolist(),
                     'type': 'bar',
-                    'name': 'LPN HPRD (Total)',
+                    'name': 'Total LPN HPRD',
                     'marker': {'color': '#ff7f0e'}
                 },
                 {
                     'x': dow_summary['DayOfWeek'].tolist(),
                     'y': dow_summary['Total_Nurse_Aide_HPRD'].tolist(),
                     'type': 'bar',
-                    'name': 'Nurse Aide HPRD (Total)',
+                    'name': 'Nurse Aide HPRD',
                     'marker': {'color': '#2ca02c'}
                 }
             ],
@@ -1511,7 +1908,7 @@ def get_chart_aggregated():
                     'y': agg_data['Nurse_Staff_HPRD_Excl_Admin'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Staff HPRD (excl. Admin & DON)',
+                    'name': 'Direct Staff HPRD',
                     'line': {'color': '#9467bd'}
                 },
                 {
@@ -1527,7 +1924,7 @@ def get_chart_aggregated():
                     'y': agg_data['Total_LPN_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'LPN HPRD',
+                    'name': 'Total LPN HPRD',
                     'line': {'color': '#ff7f0e'}
                 },
                 {
@@ -1753,7 +2150,7 @@ def get_hprd_aggregated():
                 'y': agg_data['Nurse_Staff_HPRD_Excl_Admin'].fillna(0).tolist(),
                 'type': 'scatter',
                 'mode': 'lines+markers',
-                'name': 'Nurse Staff HPRD (excl. Admin & DON)',
+                'name': 'Direct Staff HPRD',
                 'line': {'color': '#9467bd'}
             },
             {
@@ -1769,7 +2166,7 @@ def get_hprd_aggregated():
                 'y': agg_data['Total_LPN_HPRD'].fillna(0).tolist(),
                 'type': 'scatter',
                 'mode': 'lines+markers',
-                'name': 'LPN HPRD',
+                'name': 'Total LPN HPRD',
                 'line': {'color': '#ff7f0e'}
             },
             {
@@ -1815,38 +2212,57 @@ def get_quarters():
 @app.route('/api/date_range')
 def get_date_range():
     """Get available date range (filtered to valid PBJ data from 2017 onwards)"""
-    # Filter out any data before 2017 (invalid/outlier data)
-    # Use explicit date filtering to avoid timezone issues
-    from datetime import datetime
-    start_2017 = datetime(2017, 1, 1)
-    valid_data = global_df[global_df['WorkDate'] >= start_2017]
-    
-    if len(valid_data) == 0:
-        # Fallback if no valid data found
+    try:
+        global global_df
+        if global_df is None or len(global_df) == 0:
+            # Fallback if no data loaded
+            return jsonify({
+                'min_date': '2017-01-01',
+                'max_date': '2025-12-31'
+            })
+        
+        # Filter out any data before 2017 (invalid/outlier data)
+        # Use explicit date filtering to avoid timezone issues
+        from datetime import datetime
+        start_2017 = datetime(2017, 1, 1)
+        valid_data = global_df[global_df['WorkDate'] >= start_2017]
+        
+        if len(valid_data) == 0:
+            # Fallback if no valid data found
+            return jsonify({
+                'min_date': '2017-01-01',
+                'max_date': '2025-12-31'
+            })
+        
+        # Use .date() to ensure we get just the date part without time/timezone issues
+        min_date = valid_data['WorkDate'].min().date()
+        max_date = valid_data['WorkDate'].max().date()
+        
+        return jsonify({
+            'min_date': min_date.strftime('%Y-%m-%d'),
+            'max_date': max_date.strftime('%Y-%m-%d')
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error in get_date_range: {str(e)}")
+        traceback.print_exc()
+        # Fallback response
         return jsonify({
             'min_date': '2017-01-01',
-            'max_date': '2025-12-31'
+            'max_date': '2025-12-31',
+            'error': str(e)
         })
-    
-    # Use .date() to ensure we get just the date part without time/timezone issues
-    min_date = valid_data['WorkDate'].min().date()
-    max_date = valid_data['WorkDate'].max().date()
-    
-    return jsonify({
-        'min_date': min_date.strftime('%Y-%m-%d'),
-        'max_date': max_date.strftime('%Y-%m-%d')
-    })
 
 @app.route('/api/data_completeness')
 def get_data_completeness():
     """Analyze data completeness and identify missing quarters/days"""
     completeness_issues = []
     
-    # Get all quarters that should exist (2017Q1 to 2025Q1)
+    # Get all quarters that should exist (2017Q1 to 2025Q2)
     expected_quarters = []
     for year in range(2017, 2026):
         for quarter in range(1, 5):
-            if year == 2025 and quarter > 1:  # Only Q1 2025 exists
+            if year == 2025 and quarter > 2:  # Only Q1 and Q2 2025 exist
                 break
             expected_quarters.append(f"{year}Q{quarter}")
     
