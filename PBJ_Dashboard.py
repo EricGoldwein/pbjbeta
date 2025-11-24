@@ -2897,10 +2897,10 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         fig.update_yaxes(title_text="Residents Per Day", row=3, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         fig.update_yaxes(title_text="% Contract Staff", row=4, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         
-        # Set y-axis ranges to ensure minimum is 0 for all charts
-        fig.update_yaxes(range=[0, None], row=1, col=1)  # Total Nurse HPRD
-        fig.update_yaxes(range=[0, None], row=2, col=1)  # RN HPRD
-        fig.update_yaxes(range=[0, None], row=3, col=1)  # Census
+        # Let all charts auto-scale for better visibility (no forced minimum of 0)
+        # fig.update_yaxes(range=[0, None], row=1, col=1)  # Total Nurse HPRD - auto-scale
+        # fig.update_yaxes(range=[0, None], row=2, col=1)  # RN HPRD - auto-scale
+        # fig.update_yaxes(range=[0, None], row=3, col=1)  # Census - auto-scale
         
         # Special handling for Contract Percentage to prevent negative range when all values are 0
         # Best practice: Show a small positive range (0-2%) for all-zero longitudinal data
