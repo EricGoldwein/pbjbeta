@@ -3015,8 +3015,9 @@ def _go_home():
 def main() -> None:
     """Main app layout and data flow."""
     try:
-        # Clear caches to ensure updated functions are used
-        clear_all_caches()
+        # NOTE: Removed clear_all_caches() - it was causing app to reload all data on every request,
+        # leading to 100+ minute load times. Caches should only be cleared when code actually changes.
+        # If you need to clear cache, do it manually via Streamlit's cache management UI.
         
         # Initialize session state variables at the very start
         if 'view_mode' not in st.session_state:
