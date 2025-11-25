@@ -14,7 +14,7 @@ import numpy as np
 from decimal import Decimal, ROUND_HALF_UP
 
 # Import dynamic file finder
-from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity, find_previous_affiliated_entity
+from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
 # Import dynamic date utilities
 from utils.date_utils import get_latest_data_periods, apply_dynamic_replacements
 
@@ -65,147 +65,175 @@ def load_pbj_favicon():
 # Trigger deployment
 import os
 
-# Check if we're in staging environment
+# Define IS_STAGING as a module-level variable so it's available everywhere
 IS_STAGING = os.getenv('STAGING', 'false').lower() == 'true'
 
-if IS_STAGING:
-    st.set_page_config(
-        page_title="PBJ Dashboard - STAGING", 
-        page_icon="pbj_images/pbj_favicon.png", 
-        layout="wide", 
-        initial_sidebar_state="collapsed"
-    )
-    st.warning("🚧 **STAGING ENVIRONMENT** - This is a test site")
-    
-    # Memory optimization for staging
-    import gc
-    gc.set_threshold(100, 10, 10)  # More aggressive garbage collection
-    
-    # Force garbage collection
-    gc.collect()
-else:
-    st.set_page_config(
-        page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-        page_icon="pbj_images/pbj_favicon.png", 
-        layout="wide", 
-        initial_sidebar_state="collapsed"
-    )
+def _is_streamlit_context() -> bool:
+    """Check if we're running in a Streamlit script context."""
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        return get_script_run_ctx() is not None
+    except (ImportError, AttributeError):
+        return False
 
-# Add SEO meta tags for better search engine optimization and social media sharing
-st.markdown("""
-    <!-- SEO Meta Tags -->
-    <meta name="description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
-    <meta name="keywords" content="PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics">
-    <meta name="author" content="320 Consulting">
-    <meta name="robots" content="index, follow">
-    <meta name="language" content="English">
-    <meta name="revisit-after" content="7 days">
+def _init_streamlit_config():
+    """Initialize Streamlit configuration only when running in Streamlit context."""
+    if not _is_streamlit_context():
+        return  # Don't run if not in Streamlit context
     
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://pbjdashboard.com/">
-    <meta property="og:title" content="PBJ Nursing Home Staffing Dashboard by 320 Consulting">
-    <meta property="og:description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
-    <meta property="og:image" content="https://pbjdashboard.com/pbj.seo.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:site_name" content="PBJ Nursing Home Staffing Dashboard">
-    
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://pbjdashboard.com/">
-    <meta property="twitter:title" content="PBJ Nursing Home Staffing Dashboard by 320 Consulting">
-    <meta property="twitter:description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
-    <meta property="twitter:image" content="https://pbjdashboard.com/pbj.seo.png">
-    
-    <!-- Additional SEO -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#1e88e5">
-    <link rel="canonical" href="https://pbjdashboard.com/">
-    
-    <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "PBJ Nursing Home Staffing Dashboard",
-        "description": "Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.",
-        "url": "https://pbjdashboard.com/",
-        "applicationCategory": "HealthcareApplication",
-        "operatingSystem": "Web Browser",
-        "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
-        },
-        "provider": {
-            "@type": "Organization",
-            "name": "320 Consulting",
-            "url": "https://pbjdashboard.com/"
-        },
-        "keywords": "PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics"
-    }
-    </script>
-""", unsafe_allow_html=True)
+    # Use the global IS_STAGING variable
+    global IS_STAGING
 
-# Add subtle modern styling for metric containers only (not delta or value)
-st.markdown("""
+    if IS_STAGING:
+        st.set_page_config(
+            page_title="PBJ Dashboard - STAGING", 
+            page_icon="pbj_images/pbj_favicon.png", 
+            layout="wide", 
+            initial_sidebar_state="collapsed"
+        )
+        st.warning("🚧 **STAGING ENVIRONMENT** - This is a test site")
+        
+        # Memory optimization for staging
+        import gc
+        gc.set_threshold(100, 10, 10)  # More aggressive garbage collection
+        
+        # Force garbage collection
+        gc.collect()
+    else:
+        st.set_page_config(
+            page_title="PBJ Nursing Home Staffing Dashboard by 320", 
+            page_icon="pbj_images/pbj_favicon.png", 
+            layout="wide", 
+            initial_sidebar_state="collapsed"
+        )
+
+    # Add SEO meta tags for better search engine optimization and social media sharing
+    st.markdown("""
+        <!-- SEO Meta Tags -->
+        <meta name="description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+        <meta name="keywords" content="PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics">
+        <meta name="author" content="320 Consulting">
+        <meta name="robots" content="index, follow">
+        <meta name="language" content="English">
+        <meta name="revisit-after" content="7 days">
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://pbjdashboard.com/">
+        <meta property="og:title" content="PBJ Nursing Home Staffing Dashboard by 320 Consulting">
+        <meta property="og:description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+        <meta property="og:image" content="https://pbjdashboard.com/pbj.seo.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:site_name" content="PBJ Nursing Home Staffing Dashboard">
+        
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image">
+        <meta property="twitter:url" content="https://pbjdashboard.com/">
+        <meta property="twitter:title" content="PBJ Nursing Home Staffing Dashboard by 320 Consulting">
+        <meta property="twitter:description" content="Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.">
+        <meta property="twitter:image" content="https://pbjdashboard.com/pbj.seo.png">
+        
+        <!-- Additional SEO -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="theme-color" content="#1e88e5">
+        <link rel="canonical" href="https://pbjdashboard.com/">
+        
+        <!-- Structured Data (JSON-LD) -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "name": "PBJ Nursing Home Staffing Dashboard",
+            "description": "Explore staffing trends across 15,000+ U.S. nursing homes with CMS payroll-based journal data.",
+            "url": "https://pbjdashboard.com/",
+            "applicationCategory": "HealthcareApplication",
+            "operatingSystem": "Web Browser",
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+            },
+            "provider": {
+                "@type": "Organization",
+                "name": "320 Consulting",
+                "url": "https://pbjdashboard.com/"
+            },
+            "keywords": "PBJ, nursing home staffing, HPRD, healthcare staffing, nursing home compliance, healthcare analytics, nursing home data, staffing metrics"
+        }
+        </script>
+    """, unsafe_allow_html=True)
+
+    # Add subtle modern styling for metric containers only (not delta or value)
+    st.markdown("""
+        <style>
+        div[data-testid="stMetric"] {
+            background: #fafdff;
+            border: 1px solid #e3eaf3;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(30,136,229,0.04);
+            padding: 12px 18px 4px 18px;
+            margin: 12px 4px 6px 4px;
+        }
+        
+        /* Override delta colors for neutral indicators */
+        div[data-testid="stMetric"] div[data-testid="metric-container"] div[data-testid="metric-delta"] svg {
+            color: #6c757d !important;
+        }
+        div[data-testid="stMetric"] div[data-testid="metric-container"] div[data-testid="metric-delta"] span {
+            color: #6c757d !important;
+        }
+        </style>
+        
+        <script>
+        // Force sidebar to be collapsed on page load
+        window.addEventListener('load', function() {
+            try {
+                const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+                if (sidebar) {
+                    sidebar.setAttribute('aria-expanded', 'false');
+                    sidebar.style.transform = 'translateX(-100%)';
+                }
+            } catch (error) {
+                console.log('Error collapsing sidebar:', error);
+            }
+        });
+        </script>
+    """, unsafe_allow_html=True)
+
+    # Add CSS to hide the toggle tip on desktop and mobile-responsive title
+    st.markdown("""
     <style>
-    div[data-testid="stMetric"] {
-        background: #fafdff;
-        border: 1px solid #e3eaf3;
-        border-radius: 10px;
-        box-shadow: 0 1px 4px rgba(30,136,229,0.04);
-        padding: 12px 18px 4px 18px;
-        margin: 12px 4px 6px 4px;
+    .toggle-tip-mobile {
+        display: block;
     }
-    
-    /* Override delta colors for neutral indicators */
-    div[data-testid="stMetric"] div[data-testid="metric-container"] div[data-testid="metric-delta"] svg {
-        color: #6c757d !important;
+    @media (min-width: 900px) {
+        .toggle-tip-mobile {
+            display: none !important;
+        }
     }
-    div[data-testid="stMetric"] div[data-testid="metric-container"] div[data-testid="metric-delta"] span {
-        color: #6c757d !important;
+
+    /* Mobile-responsive title styling */
+    @media (max-width: 768px) {
+        .dashboard-title {
+            font-size: 2.1em !important;
+            line-height: 1.2 !important;
+        }
     }
     </style>
+    """, unsafe_allow_html=True)
     
-    <script>
-    // Force sidebar to be collapsed on page load
-    window.addEventListener('load', function() {
-        try {
-            const sidebar = document.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar) {
-                sidebar.setAttribute('aria-expanded', 'false');
-                sidebar.style.transform = 'translateX(-100%)';
-            }
-        } catch (error) {
-            console.log('Error collapsing sidebar:', error);
+    # Add facilities table styling
+    st.markdown("""
+        <style>
+        #facilities-table .dataframe th {
+            color: #000 !important;
         }
-    });
-    </script>
-""", unsafe_allow_html=True)
+        </style>
+    """, unsafe_allow_html=True)
 
-# Add CSS to hide the toggle tip on desktop and mobile-responsive title
-st.markdown("""
-<style>
-.toggle-tip-mobile {
-    display: block;
-}
-@media (min-width: 900px) {
-    .toggle-tip-mobile {
-        display: none !important;
-    }
-}
-
-/* Mobile-responsive title styling */
-@media (max-width: 768px) {
-    .dashboard-title {
-        font-size: 2.1em !important;
-        line-height: 1.2 !important;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
+# Initialize Streamlit configuration at module level (but guarded)
+_init_streamlit_config()
 
 # Initialize DuckDB connection for facility data
 facility_db = duckdb.connect(':memory:')
@@ -437,15 +465,15 @@ def pbj_takeaway_card(
     casemix_hprd: float,
     census: str = "—",
     contract: str = "—",
-    trend_delta: float = None,  # Change from previous quarter
-    census_trend: float = None,  # Change in census from previous quarter
-    previous_year: str = None,  # Previous year quarter for comparison (4 quarters behind)
+    trend_delta: Optional[float] = None,  # Change from previous quarter
+    census_trend: Optional[float] = None,  # Change in census from previous quarter
+    previous_year: Optional[str] = None,  # Previous year quarter for comparison (4 quarters behind)
     aide_share: float = 0.60,  # or compute from PBJ if you have it
     floor_beds: int = 30,
-    ownership_type: str = None,  # Ownership type (For Profit, Non Profit, Government)
-    affiliated_entity: str = None,  # Affiliated entity name
-    affiliated_entity_id: str = None,  # Affiliated entity ID
-    high_risk_indicators: dict = None,  # High-risk indicators
+    ownership_type: Optional[str] = None,  # Ownership type (For Profit, Non Profit, Government)
+    affiliated_entity: Optional[str] = None,  # Affiliated entity name
+    affiliated_entity_id: Optional[str] = None,  # Affiliated entity ID
+    high_risk_indicators: Optional[dict] = None,  # High-risk indicators
     ownership_change: bool = False  # Whether facility changed ownership in last 12 months
 ):
     # Calculate previous year quarter if not provided
@@ -621,8 +649,8 @@ def state_pbj_takeaway_card(
     national_hprd: float,
     state_rank: int,
     total_states: int,
-    trend_delta: float = None,  # Change from previous quarter
-    previous_year: str = None,  # Previous year quarter for comparison (4 quarters behind)
+    trend_delta: Optional[float] = None,  # Change from previous quarter
+    previous_year: Optional[str] = None,  # Previous year quarter for comparison (4 quarters behind)
     aide_share: float = 0.60,  # or compute from PBJ if you have it
     floor_beds: int = 30,
     avg_facility_size: float = 100  # Average facility size for the state
@@ -865,9 +893,13 @@ def load_metrics_data(cache_version="v2024_12_15"):
 
         # Convert CY_QTR to datetime for all dataframes
         for df in [national_metrics, state_metrics, facility_metrics]:
-            df['date'] = pd.to_datetime(df['CY_QTR'].str[:4] + '-' + 
-                                      ((df['CY_QTR'].str[-1].astype(int) - 1) * 3 + 1).astype(str).str.zfill(2) + 
-                                      '-01')
+            if 'CY_QTR' in df.columns and not df.empty:
+                df['date'] = pd.to_datetime(df['CY_QTR'].str[:4] + '-' + 
+                                          ((df['CY_QTR'].str[-1].astype(int) - 1) * 3 + 1).astype(str).str.zfill(2) + 
+                                          '-01')
+            else:
+                # If CY_QTR doesn't exist, create a dummy date column
+                df['date'] = pd.to_datetime('2024-01-01')
         
         # Force garbage collection to free memory
         gc.collect()
@@ -1103,9 +1135,12 @@ def create_facility_db():
         facility_metrics.rename(columns=column_mapping, inplace=True)
         
         # Add date column before creating table
-        facility_metrics['date'] = pd.to_datetime(facility_metrics['CY_QTR'].str[:4] + '-' + 
-                                                ((facility_metrics['CY_QTR'].str[-1].astype(int) - 1) * 3 + 1).astype(str).str.zfill(2) + 
-                                                '-01')
+        if 'CY_QTR' in facility_metrics.columns and not facility_metrics.empty:
+            facility_metrics['date'] = pd.to_datetime(facility_metrics['CY_QTR'].str[:4] + '-' + 
+                                                    ((facility_metrics['CY_QTR'].str[-1].astype(int) - 1) * 3 + 1).astype(str).str.zfill(2) + 
+                                                    '-01')
+        else:
+            facility_metrics['date'] = pd.to_datetime('2024-01-01')
         
         # Drop the table if it exists
         facility_db.execute("DROP TABLE IF EXISTS facility_metrics")
@@ -1400,14 +1435,7 @@ def get_provider_county(provnum):
     """Get provider county from PBJ files."""
     return get_provider_info(provnum, 'county')
 
-st.markdown("""
-    <style>
-    #facilities-table .dataframe th {
-        color: #000 !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-def get_facility_staffing_rating(provnum: str) -> float:
+def get_facility_staffing_rating(provnum: str) -> Optional[float]:
     """Get the staffing rating for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1430,7 +1458,7 @@ def get_facility_staffing_rating(provnum: str) -> float:
         return None
 
 @st.cache_data
-def get_facility_affiliated_entity(provnum: str) -> str:
+def get_facility_affiliated_entity(provnum: str) -> Optional[str]:
     """Get the chain name for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1455,7 +1483,7 @@ def get_facility_affiliated_entity(provnum: str) -> str:
         return None
 
 @st.cache_data
-def get_facility_affiliated_entity_id(provnum: str) -> str:
+def get_facility_affiliated_entity_id(provnum: str) -> Optional[str]:
     """Get the chain ID for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1480,7 +1508,7 @@ def get_facility_affiliated_entity_id(provnum: str) -> str:
         return None
 
 @st.cache_data
-def get_facility_overall_rating(provnum: str) -> float:
+def get_facility_overall_rating(provnum: str) -> Optional[float]:
     """Get the overall rating for a specific facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1506,7 +1534,7 @@ def get_facility_overall_rating(provnum: str) -> float:
         return None
 
 @st.cache_data
-def get_facility_staffing_rating_trend(provnum: str) -> str:
+def get_facility_staffing_rating_trend(provnum: str) -> Optional[str]:
     """Get the staffing rating trend by comparing current vs previous reporting period."""
     try:
         current_data = load_provider_info_data()
@@ -1546,7 +1574,7 @@ def get_facility_staffing_rating_trend(provnum: str) -> str:
         return None
 
 @st.cache_data
-def get_facility_overall_rating_trend(provnum: str) -> str:
+def get_facility_overall_rating_trend(provnum: str) -> Optional[str]:
     """Get the overall rating trend by comparing current vs previous reporting period."""
     try:
         current_data = load_provider_info_data()
@@ -1671,7 +1699,7 @@ def search_facilities(search_term: str) -> List[Dict[str, str]]:
         return []
 
 @st.cache_data
-def get_facility_info(provnum: str) -> dict:
+def get_facility_info(provnum: str) -> Optional[dict]:
     """Get facility information from the database."""
     try:
         conn = get_db_connection()
@@ -1705,7 +1733,7 @@ def get_facility_info(provnum: str) -> dict:
         return None
 
 @st.cache_data
-def get_facility_ownership_type(provnum: str) -> str:
+def get_facility_ownership_type(provnum: str) -> Optional[str]:
     """Get ownership type for a facility from provider info data."""
     try:
         provider_data = load_provider_info_data()
@@ -1763,7 +1791,7 @@ def get_facility_ownership_change(provnum: str) -> bool:
         return False
 
 @st.cache_data
-def get_facility_high_risk_indicators(provnum: str) -> dict:
+def get_facility_high_risk_indicators(provnum: str) -> Optional[dict]:
     """Get high-risk indicators for a facility."""
     try:
         provider_data = load_provider_info_data()
@@ -1800,7 +1828,7 @@ def get_facility_high_risk_indicators(provnum: str) -> dict:
     except Exception as e:
         return None
 
-def get_quarterly_metrics(provnum: str, quarter: str) -> dict:
+def get_quarterly_metrics(provnum: str, quarter: str) -> Optional[dict]:
     """Get quarterly metrics for a facility."""
     try:
         conn = get_db_connection()
@@ -1956,8 +1984,8 @@ def display_inactive_facility_message(provnum: str, facility_status: dict):
         
         This facility's CCN is no longer active in current CMS data. 
         
-        **Last Available Data:** {format_quarter(last_quarter)}  
-        **Current Data Range:** Through {format_quarter(latest_quarter)}
+        **Last Available Data:** {format_quarter(last_quarter) if last_quarter else 'Unknown'}  
+        **Current Data Range:** Through {format_quarter(latest_quarter) if latest_quarter else 'Unknown'}
         
         **Last Known Metrics:**
         - HPRD: {last_hprd:.2f}
@@ -1969,7 +1997,7 @@ def display_inactive_facility_message(provnum: str, facility_status: dict):
     
     return False
 
-def display_facility_info(provnum: str, quarter_name: str = None, affiliated_entity: str = None):
+def display_facility_info(provnum: str, quarter_name: Optional[str] = None, affiliated_entity: Optional[str] = None):
     """Display facility information in a formatted box. On mobile, remove ownership entity and show quarter below provider name."""
     try:
         # Note: Inactive facility handling is now done in the main flow, not here
@@ -2359,8 +2387,23 @@ def display_metrics(metrics: pd.DataFrame, level: str):
         # Display metrics in columns - use 4 columns for all levels
         col1, col2, col3, col4 = st.columns(4)
         
+        # Initialize facility_count and prev_facility_count for all levels
+        facility_count = 0
+        prev_facility_count: Optional[int] = None
+        
         # For National and State, add facility count metric
         if level in ["National", "State"]:
+            # Ensure facility_count and prev_facility_count are defined (they should be set above)
+            # But re-get them here to be safe
+            if level == "State":
+                state = metrics['STATE'].iloc[0] if not metrics.empty else None
+                if state:
+                    facility_count = current_metrics['Facility_Count'].iloc[0] if 'Facility_Count' in current_metrics.columns else len(current_metrics['PROVNUM'].unique())
+                    prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics.columns else None
+            elif level == "National":
+                facility_count = current_metrics['Facility_Count'].iloc[0] if 'Facility_Count' in current_metrics.columns else len(current_metrics['PROVNUM'].unique())
+                prev_facility_count = prev_metrics['Facility_Count'].iloc[0] if not prev_metrics.empty and 'Facility_Count' in prev_metrics.columns else None
+            
             with col1:
                 st.metric("Nursing Homes", 
                          format_metric(facility_count, decimal_places=0, thousands=True),
@@ -2450,7 +2493,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     
                     # Create help text based on whether dates are different
                     if latest_date != previous_date:
-                        help_text = f"5-star rating from most recent CMS Provider Info ({latest_date}) compared to most recent prior quarter ({previous_date})."
+                        help_text = f"5-star rating determined by federal CMS ({latest_date} vs. {previous_date})."
                     else:
                         help_text = f"5-star rating determined by federal CMS ({latest_date})."
                     
@@ -2466,7 +2509,7 @@ def display_metrics(metrics: pd.DataFrame, level: str):
                     
                     # Create help text based on whether dates are different
                     if latest_date != previous_date:
-                        help_text = f"5-star rating from most recent CMS Provider Info ({latest_date}) compared to most recent prior quarter ({previous_date})."
+                        help_text = f"5-star rating determined by federal CMS ({latest_date} vs. {previous_date})."
                     else:
                         help_text = f"5-star rating determined by federal CMS ({latest_date})."
                     
@@ -2531,30 +2574,34 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         available_categories = []
         
         for category in categories:
+            # Initialize variables
+            reported_val = None
+            case_mix_val = None
+            
             if category == "Total Nursing":
-                reported_val = row["Reported Total Nurse Staffing Hours per Resident per Day"]
-                case_mix_val = row["Case-Mix Total Nurse Staffing Hours per Resident per Day"]
+                reported_val = row.get("Reported Total Nurse Staffing Hours per Resident per Day")
+                case_mix_val = row.get("Case-Mix Total Nurse Staffing Hours per Resident per Day")
             elif category == "RN":
-                reported_val = row["Reported RN Staffing Hours per Resident per Day"]
-                case_mix_val = row["Case-Mix RN Staffing Hours per Resident per Day"]
+                reported_val = row.get("Reported RN Staffing Hours per Resident per Day")
+                case_mix_val = row.get("Case-Mix RN Staffing Hours per Resident per Day")
             elif category == "Nurse Aide":
-                reported_val = row["Reported Nurse Aide Staffing Hours per Resident per Day"]
-                case_mix_val = row["Case-Mix Nurse Aide Staffing Hours per Resident per Day"]
+                reported_val = row.get("Reported Nurse Aide Staffing Hours per Resident per Day")
+                case_mix_val = row.get("Case-Mix Nurse Aide Staffing Hours per Resident per Day")
             
             # Check if we have valid data for this category
-            has_reported = pd.notna(reported_val) and reported_val > 0
-            has_case_mix = pd.notna(case_mix_val) and case_mix_val > 0
+            has_reported = reported_val is not None and pd.notna(reported_val) and reported_val > 0
+            has_case_mix = case_mix_val is not None and pd.notna(case_mix_val) and case_mix_val > 0
             
             if has_reported or has_case_mix:
                 available_categories.append(category)
                 # Calculate values
-                delta = reported_val - case_mix_val if has_reported and has_case_mix else 0
-                delta_pct = ((reported_val / case_mix_val - 1) * 100) if has_reported and has_case_mix and case_mix_val > 0 else 0
+                delta = (reported_val - case_mix_val) if (has_reported and has_case_mix and reported_val is not None and case_mix_val is not None) else 0.0
+                delta_pct = ((reported_val / case_mix_val - 1) * 100) if (has_reported and has_case_mix and case_mix_val is not None and case_mix_val > 0 and reported_val is not None) else 0.0
                 
                 deltas.append(delta)
                 delta_percentages.append(delta_pct)
-                reported_values.append(reported_val if has_reported else 0)
-                case_mix_values.append(case_mix_val if has_case_mix else 0)
+                reported_values.append(reported_val if has_reported and reported_val is not None else 0.0)
+                case_mix_values.append(case_mix_val if has_case_mix and case_mix_val is not None else 0.0)
         
         # If no case-mix data available at all, return None
         if not any(case_mix_values):
@@ -2632,8 +2679,9 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
                 )
         
         # Add 320 Consulting badge
+        provider_info_latest = get_latest_data_periods().get('provider_info_latest', 'Unknown')
         fig.add_annotation(
-            text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
+            text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({provider_info_latest})",
             x=0.99,
             y=-0.6,
             xref="x domain",
@@ -2652,7 +2700,7 @@ def create_case_mix_charts(provnum, quarter_label="", facility_name=""):
         return None, None
 
 
-def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = None):
+def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facility: Optional[str] = None):
     """Plot quarterly trends with optimized data processing."""
     try:
         # Check if data is empty or missing required columns
@@ -2897,10 +2945,10 @@ def plot_quarterly_trends(df: pd.DataFrame, state: str = None, facility: str = N
         fig.update_yaxes(title_text="Residents Per Day", row=3, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         fig.update_yaxes(title_text="% Contract Staff", row=4, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         
-        # Let all charts auto-scale for better visibility (no forced minimum of 0)
-        # fig.update_yaxes(range=[0, None], row=1, col=1)  # Total Nurse HPRD - auto-scale
-        # fig.update_yaxes(range=[0, None], row=2, col=1)  # RN HPRD - auto-scale
-        # fig.update_yaxes(range=[0, None], row=3, col=1)  # Census - auto-scale
+        # Set y-axis ranges to ensure minimum is 0 for all charts
+        fig.update_yaxes(range=[0, None], row=1, col=1)  # Total Nurse HPRD
+        fig.update_yaxes(range=[0, None], row=2, col=1)  # RN HPRD
+        fig.update_yaxes(range=[0, None], row=3, col=1)  # Census
         
         # Special handling for Contract Percentage to prevent negative range when all values are 0
         # Best practice: Show a small positive range (0-2%) for all-zero longitudinal data
@@ -3250,17 +3298,17 @@ def main() -> None:
         
         @st.cache_data
         def load_previous_ownership_data():
-            """Load previous ownership data for comparison (most recent prior quarter)."""
+            """Load previous ownership data for comparison."""
             try:
-                # Use dynamic file finder to get the previous affiliated entity file from a different quarter
-                file_path = find_previous_affiliated_entity()
+                # Use dynamic file finder to get the previous affiliated entity file
+                file_path = find_latest_affiliated_entity()
                 
                 if not file_path:
                     st.warning("Previous ownership data file not found. Some features may be limited.")
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
-                # Map older column names to newer column names for comparison
+                # Map March column names to July column names for comparison
                 column_mapping = {
                     'Affiliated entity': 'Chain',
                     'Affiliated entity ID': 'Chain ID'
@@ -3272,7 +3320,7 @@ def main() -> None:
                     df = df.rename(columns=rename_dict)
                 return df
             except Exception as e:
-                st.error(f"Error loading previous ownership data: {str(e)}")
+                st.error(f"Error loading March ownership data: {str(e)}")
                 return pd.DataFrame()
         
         @st.cache_data
@@ -4233,7 +4281,13 @@ def main() -> None:
 
         # Get all available quarters
         try:
+            if national_metrics.empty or 'CY_QTR' not in national_metrics.columns:
+                st.error("Error loading quarters: CY_QTR column not found in national metrics data")
+                return
             all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
+            if len(all_quarters) == 0:
+                st.error("Error loading quarters: No quarters found in data")
+                return
             start_quarter = all_quarters[0]  # First quarter
             end_quarter = all_quarters[-1]   # Last quarter
         except Exception as e:
@@ -4869,14 +4923,12 @@ def main() -> None:
                         entity_name_title_case = proper_title_case(selected_value)
                         
                         # Get the most recent data period dynamically
-                        periods = get_latest_data_periods()
-                        most_recent_period = periods['affiliated_entity_latest']
-                        previous_period = periods.get('affiliated_entity_previous', 'previous period')
+                        most_recent_period = get_latest_data_periods()['affiliated_entity_latest']
                         
                         # Responsive header with mobile optimization
                         st.markdown(f'''
                                 <h2 style="margin-bottom: 0.1em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233; line-height: 1.0;">{entity_name_title_case} <span class="desktop-id" style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>
-                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS, {most_recent_period}.</div>
+                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS, {most_recent_period}</div>
                                 <style>
                                     @media (max-width: 768px) {{
                                         .desktop-id {{ display: none !important; }}
@@ -4904,7 +4956,7 @@ def main() -> None:
                             st.metric("Total Facilities", 
                                      format_metric(current_facilities, decimal_places=0, thousands=True),
                                      delta_display,
-                                     help=f"Total number of nursing homes owned by this entity (vs. {previous_period})")
+                                     help="Total number of nursing homes owned by this entity (vs. March 2025)")
                         with col2:
                             current_states = entity_row['Number of states and territories with operations']
                             prev_states = previous_row['Number of states and territories with operations'] if previous_row is not None else None
@@ -4921,7 +4973,7 @@ def main() -> None:
                             st.metric("States of Operation", 
                                      format_metric(current_states, decimal_places=0),
                                      delta_display,
-                                     help=f"Number of states where this entity operates nursing homes (vs. {previous_period})")
+                                     help="Number of states where this entity operates nursing homes (vs. March 2025)")
                         with col3:
                             current_rating = entity_row['Average overall 5-star rating']
                             prev_rating = previous_row['Average overall 5-star rating'] if previous_row is not None else None
@@ -4938,7 +4990,7 @@ def main() -> None:
                             st.metric("Overall Rating", 
                                      format_metric(current_rating, decimal_places=1),
                                      delta_display,
-                                     help=f"Average CMS 5-star overall rating across all facilities (vs. {previous_period})")
+                                     help="Average CMS 5-star overall rating across all facilities (vs. March 2025)")
                         with col4:
                             current_fines = entity_row['Total amount of fines in dollars']
                             prev_fines = previous_row['Total amount of fines in dollars'] if previous_row is not None else None
@@ -4963,7 +5015,7 @@ def main() -> None:
                             st.metric("Total Fines", 
                                      format_fines_display(current_fines),
                                      delta_display,
-                                     help=f"Total amount of fines in dollars across all facilities (vs. {previous_period})")
+                                     help="Total amount of fines in dollars across all facilities (vs. March 2025)")
                         with col5:
                             # Add spacing before ownership chart on desktop only
                             if not st.session_state.get('is_mobile', False):
@@ -5025,8 +5077,9 @@ def main() -> None:
                             )
                             
                             # Add 320 Consulting badge
+                            provider_info_latest = get_latest_data_periods().get('provider_info_latest', 'Unknown')
                             fig_pie.add_annotation(
-                                text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
+                                text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({provider_info_latest})",
                                 x=0.99,
                                 y=-0.45,
                                 xref="x domain",
@@ -5065,7 +5118,7 @@ def main() -> None:
                             st.metric("Special Focus Facilities (SFFs)", 
                                      format_metric(current_sff, decimal_places=0),
                                      delta_display,
-                                     help=f"Special Focus Facilities are nursing homes with serious quality issues under CMS oversight (vs. {previous_period})")
+                                     help="Special Focus Facilities are nursing homes with serious quality issues under CMS oversight (vs. March 2025)")
                         with risk_col2:
                             current_sff_candidate = entity_row['Number of SFF candidates']
                             prev_sff_candidate = previous_row['Number of SFF candidates'] if previous_row is not None else None
@@ -5082,7 +5135,7 @@ def main() -> None:
                             st.metric("SFF Candidates", 
                                      format_metric(current_sff_candidate, decimal_places=0),
                                      delta_display,
-                                     help=f"Facilities monitored for potential SFF designation (vs. {previous_period})")
+                                     help="Facilities monitored for potential SFF designation (vs. March 2025)")
                         with risk_col3:
                             current_abuse = entity_row['Number of facilities with an abuse icon']
                             prev_abuse = previous_row['Number of facilities with an abuse icon'] if previous_row is not None else None
@@ -5104,7 +5157,7 @@ def main() -> None:
                             st.metric("Facilited Cited for Abuse", 
                                      abuse_display,
                                      delta_display,
-                                     help=f"Facilities cited for abuse (vs. {previous_period})")
+                                     help="Facilities cited for abuse (vs. March 2025)")
                         with risk_col4:
                             # Calculate 1-star comparison from previous data
                             prev_1star = 0
@@ -5140,7 +5193,7 @@ def main() -> None:
                             st.metric("1-Star Rating Facilities", 
                                      one_star_display,
                                      delta_display,
-                                     help=f"Facilities with the lowest CMS overall rating (vs. {previous_period})")
+                                     help="Facilities with the lowest CMS overall rating (vs. March 2025)")
                         
 
                         
@@ -5205,7 +5258,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Overall", f"{current_overall:.1f}", delta_display, help=f"Average overall 5-star rating (vs. {previous_period})")
+                            st.metric("Overall", f"{current_overall:.1f}", delta_display, help="Average overall 5-star rating (vs. March 2025)")
                         with qual_col2:
                             # Health inspection rating delta
                             current_health = entity_row['Average health inspection rating']
@@ -5219,7 +5272,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Health Inspection", f"{current_health:.1f}", delta_display, help=f"Average health inspection rating (vs. {previous_period})")
+                            st.metric("Health Inspection", f"{current_health:.1f}", delta_display, help="Average health inspection rating (vs. March 2025)")
                         with qual_col3:
                             # Staffing rating delta
                             current_staffing = entity_row['Average staffing rating']
@@ -5233,7 +5286,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Staffing", f"{current_staffing:.1f}", delta_display, help=f"Average staffing rating (vs. {previous_period})")
+                            st.metric("Staffing", f"{current_staffing:.1f}", delta_display, help="Average staffing rating (vs. March 2025)")
                         with qual_col4:
                             # Quality rating delta
                             current_quality = entity_row['Average quality rating']
@@ -5247,7 +5300,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Quality", f"{current_quality:.1f}", delta_display, help=f"Average quality rating (vs. {previous_period})")
+                            st.metric("Quality", f"{current_quality:.1f}", delta_display, help="Average quality rating (vs. March 2025)")
                         # Quality ratings chart and distribution chart side by side
                         # Add spacing before charts to prevent overlap with metrics above
                         st.markdown('<div style="margin-top: 30px;"></div>', unsafe_allow_html=True)
@@ -5290,8 +5343,9 @@ def main() -> None:
                             )
                             
                             # Add 320 Consulting badge
+                            provider_info_latest = get_latest_data_periods().get('provider_info_latest', 'Unknown')
                             fig.add_annotation(
-                                text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
+                                text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({provider_info_latest})",
                                 x=0.99,
                                 y=-0.45,
                                 xref="x domain",
@@ -5362,8 +5416,9 @@ def main() -> None:
                                     )
                                     
                                     # Add 320 Consulting badge
+                                    provider_info_latest = get_latest_data_periods().get('provider_info_latest', 'Unknown')
                                     fig_ratings.add_annotation(
-                                        text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({get_latest_data_periods()['provider_info_latest']})",
+                                        text=f"<b>320 Consulting</b> | Source: CMS Provider Info ({provider_info_latest})",
                                         x=0.99,
                                         y=-0.45,
                                         xref="x domain",
@@ -5398,7 +5453,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Nurse HPRD", f"{current_total_hprd:.1f}", delta_display, help=f"Average total nurse hours per resident day (vs. {previous_period})")
+                            st.metric("Total Nurse HPRD", f"{current_total_hprd:.1f}", delta_display, help="Average total nurse hours per resident day (vs. March 2025)")
                         with staff_col2:
                             # RN HPRD delta
                             current_rn_hprd = entity_row['Average total Registered Nurse hours per resident day']
@@ -5412,7 +5467,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN HPRD", f"{current_rn_hprd:.1f}", delta_display, help=f"Average RN hours per resident day (vs. {previous_period})")
+                            st.metric("RN HPRD", f"{current_rn_hprd:.1f}", delta_display, help="Average RN hours per resident day (vs. March 2025)")
                         with staff_col3:
                             # Weekend HPRD delta
                             current_weekend_hprd = entity_row['Average total weekend nurse hours per resident day']
@@ -5440,7 +5495,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Admin Turnover", f"{current_admin_turnover:.1f}", delta_display, help=f"Number of administrators that stopped working at the nursing home over a 12-month period (vs. {previous_period})")
+                            st.metric("Admin Turnover", f"{current_admin_turnover:.1f}", delta_display, help="Number of administrators that stopped working at the nursing home over a 12-month period (vs March 2025)")
                         
                         # Turnover metrics
                         turn_col1, turn_col2 = st.columns(2)
@@ -5462,7 +5517,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help=f"The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. {previous_period})")
+                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help="The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
                         with turn_col2:
                             # RN Turnover delta
                             current_rn_turnover = entity_row['Average Registered Nurse turnover percentage']
@@ -5476,7 +5531,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help=f"The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. {previous_period})")
+                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help="The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
                         
                         # Compliance metrics
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5502,7 +5557,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Fines", format_fines_display(current_total_fines), delta_display, help=f"Total amount of fines in dollars (vs. {previous_period})")
+                            st.metric("Total Fines", format_fines_display(current_total_fines), delta_display, help="Total amount of fines in dollars (vs. March 2025)")
                         with comp_col2:
                             # Avg Fines per Facility delta
                             current_avg_fines = entity_row['Average amount of fines in dollars']
@@ -5516,7 +5571,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Avg Fines per Facility", f"${current_avg_fines:,.0f}", delta_display, help=f"Average fines per facility (vs. {previous_period})")
+                            st.metric("Avg Fines per Facility", f"${current_avg_fines:,.0f}", delta_display, help="Average fines per facility (vs. March 2025)")
                         with comp_col3:
                             # Total Payment Denials delta
                             current_denials = entity_row['Total number of payment denials']
@@ -5530,7 +5585,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Payment Denials", f"{current_denials:,.0f}", delta_display, help=f"Total number of payment denials (vs. {previous_period})")
+                            st.metric("Total Payment Denials", f"{current_denials:,.0f}", delta_display, help="Total number of payment denials (vs. March 2025)")
                         with comp_col4:
                             # Avg Payment Denials delta
                             current_avg_denials = entity_row['Average number of payment denials']
@@ -5544,7 +5599,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Avg Payment Denials", f"{current_avg_denials:.1f}", delta_display, help=f"Average number of payment denials (vs. {previous_period})")
+                            st.metric("Avg Payment Denials", f"{current_avg_denials:.1f}", delta_display, help="Average number of payment denials (vs. March 2025)")
                         
                         # Antipsychotic usage
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Antipsychotics - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5568,7 +5623,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Short-Stay Antipsychotic", format_antipsychotic_pct(current_short_stay), delta_display, help=f"Short-stay residents receiving antipsychotics (vs. {previous_period})")
+                            st.metric("Short-Stay Antipsychotic", format_antipsychotic_pct(current_short_stay), delta_display, help="Short-stay residents receiving antipsychotics (vs. March 2025)")
                         with anti_col2:
                             # Long-Stay Antipsychotic delta
                             current_long_stay = entity_row['Average percentage of long-stay residents who received an antipsychotic medication']
@@ -5582,7 +5637,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help=f"Long-stay residents receiving antipsychotics (vs. {previous_period})")
+                            st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help="Long-stay residents receiving antipsychotics (vs. March 2025)")
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
                         # Get facilities for this entity
