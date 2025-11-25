@@ -2945,19 +2945,54 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
         fig.update_yaxes(title_text="Residents Per Day", row=3, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         fig.update_yaxes(title_text="% Contract Staff", row=4, col=1, title_font=dict(size=10, color="#999999"), title_standoff=10)
         
-        # Set y-axis ranges to ensure minimum is 0 for all charts
-        fig.update_yaxes(range=[0, None], row=1, col=1)  # Total Nurse HPRD
-        fig.update_yaxes(range=[0, None], row=2, col=1)  # RN HPRD
-        fig.update_yaxes(range=[0, None], row=3, col=1)  # Census
-        
-        # Special handling for Contract Percentage to prevent negative range when all values are 0
-        # Best practice: Show a small positive range (0-2%) for all-zero longitudinal data
-        contract_values = data['Contract_Percentage'].dropna()
-        if len(contract_values) > 0 and contract_values.min() == contract_values.max() == 0:
-            # When all contract percentages are 0, set a small positive range (best practice for all-zero data)
-            fig.update_yaxes(range=[0, 2], row=4, col=1)  # Contract Percentage - 0 to 2%
+        # Calculate dynamic y-axis ranges based on data values (with padding)
+        # Total Nurse HPRD (row 1)
+        hprd_values = pd.concat([hprd_display, nurse_care_hprd_display]).dropna()
+        if len(hprd_values) > 0:
+            min_hprd = hprd_values.min()
+            max_hprd = hprd_values.max()
+            padding = (max_hprd - min_hprd) * 0.1 if max_hprd > min_hprd else max_hprd * 0.1
+            y_min_hprd = max(0, min_hprd - padding)  # Don't go below 0
+            fig.update_yaxes(range=[y_min_hprd, None], row=1, col=1)
         else:
-            fig.update_yaxes(range=[0, None], row=4, col=1)  # Contract Percentage - normal range
+            fig.update_yaxes(range=[0, None], row=1, col=1)
+        
+        # RN HPRD (row 2)
+        rn_hprd_values = total_rn_hprd_display.dropna()
+        if len(rn_hprd_values) > 0:
+            min_rn = rn_hprd_values.min()
+            max_rn = rn_hprd_values.max()
+            padding = (max_rn - min_rn) * 0.1 if max_rn > min_rn else max_rn * 0.1
+            y_min_rn = max(0, min_rn - padding)  # Don't go below 0
+            fig.update_yaxes(range=[y_min_rn, None], row=2, col=1)
+        else:
+            fig.update_yaxes(range=[0, None], row=2, col=1)
+        
+        # Census (row 3)
+        census_values = data[census_column].dropna()
+        if len(census_values) > 0:
+            min_census = census_values.min()
+            max_census = census_values.max()
+            padding = (max_census - min_census) * 0.1 if max_census > min_census else max_census * 0.1
+            y_min_census = max(0, min_census - padding)  # Don't go below 0
+            fig.update_yaxes(range=[y_min_census, None], row=3, col=1)
+        else:
+            fig.update_yaxes(range=[0, None], row=3, col=1)
+        
+        # Contract Percentage (row 4)
+        contract_values = data['Contract_Percentage'].dropna()
+        if len(contract_values) > 0:
+            if contract_values.min() == contract_values.max() == 0:
+                # When all contract percentages are 0, set a small positive range
+                fig.update_yaxes(range=[0, 2], row=4, col=1)
+            else:
+                min_contract = contract_values.min()
+                max_contract = contract_values.max()
+                padding = (max_contract - min_contract) * 0.1 if max_contract > min_contract else max_contract * 0.1
+                y_min_contract = max(0, min_contract - padding)  # Don't go below 0
+                fig.update_yaxes(range=[y_min_contract, None], row=4, col=1)
+        else:
+            fig.update_yaxes(range=[0, None], row=4, col=1)
         
         return fig
         
