@@ -14,7 +14,7 @@ import numpy as np
 from decimal import Decimal, ROUND_HALF_UP
 
 # Import dynamic file finder
-from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity
+from utils.file_finder import find_latest_provider_info, find_previous_provider_info, find_latest_affiliated_entity, find_previous_affiliated_entity
 # Import dynamic date utilities
 from utils.date_utils import get_latest_data_periods, apply_dynamic_replacements
 
@@ -3337,7 +3337,7 @@ def main() -> None:
             """Load previous ownership data for comparison."""
             try:
                 # Use dynamic file finder to get the previous affiliated entity file
-                file_path = find_latest_affiliated_entity()
+                file_path = find_previous_affiliated_entity()
                 
                 if not file_path:
                     st.warning("Previous ownership data file not found. Some features may be limited.")

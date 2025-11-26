@@ -264,6 +264,13 @@ def find_previous_affiliated_entity() -> Optional[str]:
     latest_file, latest_date = unique_file_list[0]
     latest_quarter = (latest_date.year, (latest_date.month - 1) // 3 + 1)
     
+    # Prefer March files for comparison (Q1) when available, as dashboard help text references March
+    march_files = [(fp, fd) for fp, fd in unique_file_list[1:] if fd.month == 3]
+    if march_files:
+        march_file, march_date = march_files[0]  # Get most recent March file
+        print(f"Using March ownership file for comparison: {os.path.basename(march_file)} (dated {march_date.strftime('%B %Y')})")
+        return march_file
+    
     # Find the most recent file from a different quarter
     for file_path, file_date in unique_file_list[1:]:
         file_quarter = (file_date.year, (file_date.month - 1) // 3 + 1)
