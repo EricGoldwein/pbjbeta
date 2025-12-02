@@ -60,6 +60,7 @@ def _calculate_data_range_and_quarters() -> tuple:
     """Calculate the data range and quarter count from available PBJ files."""
     import glob
     import os
+    import re
     
     # Look for PBJ files in standardized_PBJ directory
     pbj_files = glob.glob('standardized_PBJ/PBJ_dailynursestaffing_*.csv')
@@ -70,26 +71,29 @@ def _calculate_data_range_and_quarters() -> tuple:
     
     if not pbj_files:
         # Default fallback
-        return "2017-2025", 33
+        return "2017-2025", 34
     
-    # Extract years from filenames
+    # Extract unique quarters from filenames
+    quarters = set()
     years = set()
     for file_path in pbj_files:
         filename = os.path.basename(file_path)
-        # Extract year from filename like "PBJ_dailynursestaffing_CY2025Q1.csv"
-        import re
-        match = re.search(r'CY(\d{4})Q', filename)
+        # Extract year and quarter from filename like "PBJ_dailynursestaffing_CY2025Q1.csv"
+        match = re.search(r'CY(\d{4})Q(\d)', filename)
         if match:
-            years.add(int(match.group(1)))
+            year = int(match.group(1))
+            quarter = int(match.group(2))
+            quarters.add((year, quarter))
+            years.add(year)
     
-    if not years:
-        return "2017-2025", 33
+    if not quarters:
+        return "2017-2025", 34
+    
+    # Count actual quarters
+    quarter_count = len(quarters)
     
     min_year = min(years)
     max_year = max(years)
-    
-    # Calculate quarter count (4 quarters per year)
-    quarter_count = (max_year - min_year + 1) * 4
     
     return f"{min_year}-{max_year}", quarter_count
 

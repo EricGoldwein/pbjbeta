@@ -1,5 +1,6 @@
 import streamlit as st
 import base64
+from utils.date_utils import get_latest_data_periods
 
 def load_pbj_favicon():
     """Load PBJ favicon data for use in floating action button"""
@@ -134,7 +135,7 @@ def dashboard_page():
 
 def about_page():
     """About page content"""
-    st.markdown("""
+    st.markdown(f"""
     <div style="background: #f5f8fd; border-radius: 10px; padding: 2.2rem 2.5rem 1.5rem 2.5rem; margin-bottom: 2.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
         <div style='text-align: center; margin-bottom: 1.2em;'>
             <span style='font-size:2.3em; font-weight:800; color:#1769aa; letter-spacing:0.01em; line-height:1.1;'>PBJ Nursing Home Staffing Dashboard</span><br>
@@ -160,7 +161,7 @@ def about_page():
     | **Ownership Group** | Essential data on any chain and its facilities (e.g., **Genesis** → 215 facilities in 19 states, 2.3-star average) |
 
     ### Under the hood  
-    * **Payroll-Based Journal (PBJ) Staffing Data** – 33 quarters of daily data, aggregated for clarity  
+    * **Payroll-Based Journal (PBJ) Staffing Data** – {get_latest_data_periods()['quarter_count']} quarters of daily data, aggregated for clarity  
     * **CMS Provider Info** – 5-star ratings, enforcement data, and other key indicators (July 2025 & June 2025)  
     * **CMS Affiliated Entity** – Selected quality and performance metrics for groups of nursing homes sharing common owners, officers, or entities (July 2025)
     * **CMS Citations (Premium)** - Citation data and inspection reports, categorized by date, type, severity, and more. 

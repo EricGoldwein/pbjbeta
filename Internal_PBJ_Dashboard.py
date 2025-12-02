@@ -4924,12 +4924,21 @@ def main() -> None:
                                     # Load previous provider data for comparison
                                     march_provider_data = load_march_provider_info_data()
                                     if not march_provider_data.empty and entity_id:
-                                        march_chain_facilities = march_provider_data[
-                                            march_provider_data['Affiliated Entity ID'] == entity_id
-                                        ].copy()
+                                        # Try both column names for compatibility
+                                        if 'Chain ID' in march_provider_data.columns:
+                                            march_chain_facilities = march_provider_data[
+                                                march_provider_data['Chain ID'] == entity_id
+                                            ].copy()
+                                        elif 'Affiliated Entity ID' in march_provider_data.columns:
+                                            march_chain_facilities = march_provider_data[
+                                                march_provider_data['Affiliated Entity ID'] == entity_id
+                                            ].copy()
+                                        else:
+                                            march_chain_facilities = pd.DataFrame()
+                                        
                                         if not march_chain_facilities.empty:
                                             prev_1star = (march_chain_facilities['Overall Rating'] == 1).sum()
-                                except:
+                                except Exception as e:
                                     prev_1star = 0
                             
                             delta_1star = num_1star - prev_1star
