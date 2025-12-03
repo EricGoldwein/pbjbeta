@@ -438,6 +438,12 @@ def get_full_state_name(state_abbr: str) -> str:
     """Return the full state name for a given abbreviation."""
     return state_name_map.get(state_abbr, state_abbr)
 
+def get_state_abbr(full_state_name: str) -> str:
+    """Return the state abbreviation for a given full state name."""
+    # Create reverse mapping
+    reverse_map = {v: k for k, v in state_name_map.items()}
+    return reverse_map.get(full_state_name, full_state_name)
+
 def _classify(v, ref, tol=0.03):
     if ref == 0 or v is None or ref is None:
         return "—"
@@ -1145,7 +1151,7 @@ def create_facility_db():
         # Drop the table if it exists
         facility_db.execute("DROP TABLE IF EXISTS facility_metrics")
         
-        # Create the table with explicit schema
+        # Create the table with explicit schema - include Nurse_Care_HPRD
         facility_db.execute("""
             CREATE TABLE facility_metrics (
                 PROVNUM VARCHAR,
@@ -1155,18 +1161,26 @@ def create_facility_db():
                 CY_QTR VARCHAR,
                 Census DOUBLE,
                 Total_Nurse_HPRD DOUBLE,
+                Nurse_Care_HPRD DOUBLE,
                 Contract_Percentage DOUBLE,
                 date DATE
             )
         """)
         
-        # Insert data using register method
+        # Insert data using register method - include Nurse_Care_HPRD if it exists
         facility_db.register("temp_facility_metrics", facility_metrics)
-        facility_db.execute("""
-            INSERT INTO facility_metrics 
-            SELECT PROVNUM, PROVNAME, STATE, COUNTY_NAME, CY_QTR, Census, Total_Nurse_HPRD, Contract_Percentage, date 
-            FROM temp_facility_metrics
-        """)
+        if 'Nurse_Care_HPRD' in facility_metrics.columns:
+            facility_db.execute("""
+                INSERT INTO facility_metrics 
+                SELECT PROVNUM, PROVNAME, STATE, COUNTY_NAME, CY_QTR, Census, Total_Nurse_HPRD, Nurse_Care_HPRD, Contract_Percentage, date 
+                FROM temp_facility_metrics
+            """)
+        else:
+            facility_db.execute("""
+                INSERT INTO facility_metrics 
+                SELECT PROVNUM, PROVNAME, STATE, COUNTY_NAME, CY_QTR, Census, Total_Nurse_HPRD, NULL as Nurse_Care_HPRD, Contract_Percentage, date 
+                FROM temp_facility_metrics
+            """)
         
         # Create indexes for faster lookups
         facility_db.execute("CREATE INDEX IF NOT EXISTS idx_provnum ON facility_metrics(PROVNUM)")
@@ -6455,271 +6469,643 @@ def main() -> None:
                     # State Facilities List Section
                     if level == "State" and selected_value:
                         try:
-                            # Get facilities from provider info CSV for this state (same as ownership logic)
+                            # Get facilities from provider info CSV for this state
                             file_path = find_latest_provider_info()
                             if file_path:
                                 provider_df = pd.read_csv(file_path)
                                 state_facilities = provider_df[provider_df['State'] == selected_value]
                                 
                                 if not state_facilities.empty:
-                                    # Limit to 25 facilities initially
-                                    show_all_facilities = st.checkbox(
-                                        "Show all facilities", 
-                                        value=False,
-                                        key=f"show_all_state_facilities_{selected_value}",
-                                        help="Show all facilities in this state (may be many)"
-                                    )
-                                    
-                                    # Sort facilities alphabetically by provider name
-                                    state_facilities_sorted = state_facilities.sort_values('Provider Name')
-                                    
-                                    if show_all_facilities:
-                                        display_facilities = state_facilities_sorted
-                                    else:
-                                        display_facilities = state_facilities_sorted.head(25)
-                                    
-                                    st.markdown(f"**{len(display_facilities):,} facilities shown**")
-                                    if not show_all_facilities and len(state_facilities) > 25:
-                                        st.markdown(f"<small>Showing first 25 of {len(state_facilities):,} total facilities</small>", unsafe_allow_html=True)
-                                    
-                                    # Get most recent HPRD and census data for each facility from PBJ database
-                                    def get_facility_latest_metrics(provnum_list):
+                                    # Get facilities with data in the most recent quarter across all facilities
+                                    # Optimized: single query with subquery for better performance
+                                    def get_facility_metrics_for_latest_quarter(provnum_list):
+                                        """Get metrics for facilities in the most recent quarter only."""
                                         try:
-                                            # Query the facility database for the most recent data for each facility
+                                            if not provnum_list:
+                                                return pd.DataFrame(), None
+                                            # Single optimized query: get latest quarter and facilities in one go
                                             placeholders = ','.join(['?' for _ in provnum_list])
                                             query = f"""
-                                            SELECT PROVNUM, Total_Nurse_HPRD, Census, CY_QTR
-                                            FROM facility_metrics 
-                                            WHERE PROVNUM IN ({placeholders})
-                                            AND (PROVNUM, CY_QTR) IN (
-                                                SELECT PROVNUM, MAX(CY_QTR) 
-                                                FROM facility_metrics 
-                                                WHERE PROVNUM IN ({placeholders})
-                                                GROUP BY PROVNUM
+                                            WITH latest_quarter AS (
+                                                SELECT MAX(CY_QTR) as latest_qtr
+                                                FROM facility_metrics
                                             )
+                                            SELECT fm.PROVNUM, fm.Total_Nurse_HPRD, fm.Nurse_Care_HPRD, fm.Census, fm.CY_QTR, lq.latest_qtr
+                                            FROM facility_metrics fm
+                                            CROSS JOIN latest_quarter lq
+                                            WHERE fm.PROVNUM IN ({placeholders})
+                                            AND fm.CY_QTR = lq.latest_qtr
                                             """
-                                            result = facility_db.execute(query, provnum_list + provnum_list).fetchdf()
-                                            return result
+                                            result = facility_db.execute(query, provnum_list).fetchdf()
+                                            latest_quarter = result['latest_qtr'].iloc[0] if not result.empty and 'latest_qtr' in result.columns else None
+                                            # Drop the latest_qtr column from result
+                                            if 'latest_qtr' in result.columns:
+                                                result = result.drop(columns=['latest_qtr'])
+                                            return result, latest_quarter
                                         except Exception as e:
                                             st.error(f"Error querying facility metrics: {str(e)}")
-                                            return pd.DataFrame()
+                                            return pd.DataFrame(), None
                                     
-                                    # Get facility metrics for all facilities in this state
-                                    provnum_list = display_facilities['CMS Certification Number (CCN)'].tolist()
-                                    facility_metrics = get_facility_latest_metrics(provnum_list)
+                                    # Get all PROVNUMs for this state
+                                    all_provnums = state_facilities['CMS Certification Number (CCN)'].tolist()
+                                    facility_metrics, latest_quarter = get_facility_metrics_for_latest_quarter(all_provnums)
                                     
-                                    # Prepare facilities data for display with County instead of City
-                                    facilities_display = display_facilities[[
-                                        'State',
-                                        'County/Parish',
-                                        'Provider Name'
-                                    ]].copy()
+                                    # Format quarter for display (e.g., "2025Q2" -> "Q2 2025")
+                                    def format_quarter_display(quarter):
+                                        """Format quarter from '2025Q2' to 'Q2 2025'."""
+                                        if not quarter:
+                                            return ""
+                                        quarter_str = str(quarter).strip()
+                                        if 'Q' in quarter_str:
+                                            parts = quarter_str.split('Q')
+                                            if len(parts) == 2:
+                                                return f"Q{parts[1]} {parts[0]}"
+                                        return quarter_str
                                     
-                                    # Add HPRD and Census data from facility metrics
-                                    if not facility_metrics.empty:
-                                        # Merge with facility metrics to get HPRD and Census
-                                        facilities_display = facilities_display.merge(
-                                            facility_metrics[['PROVNUM', 'Total_Nurse_HPRD', 'Census']],
-                                            left_on=display_facilities['CMS Certification Number (CCN)'],
-                                            right_on='PROVNUM',
-                                            how='left'
-                                        )
-                                        # Drop the duplicate PROVNUM column
-                                        facilities_display = facilities_display.drop('PROVNUM', axis=1)
-                                        
-                                        # Store raw values for data-sort attributes
-                                        facilities_display['Census_raw'] = facilities_display['Census']
-                                        facilities_display['HPRD_raw'] = facilities_display['Total_Nurse_HPRD']
-                                        
-                                        # Format HPRD and Census columns for display
-                                        facilities_display['Total Nurse HPRD'] = facilities_display['Total_Nurse_HPRD'].apply(
-                                            lambda x: f"{x:.2f}" if pd.notna(x) else 'N/A'
-                                        )
-                                        facilities_display['Census'] = facilities_display['Census'].apply(
-                                            lambda x: f"{x:,.0f}" if pd.notna(x) else 'N/A'
-                                        )
-                                        # Drop the original column name
-                                        facilities_display = facilities_display.drop('Total_Nurse_HPRD', axis=1)
-                                    else:
-                                        # Add empty columns if no facility metrics available
-                                        facilities_display['Census_raw'] = None
-                                        facilities_display['HPRD_raw'] = None
-                                        facilities_display['Total Nurse HPRD'] = 'N/A'
-                                        facilities_display['Census'] = 'N/A'
+                                    latest_quarter_display = format_quarter_display(latest_quarter) if latest_quarter else ""
                                     
-                                    # Clean up the data - fill remaining NaN with 'N/A'
-                                    facilities_display = facilities_display.fillna('N/A')
-                                    
-                                    # Apply proper capitalization to provider names and county
-                                    def capitalize_name(name):
-                                        if pd.isna(name):
-                                            return name
-                                        # Common words to keep lowercase
-                                        lowercase_words = {'and', 'or', 'of', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
-                                        words = name.lower().split()
-                                        capitalized_words = []
-                                        for i, word in enumerate(words):
-                                            if i == 0 or word not in lowercase_words:
-                                                capitalized_words.append(word.capitalize())
-                                            else:
-                                                capitalized_words.append(word)
-                                        return ' '.join(capitalized_words)
-                                    
-                                    # Apply capitalization
-                                    facilities_display['Provider Name'] = facilities_display['Provider Name'].apply(capitalize_name)
-                                    facilities_display['County/Parish'] = facilities_display['County/Parish'].apply(capitalize_name)
-                                    
-                                    # Rename County/Parish to County for display
-                                    facilities_display = facilities_display.rename(columns={'County/Parish': 'County'})
-                                    
-                                    # Create provider names as HTML links
-                                    def format_provnum(provnum):
-                                        provnum_str = str(provnum).strip().upper().zfill(6)
-                                        if len(provnum_str) > 6:
-                                            provnum_str = provnum_str[-6:]
-                                        return provnum_str
-                                    facilities_display['Provider Name'] = facilities_display.apply(
-                                        lambda row: f'<a href="/?facility={format_provnum(display_facilities.iloc[row.name]["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider Name"]}</a>',
-                                        axis=1
+                                    # Merge facility metrics with provider info - includes Total_Nurse_HPRD and Nurse_Care_HPRD from DuckDB
+                                    # Use inner join to only include facilities that have data in the most recent quarter
+                                    state_facilities_with_metrics = state_facilities.merge(
+                                        facility_metrics[['PROVNUM', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Census']],
+                                        left_on='CMS Certification Number (CCN)',
+                                        right_on='PROVNUM',
+                                        how='inner'  # Only include facilities with data in latest quarter
                                     )
                                     
-                                    # Reorder columns to include HPRD and Census
-                                    # Keep raw columns for sorting but don't display them
-                                    column_order = [
-                                        'State',
-                                        'Provider Name',
-                                        'Census',
-                                        'Total Nurse HPRD'
-                                    ]
-                                    # Keep the raw columns for data-sort attributes
-                                    raw_columns = ['Census_raw', 'HPRD_raw']
-                                    all_columns = column_order + [col for col in raw_columns if col in facilities_display.columns]
-                                    facilities_display = facilities_display[all_columns]
+                                    # Get case-mix and direct care data from provider info
+                                    # Try different column name variations for case-mix
+                                    case_mix_col = None
+                                    reported_col = None
+                                    for col_name in ['Case-Mix Total Nurse Staffing Hours per Resident per Day',
+                                                     'case_mix_total_nurse_hrs_per_resident_per_day',
+                                                     'Case Mix Total Nurse HPRD']:
+                                        if col_name in state_facilities.columns:
+                                            case_mix_col = col_name
+                                            break
                                     
-                                    # Build HTML table manually like ownership table
-                                    import re
+                                    for col_name in ['Reported Total Nurse Staffing Hours per Resident per Day',
+                                                     'reported_total_nurse_hrs_per_resident_per_day',
+                                                     'Reported Total Nurse HPRD']:
+                                        if col_name in state_facilities.columns:
+                                            reported_col = col_name
+                                            break
                                     
-                                    # Start building the HTML table
-                                    html_table = '<table class="dataframe table table-striped" id="facilities-table">\n<thead>\n<tr>'
+                                    # Calculate direct care HPRD from individual components if available
+                                    rn_col = None
+                                    lpn_col = None
+                                    na_col = None
+                                    case_mix_rn_col = None
+                                    case_mix_lpn_col = None
+                                    case_mix_na_col = None
                                     
-                                    # Add headers with data-sort-method for numeric columns
-                                    numeric_cols = ['Census', 'Total Nurse HPRD']
-                                    for col in column_order:
-                                        if col in numeric_cols:
-                                            html_table += f'<th data-sort-method="number">{col}</th>'
+                                    for col_name in ['Reported RN Staffing Hours per Resident per Day',
+                                                     'reported_rn_hrs_per_resident_per_day']:
+                                        if col_name in state_facilities.columns:
+                                            rn_col = col_name
+                                            break
+                                    
+                                    for col_name in ['Reported LPN Staffing Hours per Resident per Day',
+                                                     'reported_lpn_hrs_per_resident_per_day']:
+                                        if col_name in state_facilities.columns:
+                                            lpn_col = col_name
+                                            break
+                                    
+                                    for col_name in ['Reported Nurse Aide Staffing Hours per Resident per Day',
+                                                     'reported_na_hrs_per_resident_per_day']:
+                                        if col_name in state_facilities.columns:
+                                            na_col = col_name
+                                            break
+                                    
+                                    # Prepare data for calculation
+                                    facilities_df = state_facilities_with_metrics.copy()
+                                    
+                                    # Calculate direct care HPRD
+                                    # Use Nurse_Care_HPRD from DuckDB (same source as Total_Nurse_HPRD, same quarter)
+                                    if 'Nurse_Care_HPRD' in facilities_df.columns:
+                                        # Use the accurate PBJ-based direct care HPRD directly from DuckDB
+                                        facilities_df['Direct_Care_HPRD'] = pd.to_numeric(facilities_df['Nurse_Care_HPRD'], errors='coerce')
+                                        # Leave missing values as NaN - they will show as N/A (no estimation)
+                                    else:
+                                        # If column doesn't exist, create NaN column (will show N/A)
+                                        facilities_df['Direct_Care_HPRD'] = pd.NA
+                                    
+                                    # Calculate case-mix percentages
+                                    def calculate_case_mix_pct(row, exclude_admin=False):
+                                        """Calculate case-mix percentage."""
+                                        # Use total case-mix as denominator in both cases
+                                        if not case_mix_col:
+                                            return None
+                                        
+                                        case_mix_val = pd.to_numeric(row.get(case_mix_col), errors='coerce')
+                                        if pd.isna(case_mix_val) or case_mix_val <= 0:
+                                            return None
+                                        
+                                        if exclude_admin:
+                                            # Direct care over total case-mix
+                                            reported_val = row.get('Direct_Care_HPRD', 0)
+                                            if pd.notna(reported_val) and reported_val > 0:
+                                                return (reported_val / case_mix_val) * 100
                                         else:
-                                            html_table += f'<th>{col}</th>'
-                                    html_table += '</tr>\n</thead>\n<tbody>\n'
+                                            # Total reported over total case-mix
+                                            reported_val = row.get('Total_Nurse_HPRD', 0)
+                                            if pd.notna(reported_val) and reported_val > 0:
+                                                return (reported_val / case_mix_val) * 100
+                                        return None
                                     
-                                    # Add rows with data-sort attributes
-                                    for idx, row in facilities_display.iterrows():
-                                        html_table += '<tr>'
-                                        for col in column_order:
-                                            value = row[col]
+                                    # Filters with better help text - responsive layout
+                                    # Check if mobile
+                                    is_mobile = st.session_state.get('is_mobile', False)
+                                    
+                                    if is_mobile:
+                                        # Mobile: stack filters vertically
+                                        show_all_facilities = st.checkbox(
+                                            "Show all facilities", 
+                                            value=False,
+                                            key=f"show_all_state_facilities_{selected_value}",
+                                            help="Show all facilities instead of bottom 20%"
+                                        )
+                                        exclude_admin_don = st.checkbox(
+                                            "Excl. admin/DON",
+                                            value=False,
+                                            key=f"excl_admin_don_{selected_value}",
+                                            help="Show direct care staffing instead of total staffing"
+                                        )
+                                        min_100_residents = st.checkbox(
+                                            "100+ Residents",
+                                            value=False,
+                                            key=f"min_100_residents_{selected_value}",
+                                            help="Exclude facilities with fewer than 100 residents"
+                                        )
+                                    else:
+                                        # Desktop: show filters in columns
+                                        col1, col2, col3 = st.columns(3)
+                                        with col1:
+                                            show_all_facilities = st.checkbox(
+                                                "Show all facilities", 
+                                                value=False,
+                                                key=f"show_all_state_facilities_{selected_value}",
+                                                help="Show all facilities instead of bottom 20%"
+                                            )
+                                        with col2:
+                                            exclude_admin_don = st.checkbox(
+                                                "Excl. admin/DON",
+                                                value=False,
+                                                key=f"excl_admin_don_{selected_value}",
+                                                help="Show direct care staffing (RN + LPN + NA excluding admin/DON roles) instead of total staffing"
+                                            )
+                                        with col3:
+                                            min_100_residents = st.checkbox(
+                                                "100+ Residents",
+                                                value=False,
+                                                key=f"min_100_residents_{selected_value}",
+                                                help="Exclude facilities with fewer than 100 residents"
+                                            )
+                                    
+                                    # Ensure Direct_Care_HPRD column exists (in case merge didn't work)
+                                    if 'Direct_Care_HPRD' not in facilities_df.columns:
+                                        facilities_df['Direct_Care_HPRD'] = pd.NA
+                                    
+                                    # Always filter by Total_Nurse_HPRD (which should exist)
+                                    # Direct_Care_HPRD may be NaN - that's fine, will show as N/A
+                                    facilities_with_hprd = facilities_df[
+                                        pd.notna(facilities_df['Total_Nurse_HPRD']) & 
+                                        (facilities_df['Total_Nurse_HPRD'] > 0)
+                                    ].copy()
+                                    
+                                    # Apply 100+ residents filter
+                                    if min_100_residents:
+                                        facilities_with_hprd = facilities_with_hprd[
+                                            pd.notna(facilities_with_hprd['Census']) & 
+                                            (facilities_with_hprd['Census'] > 100)
+                                        ].copy()
+                                    
+                                    if not facilities_with_hprd.empty:
+                                        # Determine which HPRD column to use for ranking/sorting
+                                        if exclude_admin_don:
+                                            # Sort by Direct_Care_HPRD directly - NaN values will be at the end
+                                            hprd_col_for_ranking = 'Direct_Care_HPRD'
+                                        else:
+                                            hprd_col_for_ranking = 'Total_Nurse_HPRD'
+                                        
+                                        # Sort by HPRD (ascending for bottom 20%)
+                                        # Handle NaN values - put them at the end when sorting
+                                        facilities_with_hprd = facilities_with_hprd.sort_values(
+                                            hprd_col_for_ranking, 
+                                            ascending=True, 
+                                            na_position='last'
+                                        )
+                                        
+                                        # Get state name and abbreviation for header
+                                        state_full_name = selected_value  # selected_value is the full state name
+                                        state_abbr = get_state_abbr(state_full_name)
+                                        
+                                        # Calculate bottom 20% threshold
+                                        if not show_all_facilities:
+                                            bottom_20_percent_count = max(1, int(len(facilities_with_hprd) * 0.2))
+                                            display_facilities = facilities_with_hprd.head(bottom_20_percent_count)
+                                            # Use full state name on desktop, abbreviation on mobile
+                                            state_display = state_abbr if is_mobile else state_full_name
+                                            quarter_text = f" ({latest_quarter_display})" if latest_quarter_display else ""
+                                            st.markdown(f"**Bottom 20% Staffing HPRD ({len(display_facilities):,} facilities) - {state_display}{quarter_text}**")
+                                        else:
+                                            display_facilities = facilities_with_hprd
+                                            state_display = state_abbr if is_mobile else state_full_name
+                                            quarter_text = f" ({latest_quarter_display})" if latest_quarter_display else ""
+                                            st.markdown(f"**All {len(display_facilities):,} facilities - {state_display}{quarter_text}**")
+                                        
+                                        # Apply proper capitalization to provider names
+                                        def capitalize_name(name):
+                                            if pd.isna(name):
+                                                return name
+                                            lowercase_words = {'and', 'or', 'of', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
+                                            words = str(name).lower().split()
+                                            capitalized_words = []
+                                            for i, word in enumerate(words):
+                                                if i == 0 or word not in lowercase_words:
+                                                    capitalized_words.append(word.capitalize())
+                                                else:
+                                                    capitalized_words.append(word)
+                                            return ' '.join(capitalized_words)
+                                    
+                                        # Format provider names
+                                        display_facilities = display_facilities.copy()
+                                        display_facilities['Provider_Name_Formatted'] = display_facilities['Provider Name'].apply(capitalize_name)
+                                        
+                                        # Calculate case-mix percentage
+                                        display_facilities['Case_Mix_Pct'] = display_facilities.apply(
+                                            lambda row: calculate_case_mix_pct(row, exclude_admin_don), axis=1
+                                        )
+                                        
+                                        # Format provider names as HTML links
+                                        def format_provnum(provnum):
+                                            provnum_str = str(provnum).strip().upper().zfill(6)
+                                            if len(provnum_str) > 6:
+                                                provnum_str = provnum_str[-6:]
+                                            return provnum_str
+                                        
+                                        display_facilities['Provider_Link'] = display_facilities.apply(
+                                            lambda row: f'<a href="/?facility={format_provnum(row["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider_Name_Formatted"]}</a>',
+                                            axis=1
+                                        )
+                                    
+                                        # Prepare display columns
+                                        hprd_col_display = 'Direct Care HPRD' if exclude_admin_don else 'Total HPRD'
+                                        
+                                        # Build table data
+                                        table_data = []
+                                        for idx, row in display_facilities.iterrows():
+                                            census_val = row.get('Census')
+                                            hprd_val = row.get('Direct_Care_HPRD' if exclude_admin_don else 'Total_Nurse_HPRD')
+                                            case_mix_pct = row.get('Case_Mix_Pct')
                                             
-                                            # Add data-sort attribute for sortable columns
-                                            if col == 'Census':
-                                                try:
-                                                    raw_val = row['Census_raw']
-                                                    sort_val = float(raw_val) if pd.notna(raw_val) else 0
-                                                except:
-                                                    sort_val = 0
-                                                html_table += f'<td data-sort="{int(sort_val)}">{value}</td>'
-                                            elif col == 'Total Nurse HPRD':
-                                                try:
-                                                    raw_val = row['HPRD_raw']
-                                                    sort_val = float(raw_val) if pd.notna(raw_val) else 0
-                                                except:
-                                                    sort_val = 0
-                                                html_table += f'<td data-sort="{sort_val:.1f}">{value}</td>'
+                                            # Format values
+                                            census_display = f"{census_val:,.0f}" if pd.notna(census_val) else 'N/A'
+                                            
+                                            if pd.notna(hprd_val):
+                                                hprd_formatted = float(Decimal(str(hprd_val)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+                                                hprd_display = f"{hprd_formatted:.2f}"
                                             else:
-                                                html_table += f'<td>{value}</td>'
-                                        html_table += '</tr>\n'
-                                    
-                                    html_table += '</tbody>\n</table>'
-                                    
-                                    # Display the table with CSS
+                                                hprd_display = 'N/A'
+                                            
+                                            if pd.notna(case_mix_pct):
+                                                case_mix_formatted = float(Decimal(str(case_mix_pct)).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP))
+                                                case_mix_display = f"{case_mix_formatted:.1f}%"
+                                            else:
+                                                case_mix_display = 'N/A'
+                                            
+                                            table_data.append({
+                                                'State': row.get('State', ''),
+                                                'Provider': row.get('Provider_Link', ''),
+                                                'Census': census_display,
+                                                'HPRD': hprd_display,
+                                                'Case_Mix_Pct': case_mix_display,
+                                                'Census_raw': float(census_val) if pd.notna(census_val) else 0,
+                                                'HPRD_raw': float(hprd_val) if pd.notna(hprd_val) else 0,
+                                                'Case_Mix_Pct_raw': float(case_mix_pct) if pd.notna(case_mix_pct) else 0
+                                            })
+                                        
+                                        # Build HTML table with unique class to avoid CSS conflicts
+                                        html_table = '<table class="state-facilities-table" id="facilities-table">\n<thead>\n<tr>'
+                                        html_table += '<th data-sort-method="none">State</th>'
+                                        html_table += '<th data-sort-method="none">Provider</th>'
+                                        html_table += '<th data-sort-method="number">Census</th>'
+                                        # Add line breaks for mobile wrapping (hidden on desktop)
+                                        hprd_header_mobile = hprd_col_display.replace(' ', '<br>')
+                                        html_table += f'<th data-sort-method="number"><span class="desktop-only">{hprd_col_display}</span><span class="mobile-only">{hprd_header_mobile}</span></th>'
+                                        html_table += '<th data-sort-method="number"><span class="desktop-only">Case-Mix %</span><span class="mobile-only">Case-Mix<br>%</span>'
+                                        html_table += ' <span title="Case-Mix % compares reported staffing to expected staffing based on resident acuity. When &quot;Excl. admin/DON&quot; is checked, it shows direct care staffing as a percentage of total case-mix expected staffing. A value below 100% indicates staffing below expected levels." style="cursor: help; color: #6b7280; font-size: 0.85em;">ℹ️</span></th>'
+                                        html_table += '</tr>\n</thead>\n<tbody>\n'
+                                        
+                                        for row_data in table_data:
+                                            html_table += '<tr>'
+                                            html_table += f'<td>{row_data["State"]}</td>'
+                                            html_table += f'<td>{row_data["Provider"]}</td>'
+                                            html_table += f'<td data-sort="{int(row_data["Census_raw"])}">{row_data["Census"]}</td>'
+                                            html_table += f'<td data-sort="{row_data["HPRD_raw"]:.2f}">{row_data["HPRD"]}</td>'
+                                            html_table += f'<td data-sort="{row_data["Case_Mix_Pct_raw"]:.1f}">{row_data["Case_Mix_Pct"]}</td>'
+                                            html_table += '</tr>\n'
+                                        
+                                        html_table += '</tbody>\n</table>'
+                                        
+                                        # Display table with clean, professional CSS (best practices)
                                     st.markdown("""
                                         <style>
-                                        .dataframe {
+                                            /* State Facilities Table - Clean, Professional Styling */
+                                            .state-facilities-table {
                                             width: 100%;
-                                            border-collapse: collapse;
-                                            margin: 0.3rem 0;
-                                            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-                                            font-size: 0.8em;
-                                            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-                                            border-radius: 6px;
+                                                border-collapse: separate;
+                                                border-spacing: 0;
+                                                margin: 1rem 0;
+                                                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                                                font-size: 0.875rem;
+                                                background: #ffffff;
+                                                border-radius: 8px;
                                             overflow: hidden;
-                                            table-layout: fixed;
-                                        }
-                                        .dataframe th {
-                                            background: #f8f9fa;
-                                            padding: 6px 4px;
+                                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+                                                border: 1px solid #e5e7eb;
+                                            }
+                                            
+                                            .state-facilities-table thead {
+                                                background: #f9fafb;
+                                                border-bottom: 2px solid #e5e7eb;
+                                            }
+                                            
+                                            .state-facilities-table th {
+                                                background: #f9fafb !important;
+                                                padding: 12px 16px;
                                             text-align: left;
                                             font-weight: 600;
-                                            border: none;
-                                            border-bottom: 2px solid #e9ecef;
-                                            color: #000;
-                                            font-size: 0.75em;
+                                                font-size: 0.8125rem;
+                                                color: #374151 !important;
+                                                letter-spacing: 0.025em;
                                             text-transform: none;
-                                            letter-spacing: 0.3px;
+                                                border: none;
+                                                border-bottom: 2px solid #e5e7eb;
                                             cursor: pointer;
                                             user-select: none;
                                             position: relative;
+                                                white-space: nowrap;
                                         }
-                                        .dataframe th:hover {
-                                            background: #e9ecef;
+                                            
+                                            .state-facilities-table th:hover {
+                                                background: #f3f4f6 !important;
                                         }
-                                        .dataframe th::after {
+                                            
+                                            .state-facilities-table th::after {
                                             content: ' ↕';
-                                            font-size: 0.7em;
-                                            color: #6c757d;
+                                                font-size: 0.75rem;
+                                                color: #9ca3af;
                                             position: absolute;
-                                            right: 4px;
+                                                right: 12px;
                                             top: 50%;
                                             transform: translateY(-50%);
                                         }
-                                        .dataframe th.sort-asc::after {
+                                            
+                                            .state-facilities-table th.sort-asc::after {
                                             content: ' ↑';
-                                            color: #007bff;
+                                                color: #2563eb;
                                         }
-                                        .dataframe th.sort-desc::after {
+                                            
+                                            .state-facilities-table th.sort-desc::after {
                                             content: ' ↓';
-                                            color: #007bff;
-                                        }
-                                        .dataframe td {
-                                            padding: 4px 6px;
-                                            border-bottom: 1px solid #f0f0f0;
+                                                color: #2563eb;
+                                            }
+                                            
+                                            .state-facilities-table tbody tr {
+                                                border-bottom: 1px solid #f3f4f6;
+                                                transition: background-color 0.15s ease;
+                                            }
+                                            
+                                            .state-facilities-table tbody tr:hover {
+                                                background-color: #f9fafb;
+                                            }
+                                            
+                                            .state-facilities-table tbody tr:nth-child(even) {
+                                                background-color: #ffffff;
+                                            }
+                                            
+                                            .state-facilities-table tbody tr:nth-child(even):hover {
+                                                background-color: #f9fafb;
+                                            }
+                                            
+                                            .state-facilities-table td {
+                                                padding: 12px 16px;
+                                                border: none;
+                                                border-bottom: 1px solid #f3f4f6;
                                             vertical-align: middle;
-                                            font-size: 0.8em;
-                                        }
-                                        .dataframe tr:hover {
-                                            background-color: #f8f9fa;
-                                        }
-                                        .dataframe tr:nth-child(even) {
-                                            background-color: #fafbfc;
-                                        }
-                                        .dataframe tr:nth-child(even):hover {
-                                            background-color: #f0f2f5;
-                                        }
-                                        .dataframe a {
-                                            color: #007bff;
+                                                font-size: 0.875rem;
+                                                color: #1f2937;
+                                                line-height: 1.5;
+                                            }
+                                            
+                                            .state-facilities-table tbody tr:last-child td {
+                                                border-bottom: none;
+                                            }
+                                            
+                                            /* Show/hide desktop vs mobile header text - desktop by default */
+                                            .state-facilities-table .desktop-only {
+                                                display: inline;
+                                            }
+                                            .state-facilities-table .mobile-only {
+                                                display: none;
+                                            }
+                                            
+                                            .state-facilities-table a {
+                                                color: #2563eb;
                                             text-decoration: none;
                                             font-weight: 500;
+                                                transition: color 0.15s ease;
                                         }
-                                        .dataframe a:hover {
-                                            color: #0056b3;
+                                            
+                                            .state-facilities-table a:hover {
+                                                color: #1d4ed8;
                                             text-decoration: underline;
                                         }
-                                        .dataframe th {
-                                            color: #000 !important;
+                                            
+                                            /* Subtle emphasis on HPRD column (4th column) - the focus of the table */
+                                            .state-facilities-table th:nth-child(4) {
+                                                background: #f3f4f6 !important;
+                                                font-weight: 700 !important;
+                                                border-left: 3px solid #2563eb !important;
+                                                padding-left: 13px !important;
+                                            }
+                                            
+                                            .state-facilities-table td:nth-child(4) {
+                                                background: #fafbfc !important;
+                                                font-weight: 500 !important;
+                                                border-left: 3px solid #e5e7eb !important;
+                                                padding-left: 13px !important;
+                                            }
+                                            
+                                            .state-facilities-table tbody tr:hover td:nth-child(4) {
+                                                background: #f3f4f6 !important;
+                                                border-left-color: #2563eb !important;
+                                            }
+                                            
+                                            /* Ensure no color inheritance from other tables */
+                                            .state-facilities-table th:nth-child(n),
+                                            .state-facilities-table td:nth-child(n) {
+                                                color: inherit !important;
+                                            }
+                                            
+                                            .state-facilities-table th:nth-child(1),
+                                            .state-facilities-table th:nth-child(2),
+                                            .state-facilities-table th:nth-child(3),
+                                            .state-facilities-table th:nth-child(5),
+                                            .state-facilities-table td:nth-child(1),
+                                            .state-facilities-table td:nth-child(2),
+                                            .state-facilities-table td:nth-child(3),
+                                            .state-facilities-table td:nth-child(5) {
+                                                background: inherit !important;
+                                            }
+                                            
+                                            /* Mobile Responsive Design */
+                                            @media (max-width: 768px) {
+                                                /* Enable horizontal scrolling on mobile */
+                                                .state-facilities-table {
+                                                    font-size: 0.7rem;
+                                                    display: block;
+                                                    overflow-x: auto;
+                                                    -webkit-overflow-scrolling: touch;
+                                                    width: 100%;
+                                                    min-width: 600px;
+                                                }
+                                                
+                                                /* Compact column widths for mobile */
+                                                .state-facilities-table th:nth-child(1),
+                                                .state-facilities-table td:nth-child(1) {
+                                                    width: 50px;
+                                                    min-width: 50px;
+                                                    max-width: 50px;
+                                                    padding: 8px 6px;
+                                                    font-size: 0.7rem;
+                                                }
+                                                
+                                                .state-facilities-table th:nth-child(2),
+                                                .state-facilities-table td:nth-child(2) {
+                                                    width: 180px;
+                                                    min-width: 180px;
+                                                    max-width: 180px;
+                                                    padding: 8px 8px;
+                                                    font-size: 0.7rem;
+                                                    word-break: break-word;
+                                                    line-height: 1.3;
+                                                }
+                                                
+                                                .state-facilities-table th:nth-child(3),
+                                                .state-facilities-table td:nth-child(3) {
+                                                    width: 70px;
+                                                    min-width: 70px;
+                                                    max-width: 70px;
+                                                    padding: 8px 6px;
+                                                    font-size: 0.7rem;
+                                                }
+                                                
+                                                /* HPRD column (4th) - allow wrapping to two rows on mobile */
+                                                .state-facilities-table th:nth-child(4),
+                                                .state-facilities-table td:nth-child(4) {
+                                                    width: 80px;
+                                                    min-width: 80px;
+                                                    max-width: 80px;
+                                                    padding: 8px 4px;
+                                                    font-size: 0.7rem;
+                                                }
+                                                
+                                                .state-facilities-table th:nth-child(4) {
+                                                    white-space: normal !important;
+                                                    line-height: 1.2 !important;
+                                                    word-break: break-word !important;
+                                                    height: auto !important;
+                                                    padding-top: 10px !important;
+                                                    padding-bottom: 10px !important;
+                                                }
+                                                
+                                                /* Case-Mix % column (5th) - allow wrapping to two rows on mobile */
+                                                .state-facilities-table th:nth-child(5),
+                                                .state-facilities-table td:nth-child(5) {
+                                                    width: 80px;
+                                                    min-width: 80px;
+                                                    max-width: 80px;
+                                                    padding: 8px 4px;
+                                                    font-size: 0.7rem;
+                                                }
+                                                
+                                                .state-facilities-table th:nth-child(5) {
+                                                    white-space: normal !important;
+                                                    line-height: 1.2 !important;
+                                                    word-break: break-word !important;
+                                                    height: auto !important;
+                                                    padding-top: 10px !important;
+                                                    padding-bottom: 10px !important;
+                                                }
+                                                
+                                                /* Fix header padding to prevent arrow bleed */
+                                                .state-facilities-table th {
+                                                    padding: 8px 28px 8px 8px !important;
+                                                    font-size: 0.7rem !important;
+                                                    white-space: nowrap;
+                                                }
+                                                
+                                                /* On mobile, show mobile version and hide desktop version */
+                                                .state-facilities-table .desktop-only {
+                                                    display: none !important;
+                                                }
+                                                .state-facilities-table .mobile-only {
+                                                    display: inline !important;
+                                                }
+                                                
+                                                /* Allow wrapping for HPRD and Case-Mix headers on mobile */
+                                                .state-facilities-table th:nth-child(4),
+                                                .state-facilities-table th:nth-child(5) {
+                                                    white-space: normal !important;
+                                                    line-height: 1.3 !important;
+                                                    word-break: break-word !important;
+                                                    padding: 10px 4px !important;
+                                                    height: auto !important;
+                                                }
+                                                
+                                                /* Hide sorting arrows on mobile to prevent bleed - users can still tap to sort */
+                                                .state-facilities-table th::after {
+                                                    display: none !important;
+                                                }
+                                                
+                                                /* Compact cell padding */
+                                                .state-facilities-table td {
+                                                    padding: 8px 8px !important;
+                                                    font-size: 0.7rem !important;
+                                                }
+                                                
+                                                /* Reduce emphasis on HPRD column for mobile */
+                                                .state-facilities-table th:nth-child(4) {
+                                                    border-left-width: 2px !important;
+                                                    padding-left: 4px !important;
+                                                }
+                                                
+                                                .state-facilities-table td:nth-child(4) {
+                                                    border-left-width: 2px !important;
+                                                    padding-left: 4px !important;
+                                                }
+                                                
+                                                /* Reduce table margins on mobile */
+                                                .state-facilities-table {
+                                                    margin: 0.5rem 0;
+                                                }
                                         }
                                         </style>
                                     """, unsafe_allow_html=True)
                                     
-                                    st.markdown(html_table, unsafe_allow_html=True)
+                                    # Wrap table in a scrollable container for mobile with improved styling
+                                    st.markdown(
+                                        f"""
+                                        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;margin:1rem 0;">
+                                            {html_table}
+                                        </div>
+                                        """,
+                                        unsafe_allow_html=True
+                                    )
                                     
-                                    # Add sorting functionality using Tablesort library
+                                    # Add sorting functionality
                                     from streamlit.components.v1 import html
                                     html('''
                                     <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js'></script>
@@ -6729,17 +7115,21 @@ def main() -> None:
                                             var table = window.parent.document.getElementById("facilities-table");
                                             if (table) {
                                                 var sort = new Tablesort(table, {
-                                                    descending: true
-                                                });
-                                                console.log("Table sorting initialized with Tablesort (descending first)");
-                                            } else {
-                                                console.log("Table not found, skipping sort initialization");
+                                                        descending: false
+                                                    });
+                                                    // Sort by HPRD column (4th column, 0-indexed as 3) in ascending order
+                                                    var hprdHeader = table.querySelectorAll('th')[3];
+                                                    if (hprdHeader) {
+                                                        hprdHeader.click();
+                                                    }
                                             }
                                         } catch (error) {
                                             console.log("Error initializing table sort:", error);
                                         }
                                     </script>
                                     ''', height=0)
+                                else:
+                                    st.info("No staffing data available for facilities in this state.")
                         except Exception as e:
                             st.error(f"Error displaying state facilities: {str(e)}")
                     # Add state PBJ Takeaway card for state level
