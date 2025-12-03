@@ -84,10 +84,31 @@ def _init_streamlit_config():
     # Use the global IS_STAGING variable
     global IS_STAGING
 
+    # Check if favicon file exists before using it to prevent media storage errors
+    import os
+    favicon_paths = [
+        os.path.join(os.getcwd(), 'pbj_images', 'pbj_favicon.png'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pbj_images', 'pbj_favicon.png'),
+        'pbj_images/pbj_favicon.png',
+        'pbj_favicon.png',
+    ]
+    page_icon = None
+    for path in favicon_paths:
+        try:
+            if os.path.exists(path) and os.path.isfile(path):
+                page_icon = path
+                break
+        except Exception:
+            continue
+    
+    # Fallback to emoji if file not found (prevents media storage errors)
+    if not page_icon:
+        page_icon = "📊"
+
     if IS_STAGING:
         st.set_page_config(
             page_title="PBJ Dashboard - STAGING", 
-            page_icon="pbj_images/pbj_favicon.png", 
+            page_icon=page_icon, 
             layout="wide", 
             initial_sidebar_state="collapsed"
         )
@@ -102,7 +123,7 @@ def _init_streamlit_config():
     else:
         st.set_page_config(
             page_title="PBJ Nursing Home Staffing Dashboard by 320", 
-            page_icon="pbj_images/pbj_favicon.png", 
+            page_icon=page_icon, 
             layout="wide", 
             initial_sidebar_state="collapsed"
         )
