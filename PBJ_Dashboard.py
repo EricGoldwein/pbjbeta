@@ -1193,15 +1193,15 @@ def create_facility_db():
         if 'Nurse_Care_HPRD' in facility_metrics.columns:
             facility_db.execute("""
                 INSERT INTO facility_metrics 
-                SELECT PROVNUM, PROVNAME, STATE, COUNTY_NAME, CY_QTR, Census, Total_Nurse_HPRD, Nurse_Care_HPRD, Contract_Percentage, date 
-                FROM temp_facility_metrics
-            """)
+                    SELECT PROVNUM, PROVNAME, STATE, COUNTY_NAME, CY_QTR, Census, Total_Nurse_HPRD, Nurse_Care_HPRD, Contract_Percentage, date 
+                    FROM temp_facility_metrics
+                """)
         else:
             facility_db.execute("""
                 INSERT INTO facility_metrics 
                 SELECT PROVNUM, PROVNAME, STATE, COUNTY_NAME, CY_QTR, Census, Total_Nurse_HPRD, NULL as Nurse_Care_HPRD, Contract_Percentage, date 
-                FROM temp_facility_metrics
-            """)
+            FROM temp_facility_metrics
+        """)
         
         # Create indexes for faster lookups
         facility_db.execute("CREATE INDEX IF NOT EXISTS idx_provnum ON facility_metrics(PROVNUM)")
@@ -2748,6 +2748,10 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
             return None
             
         data = df.sort_values('date')
+        # Initialize facility_state to avoid unbound variable error
+        facility_state = None
+        facility_name = None
+        
         # Restore title_prefix logic
         if state:
             full_state_name = get_full_state_name(state)
@@ -2850,6 +2854,44 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
                        line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_hprd, showlegend=False), row=1, col=1)
+        
+        # Add NY State Minimum line (3.50 HPRD) for NY facilities only (not state page)
+        is_ny_facility = False
+        if facility and facility_state:
+            # Check if facility is in NY
+            is_ny_facility = (facility_state == "New York" or facility_state == "NY")
+        
+        if is_ny_facility:
+            # Add horizontal line at 3.50 HPRD (less pronounced, with label)
+            fig.add_trace(go.Scatter(
+                x=date_range,  # Use the full date range
+                y=[3.50, 3.50],  # Constant y value at 3.50
+                mode='lines',
+                name='NY State Minimum',
+                line=dict(color='rgba(255, 0, 0, 0.5)', width=1.5, dash='dot'),  # Less pronounced: lighter red, thinner
+                hovertemplate="<b>NY State Min. 3.50 HPRD</b><extra></extra>",
+                showlegend=False
+            ), row=1, col=1)
+            
+            # Add annotation label for NY State Minimum (visible on mobile and desktop)
+            # Use domain positioning to keep it within chart bounds, with multi-line text
+            fig.add_annotation(
+                text="NY State Min.<br>3.50 HPRD",
+                x=0.98,  # 98% across the chart width
+                y=3.50,
+                xref="x domain",
+                yref="y",
+                showarrow=False,
+                xanchor="right",  # Right-align to keep within bounds
+                yanchor="middle",
+                font=dict(size=10, color='rgba(255, 0, 0, 0.8)'),
+                bgcolor="rgba(255, 255, 255, 0.9)",
+                bordercolor="rgba(255, 0, 0, 0.3)",
+                borderwidth=1,
+                borderpad=3,
+                row=1,
+                col=1
+            )
         
         # Add nurse care HPRD line
         fig.add_trace(go.Scatter(x=data['date'], y=nurse_care_hprd_display,
@@ -2986,6 +3028,10 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
         if len(hprd_values) > 0:
             min_hprd = hprd_values.min()
             max_hprd = hprd_values.max()
+            # If NY line is shown, ensure 3.50 is included in the range
+            if is_ny_facility:
+                min_hprd = min(min_hprd, 3.50)
+                max_hprd = max(max_hprd, 3.50)
             padding = (max_hprd - min_hprd) * 0.1 if max_hprd > min_hprd else max_hprd * 0.1
             y_min_hprd = max(0, min_hprd - padding)  # Don't go below 0
             fig.update_yaxes(range=[y_min_hprd, None], row=1, col=1)
@@ -6465,30 +6511,109 @@ def main() -> None:
                             with st.expander("⚙️ Methodology", expanded=False):
                                 st.markdown(f"""
                                 This dashboard uses CMS Payroll-Based Journal (PBJ) data ({get_latest_data_periods()['data_range']}), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
-                                
-                                **Metrics**
-                                
-                                **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
-                                
-                                **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
-                                
-                                **Contract Staff %:** Share of hours provided by contract staff.
-                                
-                                **Census:** Average number of residents during the period.
-                                
-                                **Note:** Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
-                                
-                                **Data Transparency**
-                                <div style="font-size: 0.9em; color: #666;">
-                                The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
-                                </div>
-                                
-                                """, unsafe_allow_html=True)
                             
-                            st.markdown("</div>", unsafe_allow_html=True)
+                            **Metrics**
+                            
+                            **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                            
+                            **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
+                            
+                            **Contract Staff %:** Share of hours provided by contract staff.
+                            
+                            **Census:** Average number of residents during the period.
+                            
+                            **Note:** Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
+                            
+                            **Data Transparency**
+                            <div style="font-size: 0.9em; color: #666;">
+                            The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
+                            </div>
+                            
+                            """, unsafe_allow_html=True)
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
                     
                     # State Facilities List Section
                     if level == "State" and selected_value:
+                        # Add state PBJ Takeaway card for state level
+                        # Add anchor for PBJ Takeaway section
+                        st.markdown('<div id="pbj-takeaway" style="margin-top: -110px; padding-top: 60px;"></div>', unsafe_allow_html=True)
+                        # Get state data from filtered data
+                        if not filtered_data.empty:
+                            latest_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
+                            state_hprd = latest_data['Total_Nurse_HPRD']
+                            quarter = latest_data['CY_QTR'][-1]
+                            year = latest_data['CY_QTR'][:4]
+                            
+                            # Get national average HPRD
+                            import os
+                            def find_file(filename):
+                                possible_paths = [
+                                    os.path.join(os.getcwd(), filename),
+                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
+                                    filename  # Try relative path
+                                ]
+                                for path in possible_paths:
+                                    if os.path.exists(path):
+                                        return path
+                                return None
+                            
+                            # Use cached metrics data for consistency
+                            national_metrics, state_metrics, facility_metrics = load_metrics_data()
+                            
+                            # Get national HPRD for most recent quarter
+                            most_recent_national = national_metrics.sort_values('CY_QTR', ascending=False).iloc[0]
+                            national_hprd = most_recent_national['Total_Nurse_HPRD'] if pd.notna(most_recent_national['Total_Nurse_HPRD']) else 3.5
+                            
+                            # Calculate state rank for most recent quarter
+                            most_recent_state_data = state_metrics.sort_values('CY_QTR', ascending=False).groupby('STATE').first().reset_index()
+                            if not most_recent_state_data.empty:
+                                state_metrics_sorted = most_recent_state_data.sort_values('Total_Nurse_HPRD', ascending=False).reset_index(drop=True)
+                                state_row = state_metrics_sorted[state_metrics_sorted['STATE'] == selected_value]
+                                state_rank = state_row.index[0] + 1 if not state_row.empty else 0
+                                total_states = len(state_metrics_sorted)
+                            else:
+                                # Fallback to all data if most recent quarter not available
+                                state_metrics_sorted = state_metrics.sort_values('Total_Nurse_HPRD', ascending=False).reset_index(drop=True)
+                                state_row = state_metrics_sorted[state_metrics_sorted['STATE'] == selected_value]
+                                state_rank = state_row.index[0] + 1 if not state_row.empty else 0
+                                total_states = len(state_metrics_sorted)
+                            
+                            # Calculate trend from previous quarter
+                            trend_delta = None
+                            if len(filtered_data) > 1:
+                                # Get current quarter data
+                                current_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
+                                current_hprd = current_data['Total_Nurse_HPRD']
+                                
+                                # Calculate previous year quarter
+                                previous_year_quarter = calculate_previous_year_quarter(f"Q{quarter} {year}")
+                                
+                                # Find the same quarter from previous year
+                                previous_year_data = filtered_data[filtered_data['CY_QTR'] == previous_year_quarter]
+                                if not previous_year_data.empty:
+                                    previous_hprd = previous_year_data.iloc[0]['Total_Nurse_HPRD']
+                                    trend_delta = current_hprd - previous_hprd
+                            
+                            # Get full state name
+                            state_full_name = get_full_state_name(selected_value)
+                            
+                            # Get average facility size from state metrics
+                            state_avg_census = latest_data['Census'] if 'Census' in latest_data and pd.notna(latest_data['Census']) else 100
+                            
+                            # Use the state PBJ Takeaway card
+                            state_pbj_takeaway_card(
+                                state_name=state_full_name,
+                                reported_hprd=state_hprd,
+                                quarter_label=f"Q{quarter} {year}",
+                                national_hprd=national_hprd,
+                                state_rank=state_rank,
+                                total_states=total_states,
+                                trend_delta=trend_delta,
+                                previous_year=None,  # Will be calculated automatically as 4 quarters behind
+                                avg_facility_size=state_avg_census
+                            )
+                        
                         try:
                             # Get facilities from provider info CSV for this state
                             file_path = find_latest_provider_info()
@@ -6509,7 +6634,7 @@ def main() -> None:
                                             query = f"""
                                             WITH latest_quarter AS (
                                                 SELECT MAX(CY_QTR) as latest_qtr
-                                                FROM facility_metrics
+                                            FROM facility_metrics 
                                             )
                                             SELECT fm.PROVNUM, fm.Total_Nurse_HPRD, fm.Nurse_Care_HPRD, fm.Census, fm.CY_QTR, lq.latest_qtr
                                             FROM facility_metrics fm
@@ -6550,7 +6675,7 @@ def main() -> None:
                                     state_facilities_with_metrics = state_facilities.merge(
                                         facility_metrics[['PROVNUM', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Census']],
                                         left_on='CMS Certification Number (CCN)',
-                                        right_on='PROVNUM',
+                                            right_on='PROVNUM',
                                         how='inner'  # Only include facilities with data in latest quarter
                                     )
                                     
@@ -6634,203 +6759,260 @@ def main() -> None:
                                                 return (reported_val / case_mix_val) * 100
                                         return None
                                     
-                                    # Filters with better help text - responsive layout
-                                    # Check if mobile
-                                    is_mobile = st.session_state.get('is_mobile', False)
-                                    
-                                    if is_mobile:
-                                        # Mobile: stack filters vertically
-                                        show_all_facilities = st.checkbox(
-                                            "Show all facilities", 
-                                            value=False,
-                                            key=f"show_all_state_facilities_{selected_value}",
-                                            help="Show all facilities instead of bottom 20%"
-                                        )
-                                        exclude_admin_don = st.checkbox(
-                                            "Excl. admin/DON",
-                                            value=False,
-                                            key=f"excl_admin_don_{selected_value}",
-                                            help="Show direct care staffing instead of total staffing"
-                                        )
-                                        min_100_residents = st.checkbox(
-                                            "100+ Residents",
-                                            value=False,
-                                            key=f"min_100_residents_{selected_value}",
-                                            help="Exclude facilities with fewer than 100 residents"
-                                        )
-                                    else:
-                                        # Desktop: show filters in columns
-                                        col1, col2, col3 = st.columns(3)
-                                        with col1:
-                                            show_all_facilities = st.checkbox(
-                                                "Show all facilities", 
-                                                value=False,
-                                                key=f"show_all_state_facilities_{selected_value}",
-                                                help="Show all facilities instead of bottom 20%"
-                                            )
-                                        with col2:
-                                            exclude_admin_don = st.checkbox(
-                                                "Excl. admin/DON",
-                                                value=False,
-                                                key=f"excl_admin_don_{selected_value}",
-                                                help="Show direct care staffing (RN + LPN + NA excluding admin/DON roles) instead of total staffing"
-                                            )
-                                        with col3:
-                                            min_100_residents = st.checkbox(
-                                                "100+ Residents",
-                                                value=False,
-                                                key=f"min_100_residents_{selected_value}",
-                                                help="Exclude facilities with fewer than 100 residents"
-                                            )
-                                    
-                                    # Ensure Direct_Care_HPRD column exists (in case merge didn't work)
-                                    if 'Direct_Care_HPRD' not in facilities_df.columns:
-                                        facilities_df['Direct_Care_HPRD'] = pd.NA
-                                    
-                                    # Always filter by Total_Nurse_HPRD (which should exist)
-                                    # Direct_Care_HPRD may be NaN - that's fine, will show as N/A
-                                    facilities_with_hprd = facilities_df[
-                                        pd.notna(facilities_df['Total_Nurse_HPRD']) & 
-                                        (facilities_df['Total_Nurse_HPRD'] > 0)
-                                    ].copy()
-                                    
-                                    # Apply 100+ residents filter
-                                    if min_100_residents:
-                                        facilities_with_hprd = facilities_with_hprd[
-                                            pd.notna(facilities_with_hprd['Census']) & 
-                                            (facilities_with_hprd['Census'] > 100)
+                                    # High-Risk Nursing Homes Expander
+                                    with st.expander("⚠️ High-Risk Nursing Homes", expanded=False):
+                                        # Check if mobile
+                                        is_mobile = st.session_state.get('is_mobile', False)
+                                        
+                                        # Ensure Direct_Care_HPRD column exists (in case merge didn't work)
+                                        if 'Direct_Care_HPRD' not in facilities_df.columns:
+                                            facilities_df['Direct_Care_HPRD'] = pd.NA
+                                        
+                                        # Get filter states from session state (with defaults)
+                                        show_all_facilities = st.session_state.get(f"show_all_state_facilities_{selected_value}", False)
+                                        exclude_admin_don = st.session_state.get(f"excl_admin_don_{selected_value}", False)
+                                        min_100_residents = st.session_state.get(f"min_100_residents_{selected_value}", False)
+                                        
+                                        # Always filter by Total_Nurse_HPRD (which should exist)
+                                        # Direct_Care_HPRD may be NaN - that's fine, will show as N/A
+                                        facilities_with_hprd = facilities_df[
+                                            pd.notna(facilities_df['Total_Nurse_HPRD']) & 
+                                            (facilities_df['Total_Nurse_HPRD'] > 0)
                                         ].copy()
-                                    
-                                    if not facilities_with_hprd.empty:
-                                        # Determine which HPRD column to use for ranking/sorting
-                                        if exclude_admin_don:
-                                            # Sort by Direct_Care_HPRD directly - NaN values will be at the end
-                                            hprd_col_for_ranking = 'Direct_Care_HPRD'
+                                        
+                                        # Apply 100+ residents filter for header calculation
+                                        if min_100_residents:
+                                            facilities_for_header = facilities_with_hprd[
+                                                pd.notna(facilities_with_hprd['Census']) & 
+                                                (facilities_with_hprd['Census'] > 100)
+                                            ].copy()
                                         else:
-                                            hprd_col_for_ranking = 'Total_Nurse_HPRD'
+                                            facilities_for_header = facilities_with_hprd.copy()
                                         
-                                        # Sort by HPRD (ascending for bottom 20%)
-                                        # Handle NaN values - put them at the end when sorting
-                                        facilities_with_hprd = facilities_with_hprd.sort_values(
-                                            hprd_col_for_ranking, 
-                                            ascending=True, 
-                                            na_position='last'
-                                        )
-                                        
-                                        # Get state name and abbreviation for header
-                                        state_full_name = selected_value  # selected_value is the full state name
-                                        state_abbr = get_state_abbr(state_full_name)
-                                        
-                                        # Calculate bottom 20% threshold
-                                        if not show_all_facilities:
-                                            bottom_20_percent_count = max(1, int(len(facilities_with_hprd) * 0.2))
-                                            display_facilities = facilities_with_hprd.head(bottom_20_percent_count)
-                                            # Use full state name on desktop, abbreviation on mobile
-                                            state_display = state_abbr if is_mobile else state_full_name
-                                            quarter_text = f" ({latest_quarter_display})" if latest_quarter_display else ""
-                                            st.markdown(f"**Bottom 20% Staffing HPRD ({len(display_facilities):,} facilities) - {state_display}{quarter_text}**")
-                                        else:
-                                            display_facilities = facilities_with_hprd
-                                            state_display = state_abbr if is_mobile else state_full_name
-                                            quarter_text = f" ({latest_quarter_display})" if latest_quarter_display else ""
-                                            st.markdown(f"**All {len(display_facilities):,} facilities - {state_display}{quarter_text}**")
-                                        
-                                        # Apply proper capitalization to provider names
-                                        def capitalize_name(name):
-                                            if pd.isna(name):
-                                                return name
-                                            lowercase_words = {'and', 'or', 'of', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
-                                            words = str(name).lower().split()
-                                            capitalized_words = []
-                                            for i, word in enumerate(words):
-                                                if i == 0 or word not in lowercase_words:
-                                                    capitalized_words.append(word.capitalize())
+                                        # Calculate header based on current filter state
+                                        if not facilities_for_header.empty:
+                                            state_full_name = selected_value  # selected_value is the full state name
+                                            state_abbr = get_state_abbr(state_full_name)
+                                            
+                                            # Determine which HPRD column to use for sorting (for bottom 20% calculation)
+                                            if exclude_admin_don:
+                                                hprd_col_for_sorting = 'Direct_Care_HPRD'
+                                            else:
+                                                hprd_col_for_sorting = 'Total_Nurse_HPRD'
+                                            
+                                            # Sort facilities for bottom 20% calculation
+                                            facilities_sorted = facilities_for_header.sort_values(
+                                                hprd_col_for_sorting,
+                                                ascending=True,
+                                                na_position='last'
+                                            )
+                                            
+                                            if not show_all_facilities:
+                                                bottom_20_percent_count = max(1, int(len(facilities_sorted) * 0.2))
+                                                facility_count = bottom_20_percent_count
+                                                if is_mobile:
+                                                    header_text_prefix = f"{state_abbr} Bottom 20% HPRD"
                                                 else:
-                                                    capitalized_words.append(word)
-                                            return ' '.join(capitalized_words)
-                                    
-                                        # Format provider names
-                                        display_facilities = display_facilities.copy()
-                                        display_facilities['Provider_Name_Formatted'] = display_facilities['Provider Name'].apply(capitalize_name)
-                                        
-                                        # Calculate case-mix percentage
-                                        display_facilities['Case_Mix_Pct'] = display_facilities.apply(
-                                            lambda row: calculate_case_mix_pct(row, exclude_admin_don), axis=1
-                                        )
-                                        
-                                        # Format provider names as HTML links
-                                        def format_provnum(provnum):
-                                            provnum_str = str(provnum).strip().upper().zfill(6)
-                                            if len(provnum_str) > 6:
-                                                provnum_str = provnum_str[-6:]
-                                            return provnum_str
-                                        
-                                        display_facilities['Provider_Link'] = display_facilities.apply(
-                                            lambda row: f'<a href="/?facility={format_provnum(row["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider_Name_Formatted"]}</a>',
-                                            axis=1
-                                        )
-                                    
-                                        # Prepare display columns
-                                        hprd_col_display = 'Direct Care HPRD' if exclude_admin_don else 'Total HPRD'
-                                        
-                                        # Build table data
-                                        table_data = []
-                                        for idx, row in display_facilities.iterrows():
-                                            census_val = row.get('Census')
-                                            hprd_val = row.get('Direct_Care_HPRD' if exclude_admin_don else 'Total_Nurse_HPRD')
-                                            case_mix_pct = row.get('Case_Mix_Pct')
-                                            
-                                            # Format values
-                                            census_display = f"{census_val:,.0f}" if pd.notna(census_val) else 'N/A'
-                                            
-                                            if pd.notna(hprd_val):
-                                                hprd_formatted = float(Decimal(str(hprd_val)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
-                                                hprd_display = f"{hprd_formatted:.2f}"
+                                                    header_text_prefix = f"{state_full_name} Bottom 20% HPRD"
                                             else:
-                                                hprd_display = 'N/A'
+                                                facility_count = len(facilities_sorted)
+                                                if is_mobile:
+                                                    header_text_prefix = f"{state_abbr} All Providers"
+                                                else:
+                                                    header_text_prefix = f"{state_full_name} All Providers"
                                             
-                                            if pd.notna(case_mix_pct):
-                                                case_mix_formatted = float(Decimal(str(case_mix_pct)).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP))
-                                                case_mix_display = f"{case_mix_formatted:.1f}%"
+                                            # Format facility count as integer with thousands separator
+                                            count_formatted = f"{facility_count:,}"
+                                            quarter_text = f" - {latest_quarter_display}" if latest_quarter_display else ""
+                                            
+                                            # Format header: "NY Bottom 20% HPRD Providers - Q2 2025 (n = 1,234)"
+                                            header_text = f"**{header_text_prefix}{quarter_text} (n = {count_formatted})**"
+                                            
+                                            # Display header BEFORE filters
+                                            st.markdown(header_text)
+                                        
+                                        # Filters with better help text - responsive layout
+                                        if is_mobile:
+                                            # Mobile: filters in one row
+                                            filter_col1, filter_col2, filter_col3 = st.columns(3)
+                                            with filter_col1:
+                                                show_all_facilities = st.checkbox(
+                                                    "Show all", 
+                                                    value=False,
+                                                    key=f"show_all_state_facilities_{selected_value}",
+                                                    help="Show all facilities instead of bottom 20%"
+                                                )
+                                            with filter_col2:
+                                                exclude_admin_don = st.checkbox(
+                                                    "Excl. admin/DON",
+                                                    value=False,
+                                                    key=f"excl_admin_don_{selected_value}",
+                                                    help="Show direct care staffing instead of total staffing"
+                                                )
+                                            with filter_col3:
+                                                min_100_residents = st.checkbox(
+                                                    "100+ Residents",
+                                                    value=False,
+                                                    key=f"min_100_residents_{selected_value}",
+                                                    help="Exclude facilities with fewer than 100 residents"
+                                                )
+                                        else:
+                                            # Desktop: show filters in columns
+                                            col1, col2, col3 = st.columns(3)
+                                            with col1:
+                                                show_all_facilities = st.checkbox(
+                                                    "Show all facilities", 
+                                                    value=False,
+                                                    key=f"show_all_state_facilities_{selected_value}",
+                                                    help="Show all facilities instead of bottom 20%"
+                                                )
+                                            with col2:
+                                                exclude_admin_don = st.checkbox(
+                                                    "Excl. admin/DON",
+                                                    value=False,
+                                                    key=f"excl_admin_don_{selected_value}",
+                                                    help="Show direct care staffing (RN + LPN + NA excluding admin/DON roles) instead of total staffing"
+                                                )
+                                            with col3:
+                                                min_100_residents = st.checkbox(
+                                                    "100+ Residents",
+                                                    value=False,
+                                                    key=f"min_100_residents_{selected_value}",
+                                                    help="Exclude facilities with fewer than 100 residents"
+                                                )
+                                        
+                                        # Re-apply filters now that we have current filter state
+                                        facilities_with_hprd = facilities_df[
+                                            pd.notna(facilities_df['Total_Nurse_HPRD']) & 
+                                            (facilities_df['Total_Nurse_HPRD'] > 0)
+                                        ].copy()
+                                        
+                                        # Apply 100+ residents filter
+                                        if min_100_residents:
+                                            facilities_with_hprd = facilities_with_hprd[
+                                                pd.notna(facilities_with_hprd['Census']) & 
+                                                (facilities_with_hprd['Census'] > 100)
+                                            ].copy()
+                                        
+                                        if not facilities_with_hprd.empty:
+                                            # Determine which HPRD column to use for ranking/sorting
+                                            if exclude_admin_don:
+                                                # Sort by Direct_Care_HPRD directly - NaN values will be at the end
+                                                hprd_col_for_ranking = 'Direct_Care_HPRD'
                                             else:
-                                                case_mix_display = 'N/A'
+                                                hprd_col_for_ranking = 'Total_Nurse_HPRD'
                                             
-                                            table_data.append({
-                                                'State': row.get('State', ''),
-                                                'Provider': row.get('Provider_Link', ''),
-                                                'Census': census_display,
-                                                'HPRD': hprd_display,
-                                                'Case_Mix_Pct': case_mix_display,
-                                                'Census_raw': float(census_val) if pd.notna(census_val) else 0,
-                                                'HPRD_raw': float(hprd_val) if pd.notna(hprd_val) else 0,
-                                                'Case_Mix_Pct_raw': float(case_mix_pct) if pd.notna(case_mix_pct) else 0
-                                            })
+                                            # Sort by HPRD (ascending for bottom 20%)
+                                            # Handle NaN values - put them at the end when sorting
+                                            facilities_with_hprd = facilities_with_hprd.sort_values(
+                                                hprd_col_for_ranking, 
+                                                ascending=True, 
+                                                na_position='last'
+                                            )
+                                            
+                                            # Calculate bottom 20% threshold
+                                            if not show_all_facilities:
+                                                bottom_20_percent_count = max(1, int(len(facilities_with_hprd) * 0.2))
+                                                display_facilities = facilities_with_hprd.head(bottom_20_percent_count)
+                                            else:
+                                                display_facilities = facilities_with_hprd
                                         
-                                        # Build HTML table with unique class to avoid CSS conflicts
-                                        html_table = '<table class="state-facilities-table" id="facilities-table">\n<thead>\n<tr>'
-                                        html_table += '<th data-sort-method="none">State</th>'
-                                        html_table += '<th data-sort-method="none">Provider</th>'
-                                        html_table += '<th data-sort-method="number">Census</th>'
-                                        # Add line breaks for mobile wrapping (hidden on desktop)
-                                        hprd_header_mobile = hprd_col_display.replace(' ', '<br>')
-                                        html_table += f'<th data-sort-method="number"><span class="desktop-only">{hprd_col_display}</span><span class="mobile-only">{hprd_header_mobile}</span></th>'
-                                        html_table += '<th data-sort-method="number"><span class="desktop-only">Case-Mix %</span><span class="mobile-only">Case-Mix<br>%</span>'
-                                        html_table += ' <span title="Case-Mix % compares reported staffing to expected staffing based on resident acuity. When &quot;Excl. admin/DON&quot; is checked, it shows direct care staffing as a percentage of total case-mix expected staffing. A value below 100% indicates staffing below expected levels." style="cursor: help; color: #6b7280; font-size: 0.85em;">ℹ️</span></th>'
-                                        html_table += '</tr>\n</thead>\n<tbody>\n'
+                                            # Apply proper capitalization to provider names
+                                            def capitalize_name(name):
+                                                if pd.isna(name):
+                                                    return name
+                                                lowercase_words = {'and', 'or', 'of', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
+                                                words = str(name).lower().split()
+                                                capitalized_words = []
+                                                for i, word in enumerate(words):
+                                                    if i == 0 or word not in lowercase_words:
+                                                        capitalized_words.append(word.capitalize())
+                                                    else:
+                                                        capitalized_words.append(word)
+                                                return ' '.join(capitalized_words)
+                                            
+                                            # Format provider names
+                                            display_facilities = display_facilities.copy()
+                                            display_facilities['Provider_Name_Formatted'] = display_facilities['Provider Name'].apply(capitalize_name)
+                                            
+                                            # Calculate case-mix percentage
+                                            display_facilities['Case_Mix_Pct'] = display_facilities.apply(
+                                                lambda row: calculate_case_mix_pct(row, exclude_admin_don), axis=1
+                                            )
                                         
-                                        for row_data in table_data:
-                                            html_table += '<tr>'
-                                            html_table += f'<td>{row_data["State"]}</td>'
-                                            html_table += f'<td>{row_data["Provider"]}</td>'
-                                            html_table += f'<td data-sort="{int(row_data["Census_raw"])}">{row_data["Census"]}</td>'
-                                            html_table += f'<td data-sort="{row_data["HPRD_raw"]:.2f}">{row_data["HPRD"]}</td>'
-                                            html_table += f'<td data-sort="{row_data["Case_Mix_Pct_raw"]:.1f}">{row_data["Case_Mix_Pct"]}</td>'
-                                            html_table += '</tr>\n'
-                                        
-                                        html_table += '</tbody>\n</table>'
-                                        
-                                        # Display table with clean, professional CSS (best practices)
-                                    st.markdown("""
+                                            # Format provider names as HTML links
+                                            def format_provnum(provnum):
+                                                provnum_str = str(provnum).strip().upper().zfill(6)
+                                                if len(provnum_str) > 6:
+                                                    provnum_str = provnum_str[-6:]
+                                                return provnum_str
+                                            
+                                            display_facilities['Provider_Link'] = display_facilities.apply(
+                                                lambda row: f'<a href="/?facility={format_provnum(row["CMS Certification Number (CCN)"])}" target="_blank">{row["Provider_Name_Formatted"]}</a>',
+                                                axis=1
+                                            )
+                                            
+                                            # Prepare display columns
+                                            hprd_col_display = 'Direct Care HPRD' if exclude_admin_don else 'Total HPRD'
+                                            
+                                            # Build table data
+                                            table_data = []
+                                            for idx, row in display_facilities.iterrows():
+                                                census_val = row.get('Census')
+                                                hprd_val = row.get('Direct_Care_HPRD' if exclude_admin_don else 'Total_Nurse_HPRD')
+                                                case_mix_pct = row.get('Case_Mix_Pct')
+                                                
+                                                # Format values
+                                                census_display = f"{census_val:,.0f}" if pd.notna(census_val) else 'N/A'
+                                                
+                                                if pd.notna(hprd_val):
+                                                    hprd_formatted = float(Decimal(str(hprd_val)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+                                                    hprd_display = f"{hprd_formatted:.2f}"
+                                                else:
+                                                    hprd_display = 'N/A'
+                                                
+                                                if pd.notna(case_mix_pct):
+                                                    case_mix_formatted = float(Decimal(str(case_mix_pct)).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP))
+                                                    case_mix_display = f"{case_mix_formatted:.1f}%"
+                                                else:
+                                                    case_mix_display = 'N/A'
+                                                
+                                                table_data.append({
+                                                    'State': row.get('State', ''),
+                                                    'Provider': row.get('Provider_Link', ''),
+                                                    'Census': census_display,
+                                                    'HPRD': hprd_display,
+                                                    'Case_Mix_Pct': case_mix_display,
+                                                    'Census_raw': float(census_val) if pd.notna(census_val) else 0,
+                                                    'HPRD_raw': float(hprd_val) if pd.notna(hprd_val) else 0,
+                                                    'Case_Mix_Pct_raw': float(case_mix_pct) if pd.notna(case_mix_pct) else 0
+                                                })
+                                            
+                                            # Build HTML table with unique class to avoid CSS conflicts
+                                            html_table = '<table class="state-facilities-table" id="facilities-table">\n<thead>\n<tr>'
+                                            html_table += '<th data-sort-method="none">State</th>'
+                                            html_table += '<th data-sort-method="none">Provider</th>'
+                                            html_table += '<th data-sort-method="number">Census</th>'
+                                            # Add line breaks for mobile wrapping (hidden on desktop)
+                                            hprd_header_mobile = hprd_col_display.replace(' ', '<br>')
+                                            html_table += f'<th data-sort-method="number"><span class="desktop-only">{hprd_col_display}</span><span class="mobile-only">{hprd_header_mobile}</span></th>'
+                                            html_table += '<th data-sort-method="number"><span class="desktop-only">Case-Mix %</span><span class="mobile-only">Case-Mix<br>%</span>'
+                                            html_table += ' <span title="Case-Mix % compares reported staffing to expected staffing based on resident acuity. When &quot;Excl. admin/DON&quot; is checked, it shows direct care staffing as a percentage of total case-mix expected staffing. A value below 100% indicates staffing below expected levels." style="cursor: help; color: #6b7280; font-size: 0.85em;">ℹ️</span></th>'
+                                            html_table += '</tr>\n</thead>\n<tbody>\n'
+                                            
+                                            for row_data in table_data:
+                                                html_table += '<tr>'
+                                                html_table += f'<td>{row_data["State"]}</td>'
+                                                html_table += f'<td>{row_data["Provider"]}</td>'
+                                                html_table += f'<td data-sort="{int(row_data["Census_raw"])}">{row_data["Census"]}</td>'
+                                                html_table += f'<td data-sort="{row_data["HPRD_raw"]:.2f}">{row_data["HPRD"]}</td>'
+                                                html_table += f'<td data-sort="{row_data["Case_Mix_Pct_raw"]:.1f}">{row_data["Case_Mix_Pct"]}</td>'
+                                                html_table += '</tr>\n'
+                                            
+                                            html_table += '</tbody>\n</table>'
+                                            
+                                            # Display table with clean, professional CSS (best practices)
+                                            st.markdown("""
                                         <style>
                                             /* State Facilities Table - Clean, Professional Styling */
                                             .state-facilities-table {
@@ -6850,7 +7032,7 @@ def main() -> None:
                                             .state-facilities-table thead {
                                                 background: #f9fafb;
                                                 border-bottom: 2px solid #e5e7eb;
-                                            }
+                                        }
                                             
                                             .state-facilities-table th {
                                                 background: #f9fafb !important;
@@ -6900,7 +7082,7 @@ def main() -> None:
                                             
                                             .state-facilities-table tbody tr:hover {
                                                 background-color: #f9fafb;
-                                            }
+                                        }
                                             
                                             .state-facilities-table tbody tr:nth-child(even) {
                                                 background-color: #ffffff;
@@ -6918,11 +7100,11 @@ def main() -> None:
                                                 font-size: 0.875rem;
                                                 color: #1f2937;
                                                 line-height: 1.5;
-                                            }
+                                        }
                                             
                                             .state-facilities-table tbody tr:last-child td {
                                                 border-bottom: none;
-                                            }
+                                        }
                                             
                                             /* Show/hide desktop vs mobile header text - desktop by default */
                                             .state-facilities-table .desktop-only {
@@ -6930,7 +7112,7 @@ def main() -> None:
                                             }
                                             .state-facilities-table .mobile-only {
                                                 display: none;
-                                            }
+                                        }
                                             
                                             .state-facilities-table a {
                                                 color: #2563eb;
@@ -7115,126 +7297,76 @@ def main() -> None:
                                         }
                                         </style>
                                     """, unsafe_allow_html=True)
-                                    
-                                    # Wrap table in a scrollable container for mobile with improved styling
-                                    st.markdown(
-                                        f"""
-                                        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;margin:1rem 0;">
-                                            {html_table}
-                                        </div>
-                                        """,
-                                        unsafe_allow_html=True
-                                    )
-                                    
-                                    # Add sorting functionality
-                                    from streamlit.components.v1 import html
-                                    html('''
-                                    <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js'></script>
-                                    <script src='https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/sorts/tablesort.number.min.js'></script>
-                                    <script>
-                                        try {
-                                            var table = window.parent.document.getElementById("facilities-table");
-                                            if (table) {
-                                                var sort = new Tablesort(table, {
-                                                        descending: false
-                                                    });
-                                                    // Sort by HPRD column (4th column, 0-indexed as 3) in ascending order
-                                                    var hprdHeader = table.querySelectorAll('th')[3];
-                                                    if (hprdHeader) {
-                                                        hprdHeader.click();
+                                            
+                                            # Wrap table in a scrollable container for mobile with improved styling
+                                            st.markdown(
+                                                f"""
+                                                <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;margin:1rem 0;">
+                                                    {html_table}
+                                                </div>
+                                                """,
+                                                unsafe_allow_html=True
+                                            )
+                                            
+                                            # Add sorting functionality
+                                            from streamlit.components.v1 import html
+                                            html('''
+                                            <script>
+                                                (function() {
+                                                    try {
+                                                        // Load Tablesort library dynamically
+                                                        var script1 = document.createElement('script');
+                                                        script1.src = 'https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js';
+                                                        script1.onload = function() {
+                                                            var script2 = document.createElement('script');
+                                                            script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/sorts/tablesort.number.min.js';
+                                                            script2.onload = function() {
+                                                                setTimeout(function() {
+                                                                    try {
+                                                                        // Safely access parent window
+                                                                        var parentWindow = null;
+                                                                        try {
+                                                                            if (window.parent && window.parent !== window && window.parent.document) {
+                                                                                parentWindow = window.parent;
+                                                                            }
+                                                                        } catch (e) {
+                                                                            // Cross-origin or other access issue
+                                                                        }
+                                                                        
+                                                                        var doc = parentWindow ? parentWindow.document : document;
+                                                                        var table = doc ? doc.getElementById("facilities-table") : null;
+                                                                        
+                                                                        if (table && typeof Tablesort !== 'undefined') {
+                                                                            var sort = new Tablesort(table, {
+                                                                                descending: false
+                                                                            });
+                                                                            // Sort by HPRD column (4th column, 0-indexed as 3) in ascending order
+                                                                            var hprdHeader = table.querySelectorAll('th')[3];
+                                                                            if (hprdHeader) {
+                                                                                hprdHeader.click();
+                                                                            }
+                                                                        }
+                                                                    } catch (e) {
+                                                                        // Silently fail - table sorting is not critical
+                                                                    }
+                                                                }, 200);
+                                                            };
+                                                            document.head.appendChild(script2);
+                                                        };
+                                                        document.head.appendChild(script1);
+                                                    } catch (error) {
+                                                        // Silently fail - table sorting is not critical
                                                     }
-                                            }
-                                        } catch (error) {
-                                            console.log("Error initializing table sort:", error);
-                                        }
-                                    </script>
-                                    ''', height=0)
-                                else:
-                                    st.info("No staffing data available for facilities in this state.")
+                                                })();
+                                            </script>
+                                            ''', height=0)
+                                        else:
+                                            st.info("No staffing data available for facilities in this state.")
                         except Exception as e:
                             st.error(f"Error displaying state facilities: {str(e)}")
-                    # Add state PBJ Takeaway card for state level
-                    if level == "State" and selected_value:
-                        # Add anchor for PBJ Takeaway section
-                        st.markdown('<div id="pbj-takeaway" style="margin-top: -110px; padding-top: 60px;"></div>', unsafe_allow_html=True)
-                        # Get state data from filtered data
-                        if not filtered_data.empty:
-                            latest_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
-                            state_hprd = latest_data['Total_Nurse_HPRD']
-                            quarter = latest_data['CY_QTR'][-1]
-                            year = latest_data['CY_QTR'][:4]
                             
-                            # Get national average HPRD
-                            import os
-                            def find_file(filename):
-                                possible_paths = [
-                                    os.path.join(os.getcwd(), filename),
-                                    os.path.join(os.path.dirname(os.path.abspath(__file__)), filename),
-                                    filename  # Try relative path
-                                ]
-                                for path in possible_paths:
-                                    if os.path.exists(path):
-                                        return path
-                                return None
-                            
-                            # Use cached metrics data for consistency
-                            national_metrics, state_metrics, facility_metrics = load_metrics_data()
-                            
-                            # Get national HPRD for most recent quarter
-                            most_recent_national = national_metrics.sort_values('CY_QTR', ascending=False).iloc[0]
-                            national_hprd = most_recent_national['Total_Nurse_HPRD'] if pd.notna(most_recent_national['Total_Nurse_HPRD']) else 3.5
-                            
-                            # Calculate state rank for most recent quarter
-                            most_recent_state_data = state_metrics.sort_values('CY_QTR', ascending=False).groupby('STATE').first().reset_index()
-                            if not most_recent_state_data.empty:
-                                state_metrics_sorted = most_recent_state_data.sort_values('Total_Nurse_HPRD', ascending=False).reset_index(drop=True)
-                                state_row = state_metrics_sorted[state_metrics_sorted['STATE'] == selected_value]
-                                state_rank = state_row.index[0] + 1 if not state_row.empty else 0
-                                total_states = len(state_metrics_sorted)
-                            else:
-                                # Fallback to all data if most recent quarter not available
-                                state_metrics_sorted = state_metrics.sort_values('Total_Nurse_HPRD', ascending=False).reset_index(drop=True)
-                                state_row = state_metrics_sorted[state_metrics_sorted['STATE'] == selected_value]
-                                state_rank = state_row.index[0] + 1 if not state_row.empty else 0
-                                total_states = len(state_metrics_sorted)
-                            
-                            # Calculate trend from previous quarter
-                            trend_delta = None
-                            if len(filtered_data) > 1:
-                                # Get current quarter data
-                                current_data = filtered_data.sort_values('CY_QTR', ascending=False).iloc[0]
-                                current_hprd = current_data['Total_Nurse_HPRD']
-                                
-                                # Calculate previous year quarter
-                                previous_year_quarter = calculate_previous_year_quarter(f"Q{quarter} {year}")
-                                
-                                # Find the same quarter from previous year
-                                previous_year_data = filtered_data[filtered_data['CY_QTR'] == previous_year_quarter]
-                                if not previous_year_data.empty:
-                                    previous_hprd = previous_year_data.iloc[0]['Total_Nurse_HPRD']
-                                    trend_delta = current_hprd - previous_hprd
-                            
-                            # Get full state name
-                            state_full_name = get_full_state_name(selected_value)
-                            
-                            # Get average facility size from state metrics
-                            state_avg_census = latest_data['Census'] if 'Census' in latest_data and pd.notna(latest_data['Census']) else 100
-                            
-                            # Use the state PBJ Takeaway card
-                            state_pbj_takeaway_card(
-                                state_name=state_full_name,
-                                reported_hprd=state_hprd,
-                                quarter_label=f"Q{quarter} {year}",
-                                national_hprd=national_hprd,
-                                state_rank=state_rank,
-                                total_states=total_states,
-                                trend_delta=trend_delta,
-                                previous_year=None,  # Will be calculated automatically as 4 quarters behind
-                                avg_facility_size=state_avg_census
-                            )
-                            
-                            # State Rankings Expander
-                            with st.expander("📊 State Rankings", expanded=False):
+                        # State Rankings Expander
+                        with st.expander("📊 State Rankings", expanded=False):
                                 # Load state rankings data
                                 try:
                                     import os
@@ -7318,6 +7450,7 @@ def main() -> None:
                                             rankings_df['Total Providers'] = rankings_df['Total Providers'].astype(int)
                                             rankings_df['Total Residents (avg. per day)'] = (rankings_df['Total Residents (avg. per day)'] + 0.5).astype(int)  # Round to whole numbers
                                             # Use ROUND_HALF_UP to avoid bankers rounding (e.g., 3.465 -> 3.47)
+                                            # Keep as float - formatting will be done in style.format to always show 2 decimals
                                             rankings_df['Total Nurse HPRD'] = rankings_df['Total Nurse HPRD'].apply(
                                                 lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP))
                                             )
@@ -7450,35 +7583,35 @@ def main() -> None:
                                 except Exception as e:
                                     st.error(f"Error loading state rankings data: {str(e)}")
                             
-                            # Add methodology expander for state pages - centered below PBJ Takeaway
-                            st.markdown("""
-                            <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
+                        # Add methodology expander for state pages - centered below PBJ Takeaway
+                        st.markdown("""
+                        <div style='text-align: center; margin-top: 20px; margin-bottom: 20px;'>
+                        """, unsafe_allow_html=True)
+                        
+                        with st.expander("⚙️ Methodology", expanded=False):
+                            st.markdown(f"""
+                            This dashboard uses CMS Payroll-Based Journal (PBJ) data ({get_latest_data_periods()['data_range']}), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
+                            
+                            **Metrics**
+                            
+                            **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
+                            
+                            **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
+                            
+                            **Contract Staff %:** Share of hours provided by contract staff.
+                            
+                            **Census:** Average number of residents during the period.
+                            
+                            **Note:** Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
+                            
+                            **Data Transparency**
+                            <div style="font-size: 0.9em; color: #666;">
+                            The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
+                            </div>
+                            
                             """, unsafe_allow_html=True)
-                            
-                            with st.expander("⚙️ Methodology", expanded=False):
-                                st.markdown(f"""
-                                This dashboard uses CMS Payroll-Based Journal (PBJ) data ({get_latest_data_periods()['data_range']}), along with other public datasets (Provider Information, Affiliated Entity). State staffing standards via MACPAC (2022).
-                                
-                                **Metrics**
-                                
-                                **Hours Per Resident Day (HPRD):** Total staff hours ÷ average residents. Example: 350 hours for 100 residents = 3.5 HPRD.
-                                
-                                **Direct Care (excl. Admin, DON):** Hours per resident day for direct care staff only (RN, LPN, CNA, NAtrn, MedAide), excluding administrative and supervisory roles.
-                                
-                                **Contract Staff %:** Share of hours provided by contract staff.
-                                
-                                **Census:** Average number of residents during the period.
-                                
-                                **Note:** Some states set minimums (e.g., NJ, CA, NY at 3.5 HPRD) while a federal 3.48 minimum was recently overturned (2025). A 2001 federal study found 4.1 HPRD linked to better outcomes. Staffing needs vary by resident acuity ("case-mix"), day, and shift. Estimates on PBJ Takeaway assume roughly 60% of staff are CNAs.
-                                
-                                **Data Transparency**
-                                <div style="font-size: 0.9em; color: #666;">
-                                The PBJ Dashboard pulls directly from CMS data and is carefully vetted for accuracy. Still, sometimes a bug sneaks into the jelly. That could mean: a systemic CMS data reporting issue (e.g., Q2 2017 contract staffing, missing data in 2020 due to COVID) or there could be a coding error on our part. If you spot something that looks off, please let me know <a href="mailto:eric@320insight.com">eric@320insight.com</a> so I can set things right.
-                                </div>
-                                
-                                """, unsafe_allow_html=True)
-                            
-                            st.markdown("</div>", unsafe_allow_html=True)
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
                     
                     # Add subscription button for all levels
                     if level == "National":
