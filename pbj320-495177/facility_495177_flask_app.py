@@ -622,6 +622,27 @@ def load_facility_data(provnum):
     return global_df
 
 
+
+# Initialize data lazily (for Vercel deployment)
+# Hardcoded for facility 495177
+PROVNUM = "495177"
+_data_initialized = False
+
+def ensure_data_loaded():
+    """Lazy initialization - only load data on first request"""
+    global _data_initialized
+    if not _data_initialized:
+        try:
+            print(f"Initializing facility {PROVNUM} dashboard (lazy load)...")
+            create_dynamic_dashboard(PROVNUM)
+            print(f"✅ Successfully initialized facility {PROVNUM} dashboard")
+            _data_initialized = True
+        except Exception as e:
+            print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")
+            import traceback
+            traceback.print_exc()
+            # Will retry on next request
+
 # Ensure data is loaded before any request
 @app.before_request
 def before_request():
@@ -1283,61 +1304,18 @@ def get_provider_info_charts():
         if provider_info_df is None:
             return jsonify({'error': 'Provider info data not loaded'})
         
-        # Helper function to normalize quarter format
-        def normalize_quarter_for_matching(q):
-            """Convert quarter to PBJ format (2018Q1) for matching"""
-            if not q or pd.isna(q):
-                return None
-            q_str = str(q).strip()
-            # If already in "2018Q1" format, return as is
-            if len(q_str) == 6 and q_str[4] == 'Q' and q_str[0:4].isdigit() and q_str[5].isdigit():
-                return q_str
-            # If in "Q1 2018" or "Q1 2 018" format, convert to "2018Q1"
-            if q_str.startswith('Q') and ' ' in q_str:
-                parts = q_str.replace('Q', '').split()
-                if len(parts) >= 2:
-                    quarter_num = parts[0]
-                    year = ''.join(parts[1:])  # Join year parts in case of "2 018"
-                    if quarter_num.isdigit() and year.isdigit():
-                        return f"{year}Q{quarter_num}"
-            return None
-        
         # Group by quarter and take the latest processing date per quarter
         chart_data = provider_info_df.dropna(subset=['quarter']).copy()
         chart_data = chart_data.sort_values('processing_date').groupby('quarter').last().reset_index()
         
-        # Create normalized quarter column for matching with PBJ data
-        chart_data['quarter_normalized'] = chart_data['quarter'].apply(normalize_quarter_for_matching)
-        
         # Format quarter labels for x-axis (Q1 2021 instead of 2021Q1)
-        # Preserve original format if it's already "Q1 2018", otherwise convert from "2018Q1"
-        def format_quarter_label(q):
-            if pd.isna(q):
-                return None
-            q_str = str(q).strip()
-            # If already in "Q1 2018" format, return as is
-            if q_str.startswith('Q') and ' ' in q_str:
-                return q_str
-            # If in "2018Q1" format, convert to "Q1 2018"
-            if len(q_str) == 6 and q_str[4] == 'Q':
-                return f"Q{q_str[-1]} {q_str[:4]}"
-            return q_str
-        
-        chart_data['quarter_label'] = chart_data['quarter'].apply(format_quarter_label)
+        chart_data['quarter_label'] = chart_data['quarter'].apply(lambda x: f"Q{x[-1]} {x[:4]}" if pd.notna(x) and len(str(x)) == 6 else str(x) if pd.notna(x) else None)
         
         # Add PBJ-calculated direct care values (excludes admin/DON) by matching quarters
         if global_df is not None and len(global_df) > 0:
             pbj_direct_data = []
-            for idx, row in chart_data.iterrows():
-                quarter_orig = row['quarter']
-                quarter_normalized = row['quarter_normalized']
-                
-                # Match using normalized quarter format
-                if quarter_normalized:
-                    pbj_quarter = global_df[global_df['CY_Qtr'] == quarter_normalized]
-                else:
-                    pbj_quarter = pd.DataFrame()  # No match if can't normalize
-                
+            for quarter in chart_data['quarter']:
+                pbj_quarter = global_df[global_df['CY_Qtr'] == quarter]
                 if len(pbj_quarter) > 0:
                     total_census = pbj_quarter['MDScensus'].sum()
                     # Direct Total (excludes RN Admin, RN DON, LPN Admin)
@@ -1346,9 +1324,9 @@ def get_provider_info_charts():
                     # RN Direct (excludes RN Admin and RN DON)
                     rn_direct_hours = pbj_quarter['Hrs_RN'].sum()
                     rn_direct_hprd = (rn_direct_hours / total_census) if total_census > 0 else 0
-                    pbj_direct_data.append({'quarter': quarter_orig, 'pbj_direct_total': direct_hprd, 'pbj_rn_direct': rn_direct_hprd})
+                    pbj_direct_data.append({'quarter': quarter, 'pbj_direct_total': direct_hprd, 'pbj_rn_direct': rn_direct_hprd})
                 else:
-                    pbj_direct_data.append({'quarter': quarter_orig, 'pbj_direct_total': 0, 'pbj_rn_direct': 0})
+                    pbj_direct_data.append({'quarter': quarter, 'pbj_direct_total': 0, 'pbj_rn_direct': 0})
             
             pbj_direct_df = pd.DataFrame(pbj_direct_data)
             chart_data = chart_data.merge(pbj_direct_df, on='quarter', how='left')
@@ -1356,48 +1334,13 @@ def get_provider_info_charts():
             chart_data['pbj_direct_total'] = 0
             chart_data['pbj_rn_direct'] = 0
         
-        # Sort quarters chronologically using normalized format
-        def quarter_sort_key(q_norm):
-            """Convert "2018Q1" to (2018, 1) for sorting"""
-            if pd.isna(q_norm):
-                return (9999, 9)
-            q_str = str(q_norm).strip()
-            try:
-                if len(q_str) == 6 and q_str[4] == 'Q':
-                    year = int(q_str[0:4])
-                    quarter = int(q_str[5])
-                    return (year, quarter)
-            except:
-                pass
-            return (9999, 9)  # Put malformed quarters at end
-        
-        chart_data['_sort_key'] = chart_data['quarter_normalized'].apply(quarter_sort_key)
-        chart_data = chart_data.sort_values('_sort_key').drop(['_sort_key', 'quarter_normalized'], axis=1)
-        
-        # Calculate case_mix_direct (RN + LPN + NA case-mix) for each quarter
-        # This is the denominator for direct staff % CMI calculations
-        chart_data['case_mix_direct'] = (
-            chart_data['case_mix_rn_hrs_per_resident_per_day'].fillna(0) + 
-            chart_data['case_mix_lpn_hrs_per_resident_per_day'].fillna(0) + 
-            chart_data['case_mix_na_hrs_per_resident_per_day'].fillna(0)
-        )
-        # Replace with None if any component is missing (not just 0)
-        chart_data['case_mix_direct'] = chart_data.apply(
-            lambda row: None if (
-                pd.isna(row['case_mix_rn_hrs_per_resident_per_day']) or 
-                pd.isna(row['case_mix_lpn_hrs_per_resident_per_day']) or 
-                pd.isna(row['case_mix_na_hrs_per_resident_per_day'])
-            ) else row['case_mix_direct'], axis=1
-        )
-        
         # Prepare data for charts
         charts = {
             'total_staffing': {
                 'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
                 'reported_total': chart_data['reported_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
-                'reported_direct': chart_data['pbj_direct_total'].fillna(0).tolist(),  # Use PBJ-calculated direct (excludes admin/DON)
+                'reported_direct': chart_data['pbj_direct_total'].fillna(0).tolist(),  # Use PBJ-calculated direct
                 'case_mix_total': chart_data['case_mix_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
-                'case_mix_direct': chart_data['case_mix_direct'].where(pd.notna(chart_data['case_mix_direct']), None).tolist(),  # Case-mix direct (RN+LPN+NA)
                 'adjusted_total': chart_data['adjusted_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist()
             },
             'rn_staffing': {
@@ -1491,24 +1434,6 @@ def get_charts():
         # Sort by date
         filtered_df = filtered_df.sort_values('WorkDate')
         
-        # Ensure RN_HPRD, LPN_HPRD, and CNA_HPRD exist (calculated from PBJ data)
-        # These should already exist from load_facility_data, but ensure they're present
-        if 'RN_HPRD' not in filtered_df.columns:
-            if 'Hrs_RN' in filtered_df.columns and 'MDScensus' in filtered_df.columns:
-                filtered_df['RN_HPRD'] = (filtered_df['Hrs_RN'] / filtered_df['MDScensus']).fillna(0).round(2)
-            else:
-                filtered_df['RN_HPRD'] = 0
-        if 'LPN_HPRD' not in filtered_df.columns:
-            if 'Hrs_LPN' in filtered_df.columns and 'MDScensus' in filtered_df.columns:
-                filtered_df['LPN_HPRD'] = (filtered_df['Hrs_LPN'] / filtered_df['MDScensus']).fillna(0).round(2)
-            else:
-                filtered_df['LPN_HPRD'] = 0
-        if 'CNA_HPRD' not in filtered_df.columns:
-            if 'Hrs_CNA' in filtered_df.columns and 'MDScensus' in filtered_df.columns:
-                filtered_df['CNA_HPRD'] = (filtered_df['Hrs_CNA'] / filtered_df['MDScensus']).fillna(0).round(2)
-            else:
-                filtered_df['CNA_HPRD'] = 0
-        
         # Debug: Print filtering results
         print(f"DEBUG: After filtering - filtered_df length: {len(filtered_df)}")
         if len(filtered_df) == 0:
@@ -1522,7 +1447,7 @@ def get_charts():
                 # Aggregate by month
                 df_copy = df.copy()
                 df_copy['year_month'] = df_copy[date_col].dt.to_period('M')
-                agg_dict = {
+                aggregated = df_copy.groupby('year_month').agg({
                     'Total_Nurse_HPRD': 'mean',
                     'Total_RN_HPRD': 'mean', 
                     'Total_LPN_HPRD': 'mean',
@@ -1540,36 +1465,14 @@ def get_charts():
                     'CNA_Contract_Pct': 'mean',
                     'Total_Contract_Pct': 'mean',
                     'IsHoliday': 'any'
-                }
-                # Add base hours columns if they exist (needed for HPRD calculations)
-                if 'Hrs_RN' in df_copy.columns:
-                    agg_dict['Hrs_RN'] = 'sum'
-                if 'Hrs_LPN' in df_copy.columns:
-                    agg_dict['Hrs_LPN'] = 'sum'
-                if 'Hrs_CNA' in df_copy.columns:
-                    agg_dict['Hrs_CNA'] = 'sum'
-                # Add RN_HPRD, LPN_HPRD, CNA_HPRD if they exist
-                if 'RN_HPRD' in df_copy.columns:
-                    agg_dict['RN_HPRD'] = 'mean'
-                if 'LPN_HPRD' in df_copy.columns:
-                    agg_dict['LPN_HPRD'] = 'mean'
-                if 'CNA_HPRD' in df_copy.columns:
-                    agg_dict['CNA_HPRD'] = 'mean'
-                aggregated = df_copy.groupby('year_month').agg(agg_dict).reset_index()
-                # Recalculate HPRD from aggregated hours if needed
-                if 'RN_HPRD' not in aggregated.columns and 'Hrs_RN' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['RN_HPRD'] = (aggregated['Hrs_RN'] / aggregated['MDScensus']).fillna(0).round(2)
-                if 'LPN_HPRD' not in aggregated.columns and 'Hrs_LPN' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['LPN_HPRD'] = (aggregated['Hrs_LPN'] / aggregated['MDScensus']).fillna(0).round(2)
-                if 'CNA_HPRD' not in aggregated.columns and 'Hrs_CNA' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['CNA_HPRD'] = (aggregated['Hrs_CNA'] / aggregated['MDScensus']).fillna(0).round(2)
+                }).reset_index()
                 aggregated[date_col] = aggregated['year_month'].dt.to_timestamp()
                 return aggregated
             elif view_mode == 'quarter':
                 # Aggregate by quarter
                 df_copy = df.copy()
                 df_copy['year_quarter'] = df_copy[date_col].dt.to_period('Q')
-                agg_dict = {
+                aggregated = df_copy.groupby('year_quarter').agg({
                     'Total_Nurse_HPRD': 'mean',
                     'Total_RN_HPRD': 'mean',
                     'Total_LPN_HPRD': 'mean', 
@@ -1587,36 +1490,14 @@ def get_charts():
                     'CNA_Contract_Pct': 'mean',
                     'Total_Contract_Pct': 'mean',
                     'IsHoliday': 'any'
-                }
-                # Add base hours columns if they exist (needed for HPRD calculations)
-                if 'Hrs_RN' in df_copy.columns:
-                    agg_dict['Hrs_RN'] = 'sum'
-                if 'Hrs_LPN' in df_copy.columns:
-                    agg_dict['Hrs_LPN'] = 'sum'
-                if 'Hrs_CNA' in df_copy.columns:
-                    agg_dict['Hrs_CNA'] = 'sum'
-                # Add RN_HPRD, LPN_HPRD, CNA_HPRD if they exist
-                if 'RN_HPRD' in df_copy.columns:
-                    agg_dict['RN_HPRD'] = 'mean'
-                if 'LPN_HPRD' in df_copy.columns:
-                    agg_dict['LPN_HPRD'] = 'mean'
-                if 'CNA_HPRD' in df_copy.columns:
-                    agg_dict['CNA_HPRD'] = 'mean'
-                aggregated = df_copy.groupby('year_quarter').agg(agg_dict).reset_index()
-                # Recalculate HPRD from aggregated hours if needed
-                if 'RN_HPRD' not in aggregated.columns and 'Hrs_RN' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['RN_HPRD'] = (aggregated['Hrs_RN'] / aggregated['MDScensus']).fillna(0).round(2)
-                if 'LPN_HPRD' not in aggregated.columns and 'Hrs_LPN' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['LPN_HPRD'] = (aggregated['Hrs_LPN'] / aggregated['MDScensus']).fillna(0).round(2)
-                if 'CNA_HPRD' not in aggregated.columns and 'Hrs_CNA' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['CNA_HPRD'] = (aggregated['Hrs_CNA'] / aggregated['MDScensus']).fillna(0).round(2)
+                }).reset_index()
                 aggregated[date_col] = aggregated['year_quarter'].dt.to_timestamp()
                 return aggregated
             elif view_mode == 'year':
                 # Aggregate by year
                 df_copy = df.copy()
                 df_copy['year'] = df_copy[date_col].dt.year
-                agg_dict = {
+                aggregated = df_copy.groupby('year').agg({
                     'Total_Nurse_HPRD': 'mean',
                     'Total_RN_HPRD': 'mean',
                     'Total_LPN_HPRD': 'mean',
@@ -1634,29 +1515,7 @@ def get_charts():
                     'CNA_Contract_Pct': 'mean',
                     'Total_Contract_Pct': 'mean',
                     'IsHoliday': 'any'
-                }
-                # Add base hours columns if they exist (needed for HPRD calculations)
-                if 'Hrs_RN' in df_copy.columns:
-                    agg_dict['Hrs_RN'] = 'sum'
-                if 'Hrs_LPN' in df_copy.columns:
-                    agg_dict['Hrs_LPN'] = 'sum'
-                if 'Hrs_CNA' in df_copy.columns:
-                    agg_dict['Hrs_CNA'] = 'sum'
-                # Add RN_HPRD, LPN_HPRD, CNA_HPRD if they exist
-                if 'RN_HPRD' in df_copy.columns:
-                    agg_dict['RN_HPRD'] = 'mean'
-                if 'LPN_HPRD' in df_copy.columns:
-                    agg_dict['LPN_HPRD'] = 'mean'
-                if 'CNA_HPRD' in df_copy.columns:
-                    agg_dict['CNA_HPRD'] = 'mean'
-                aggregated = df_copy.groupby('year').agg(agg_dict).reset_index()
-                # Recalculate HPRD from aggregated hours if needed
-                if 'RN_HPRD' not in aggregated.columns and 'Hrs_RN' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['RN_HPRD'] = (aggregated['Hrs_RN'] / aggregated['MDScensus']).fillna(0).round(2)
-                if 'LPN_HPRD' not in aggregated.columns and 'Hrs_LPN' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['LPN_HPRD'] = (aggregated['Hrs_LPN'] / aggregated['MDScensus']).fillna(0).round(2)
-                if 'CNA_HPRD' not in aggregated.columns and 'Hrs_CNA' in aggregated.columns and 'MDScensus' in aggregated.columns:
-                    aggregated['CNA_HPRD'] = (aggregated['Hrs_CNA'] / aggregated['MDScensus']).fillna(0).round(2)
+                }).reset_index()
                 aggregated[date_col] = pd.to_datetime(aggregated['year'], format='%Y')
                 return aggregated
             else:
@@ -1694,15 +1553,6 @@ def get_charts():
         hours_df = aggregate_by_view_mode(filtered_df, hours_view)
         census_df = aggregate_by_view_mode(filtered_df, census_view)
         contract_df = aggregate_by_view_mode(filtered_df, contract_view)
-        
-        # Ensure Hrs_RN exists in hours_df after aggregation (needed for RN trace)
-        if 'Hrs_RN' not in hours_df.columns:
-            # If Hrs_RN was dropped during aggregation, try to recalculate or use 0
-            if 'Total_RN_Hours' in hours_df.columns:
-                # Use Total_RN_Hours as fallback (not ideal but better than error)
-                hours_df['Hrs_RN'] = hours_df['Total_RN_Hours'] * 0.7  # Rough estimate (direct RN is usually 70-80% of total)
-            else:
-                hours_df['Hrs_RN'] = 0
         
         # Helper function to format dates based on view mode
         def format_dates_for_view_mode(df, view_mode):
@@ -1876,7 +1726,7 @@ def get_charts():
                     'y': hprd_df['Total_Nurse_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total',
+                    'name': 'Total HPRD',
                     'line': {'color': '#d62728', 'width': 3}
                 },
                 {
@@ -1884,7 +1734,7 @@ def get_charts():
                     'y': hprd_df['Nurse_Staff_HPRD_Excl_Admin'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Direct',
+                    'name': 'Direct Staff HPRD',
                     'line': {'color': '#9467bd'}
                 },
                 {
@@ -1892,23 +1742,15 @@ def get_charts():
                     'y': hprd_df['Total_RN_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'RN (Total)',
+                    'name': 'Total RN HPRD',
                     'line': {'color': '#1f77b4'}
-                },
-                {
-                    'x': format_dates_for_view_mode(hprd_df, hprd_view),
-                    'y': hprd_df['RN_HPRD'].fillna(0).tolist(),
-                    'type': 'scatter',
-                    'mode': 'lines+markers',
-                    'name': 'RN',
-                    'line': {'color': '#8bb8e8'}
                 },
                 {
                     'x': format_dates_for_view_mode(hprd_df, hprd_view),
                     'y': hprd_df['Total_LPN_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'LPN (Total)',
+                    'name': 'LPN HPRD (Total)',
                     'line': {'color': '#ff7f0e'}
                 },
                 {
@@ -1916,7 +1758,7 @@ def get_charts():
                     'y': hprd_df['Total_Nurse_Aide_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Aide',
+                    'name': 'Nurse Aide HPRD',
                     'line': {'color': '#2ca02c'}
                 }
             ] + state_standard_lines + hprd_holiday_markers,
@@ -1942,8 +1784,7 @@ def get_charts():
             'Total_LPN_HPRD': 'mean',
             'Total_Nurse_Aide_HPRD': 'mean',
             'Nurse_Staff_HPRD_Excl_Admin': 'mean',
-            'Total_Nurse_HPRD': 'mean',
-            'RN_HPRD': 'mean'  # RN HPRD (direct, excludes admin/DON) - calculated from Hrs_RN / MDScensus
+            'Total_Nurse_HPRD': 'mean'
         }).reset_index()
         
         # Reorder days
@@ -1956,42 +1797,35 @@ def get_charts():
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_Nurse_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'Total',
+                'name': 'Total HPRD',
                 'marker': {'color': '#d62728'}
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Nurse_Staff_HPRD_Excl_Admin'].tolist(),
                 'type': 'bar',
-                'name': 'Direct',
+                'name': 'Direct Staff HPRD',
                 'marker': {'color': '#9467bd'}
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_RN_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'RN (Total)',
+                'name': 'Total RN HPRD',
                 'marker': {'color': '#1f77b4'}
-            },
-            {
-                'x': dow_summary['DayOfWeek'].tolist(),
-                'y': dow_summary['RN_HPRD'].tolist(),
-                'type': 'bar',
-                'name': 'RN',
-                'marker': {'color': '#8bb8e8'}
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_LPN_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'LPN (Total)',
+                'name': 'Total LPN HPRD',
                 'marker': {'color': '#ff7f0e'}
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_Nurse_Aide_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'Nurse Aide',
+                'name': 'Nurse Aide HPRD',
                 'marker': {'color': '#2ca02c'}
             }
         ]
@@ -2085,7 +1919,7 @@ def get_charts():
                     'y': hours_df['Total_Staff_Hours'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total',
+                    'name': 'Total Nurse',
                     'line': {'color': '#d62728', 'width': 3}
                 },
                 {
@@ -2093,7 +1927,7 @@ def get_charts():
                     'y': hours_df['Nurse_Staff_Hours_Excl_Admin'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Direct',
+                    'name': 'Nurse Staff (excl. Admin/DON)',
                     'line': {'color': '#9467bd'}
                 },
                 {
@@ -2103,14 +1937,6 @@ def get_charts():
                     'mode': 'lines+markers',
                     'name': 'RN (Total)',
                     'line': {'color': '#1f77b4'}
-                },
-                {
-                    'x': format_dates_for_view_mode(hours_df, hours_view),
-                    'y': hours_df['Hrs_RN'].fillna(0).tolist() if 'Hrs_RN' in hours_df.columns else [0] * len(hours_df),
-                    'type': 'scatter',
-                    'mode': 'lines+markers',
-                    'name': 'RN',
-                    'line': {'color': '#8bb8e8'}
                 },
                 {
                     'x': format_dates_for_view_mode(hours_df, hours_view),
@@ -2125,7 +1951,7 @@ def get_charts():
                     'y': hours_df['Total_Nurse_Aide_Hours'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Aide',
+                    'name': 'Nurse Aide (Total)',
                     'line': {'color': '#2ca02c'}
                 }
             ] + hours_holiday_markers,
@@ -4076,35 +3902,16 @@ def get_case_mix_data():
         # Get all unique quarters from both sources
         all_quarters = set()
         
-        # Helper function to normalize quarter format to "2018Q1" format
-        def normalize_quarter_format(q):
-            """Convert quarter to standard format: 2018Q1"""
-            if not q or pd.isna(q):
-                return None
-            q_str = str(q).strip()
-            # If already in "2018Q1" format, return as is
-            if len(q_str) == 6 and q_str[4] == 'Q' and q_str[0:4].isdigit() and q_str[5].isdigit():
-                return q_str
-            # If in "Q1 2018" or "Q1 2 018" format, convert to "2018Q1"
-            if q_str.startswith('Q') and ' ' in q_str:
-                parts = q_str.replace('Q', '').split()
-                if len(parts) >= 2:
-                    quarter_num = parts[0]
-                    year = ''.join(parts[1:])  # Join year parts in case of "2 018"
-                    if quarter_num.isdigit() and year.isdigit():
-                        return f"{year}Q{quarter_num}"
-            return None  # Return None for unrecognized formats
-        
-        # Get quarters from PBJ data (already in "2018Q1" format)
+        # Get quarters from PBJ data
         if global_df is not None and len(global_df) > 0:
-            for q in global_df['CY_Qtr'].unique():
-                normalized = normalize_quarter_format(q)
-                if normalized:
-                    all_quarters.add(normalized)
+            all_quarters.update(global_df['CY_Qtr'].unique())
         
-        # Get quarters from Provider Info - but only add if they're not already in PBJ data
-        # This prevents duplicates. We'll match provider info to PBJ quarters by date if needed.
-        # Don't add provider info quarters directly - only use PBJ quarters as the source of truth
+        # Get quarters from Provider Info
+        if provider_info_df is not None and len(provider_info_df) > 0:
+            # Check if quarter column exists
+            if 'quarter' in provider_info_df.columns:
+                quarters_df = provider_info_df[provider_info_df['quarter'].notna()].copy()
+                all_quarters.update(quarters_df['quarter'].unique())
             else:
                 # If no quarter column, try to get quarters from CY_Qtr or create from processing_date
                 print("⚠️ Warning: 'quarter' column not found in provider_info_df. Available columns:", list(provider_info_df.columns)[:10])
@@ -4116,21 +3923,7 @@ def get_case_mix_data():
         if len(all_quarters) == 0:
             return jsonify({'error': 'No data available', 'case_mix_data': {}})
         
-        # Sort quarters chronologically (convert "2018Q1" format to sortable tuple)
-        def quarter_sort_key(q):
-            """Convert "2018Q1" to (2018, 1) for sorting"""
-            try:
-                if len(str(q)) == 6 and str(q)[4] == 'Q':
-                    year = int(str(q)[0:4])
-                    quarter = int(str(q)[5])
-                    return (year, quarter)
-            except:
-                pass
-            return (9999, 9)  # Put malformed quarters at end
-        
-        sorted_quarters = sorted(all_quarters, key=quarter_sort_key)
-        
-        for quarter in sorted_quarters:
+        for quarter in all_quarters:
             quarter_info = {
                 'quarter': quarter
             }
@@ -4139,56 +3932,7 @@ def get_case_mix_data():
             if provider_info_df is not None and len(provider_info_df) > 0:
                 # Check if quarter column exists
                 if 'quarter' in provider_info_df.columns:
-                    # Normalize quarter format for matching (handle both "2018Q1" and "Q1 2018" formats)
-                    def normalize_quarter_for_match(q):
-                        """Normalize quarter to "2018Q1" format for matching"""
-                        if pd.isna(q):
-                            return None
-                        q_str = str(q).strip()
-                        # If already in "2018Q1" format, return as is
-                        if len(q_str) == 6 and q_str[4] == 'Q' and q_str[0:4].isdigit() and q_str[5].isdigit():
-                            return q_str
-                        # If in "Q1 2018" or "Q1 2 018" format, convert to "2018Q1"
-                        if q_str.startswith('Q') and ' ' in q_str:
-                            parts = q_str.replace('Q', '').split()
-                            if len(parts) >= 2:
-                                quarter_num = parts[0]
-                                year = ''.join(parts[1:])  # Join year parts in case of "2 018"
-                                if quarter_num.isdigit() and year.isdigit():
-                                    return f"{year}Q{quarter_num}"
-                        return None  # Return None for unrecognized formats
-                    
-                    # First try exact quarter match (normalize both sides)
-                    normalized_target_quarter = normalize_quarter_for_match(quarter)
-                    prov_quarter_data = provider_info_df[
-                        provider_info_df['quarter'].apply(lambda x: normalize_quarter_for_match(x) == normalized_target_quarter)
-                    ]
-                    
-                    # If we have matches, take the most recent one (by processing_date)
-                    if len(prov_quarter_data) > 0:
-                        prov_quarter_data = prov_quarter_data.sort_values('processing_date', ascending=False).head(1)
-                    else:
-                        # If no exact match, try matching null quarters by date
-                        if global_df is not None and 'CY_Qtr' in global_df.columns:
-                            # Get date range for this quarter from PBJ data
-                            quarter_dates = global_df[global_df['CY_Qtr'] == quarter]['WorkDate']
-                            if len(quarter_dates) > 0:
-                                min_date = quarter_dates.min()
-                                max_date = quarter_dates.max()
-                                # Match provider info rows with null quarters that fall within this quarter's date range
-                                null_quarter_rows = provider_info_df[
-                                    (provider_info_df['quarter'].isna()) &
-                                    (provider_info_df['processing_date'] >= min_date) & 
-                                    (provider_info_df['processing_date'] <= max_date)
-                                ]
-                                if len(null_quarter_rows) > 0:
-                                    # Use the most recent row for this quarter
-                                    prov_quarter_data = null_quarter_rows.sort_values('processing_date', ascending=False).head(1)
-                                else:
-                                    # Fallback: use most recent data before or during this quarter
-                                    prov_quarter_data = provider_info_df[provider_info_df['processing_date'] <= max_date]
-                                    if len(prov_quarter_data) > 0:
-                                        prov_quarter_data = prov_quarter_data.sort_values('processing_date', ascending=False).head(1)
+                    prov_quarter_data = provider_info_df[provider_info_df['quarter'] == quarter]
                 else:
                     # If no quarter column, try to match by processing_date or use all data
                     print(f"⚠️ Warning: 'quarter' column not found. Using all provider info data for quarter {quarter}")
@@ -4213,38 +3957,17 @@ def get_case_mix_data():
                 if len(prov_quarter_data) > 0:
                     prov_data = prov_quarter_data.iloc[0]
                     
-                    # Reported values from Provider Info (prov_data is a pandas Series, use bracket notation)
-                    quarter_info['prov_reported_total'] = float(prov_data['reported_total_nurse_hrs_per_resident_per_day']) if pd.notna(prov_data.get('reported_total_nurse_hrs_per_resident_per_day', None)) else None
-                    quarter_info['prov_reported_rn'] = float(prov_data['reported_rn_hrs_per_resident_per_day']) if pd.notna(prov_data.get('reported_rn_hrs_per_resident_per_day', None)) else None
-                    quarter_info['prov_reported_lpn'] = float(prov_data['reported_lpn_hrs_per_resident_per_day']) if pd.notna(prov_data.get('reported_lpn_hrs_per_resident_per_day', None)) else None
-                    quarter_info['prov_reported_na'] = float(prov_data['reported_na_hrs_per_resident_per_day']) if pd.notna(prov_data.get('reported_na_hrs_per_resident_per_day', None)) else None
+                    # Reported values from Provider Info
+                    quarter_info['prov_reported_total'] = float(prov_data.get('reported_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_total_nurse_hrs_per_resident_per_day')) else None
+                    quarter_info['prov_reported_rn'] = float(prov_data.get('reported_rn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_rn_hrs_per_resident_per_day')) else None
+                    quarter_info['prov_reported_lpn'] = float(prov_data.get('reported_lpn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_lpn_hrs_per_resident_per_day')) else None
+                    quarter_info['prov_reported_na'] = float(prov_data.get('reported_na_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('reported_na_hrs_per_resident_per_day')) else None
                     
-                    # Case-mix values from Provider Info - access directly from pandas Series
-                    # Use bracket notation which works for pandas Series
-                    case_mix_total_val = prov_data['case_mix_total_nurse_hrs_per_resident_per_day'] if 'case_mix_total_nurse_hrs_per_resident_per_day' in prov_data else None
-                    case_mix_rn_val = prov_data['case_mix_rn_hrs_per_resident_per_day'] if 'case_mix_rn_hrs_per_resident_per_day' in prov_data else None
-                    case_mix_lpn_val = prov_data['case_mix_lpn_hrs_per_resident_per_day'] if 'case_mix_lpn_hrs_per_resident_per_day' in prov_data else None
-                    case_mix_na_val = prov_data['case_mix_na_hrs_per_resident_per_day'] if 'case_mix_na_hrs_per_resident_per_day' in prov_data else None
-                    
-                    # Convert to float, handling NaN, None, empty strings - but allow 0 values
-                    def safe_float_convert(val):
-                        """Safely convert value to float, handling None, NaN, and empty strings"""
-                        if val is None:
-                            return None
-                        if pd.isna(val):
-                            return None
-                        val_str = str(val).strip()
-                        if val_str == '' or val_str == 'nan':
-                            return None
-                        try:
-                            return float(val)
-                        except (ValueError, TypeError):
-                            return None
-                    
-                    quarter_info['case_mix_total'] = safe_float_convert(case_mix_total_val)
-                    quarter_info['case_mix_rn'] = safe_float_convert(case_mix_rn_val)
-                    quarter_info['case_mix_lpn'] = safe_float_convert(case_mix_lpn_val)
-                    quarter_info['case_mix_na'] = safe_float_convert(case_mix_na_val)
+                    # Case-mix values from Provider Info
+                    quarter_info['case_mix_total'] = float(prov_data.get('case_mix_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_total_nurse_hrs_per_resident_per_day')) else None
+                    quarter_info['case_mix_rn'] = float(prov_data.get('case_mix_rn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_rn_hrs_per_resident_per_day')) else None
+                    quarter_info['case_mix_lpn'] = float(prov_data.get('case_mix_lpn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_lpn_hrs_per_resident_per_day')) else None
+                    quarter_info['case_mix_na'] = float(prov_data.get('case_mix_na_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_na_hrs_per_resident_per_day')) else None
             
             # === PBJ DATA (calculated from daily records) ===
             if global_df is not None and len(global_df) > 0:
@@ -4288,17 +4011,12 @@ def get_case_mix_data():
                 quarter_info['pct_cmi_total'] = None
             
             # Direct CMI (use PBJ direct, case-mix direct = RN+LPN+NA case-mix)
-            # Calculate case-mix direct from individual components
-            case_mix_direct = None
-            if quarter_info.get('case_mix_rn') is not None and quarter_info.get('case_mix_lpn') is not None and quarter_info.get('case_mix_na') is not None:
-                case_mix_direct = (quarter_info.get('case_mix_rn', 0) or 0) + (quarter_info.get('case_mix_lpn', 0) or 0) + (quarter_info.get('case_mix_na', 0) or 0)
-                quarter_info['case_mix_direct'] = case_mix_direct if case_mix_direct > 0 else None
-            else:
-                quarter_info['case_mix_direct'] = None
-            
-            # Calculate % CMI for direct staff
-            if quarter_info.get('pbj_reported_direct') is not None and case_mix_direct is not None and case_mix_direct > 0:
-                quarter_info['pct_cmi_direct'] = (quarter_info['pbj_reported_direct'] / case_mix_direct * 100)
+            if quarter_info.get('pbj_reported_direct') and quarter_info.get('case_mix_rn') and quarter_info.get('case_mix_lpn') and quarter_info.get('case_mix_na'):
+                case_mix_direct = quarter_info['case_mix_rn'] + quarter_info['case_mix_lpn'] + quarter_info['case_mix_na']
+                if case_mix_direct > 0:
+                    quarter_info['pct_cmi_direct'] = (quarter_info['pbj_reported_direct'] / case_mix_direct * 100)
+                else:
+                    quarter_info['pct_cmi_direct'] = None
             else:
                 quarter_info['pct_cmi_direct'] = None
             
@@ -4360,27 +4078,7 @@ def run_dashboard(provnum, port=5000):
     print(f"Starting Dynamic Dashboard for facility {provnum}...")
     app_instance.run(debug=True, host='0.0.0.0', port=port)
 
-
-# Initialize data lazily (for Vercel deployment)
-# Hardcoded for facility 495177
-PROVNUM = "495177"
-_data_initialized = False
-
-def ensure_data_loaded():
-    """Lazy initialization - only load data on first request"""
-    global _data_initialized
-    if not _data_initialized:
-        try:
-            print(f"Initializing facility {PROVNUM} dashboard (lazy load)...")
-            create_dynamic_dashboard(PROVNUM)
-            print(f"✅ Successfully initialized facility {PROVNUM} dashboard")
-            _data_initialized = True
-        except Exception as e:
-            print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")
-            import traceback
-            traceback.print_exc()
-            # Will retry on next request
-
 if __name__ == "__main__":
     # For local testing
+    ensure_data_loaded()  # Load immediately for local dev
     app.run(debug=True, port=5000)
