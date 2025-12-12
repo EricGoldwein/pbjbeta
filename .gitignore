@@ -15,3 +15,6 @@ ENV
 # Ignore temporary files
 *.tmp
 *.bak
+
+# Ignore large data files
+provider_info_combined.csv

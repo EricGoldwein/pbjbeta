@@ -36,7 +36,30 @@ def capitalize_entity_name(name):
 def load_affiliated_entity_data():
     """Load and cache affiliated entity performance measures data."""
     try:
-        df = pd.read_csv('Nursing_Home_Affiliated_Entity_Performance_Measures_Jun_2025.csv')
+        # Use dynamic file finder to get the latest file
+        from utils.file_finder import find_latest_affiliated_entity
+        file_path = find_latest_affiliated_entity()
+        
+        if not file_path:
+            # Fallback to hardcoded path if file finder doesn't work
+            possible_paths = [
+                os.path.join(os.getcwd(), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
+                'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',
+                'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',
+                'Nursing_Home_Affiliated_Entity_Performance_Measures_Jul_2025.csv',
+            ]
+            file_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    file_path = path
+                    break
+            
+            if not file_path:
+                st.error("⚠️ Affiliated entity data file not found.")
+                return pd.DataFrame()
+        
+        df = pd.read_csv(file_path)
         # Clean and standardize the data
         # Convert percentage columns to numeric, handling empty strings
         percentage_columns = [
