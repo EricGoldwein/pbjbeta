@@ -15,6 +15,8 @@ import glob
 import sys
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 # Global variables
 df = None
@@ -621,6 +623,32 @@ def load_facility_data(provnum):
     
     return global_df
 
+
+
+# Initialize data lazily (for Vercel deployment)
+# Hardcoded for facility 495177
+PROVNUM = "495177"
+_data_initialized = False
+
+def ensure_data_loaded():
+    """Lazy initialization - only load data on first request"""
+    global _data_initialized
+    if not _data_initialized:
+        try:
+            print(f"Initializing facility {PROVNUM} dashboard (lazy load)...")
+            create_dynamic_dashboard(PROVNUM)
+            print(f"✅ Successfully initialized facility {PROVNUM} dashboard")
+            _data_initialized = True
+        except Exception as e:
+            print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")
+            import traceback
+            traceback.print_exc()
+            # Will retry on next request
+
+# Ensure data is loaded before any request
+@app.before_request
+def before_request():
+    ensure_data_loaded()
 
 @app.route('/')
 def index():
@@ -4052,23 +4080,7 @@ def run_dashboard(provnum, port=5000):
     print(f"Starting Dynamic Dashboard for facility {provnum}...")
     app_instance.run(debug=True, host='0.0.0.0', port=port)
 
-
-# Initialize data on module load (for Vercel deployment)
-# Hardcoded for facility 495177
-PROVNUM = "495177"
-
-# Load facility data at startup (this runs when module is imported by Vercel)
-# Wrap in try-except to prevent hanging on errors
-try:
-    print(f"Initializing facility {PROVNUM} dashboard for Vercel...")
-    create_dynamic_dashboard(PROVNUM)
-    print(f"✅ Successfully initialized facility {PROVNUM} dashboard")
-except Exception as e:
-    print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")
-    import traceback
-    traceback.print_exc()
-    # Continue anyway - data will be loaded on first request
-
 if __name__ == "__main__":
     # For local testing
+    ensure_data_loaded()  # Load immediately for local dev
     app.run(debug=True, port=5000)
