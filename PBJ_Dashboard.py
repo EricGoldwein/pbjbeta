@@ -1382,7 +1382,7 @@ def check_facility_status(provnum: str) -> dict:
 
 @st.cache_data
 def get_provider_info(provnum: str, info_type: str) -> str:
-    """Get provider information with optimized caching."""
+    """Get provider information with optimized caching. Uses latest provider info from provider_info_combined.csv when available."""
     try:
         # Always treat provnum as string
         provnum = str(provnum).strip()
@@ -1392,6 +1392,45 @@ def get_provider_info(provnum: str, info_type: str) -> str:
             if info_type == 'name':
                 value = proper_title_case(value)
             return value
+        
+        # First, try to get from provider_info_combined.csv (most up-to-date)
+        try:
+            combined_file = 'provider_info_combined.csv'
+            if os.path.exists(combined_file):
+                df = pd.read_csv(combined_file, low_memory=False, dtype={'ccn': str})
+                df['ccn'] = df['ccn'].astype(str).str.zfill(6)
+                facility_data = df[df['ccn'] == provnum.zfill(6)]
+                if not facility_data.empty:
+                    # Get the most recent entry (sorted by processing_date)
+                    if 'processing_date' in facility_data.columns:
+                        facility_data['processing_date'] = pd.to_datetime(facility_data['processing_date'], errors='coerce')
+                        facility_data = facility_data.sort_values('processing_date', ascending=False)
+                    
+                    if info_type == 'name':
+                        value = facility_data.iloc[0]['provider_name'] if 'provider_name' in facility_data.columns else None
+                    elif info_type == 'state':
+                        value = facility_data.iloc[0]['state'] if 'state' in facility_data.columns else None
+                    elif info_type == 'county':
+                        value = facility_data.iloc[0]['county_name'] if 'county_name' in facility_data.columns else None
+                    else:
+                        value = None
+                    
+                    if value and pd.notna(value):
+                        # Apply proper title case to name
+                        if info_type == 'name':
+                            value = proper_title_case(str(value))
+                        else:
+                            value = str(value).strip()
+                        # Cache the result
+                        provider_info_cache[provnum] = {
+                            'name': str(facility_data.iloc[0]['provider_name']).strip() if 'provider_name' in facility_data.columns else 'N/A',
+                            'state': str(facility_data.iloc[0]['state']).strip() if 'state' in facility_data.columns else 'N/A',
+                            'county': str(facility_data.iloc[0]['county_name']).strip() if 'county_name' in facility_data.columns else 'N/A'
+                        }
+                        return value
+        except Exception as e:
+            # If provider_info_combined.csv fails, continue with other methods
+            pass
         
         # Check if facility is inactive first (with error handling)
         try:
@@ -2336,7 +2375,11 @@ def display_metrics(metrics: pd.DataFrame, level: str):
             ''', unsafe_allow_html=True)
         else:  # Facility level
             provnum = current_metrics['PROVNUM'].iloc[0]
-            provname = proper_title_case(current_metrics['PROVNAME'].iloc[0])
+            # Use get_provider_info to get the most up-to-date provider name from provider_info_combined.csv
+            provname = get_provider_info(provnum, 'name')
+            # Fallback to PBJ data if get_provider_info returns N/A
+            if not provname or provname == 'N/A':
+                provname = proper_title_case(current_metrics['PROVNAME'].iloc[0])
             state = current_metrics['STATE'].iloc[0]
             county = proper_title_case(current_metrics['COUNTY_NAME'].iloc[0])
             care_compare_url = f"https://www.medicare.gov/care-compare/details/nursing-home/{provnum}/view-all?state={state}"

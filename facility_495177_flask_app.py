@@ -4052,21 +4052,23 @@ def run_dashboard(provnum, port=5000):
     print(f"Starting Dynamic Dashboard for facility {provnum}...")
     app_instance.run(debug=True, host='0.0.0.0', port=port)
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("Usage: python dynamic_facility_dashboard.py <PROVNUM>")
-        print("Example: python dynamic_facility_dashboard.py 015009")
-        sys.exit(1)
-    
-    provnum = sys.argv[1].strip().upper()
-    
-    # Validate provider number format - can contain letters and numbers, typically 6 characters
-    if len(provnum) < 1 or len(provnum) > 6:
-        print("❌ Please enter a valid provider number (1-6 characters, e.g., 015009 or 46A070)")
-        sys.exit(1)
-    
-    # Pad with leading zeros if all digits, otherwise keep as-is
-    if provnum.isdigit():
-        provnum = provnum.zfill(6)
-    
-    run_dashboard(provnum)
+
+# Initialize data on module load (for Vercel deployment)
+# Hardcoded for facility 495177
+PROVNUM = "495177"
+
+# Load facility data at startup (this runs when module is imported by Vercel)
+# Wrap in try-except to prevent hanging on errors
+try:
+    print(f"Initializing facility {PROVNUM} dashboard for Vercel...")
+    create_dynamic_dashboard(PROVNUM)
+    print(f"✅ Successfully initialized facility {PROVNUM} dashboard")
+except Exception as e:
+    print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")
+    import traceback
+    traceback.print_exc()
+    # Continue anyway - data will be loaded on first request
+
+if __name__ == "__main__":
+    # For local testing
+    app.run(debug=True, port=5000)
