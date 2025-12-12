@@ -81,50 +81,138 @@ def create_facility_vercel_package(provnum):
         # Keep everything up to (but not including) the main block
         new_lines = lines[:main_block_start]
         
-        # Add initialization code
-        new_lines.extend([
+        # Find the first @app.route to insert before_request hook before it
+        first_route_idx = -1
+        for i, line in enumerate(new_lines):
+            if line.strip().startswith('@app.route'):
+                first_route_idx = i
+                break
+        
+        # Add lazy initialization code (prevents Vercel deployment hangs)
+        init_code = [
             '',
-            '# Initialize data on module load (for Vercel deployment)',
+            '# Initialize data lazily (for Vercel deployment)',
             f'# Hardcoded for facility {provnum}',
             f'PROVNUM = "{provnum}"',
+            '_data_initialized = False',
             '',
-            '# Load facility data at startup (this runs when module is imported by Vercel)',
-            '# Wrap in try-except to prevent hanging on errors',
-            'try:',
-            '    print(f"Initializing facility {PROVNUM} dashboard for Vercel...")',
-            '    create_dynamic_dashboard(PROVNUM)',
-            '    print(f"✅ Successfully initialized facility {PROVNUM} dashboard")',
-            'except Exception as e:',
-            '    print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")',
-            '    import traceback',
-            '    traceback.print_exc()',
-            '    # Continue anyway - data will be loaded on first request',
+            'def ensure_data_loaded():',
+            '    """Lazy initialization - only load data on first request"""',
+            '    global _data_initialized',
+            '    if not _data_initialized:',
+            '        try:',
+            '            print(f"Initializing facility {PROVNUM} dashboard (lazy load)...")',
+            '            create_dynamic_dashboard(PROVNUM)',
+            '            print(f"✅ Successfully initialized facility {PROVNUM} dashboard")',
+            '            _data_initialized = True',
+            '        except Exception as e:',
+            '            print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")',
+            '            import traceback',
+            '            traceback.print_exc()',
+            '            # Will retry on next request',
             '',
+            '# Ensure data is loaded before any request',
+            '@app.before_request',
+            'def before_request():',
+            '    ensure_data_loaded()',
+            ''
+        ]
+        
+        # Insert initialization code before first route, or at end if no route found
+        if first_route_idx >= 0:
+            new_lines = new_lines[:first_route_idx] + init_code + new_lines[first_route_idx:]
+        else:
+            new_lines.extend(init_code)
+        
+        # Add main block
+        new_lines.extend([
             'if __name__ == "__main__":',
             '    # For local testing',
+            '    ensure_data_loaded()  # Load immediately for local dev',
             '    app.run(debug=True, port=5000)'
         ])
         
         modified_code = '\n'.join(new_lines)
     else:
-        # If no main block found, just append initialization
-        modified_code = dashboard_code + f'''
-
-# Initialize data on module load (for Vercel deployment)
+        # If no main block found, find first route and insert before_request hook
+        lines = dashboard_code.split('\n')
+        first_route_idx = -1
+        for i, line in enumerate(lines):
+            if line.strip().startswith('@app.route'):
+                first_route_idx = i
+                break
+        
+        if first_route_idx >= 0:
+            # Insert before_request hook before first route
+            init_code = f'''
+# Initialize data lazily (for Vercel deployment)
 # Hardcoded for facility {provnum}
 PROVNUM = "{provnum}"
+_data_initialized = False
 
-# Load facility data at startup (this runs when module is imported by Vercel)
-# Wrap in try-except to prevent hanging on errors
-try:
-    print(f"Initializing facility {{PROVNUM}} dashboard for Vercel...")
-    create_dynamic_dashboard(PROVNUM)
-    print(f"✅ Successfully initialized facility {{PROVNUM}} dashboard")
-except Exception as e:
-    print(f"⚠️ Error initializing facility {{PROVNUM}} dashboard: {{e}}")
-    import traceback
-    traceback.print_exc()
-    # Continue anyway - data will be loaded on first request
+def ensure_data_loaded():
+    """Lazy initialization - only load data on first request"""
+    global _data_initialized
+    if not _data_initialized:
+        try:
+            print(f"Initializing facility {{PROVNUM}} dashboard (lazy load)...")
+            create_dynamic_dashboard(PROVNUM)
+            print(f"✅ Successfully initialized facility {{PROVNUM}} dashboard")
+            _data_initialized = True
+        except Exception as e:
+            print(f"⚠️ Error initializing facility {{PROVNUM}} dashboard: {{e}}")
+            import traceback
+            traceback.print_exc()
+            # Will retry on next request
+
+# Ensure data is loaded before any request
+@app.before_request
+def before_request():
+    ensure_data_loaded()
+
+'''
+            new_lines = lines[:first_route_idx] + init_code.split('\n') + lines[first_route_idx:]
+            new_lines.extend([
+                '',
+                'if __name__ == "__main__":',
+                '    # For local testing',
+                '    ensure_data_loaded()  # Load immediately for local dev',
+                '    app.run(debug=True, port=5000)'
+            ])
+            modified_code = '\n'.join(new_lines)
+        else:
+            # Fallback: just append
+            modified_code = dashboard_code + f'''
+
+# Initialize data lazily (for Vercel deployment)
+# Hardcoded for facility {provnum}
+PROVNUM = "{provnum}"
+_data_initialized = False
+
+def ensure_data_loaded():
+    """Lazy initialization - only load data on first request"""
+    global _data_initialized
+    if not _data_initialized:
+        try:
+            print(f"Initializing facility {{PROVNUM}} dashboard (lazy load)...")
+            create_dynamic_dashboard(PROVNUM)
+            print(f"✅ Successfully initialized facility {{PROVNUM}} dashboard")
+            _data_initialized = True
+        except Exception as e:
+            print(f"⚠️ Error initializing facility {{PROVNUM}} dashboard: {{e}}")
+            import traceback
+            traceback.print_exc()
+            # Will retry on next request
+
+# Ensure data is loaded before any request
+@app.before_request
+def before_request():
+    ensure_data_loaded()
+
+if __name__ == "__main__":
+    # For local testing
+    ensure_data_loaded()  # Load immediately for local dev
+    app.run(debug=True, port=5000)
 '''
     
     # Write the facility-specific Flask app
