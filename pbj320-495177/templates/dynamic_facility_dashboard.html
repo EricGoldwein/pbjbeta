@@ -1207,10 +1207,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">Nursing Staff HPRD Trends</h5>
                         <div class="d-flex align-items-center gap-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="excludeAdminHPRD" onchange="toggleAdminExclusionMain()">
-                                <label class="form-check-label" for="excludeAdminHPRD" style="font-size: 0.75rem;">Exclude Admin/DON</label>
-                            </div>
                             <div class="btn-group btn-group-sm" role="group" aria-label="HPRD view toggle" style="font-size: 0.75rem;">
                                 <input type="radio" class="btn-check" name="hprdView" id="hprdDaily" value="daily">
                                 <label class="btn btn-outline-secondary" for="hprdDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
@@ -1237,10 +1233,6 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="mb-0">Total Nursing Staff Hours</h6>
                             <div class="d-flex align-items-center gap-2">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="excludeAdminHours" onchange="toggleAdminExclusionMain()">
-                                    <label class="form-check-label" for="excludeAdminHours" style="font-size: 0.7rem;">Exclude Admin/DON</label>
-                                </div>
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Hours view toggle" style="font-size: 0.7rem;">
                                     <input type="radio" class="btn-check" name="hoursView" id="hoursDaily" value="daily">
                                     <label class="btn btn-outline-secondary" for="hoursDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
@@ -1291,12 +1283,6 @@
             <div class="row">
                 <div class="col-md-6">
                     <div class="chart-container">
-                        <div class="d-flex justify-content-end align-items-center mb-3">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="excludeAdminDOW" onchange="toggleAdminExclusionMain()">
-                                <label class="form-check-label" for="excludeAdminDOW" style="font-size: 0.7rem;">Exclude Admin/DON</label>
-                            </div>
-                        </div>
                         <div id="dowComparisonChart"></div>
                     </div>
                 </div>
@@ -1305,10 +1291,6 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="mb-0">Contract Staff %</h6>
                             <div class="d-flex align-items-center gap-2">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="excludeAdminContract" onchange="toggleAdminExclusionMain()">
-                                    <label class="form-check-label" for="excludeAdminContract" style="font-size: 0.7rem;">Exclude Admin/DON</label>
-                                </div>
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Contract view toggle" style="font-size: 0.7rem;">
                                     <input type="radio" class="btn-check" name="contractView" id="contractDaily" value="daily">
                                     <label class="btn btn-outline-secondary" for="contractDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
@@ -1402,11 +1384,11 @@
                             <div class="mt-3 pt-3 border-top">
                                 <small class="text-muted">
                                     <strong>Red Flag Criteria:</strong><br/>
-                                    • <strong>Special Focus Facility or SFF Candidate</strong><br/>
-                                    • <strong>1-Star Overall Rating</strong><br/>
-                                    • <strong>1-Star Staffing Rating</strong><br/>
-                                    • <strong>Abuse Icon</strong><br/>
-                                    • <strong>Ownership Change (Last 12 Months)</strong>
+                                    • Special Focus Facility or SFF Candidate<br/>
+                                    • 1-Star Overall Rating<br/>
+                                    • 1-Star Staffing Rating<br/>
+                                    • Abuse History<br/>
+                                    • Ownership Change (last 12 months)
                                 </small>
                             </div>
                         </div>
@@ -1426,13 +1408,7 @@
                         <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0">Total Staffing: <span style="color: #0066cc;">Reported Total</span> vs. <span style="color: #808080;">Reported Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="excludeAdminTotal" onchange="toggleAdminExclusion('total')">
-                                            <label class="form-check-label" for="excludeAdminTotal" style="font-size: 0.85rem;">Exclude Admin/DON</label>
-                                        </div>
-                                    </div>
+                                    <h6 class="mb-0">Total Staffing: <span style="color: #0066cc;">Total</span> vs. <span style="color: #808080;">Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
                                 </div>
                                 <div class="card-body">
                                     <div id="providerInfoTotalChart"></div>
@@ -1442,13 +1418,7 @@
                         <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0">RN Staffing: <span style="color: #0066cc;">Reported</span> vs. <span style="color: #808080;">Reported Direct (RN only)</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="excludeAdminRN" onchange="toggleAdminExclusion('rn')">
-                                            <label class="form-check-label" for="excludeAdminRN" style="font-size: 0.85rem;">Exclude Admin/DON</label>
-                                        </div>
-                                    </div>
+                                    <h6 class="mb-0">RN Staffing: <span style="color: #0066cc;">Reported</span> vs. <span style="color: #808080;">Reported (excl. Admin/DON)</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
                                 </div>
                                 <div class="card-body">
                                     <div id="providerInfoRNChart"></div>
@@ -1583,7 +1553,7 @@
                     <h5 class="mb-0">Daily Data - <span id="dailyFacilityName">{{ facility_name | title }}</span></h5>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-info btn-sm" type="button" onclick="showSummaryStats()">
-                            <i class="fas fa-chart-bar"></i> Summary
+                            Summary
                         </button>
                         <button class="btn btn-outline-success btn-sm" type="button" onclick="exportDailyDataTable()">
                             <i class="fas fa-download"></i> Export
@@ -1657,9 +1627,8 @@
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
-                        <!-- Force rebuild: Expand All button -->
                         <button class="btn btn-outline-secondary btn-sm" onclick="toggleExpandedView()" id="expandToggle">
-                            <i class="fas fa-expand-arrows-alt me-1"></i>Expand All
+                            <i class="fas fa-expand-arrows-alt me-1"></i>Expand
                         </button>
                         <select id="pageSize" class="form-select form-select-sm" style="width: auto;">
                             <option value="25">25 rows</option>
@@ -1781,7 +1750,7 @@
         <div class="card mb-4">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Case-Mix Acuity Analysis - <span id="caseMixFacilityName">{{ facility_name | title }}</span></h5>
+                    <h5 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Case-Mix Acuity Analysis - <span id="caseMixFacilityName">{{ facility_name }}</span></h5>
                     <button class="btn btn-sm btn-outline-primary" onclick="exportCaseMixDataToCSV()">
                         <i class="fas fa-download me-1"></i>Export CSV
                     </button>
@@ -2474,6 +2443,7 @@
              const facilityNameElement = document.getElementById('facilityName');
              const dailyNameElement = document.getElementById('dailyFacilityName');
              const quarterlyNameElement = document.getElementById('quarterlyFacilityName');
+             const caseMixFacilityNameElement = document.getElementById('caseMixFacilityName');
              
              if (facilityNameElement) {
                  facilityNameElement.textContent = fixFacilityNameCasing(facilityNameElement.textContent);
@@ -2483,6 +2453,9 @@
              }
              if (quarterlyNameElement) {
                  quarterlyNameElement.textContent = fixFacilityNameCasing(quarterlyNameElement.textContent);
+             }
+             if (caseMixFacilityNameElement) {
+                 caseMixFacilityNameElement.textContent = fixFacilityNameCasing(caseMixFacilityNameElement.textContent);
              }
              loadProviderInfoData(); // Load provider info data
              
@@ -3028,9 +3001,9 @@
              // This creates proper gaps in the line chart for missing data
              const filterNullData = (data) => data.map((value, index) => value != null ? value : undefined);
              
-             // Prepare data with admin/DON exclusion
-             const totalReportedData = excludeTotal ? chartData.total_staffing.reported_direct : chartData.total_staffing.reported_total;
-             const rnReportedData = excludeRN ? chartData.rn_staffing.reported_rn_direct : chartData.rn_staffing.reported_rn;
+            // Prepare data (toggles removed, always show both)
+            const totalReportedData = chartData.total_staffing.reported_total;
+            const rnReportedData = chartData.rn_staffing.reported_rn;
 
             // Calculate dynamic y-axis range for ratio chart (Total Staff + Direct Staff)
             const calculateRatioRange = () => {
@@ -3044,11 +3017,13 @@
                 
                 // Get all ratio values from Direct Staff
                 chartData.total_staffing.reported_direct.forEach((reported, i) => {
-                    const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
-                    const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
-                    const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
-                    const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
-                    if (caseMixDirect > 0) allRatios.push(reported / caseMixDirect);
+                    // Use case_mix_direct from backend (already calculated as RN+LPN+NA case-mix)
+                    const caseMixDirect = chartData.total_staffing.case_mix_direct && chartData.total_staffing.case_mix_direct[i] !== null && chartData.total_staffing.case_mix_direct[i] !== undefined 
+                        ? chartData.total_staffing.case_mix_direct[i] 
+                        : null;
+                    if (caseMixDirect !== null && caseMixDirect > 0) {
+                        allRatios.push(reported / caseMixDirect);
+                    }
                 });
                 
                 if (allRatios.length === 0) return [0, 2];
@@ -3247,7 +3222,7 @@
                     y: filterZeroData(totalReportedData),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: excludeTotal ? 'Reported Direct' : 'Reported Total',
+                    name: 'Total',
                     line: { color: 'blue', width: 2 },
                     marker: { size: 6 }
                 },
@@ -3256,7 +3231,7 @@
                     y: filterZeroData(chartData.total_staffing.reported_direct),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: 'Reported Direct',
+                    name: 'Direct',
                     line: { color: 'gray', width: 2 },
                     marker: { size: 6 }
                 },
@@ -3342,7 +3317,7 @@
                     y: filterNullData(rnReportedData),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: excludeRN ? 'Reported Direct' : 'Reported',
+                    name: 'Reported',
                     line: { color: 'blue', width: 2 },
                     marker: { size: 6 }
                 },
@@ -3599,7 +3574,7 @@
                     y: chartData.ratings.overall,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: window.innerWidth < 768 ? 'Overall' : 'Overall Rating',
+                    name: 'Overall',
                     line: { color: '#1f77b4', width: 2 },
                     marker: { size: 6 }
                 },
@@ -3608,7 +3583,7 @@
                     y: chartData.ratings.staffing,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: window.innerWidth < 768 ? 'Staffing' : 'Staffing Rating',
+                    name: 'Staffing',
                     line: { color: '#2ca02c', width: 2 },
                     marker: { size: 6 }
                 },
@@ -3617,7 +3592,7 @@
                     y: chartData.ratings.health_inspection,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: window.innerWidth < 768 ? 'Health Inspection' : 'Health Inspection Rating',
+                    name: 'Health Inspection',
                     line: { color: '#ff7f0e', width: 2 },
                     marker: { size: 6 }
                 }
@@ -3662,7 +3637,7 @@
                      }),
                      type: 'scatter',
                      mode: 'lines+markers',
-                     name: 'Total Staff (% CM)',
+                     name: '% Total Case-Mix',
                      line: { color: '#0066cc', width: 3 },
                      marker: { 
                          size: 6,
@@ -3689,15 +3664,15 @@
                  {
                      x: chartData.total_staffing.quarters,
                      y: chartData.total_staffing.reported_direct.map((reported, i) => {
-                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
-                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
-                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
-                         const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
-                         return caseMixDirect > 0 ? reported / caseMixDirect : null;
+                         // Use case_mix_direct from backend (already calculated as RN+LPN+NA case-mix)
+                         const caseMixDirect = chartData.total_staffing.case_mix_direct && chartData.total_staffing.case_mix_direct[i] !== null && chartData.total_staffing.case_mix_direct[i] !== undefined 
+                             ? chartData.total_staffing.case_mix_direct[i] 
+                             : null;
+                         return (caseMixDirect !== null && caseMixDirect > 0) ? reported / caseMixDirect : null;
                      }),
                      type: 'scatter',
                      mode: 'lines+markers',
-                     name: 'Direct Staff (% CM)',
+                     name: '% Direct Case-Mix',
                      line: { color: '#808080', width: 3 },
                      marker: { 
                          size: 6,
@@ -3712,16 +3687,19 @@
                                    '<b>Status:</b> %{customdata[3]}<br>' +
                                    '<extra></extra>',
                      customdata: chartData.total_staffing.reported_direct.map((reported, i) => {
-                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
-                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
-                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
-                         const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
-                         const ratio = caseMixDirect > 0 ? reported / caseMixDirect : 1;
-                         let status = 'Meets Case-Mix';
-                         if (ratio < 0.5) status = 'Super Severe (<0.5)';
-                         else if (ratio < 0.8) status = 'Severe (<0.8)';
-                         else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
-                         return [reported, caseMixDirect, ratio, status];
+                         // Use case_mix_direct from backend (already calculated as RN+LPN+NA case-mix)
+                         const caseMixDirect = chartData.total_staffing.case_mix_direct && chartData.total_staffing.case_mix_direct[i] !== null && chartData.total_staffing.case_mix_direct[i] !== undefined 
+                             ? chartData.total_staffing.case_mix_direct[i] 
+                             : null;
+                         const ratio = (caseMixDirect !== null && caseMixDirect > 0) ? reported / caseMixDirect : null;
+                         let status = 'No Case-Mix Data';
+                         if (ratio !== null) {
+                             if (ratio < 0.5) status = 'Super Severe (<0.5)';
+                             else if (ratio < 0.8) status = 'Severe (<0.8)';
+                             else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
+                             else status = 'Meets Case-Mix';
+                         }
+                         return [reported || 0, caseMixDirect || 0, ratio || 0, status];
                      })
                  }
              ];
@@ -3898,7 +3876,7 @@
                     }),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: 'Total RN (% CM)',
+                    name: '% RN Case-Mix',
                     line: { color: '#0066cc', width: 3 },
                     marker: { 
                         size: 6,
@@ -3930,7 +3908,7 @@
                     }),
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: 'RN Direct (% CM)',
+                    name: '% RN Direct Case-Mix',
                     line: { color: '#ff8c00', width: 3 },
                     marker: { 
                         size: 5,
@@ -4490,11 +4468,11 @@
             console.log('DEBUG: total_days =', summary.total_days);
             document.getElementById('totalDays').textContent = summary.total_days.toLocaleString();
             document.getElementById('avgCensus').textContent = summary.avg_census.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            document.getElementById('totalHPRD').textContent = summary.avg_total_hprd.toFixed(3);
-            document.getElementById('totalDirectHPRD').textContent = summary.avg_nurse_staff_hprd_excl_admin.toFixed(3);
-            document.getElementById('totalRNHPRD').textContent = summary.avg_total_rn_hprd.toFixed(3);
-            document.getElementById('directRNHPRD').textContent = summary.avg_rn_hprd.toFixed(3);
-            document.getElementById('nurseAideHPRD').textContent = summary.avg_cna_hprd.toFixed(3);
+            document.getElementById('totalHPRD').textContent = summary.avg_total_hprd.toFixed(2);
+            document.getElementById('totalDirectHPRD').textContent = summary.avg_nurse_staff_hprd_excl_admin.toFixed(2);
+            document.getElementById('totalRNHPRD').textContent = summary.avg_total_rn_hprd.toFixed(2);
+            document.getElementById('directRNHPRD').textContent = summary.avg_rn_hprd.toFixed(2);
+            document.getElementById('nurseAideHPRD').textContent = summary.avg_cna_hprd.toFixed(2);
             document.getElementById('contractPct').textContent = summary.avg_total_contract_pct.toFixed(1) + '%';
            document.getElementById('totalRNSub8').textContent = summary.total_rn_sub8.toLocaleString();
            document.getElementById('directRNSub8').textContent = summary.direct_rn_sub8.toLocaleString();
@@ -5430,12 +5408,6 @@
             const providerName = "{{ facility_name }}";
             const formattedProviderName = capitalizeProviderName(providerName);
             
-            // Get toggle states
-            const excludeAdminHPRD = document.getElementById('excludeAdminHPRD')?.checked || false;
-            const excludeAdminHours = document.getElementById('excludeAdminHours')?.checked || false;
-            const excludeAdminContract = document.getElementById('excludeAdminContract')?.checked || false;
-            const excludeAdminDOW = document.getElementById('excludeAdminDOW')?.checked || false;
-            
             if (charts.hprd_trend && charts.hprd_trend.data && charts.hprd_trend.layout) {
                 const layout = { ...charts.hprd_trend.layout };
                 
@@ -5494,49 +5466,7 @@
                 layout.margin.b = 150;
                 layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
                 
-                // Apply admin/DON exclusion for HPRD chart
-                let hprdData = [...charts.hprd_trend.data];
-                if (excludeAdminHPRD) {
-                    // Find the Direct Care trace first (before filtering)
-                    const directTrace = charts.hprd_trend.data.find(t => 
-                        t.name && (t.name.includes('Direct') || t.name === 'Nurse_Staff_HPRD_Excl_Admin' || t.name === 'Nurse Staff HPRD (excl. Admin & DON)')
-                    );
-                    
-                    // Filter out Total traces that include admin/DON and replace with Direct if found
-                    hprdData = hprdData.filter(trace => {
-                        // Keep all traces except Total Nurse/Total Staff traces
-                        if (trace.name && (trace.name.includes('Total Nurse') || trace.name === 'Total_Nurse_HPRD' || trace.name === 'Total Staff HPRD' || trace.name.includes('Total Staff'))) {
-                            return false; // Remove this trace
-                        }
-                        return true; // Keep all other traces
-                    });
-                    
-                    // If we found a direct trace, add it with "Total" name
-                    if (directTrace) {
-                        hprdData.push({
-                            ...directTrace,
-                            name: 'Total'
-                        });
-                    }
-                    
-                    // Shorten legend labels for remaining traces
-                    hprdData = hprdData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
-                        }
-                        return trace;
-                    });
-                } else {
-                    // Shorten legend labels when not excluding
-                    hprdData = hprdData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
-                        }
-                        return trace;
-                    });
-                }
-                
-                Plotly.newPlot('hprdTrendChart', hprdData, layout);
+                Plotly.newPlot('hprdTrendChart', charts.hprd_trend.data, layout);
             }
             if (charts.hours_trend && charts.hours_trend.data && charts.hours_trend.layout) {
                 const layout = { ...charts.hours_trend.layout };
@@ -5609,49 +5539,7 @@
                     itemdoubleclick: 'toggleothers'  // Double click shows only that trace
                 };
                 
-                // Apply admin/DON exclusion for Hours chart
-                let hoursData = charts.hours_trend.data.map(trace => ({...trace}));
-                if (excludeAdminHours) {
-                    // Find the Direct Care trace first (before filtering)
-                    const directTrace = charts.hours_trend.data.find(t => 
-                        t.name && (t.name.includes('Direct') || t.name === 'Nurse_Staff_Hours_Excl_Admin' || t.name.includes('Excl. Admin'))
-                    );
-                    
-                    // Filter out Total traces that include admin/DON
-                    hoursData = hoursData.filter(trace => {
-                        // Keep all traces except Total Nurse/Total Staff traces
-                        if (trace.name && (trace.name.includes('Total Nurse Hours') || trace.name === 'Total_Nurse_Hours' || trace.name === 'Total Staff Hours' || trace.name.includes('Total Staff'))) {
-                            return false; // Remove this trace
-                        }
-                        return true; // Keep all other traces
-                    });
-                    
-                    // If we found a direct trace, add it with "Total" name
-                    if (directTrace) {
-                        hoursData.push({
-                            ...directTrace,
-                            name: 'Total'
-                        });
-                    }
-                    
-                    // Shorten legend labels for remaining traces
-                    hoursData = hoursData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse Hours', 'Total').replace('Total Staff Hours', 'Total');
-                        }
-                        return trace;
-                    });
-                } else {
-                    // Shorten legend labels when not excluding
-                    hoursData = hoursData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse Hours', 'Total').replace('Total Staff Hours', 'Total');
-                        }
-                        return trace;
-                    });
-                }
-                
-                Plotly.newPlot('hoursTrendChart', hoursData, layout, config);
+                Plotly.newPlot('hoursTrendChart', charts.hours_trend.data, layout, config);
             }
             if (charts.census_trend && charts.census_trend.data && charts.census_trend.layout) {
                 const layout = { ...charts.census_trend.layout };
@@ -5792,49 +5680,7 @@
                 layout.margin.b = 150;
                 layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
                 
-                // Apply admin/DON exclusion for DOW chart
-                let dowData = charts.dow_comparison.data.map(trace => ({...trace}));
-                if (excludeAdminDOW) {
-                    // Find the Direct Care trace first (before filtering)
-                    const directTrace = charts.dow_comparison.data.find(t => 
-                        t.name && (t.name.includes('Direct') || t.name === 'Nurse_Staff_HPRD_Excl_Admin' || t.name.includes('Excl. Admin'))
-                    );
-                    
-                    // Filter out Total traces that include admin/DON
-                    dowData = dowData.filter(trace => {
-                        // Keep all traces except Total Nurse/Total Staff traces
-                        if (trace.name && (trace.name.includes('Total Nurse') || trace.name === 'Total_Nurse_HPRD' || trace.name === 'Total Staff HPRD' || trace.name.includes('Total Staff'))) {
-                            return false; // Remove this trace
-                        }
-                        return true; // Keep all other traces
-                    });
-                    
-                    // If we found a direct trace, add it with "Total" name
-                    if (directTrace) {
-                        dowData.push({
-                            ...directTrace,
-                            name: 'Total'
-                        });
-                    }
-                    
-                    // Shorten legend labels for remaining traces
-                    dowData = dowData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
-                        }
-                        return trace;
-                    });
-                } else {
-                    // Shorten legend labels when not excluding
-                    dowData = dowData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse HPRD', 'Total').replace('Total Staff HPRD', 'Total');
-                        }
-                        return trace;
-                    });
-                }
-                
-                Plotly.newPlot('dowComparisonChart', dowData, layout);
+                Plotly.newPlot('dowComparisonChart', charts.dow_comparison.data, layout);
             }
             if (charts.contract_trend && charts.contract_trend.data && charts.contract_trend.layout) {
                 const layout = { ...charts.contract_trend.layout };
@@ -5893,49 +5739,24 @@
                 layout.margin.b = 150;
                 layout.margin.l = Math.max(layout.margin.l || 70, 80);  // Ensure enough left margin for source badge
                 
-                // Apply admin/DON exclusion for Contract chart (affects Total Nurse contract %)
-                let contractData = charts.contract_trend.data.map(trace => ({...trace}));
-                if (excludeAdminContract) {
-                    // Find the Direct Care trace first (before filtering)
-                    const directTrace = charts.contract_trend.data.find(t => 
-                        t.name && (t.name.includes('Direct') || t.name.includes('Excl. Admin'))
-                    );
-                    
-                    // Filter out Total traces that include admin/DON
-                    contractData = contractData.filter(trace => {
-                        // Keep all traces except Total Nurse/Total Staff traces
-                        if (trace.name && (trace.name.includes('Total Nurse') || trace.name.includes('Total Staff'))) {
-                            return false; // Remove this trace
-                        }
-                        return true; // Keep all other traces
-                    });
-                    
-                    // If we found a direct trace, add it with "Total" name
-                    if (directTrace) {
-                        contractData.push({
-                            ...directTrace,
-                            name: 'Total'
-                        });
+                // Update contract chart legend labels for mobile (Contract -> Ctr)
+                const isMobile = window.innerWidth < 768;
+                let contractData = charts.contract_trend.data.map(trace => {
+                    const newTrace = {...trace};
+                    if (isMobile && newTrace.name) {
+                        newTrace.name = newTrace.name.replace('Contract', 'Ctr');
                     }
-                    
-                    // Shorten legend labels for remaining traces
-                    contractData = contractData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse', 'Total').replace('Total Staff', 'Total');
-                        }
-                        return trace;
-                    });
-                } else {
-                    // Shorten legend labels when not excluding
-                    contractData = contractData.map(trace => {
-                        if (trace.name) {
-                            trace.name = trace.name.replace('Total Nurse', 'Total').replace('Total Staff', 'Total');
-                        }
-                        return trace;
-                    });
-                }
+                    return newTrace;
+                });
                 
-                Plotly.newPlot('contractTrendChart', contractData, layout);
+                // Configure plot with interactive legend
+                const config = {
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+                    displaylogo: false
+                };
+                
+                Plotly.newPlot('contractTrendChart', contractData, layout, config);
             }
         }
 
