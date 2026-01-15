@@ -1,5 +1,6 @@
-﻿import pandas as pd
+import pandas as pd
 import os
+from pathlib import Path
 
 def format_provnum(df):
     """Ensure PROVNUM is a 6-digit string with leading zeros."""
@@ -15,11 +16,74 @@ def format_provnum(df):
         return True
     return False
 
+def validate_quarterly_metrics_structure(facility_metrics, state_metrics, national_metrics):
+    """Validate that quarterly metrics files have expected structure."""
+    warnings = []
+    
+    # Check facility metrics
+    required_facility_cols = ['CY_Qtr', 'PROVNUM', 'PROVNAME', 'STATE', 'Total_Nurse_HPRD', 'RN_HPRD', 'Contract_Percentage', 'MDScensus']
+    missing_facility = [col for col in required_facility_cols if col not in facility_metrics.columns]
+    if missing_facility:
+        warnings.append(f"⚠️  WARNING: Missing required columns in facility_quarterly_metrics.csv: {missing_facility}")
+    
+    # Check state metrics
+    required_state_cols = ['CY_Qtr', 'STATE', 'Total_Nurse_Hours', 'Total_Nurse_HPRD', 'facility_count']
+    missing_state = [col for col in required_state_cols if col not in state_metrics.columns]
+    if missing_state:
+        warnings.append(f"⚠️  WARNING: Missing required columns in state_quarterly_metrics.csv: {missing_state}")
+    
+    # Check national metrics
+    required_national_cols = ['CY_Qtr', 'STATE', 'Total_Nurse_Hours', 'Total_Nurse_HPRD', 'facility_count']
+    missing_national = [col for col in required_national_cols if col not in national_metrics.columns]
+    if missing_national:
+        warnings.append(f"⚠️  WARNING: Missing required columns in national_quarterly_metrics.csv: {missing_national}")
+    
+    return warnings
+
 def generate_lite_metrics():
+    """Generate lite metrics from quarterly metrics files (regenerates all quarters from source)."""
+    print("="*70)
+    print("Generating Lite Metrics from Quarterly Metrics")
+    print("="*70)
+    
+    # Check if quarterly metrics files exist
+    if not os.path.exists('facility_quarterly_metrics.csv'):
+        print("ERROR: facility_quarterly_metrics.csv not found!")
+        print("Please run generate_metrics.py first.")
+        return
+    
+    if not os.path.exists('state_quarterly_metrics.csv'):
+        print("ERROR: state_quarterly_metrics.csv not found!")
+        print("Please run generate_metrics.py first.")
+        return
+    
+    if not os.path.exists('national_quarterly_metrics.csv'):
+        print("ERROR: national_quarterly_metrics.csv not found!")
+        print("Please run generate_metrics.py first.")
+        return
+    
+    print("\nLoading quarterly metrics files...")
     # Read the existing metrics files
     facility_metrics = pd.read_csv('facility_quarterly_metrics.csv', low_memory=False)
     state_metrics = pd.read_csv('state_quarterly_metrics.csv', low_memory=False)
     national_metrics_df = pd.read_csv('national_quarterly_metrics.csv', low_memory=False)
+    
+    print(f"  Loaded {len(facility_metrics):,} facility records")
+    print(f"  Loaded {len(state_metrics):,} state records")
+    print(f"  Loaded {len(national_metrics_df):,} national records")
+    
+    # Validate structure
+    warnings = validate_quarterly_metrics_structure(facility_metrics, state_metrics, national_metrics_df)
+    if warnings:
+        print("\n⚠️  WARNINGS:")
+        for warning in warnings:
+            print(f"  {warning}")
+        print("\n⚠️  Please review warnings above - file structure may have changed!")
+    
+    # Get quarter information
+    quarters = sorted(facility_metrics['CY_Qtr'].unique())
+    print(f"\nQuarters in dataset: {len(quarters)}")
+    print(f"  Range: {quarters[0]} to {quarters[-1]}")
     
     # Format PROVNUMs
     format_provnum(facility_metrics)
@@ -139,28 +203,45 @@ def generate_lite_metrics():
         'Contract_Percentage', 'MDS'
     ]
     
-    # Save the lite metrics files
+    # Save the lite metrics files to root directory
     facility_lite_output.to_csv('facility_lite_metrics.csv', index=False)
     state_lite.to_csv('state_lite_metrics.csv', index=False)
     national_lite.to_csv('national_lite_metrics.csv', index=False)
     
+    # Also save to pbj_lite directory (dashboard checks this first)
+    pbj_lite_dir = Path('pbj_lite')
+    pbj_lite_dir.mkdir(exist_ok=True)
+    facility_lite_output.to_csv(pbj_lite_dir / 'facility_lite_metrics.csv', index=False)
+    state_lite.to_csv(pbj_lite_dir / 'state_lite_metrics.csv', index=False)
+    national_lite.to_csv(pbj_lite_dir / 'national_lite_metrics.csv', index=False)
+    
     # Print summary
-    print("\nMetrics Generation Summary:")
-    print(f"Total facility records: {len(facility_lite)}")
-    print(f"Total state records: {len(state_lite)}")
-    print(f"Total national records: {len(national_lite)}")
-    print(f"Unique facilities: {facility_lite['PROVNUM'].nunique()}")
+    print(f"\n{'='*70}")
+    print("Lite Metrics Generation Summary:")
+    print(f"{'='*70}")
+    print(f"Total facility records: {len(facility_lite):,}")
+    print(f"Total state records: {len(state_lite):,}")
+    print(f"Total national records: {len(national_lite):,}")
+    print(f"Unique facilities: {facility_lite['PROVNUM'].nunique():,}")
+    print(f"Quarters processed: {len(quarters)}")
     
     # Print latest quarter's state summary
-    latest_quarter = state_lite['CY_Qtr'].max()
-    print(f"\nLatest quarter ({latest_quarter}) state summary:")
-    latest_state = state_lite[state_lite['CY_Qtr'] == latest_quarter].sort_values('STATE')
-    print(latest_state[['STATE', 'Facility_Count', 'Census', 'State_Census', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Contract_Percentage']].to_string())
+    if not state_lite.empty:
+        latest_quarter = state_lite['CY_Qtr'].max()
+        print(f"\nLatest quarter ({latest_quarter}) state summary:")
+        latest_state = state_lite[state_lite['CY_Qtr'] == latest_quarter].sort_values('STATE')
+        print(latest_state[['STATE', 'Facility_Count', 'Census', 'State_Census', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Contract_Percentage']].to_string())
+        
+        # Print latest quarter's national summary
+        print(f"\nLatest quarter ({latest_quarter}) national summary:")
+        latest_national = national_lite[national_lite['CY_Qtr'] == latest_quarter]
+        if not latest_national.empty:
+            print(latest_national[['Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Contract_Percentage', 'MDS']].to_string())
     
-    # Print latest quarter's national summary
-    print(f"\nLatest quarter ({latest_quarter}) national summary:")
-    latest_national = national_lite[national_lite['CY_Qtr'] == latest_quarter]
-    print(latest_national[['Facility_Count', 'Total_Nurse_HPRD', 'Nurse_Care_HPRD', 'Total_RN_HPRD', 'Contract_Percentage', 'MDS']].to_string())
+    print(f"\n✓ Lite metrics files generated successfully!")
+    print(f"  - facility_lite_metrics.csv (root and pbj_lite/)")
+    print(f"  - state_lite_metrics.csv (root and pbj_lite/)")
+    print(f"  - national_lite_metrics.csv (root and pbj_lite/)")
 
 if __name__ == "__main__":
     generate_lite_metrics() 

@@ -351,6 +351,72 @@ def load_macpac_standards():
         st.warning(f"Error loading MACPAC data: {e}. State requirements will not be displayed.")
         return pd.DataFrame()
 
+def get_latest_quarter_from_data() -> tuple[str, str]:
+    """Get the latest quarter and year from available data files.
+    
+    Returns:
+        tuple: (year_str, quarter_str) e.g., ("2025", "Q3")
+    """
+    from datetime import datetime
+    
+    # Default fallback
+    current_year = datetime.now().year
+    default_result: tuple[str, str] = (str(current_year), "Q1")
+    
+    try:
+        from utils.date_utils import get_latest_data_periods
+        periods = get_latest_data_periods()
+        data_range = periods.get('data_range', '2017-2025')
+        # Extract max year from range like "2017-2025"
+        if '-' in data_range:
+            max_year = data_range.split('-')[-1]
+            # Try to get latest quarter from files
+            import glob
+            import re
+            pbj_files = glob.glob('standardized_PBJ/PBJ_dailynursestaffing_*.csv')
+            if not pbj_files:
+                pbj_files = glob.glob('PBJcsv/PBJ_dailynursestaffing_*.csv')
+            
+            if pbj_files:
+                # Extract quarters from filenames
+                quarters = []
+                for file_path in pbj_files:
+                    filename = os.path.basename(file_path)
+                    match = re.search(r'CY(\d{4})Q(\d)', filename)
+                    if match:
+                        year = int(match.group(1))
+                        quarter = int(match.group(2))
+                        quarters.append((year, quarter))
+                
+                if quarters:
+                    # Get latest quarter
+                    latest = max(quarters, key=lambda x: (x[0], x[1]))
+                    return (str(latest[0]), f"Q{latest[1]}")
+        
+        # Fallback to current year and Q1
+        return default_result
+    except Exception:
+        # Fallback to current year and Q1 on any error
+        return default_result
+
+def get_comparison_date_text(use_entity_comparison: bool = False) -> str:
+    """Get the comparison date text for 'vs. [date]' references.
+    
+    Args:
+        use_entity_comparison: If True, use affiliated_entity_previous (for ownership/chain comparisons).
+                              If False, use provider_info_previous (for facility/provider comparisons).
+    """
+    try:
+        periods = get_latest_data_periods()
+        if use_entity_comparison:
+            comparison_date = periods.get('affiliated_entity_previous', 'Previous Available')
+        else:
+            comparison_date = periods.get('provider_info_previous', 'Previous Available')
+        # If it's in "Month Year" format, return it; otherwise return as-is
+        return comparison_date
+    except:
+        return "Previous Available"
+
 def calculate_previous_year_quarter(quarter_label: str) -> str:
     """
     Calculate the previous year quarter (4 quarters behind).
@@ -371,8 +437,12 @@ def calculate_previous_year_quarter(quarter_label: str) -> str:
         
         return f"{previous_year}{quarter}"
     except (ValueError, IndexError):
-        # Fallback to default if parsing fails
-        return "2024Q1"
+        # Fallback to dynamic latest quarter if parsing fails
+        year, quarter = get_latest_quarter_from_data()
+        if year and quarter:
+            prev_year = str(int(year) - 1)
+            return f"{prev_year}{quarter}"
+        return f"{datetime.now().year - 1}Q1"
 
 def format_quarter_for_display(quarter_db_format: str) -> str:
     """
@@ -391,8 +461,11 @@ def format_quarter_for_display(quarter_db_format: str) -> str:
         
         return f"{quarter} {year}"
     except (ValueError, IndexError):
-        # Fallback to default if parsing fails
-        return "Q1 2024"
+        # Fallback to dynamic latest quarter if parsing fails
+        year, quarter = get_latest_quarter_from_data()
+        if year and quarter:
+            return f"{quarter} {year}"
+        return f"Q1 {datetime.now().year}"
 
 @st.cache_data
 def load_facility_data():
@@ -839,7 +912,7 @@ def state_pbj_takeaway_card(
 
 
 @st.cache_data(ttl=300, max_entries=1)  # Cache for 5 minutes, limit cache entries
-def load_metrics_data(cache_version="v2024_12_15"):
+def load_metrics_data(cache_version="v2025_01_15"):  # Updated to force cache refresh for Q3 2025 data
     """Load and cache all metrics data with memory optimization."""
     try:
         import os
@@ -925,8 +998,10 @@ def load_metrics_data(cache_version="v2024_12_15"):
                                           ((df['CY_QTR'].str[-1].astype(int) - 1) * 3 + 1).astype(str).str.zfill(2) + 
                                           '-01')
             else:
-                # If CY_QTR doesn't exist, create a dummy date column
-                df['date'] = pd.to_datetime('2024-01-01')
+                # If CY_QTR doesn't exist, create a dummy date column using current year
+                year, _ = get_latest_quarter_from_data()
+                fallback_year = year if year else str(datetime.now().year)
+                df['date'] = pd.to_datetime(f'{fallback_year}-01-01')
         
         # Force garbage collection to free memory
         gc.collect()
@@ -940,23 +1015,7 @@ def load_metrics_data(cache_version="v2024_12_15"):
 def load_affiliated_entity_data():
     """Load and cache chain performance measures data."""
     try:
-        import os
-        # Try multiple possible paths - use proper os.path.join for all components
-        possible_paths = [
-            os.path.join(os.getcwd(), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-            os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try relative path
-            'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Also try with forward slash for compatibility
-            os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root directory
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root relative to script
-            'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Try current directory
-        ]
-        
-        file_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                file_path = path
-                break
+        file_path = find_latest_affiliated_entity()
         
         if not file_path:
             if IS_STAGING:
@@ -969,7 +1028,9 @@ def load_affiliated_entity_data():
                     'Entity_Type': ['For-Profit', 'Non-Profit', 'Government']
                 })
             else:
-                st.warning("⚠️ Affiliated entity data file not found. Looking for: ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv")
+                st.error("⚠️ Affiliated entity data file not found. Expected patterns:\n"
+                        "- ownership/Nursing_Home_Chain_Performance_Measures_{Mon}_{YYYY}.csv\n"
+                        "- ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_{Mon}_{YYYY}.csv")
                 return pd.DataFrame()
         df = pd.read_csv(file_path)
         
@@ -1134,10 +1195,10 @@ def load_previous_provider_info_data():
         
         return df
     except Exception as e:
-        st.error(f"Error loading June provider info data: {str(e)}")
+        st.error(f"Error loading provider info data: {str(e)}")
         return pd.DataFrame()
 
-@st.cache_data
+@st.cache_data(ttl=3600)  # Cache for 1 hour - will refresh after pipeline updates
 def create_facility_db():
     """Create an optimized DuckDB database for facility data."""
     try:
@@ -1167,7 +1228,10 @@ def create_facility_db():
                                                     ((facility_metrics['CY_QTR'].str[-1].astype(int) - 1) * 3 + 1).astype(str).str.zfill(2) + 
                                                     '-01')
         else:
-            facility_metrics['date'] = pd.to_datetime('2024-01-01')
+            # Fallback to current year if no CY_QTR column
+            year, _ = get_latest_quarter_from_data()
+            fallback_year = year if year else str(datetime.now().year)
+            facility_metrics['date'] = pd.to_datetime(f'{fallback_year}-01-01')
         
         # Drop the table if it exists
         facility_db.execute("DROP TABLE IF EXISTS facility_metrics")
@@ -1262,7 +1326,7 @@ def proper_title_case(text: str) -> str:
     
     return result
 
-@st.cache_data
+@st.cache_data(ttl=3600)  # Cache for 1 hour - will refresh after pipeline updates
 def check_facility_status(provnum: str) -> dict:
     """Check if a facility is active and get its last available data."""
     try:
@@ -1276,9 +1340,51 @@ def check_facility_status(provnum: str) -> dict:
             """
             latest_quarter_result = facility_db.execute(latest_quarters_query).fetchone()
             latest_quarter = latest_quarter_result[0] if latest_quarter_result else None
+            
+            # If database query returns None, try to get from CSV file directly
+            if not latest_quarter:
+                import glob
+                import re
+                # Look for latest quarter in standardized PBJ files
+                pbj_files = glob.glob('standardized_PBJ/PBJ_dailynursestaffing_*.csv')
+                if not pbj_files:
+                    pbj_files = glob.glob('PBJcsv/PBJ_dailynursestaffing_*.csv')
+                
+                quarters = []
+                for file_path in pbj_files:
+                    filename = os.path.basename(file_path)
+                    match = re.search(r'CY(\d{4})Q(\d)', filename)
+                    if match:
+                        year = match.group(1)
+                        quarter = match.group(2)
+                        quarters.append(f"{year}Q{quarter}")
+                
+                if quarters:
+                    latest_quarter = max(quarters)
         except Exception as e:
-            # If database query fails, use a default latest quarter
-            latest_quarter = "2025Q2"
+            # If database query fails, try to get from CSV files
+            try:
+                import glob
+                import re
+                pbj_files = glob.glob('standardized_PBJ/PBJ_dailynursestaffing_*.csv')
+                if not pbj_files:
+                    pbj_files = glob.glob('PBJcsv/PBJ_dailynursestaffing_*.csv')
+                
+                quarters = []
+                for file_path in pbj_files:
+                    filename = os.path.basename(file_path)
+                    match = re.search(r'CY(\d{4})Q(\d)', filename)
+                    if match:
+                        year = match.group(1)
+                        quarter = match.group(2)
+                        quarters.append(f"{year}Q{quarter}")
+                
+                if quarters:
+                    latest_quarter = max(quarters)
+                else:
+                    latest_quarter = None
+            except:
+                latest_quarter = None
         
         # Get the facility's last available data
         try:
@@ -3421,26 +3527,13 @@ def main() -> None:
         def load_ownership_data():
             """Load ownership data."""
             try:
-                import os
-                # Try multiple possible paths - use proper os.path.join for all components
-                possible_paths = [
-                    os.path.join(os.getcwd(), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),
-                    os.path.join('ownership', 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try relative path
-                    'ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Also try with forward slash for compatibility
-                    os.path.join(os.getcwd(), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root directory
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv'),  # Try root relative to script
-                    'Nursing_Home_Chain_Performance_Measures_Jul_2025.csv',  # Try current directory
-                ]
-                
-                file_path = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        file_path = path
-                        break
+                # Use dynamic file finder to get the latest ownership file
+                file_path = find_latest_affiliated_entity()
                 
                 if not file_path:
-                    st.warning("⚠️ No ownership data found. Looking for: ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv")
+                    st.error("⚠️ No ownership data found. Expected patterns:\n"
+                            "- ownership/Nursing_Home_Chain_Performance_Measures_{Mon}_{YYYY}.csv\n"
+                            "- ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_{Mon}_{YYYY}.csv")
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
@@ -3450,7 +3543,9 @@ def main() -> None:
                 
                 return df
             except FileNotFoundError:
-                st.warning("⚠️ No ownership data found. Looking for: ownership/Nursing_Home_Chain_Performance_Measures_Jul_2025.csv")
+                st.error("⚠️ No ownership data found. Expected patterns:\n"
+                        "- ownership/Nursing_Home_Chain_Performance_Measures_{Mon}_{YYYY}.csv\n"
+                        "- ownership/Nursing_Home_Affiliated_Entity_Performance_Measures_{Mon}_{YYYY}.csv")
                 return pd.DataFrame()
             except Exception as e:
                 st.error(f"Error loading ownership data: {str(e)}")
@@ -3468,7 +3563,7 @@ def main() -> None:
                     return pd.DataFrame()
                 
                 df = pd.read_csv(file_path)
-                # Map March column names to July column names for comparison
+                # Map previous period column names to current period column names for comparison
                 column_mapping = {
                     'Affiliated entity': 'Chain',
                     'Affiliated entity ID': 'Chain ID'
@@ -3480,7 +3575,7 @@ def main() -> None:
                     df = df.rename(columns=rename_dict)
                 return df
             except Exception as e:
-                st.error(f"Error loading March ownership data: {str(e)}")
+                st.error(f"Error loading previous ownership data: {str(e)}")
                 return pd.DataFrame()
         
         @st.cache_data
@@ -3496,7 +3591,7 @@ def main() -> None:
                 
                 return pd.read_csv(file_path, dtype={'CMS Certification Number (CCN)': str})
             except Exception as e:
-                st.error(f"Error loading March provider info data: {str(e)}")
+                st.error(f"Error loading previous provider info data: {str(e)}")
                 return pd.DataFrame()
         
         def proper_title_case(text):
@@ -4439,12 +4534,14 @@ def main() -> None:
             st.error(f"Error processing selection: {str(e)}")
             return
 
-        # Get all available quarters
+        # Get all available quarters - reload metrics to get latest data (cached function)
         try:
-            if national_metrics.empty or 'CY_QTR' not in national_metrics.columns:
+            # Reload metrics data to ensure we have the latest quarters (uses cache)
+            current_national_metrics, _, _ = load_metrics_data()
+            if current_national_metrics.empty or 'CY_QTR' not in current_national_metrics.columns:
                 st.error("Error loading quarters: CY_QTR column not found in national metrics data")
                 return
-            all_quarters = sort_quarters(national_metrics['CY_QTR'].unique())  # Oldest to newest
+            all_quarters = sort_quarters(current_national_metrics['CY_QTR'].unique())  # Oldest to newest
             if len(all_quarters) == 0:
                 st.error("Error loading quarters: No quarters found in data")
                 return
@@ -4779,8 +4876,10 @@ def main() -> None:
                                 year = latest_data['CY_QTR'][:4]
                             else:
                                 reported_hprd = selected_facility['Total_Nurse_HPRD']
-                                quarter = "1"
-                                year = "2025"
+                                # Get latest quarter dynamically
+                                year, quarter_str = get_latest_quarter_from_data()
+                                quarter = quarter_str[-1] if quarter_str else "1"
+                                year = year if year else str(datetime.now().year)
                             
                             # Get state average HPRD
                             import os
@@ -5059,8 +5158,8 @@ def main() -> None:
                         entity_row = selected_entity_data.iloc[0]
                         entity_id = int(entity_row['Chain ID'])
                         
-                        # Find previous month's data for comparison
-                        # March data uses 'Affiliated entity' but we need to map it to 'Chain' for comparison
+                        # Find previous period's data for comparison
+                        # Previous period data may use 'Affiliated entity' but we need to map it to 'Chain' for comparison
                         try:
                             # Check what columns are available in previous data
                             available_columns = list(previous_entity_data.columns)
@@ -5116,7 +5215,7 @@ def main() -> None:
                             st.metric("Total Facilities", 
                                      format_metric(current_facilities, decimal_places=0, thousands=True),
                                      delta_display,
-                                     help="Total number of nursing homes owned by this entity (vs. March 2025)")
+                                     help=f"Total number of nursing homes owned by this entity (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with col2:
                             current_states = entity_row['Number of states and territories with operations']
                             prev_states = previous_row['Number of states and territories with operations'] if previous_row is not None else None
@@ -5133,7 +5232,7 @@ def main() -> None:
                             st.metric("States of Operation", 
                                      format_metric(current_states, decimal_places=0),
                                      delta_display,
-                                     help="Number of states where this entity operates nursing homes (vs. March 2025)")
+                                     help=f"Number of states where this entity operates nursing homes (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with col3:
                             current_rating = entity_row['Average overall 5-star rating']
                             prev_rating = previous_row['Average overall 5-star rating'] if previous_row is not None else None
@@ -5150,7 +5249,7 @@ def main() -> None:
                             st.metric("Overall Rating", 
                                      format_metric(current_rating, decimal_places=1),
                                      delta_display,
-                                     help="Average CMS 5-star overall rating across all facilities (vs. March 2025)")
+                                     help=f"Average CMS 5-star overall rating across all facilities (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with col4:
                             current_fines = entity_row['Total amount of fines in dollars']
                             prev_fines = previous_row['Total amount of fines in dollars'] if previous_row is not None else None
@@ -5175,7 +5274,7 @@ def main() -> None:
                             st.metric("Total Fines", 
                                      format_fines_display(current_fines),
                                      delta_display,
-                                     help="Total amount of fines in dollars across all facilities (vs. March 2025)")
+                                     help=f"Total amount of fines in dollars across all facilities (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with col5:
                             # Add spacing before ownership chart on desktop only
                             if not st.session_state.get('is_mobile', False):
@@ -5278,7 +5377,7 @@ def main() -> None:
                             st.metric("Special Focus Facilities (SFFs)", 
                                      format_metric(current_sff, decimal_places=0),
                                      delta_display,
-                                     help="Special Focus Facilities are nursing homes with serious quality issues under CMS oversight (vs. March 2025)")
+                                     help=f"Special Focus Facilities are nursing homes with serious quality issues under CMS oversight (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with risk_col2:
                             current_sff_candidate = entity_row['Number of SFF candidates']
                             prev_sff_candidate = previous_row['Number of SFF candidates'] if previous_row is not None else None
@@ -5295,7 +5394,7 @@ def main() -> None:
                             st.metric("SFF Candidates", 
                                      format_metric(current_sff_candidate, decimal_places=0),
                                      delta_display,
-                                     help="Facilities monitored for potential SFF designation (vs. March 2025)")
+                                     help=f"Facilities monitored for potential SFF designation (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with risk_col3:
                             current_abuse = entity_row['Number of facilities with an abuse icon']
                             prev_abuse = previous_row['Number of facilities with an abuse icon'] if previous_row is not None else None
@@ -5317,7 +5416,7 @@ def main() -> None:
                             st.metric("Facilited Cited for Abuse", 
                                      abuse_display,
                                      delta_display,
-                                     help="Facilities cited for abuse (vs. March 2025)")
+                                     help=f"Facilities cited for abuse (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with risk_col4:
                             # Calculate 1-star comparison from previous data
                             prev_1star = 0
@@ -5362,7 +5461,7 @@ def main() -> None:
                             st.metric("1-Star Rating Facilities", 
                                      one_star_display,
                                      delta_display,
-                                     help="Facilities with the lowest CMS overall rating (vs. March 2025)")
+                                     help=f"Facilities with the lowest CMS overall rating (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         
 
                         
@@ -5427,7 +5526,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Overall", f"{current_overall:.1f}", delta_display, help="Average overall 5-star rating (vs. March 2025)")
+                            st.metric("Overall", f"{current_overall:.1f}", delta_display, help=f"Average overall 5-star rating (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with qual_col2:
                             # Health inspection rating delta
                             current_health = entity_row['Average health inspection rating']
@@ -5441,7 +5540,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Health Inspection", f"{current_health:.1f}", delta_display, help="Average health inspection rating (vs. March 2025)")
+                            st.metric("Health Inspection", f"{current_health:.1f}", delta_display, help=f"Average health inspection rating (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with qual_col3:
                             # Staffing rating delta
                             current_staffing = entity_row['Average staffing rating']
@@ -5455,7 +5554,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Staffing", f"{current_staffing:.1f}", delta_display, help="Average staffing rating (vs. March 2025)")
+                            st.metric("Staffing", f"{current_staffing:.1f}", delta_display, help=f"Average staffing rating (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with qual_col4:
                             # Quality rating delta
                             current_quality = entity_row['Average quality rating']
@@ -5469,7 +5568,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Quality", f"{current_quality:.1f}", delta_display, help="Average quality rating (vs. March 2025)")
+                            st.metric("Quality", f"{current_quality:.1f}", delta_display, help=f"Average quality rating (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         # Quality ratings chart and distribution chart side by side
                         # Add spacing before charts to prevent overlap with metrics above
                         st.markdown('<div style="margin-top: 30px;"></div>', unsafe_allow_html=True)
@@ -5622,7 +5721,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Nurse HPRD", f"{current_total_hprd:.1f}", delta_display, help="Average total nurse hours per resident day (vs. March 2025)")
+                            st.metric("Total Nurse HPRD", f"{current_total_hprd:.1f}", delta_display, help=f"Average total nurse hours per resident day (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with staff_col2:
                             # RN HPRD delta
                             current_rn_hprd = entity_row['Average total Registered Nurse hours per resident day']
@@ -5636,7 +5735,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN HPRD", f"{current_rn_hprd:.1f}", delta_display, help="Average RN hours per resident day (vs. March 2025)")
+                            st.metric("RN HPRD", f"{current_rn_hprd:.1f}", delta_display, help=f"Average RN hours per resident day (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with staff_col3:
                             # Weekend HPRD delta
                             current_weekend_hprd = entity_row['Average total weekend nurse hours per resident day']
@@ -5664,7 +5763,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Admin Turnover", f"{current_admin_turnover:.1f}", delta_display, help="Number of administrators that stopped working at the nursing home over a 12-month period (vs March 2025)")
+                            st.metric("Admin Turnover", f"{current_admin_turnover:.1f}", delta_display, help=f"Number of administrators that stopped working at the nursing home over a 12-month period (vs {get_comparison_date_text(use_entity_comparison=True)})")
                         
                         # Turnover metrics
                         turn_col1, turn_col2 = st.columns(2)
@@ -5686,7 +5785,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help="The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
+                            st.metric("Nursing Staff Turnover", format_turnover_pct(current_nursing_turnover), delta_display, help=f"The percent of nursing staff that stopped working at the nursing home over a 12-month period (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with turn_col2:
                             # RN Turnover delta
                             current_rn_turnover = entity_row['Average Registered Nurse turnover percentage']
@@ -5700,7 +5799,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help="The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. March 2025)")
+                            st.metric("RN Turnover", format_turnover_pct(current_rn_turnover), delta_display, help=f"The percent of RN staff that stopped working at the nursing home over a 12-month period (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         
                         # Compliance metrics
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Enforcement - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5726,7 +5825,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Fines", format_fines_display(current_total_fines), delta_display, help="Total amount of fines in dollars (vs. March 2025)")
+                            st.metric("Total Fines", format_fines_display(current_total_fines), delta_display, help=f"Total amount of fines in dollars (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with comp_col2:
                             # Avg Fines per Facility delta
                             current_avg_fines = entity_row['Average amount of fines in dollars']
@@ -5740,7 +5839,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Avg Fines per Facility", f"${current_avg_fines:,.0f}", delta_display, help="Average fines per facility (vs. March 2025)")
+                            st.metric("Avg Fines per Facility", f"${current_avg_fines:,.0f}", delta_display, help=f"Average fines per facility (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with comp_col3:
                             # Total Payment Denials delta
                             current_denials = entity_row['Total number of payment denials']
@@ -5754,7 +5853,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Total Payment Denials", f"{current_denials:,.0f}", delta_display, help="Total number of payment denials (vs. March 2025)")
+                            st.metric("Total Payment Denials", f"{current_denials:,.0f}", delta_display, help=f"Total number of payment denials (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with comp_col4:
                             # Avg Payment Denials delta
                             current_avg_denials = entity_row['Average number of payment denials']
@@ -5768,7 +5867,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Avg Payment Denials", f"{current_avg_denials:.1f}", delta_display, help="Average number of payment denials (vs. March 2025)")
+                            st.metric("Avg Payment Denials", f"{current_avg_denials:.1f}", delta_display, help=f"Average number of payment denials (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         
                         # Antipsychotic usage
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Antipsychotics - {entity_name_title_case}</h3></div>', unsafe_allow_html=True)
@@ -5792,7 +5891,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Short-Stay Antipsychotic", format_antipsychotic_pct(current_short_stay), delta_display, help="Short-stay residents receiving antipsychotics (vs. March 2025)")
+                            st.metric("Short-Stay Antipsychotic", format_antipsychotic_pct(current_short_stay), delta_display, help=f"Short-stay residents receiving antipsychotics (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         with anti_col2:
                             # Long-Stay Antipsychotic delta
                             current_long_stay = entity_row['Average percentage of long-stay residents who received an antipsychotic medication']
@@ -5806,7 +5905,7 @@ def main() -> None:
                             else:
                                 delta_display = None
                                 
-                            st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help="Long-stay residents receiving antipsychotics (vs. March 2025)")
+                            st.metric("Long-Stay Antipsychotic", format_antipsychotic_pct(current_long_stay), delta_display, help=f"Long-stay residents receiving antipsychotics (vs. {get_comparison_date_text(use_entity_comparison=True)})")
                         # Facilities list
                         st.markdown(f'<div class="section-header" style="font-size:1.05em;"><h3 style="font-size:1.15em;">Nursing homes affiliated with {selected_value}</h3></div>', unsafe_allow_html=True)
                         # Get facilities for this entity
