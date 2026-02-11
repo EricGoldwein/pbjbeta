@@ -2995,7 +2995,14 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
             total_rn_hprd_display = data['RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
         else:
             total_rn_hprd_display = pd.Series([0.0] * len(data))
-            
+
+        # Pre-round Direct Care RN HPRD (RN excl. Admin/DON) for row 2
+        if 'Direct_Care_RN_HPRD' in data.columns and not data['Direct_Care_RN_HPRD'].isna().all():
+            direct_care_rn_hprd_display = data['Direct_Care_RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        elif 'RN_HPRD' in data.columns and not data['RN_HPRD'].isna().all():
+            direct_care_rn_hprd_display = data['RN_HPRD'].fillna(0).apply(lambda v: float(Decimal(str(v)).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)))
+        else:
+            direct_care_rn_hprd_display = pd.Series([0.0] * len(data))
 
         # Add all traces for desktop view
         fig.add_trace(go.Scatter(x=data['date'], y=hprd_display,
@@ -3055,7 +3062,12 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
                        line=dict(color='#1f77b4', width=3),
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate="<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>", showlegend=False), row=2, col=1)
-        
+
+        fig.add_trace(go.Scatter(x=data['date'], y=direct_care_rn_hprd_display,
+                       mode='lines+markers', name='RN (excl. Admin, DON)',
+                       line=dict(color='#ff7f0e', width=3, dash='dash'),
+                       customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"),
+                       hovertemplate="<b>%{customdata}</b><br>%{y:.2f} HPRD<extra></extra>", showlegend=False), row=2, col=1)
 
         # Use State_Census for state-level charts, Census for facility and national charts
         census_column = 'State_Census' if state else 'Census'
@@ -3071,7 +3083,7 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
                        customdata=data['CY_QTR'].apply(lambda x: f"Q{x[-1]} {x[:4]}"), 
                        hovertemplate=hover_contract, showlegend=False), row=4, col=1)
 
-        # Add explanatory text directly below the title with styled background
+        # Add explanatory text directly below the title with styled background (row 1)
         fig.add_annotation(
             text="Direct staff (orange) excludes RN Admin, RN DON, LPN Admin",
             x=0.5,
@@ -3087,6 +3099,25 @@ def plot_quarterly_trends(df: pd.DataFrame, state: Optional[str] = None, facilit
             bordercolor="rgba(128, 128, 128, 0.3)",
             borderwidth=0.5,
             row=1,
+            col=1
+        )
+
+        # Add explanatory text under "Total RN HPRD - .." (row 2), same positioning as row 1
+        fig.add_annotation(
+            text="RN only (orange) excludes RN Admin, RN DON",
+            x=0.5,
+            y=0.975,
+            xref="x domain",
+            yref="y domain",
+            showarrow=False,
+            xanchor="center",
+            yanchor="bottom",
+            align="center",
+            font=dict(size=10, color="#ff7f0e"),
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="rgba(128, 128, 128, 0.3)",
+            borderwidth=0.5,
+            row=2,
             col=1
         )
 
@@ -5187,7 +5218,7 @@ def main() -> None:
                         # Responsive header with mobile optimization
                         st.markdown(f'''
                                 <h2 style="margin-bottom: 0.1em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233; line-height: 1.0;">{entity_name_title_case} <span class="desktop-id" style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>
-                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS, {most_recent_period}</div>
+                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS Chain Performance (Nov. 2025) | <a href="https://www.medicare.gov/care-compare/details/chains/{entity_id}" target="_blank" rel="noopener" style="color: #1976d2;">View on Care Compare</a></div>
                                 <style>
                                     @media (max-width: 768px) {{
                                         .desktop-id {{ display: none !important; }}

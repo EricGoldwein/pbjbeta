@@ -4686,7 +4686,7 @@ def main() -> None:
                         # Responsive header with mobile optimization
                         st.markdown(f'''
                                 <h2 style="margin-bottom: 0.1em; font-size: 2.2em; font-weight: 700; letter-spacing: 0.01em; color: #1a2233; line-height: 1.0;">{entity_name_title_case} <span class="desktop-id" style="font-size: 0.7em; font-weight: 400; color: #4b5563;">(ID: {entity_id})</span></h2>
-                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS, {most_recent_period}</div>
+                                <div style="font-size: 0.8em; color: #666; margin-bottom: 1rem;">Source: CMS Chain Performance (Nov. 2025) | <a href="https://www.medicare.gov/care-compare/details/chains/{entity_id}" target="_blank" rel="noopener" style="color: #1976d2;">View on Care Compare</a></div>
                                 <style>
                                     @media (max-width: 768px) {{
                                         .desktop-id {{ display: none !important; }}
@@ -4930,9 +4930,9 @@ def main() -> None:
                                                 march_provider_data['Chain ID'] == entity_id
                                             ].copy()
                                         elif 'Affiliated Entity ID' in march_provider_data.columns:
-                                            march_chain_facilities = march_provider_data[
-                                                march_provider_data['Affiliated Entity ID'] == entity_id
-                                            ].copy()
+                                        march_chain_facilities = march_provider_data[
+                                            march_provider_data['Affiliated Entity ID'] == entity_id
+                                        ].copy()
                                         else:
                                             march_chain_facilities = pd.DataFrame()
                                         

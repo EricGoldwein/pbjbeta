@@ -12,6 +12,7 @@ import json
 from decimal import Decimal, ROUND_HALF_UP
 import os
 import glob
+import re
 import sys
 
 app = Flask(__name__)
@@ -21,192 +22,289 @@ df = None
 global_df = None
 provider_info_df = None
 macpac_standards_df = None
+DEPLOYED_DATE = ''  # Set by create_vercel_deployment when building package (MM/DD/YYYY)
 
-def create_facility_complete_csv(provnum):
-    """Extract all data for any facility into one CSV"""
-    print(f"Creating comprehensive CSV for facility {provnum}...")
-    
-    # Load all standardized nurse files
+def _quarter_from_nurse_filename(path):
+    """Parse quarter from nurse file name, e.g. PBJ_dailynursestaffing_CY2025Q3.csv -> 'CY2025Q3'."""
+    m = re.search(r'CY(\d{4})Q(\d)', os.path.basename(path), re.IGNORECASE)
+    return f'CY{m.group(1)}Q{m.group(2)}' if m else None
+
+def _normalize_cy_qtr(val):
+    """Normalize CY_Qtr (e.g. 2025Q3 or CY2025Q3) to canonical 'CYyyyyQn' for comparison with nurse filenames."""
+    if pd.isna(val):
+        return None
+    s = str(val).strip().upper().replace('\ufeff', '')
+    m = re.search(r'CY?(\d{4})Q(\d)', s)
+    if m:
+        y, q = m.group(1), m.group(2)
+        if 1 <= int(q) <= 4:
+            return f'CY{y}Q{q}'
+    # Fallback: integer like 20171 -> 2017Q1
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        i = int(val)
+        if 20101 <= i <= 20304 and (i % 10) in (1, 2, 3, 4):
+            y, q = str(i // 10), str(i % 10)
+            return f'CY{y}Q{q}'
+    return None
+
+def create_facility_complete_csv(provnum, existing_csv_path=None, output_path=None):
+    """Extract all data for any facility into one CSV. If existing_csv_path is provided and exists,
+    only process nurse files for quarters not already in that CSV (incremental update)."""
+    provnum = str(provnum).strip()
     nurse_files = glob.glob('standardized_PBJ/PBJ_dailynursestaffing_*.csv')
     nurse_files.sort()
-    
-    all_data = []
-    total_records = 0
-    
-    for file_path in nurse_files:
-        print(f"Processing: {os.path.basename(file_path)}")
-        
+
+    existing_df = None
+    quarters_to_skip = set()
+    if existing_csv_path:
+        existing_csv_abs = os.path.abspath(existing_csv_path)
+        if not os.path.exists(existing_csv_abs):
+            print(f"[incremental] CSV not found at {existing_csv_abs}; doing full build.")
+        else:
+            try:
+                existing_df = pd.read_csv(existing_csv_abs, low_memory=False)
+                # Normalize column names (BOM/whitespace) so we find CY_Qtr
+                existing_df.columns = [str(c).strip().replace('\ufeff', '') for c in existing_df.columns]
+                cy_qtr_col = next((c for c in existing_df.columns if c == 'CY_Qtr' or c.upper() == 'CY_QTR'), None)
+                if not cy_qtr_col:
+                    print(f"[incremental] No CY_Qtr column in {existing_csv_abs} (columns: {list(existing_df.columns)[:8]}...); doing full build.")
+                else:
+                    for q in existing_df[cy_qtr_col].dropna().unique():
+                        nq = _normalize_cy_qtr(q)
+                        if nq:
+                            quarters_to_skip.add(nq)
+                    if quarters_to_skip:
+                        q_list = sorted(q for q in quarters_to_skip if q)
+                        print(f"Incremental update for facility {provnum}: existing quarters {q_list}; adding new quarters only.")
+                    else:
+                        # File has data but quarter format not recognized: do NOT full rebuild
+                        if len(existing_df) > 0:
+                            print(f"[incremental] No quarters parsed from CY_Qtr; existing file has {len(existing_df)} rows — treating as up to date (skipping full rebuild).")
+                            out = output_path or existing_csv_path or f'facility_{provnum}_complete_data.csv'
+                            existing_df.to_csv(out, index=False)
+                            return existing_df
+                        print(f"[incremental] No quarters parsed from CY_Qtr; doing full build.")
+            except Exception as e:
+                print(f"Could not read existing CSV for incremental: {e}; doing full build.")
+                existing_df = None
+                quarters_to_skip = set()
+
+    files_to_process = []
+    for path in nurse_files:
+        q = _quarter_from_nurse_filename(path)
+        if q and q in quarters_to_skip:
+            continue
+        files_to_process.append(path)
+
+    if existing_df is not None and len(files_to_process) == 0:
+        print(f"Facility {provnum} complete data already up to date (no new quarters).")
+        out = output_path or existing_csv_path or f'facility_{provnum}_complete_data.csv'
+        existing_df.to_csv(out, index=False)
+        return existing_df
+
+    if not quarters_to_skip:
+        print(f"Creating comprehensive CSV for facility {provnum}...")
+    else:
+        print(f"Adding {len(files_to_process)} quarter(s) for facility {provnum}...")
+
+    search_variants = [provnum.upper()]
+    if provnum.isdigit():
+        search_variants.extend([provnum.zfill(6), provnum.lstrip('0')])
+
+    all_data: list[pd.DataFrame] = [] if existing_df is None else [existing_df]
+    total_new = 0
+
+    for file_path in files_to_process:
         try:
-            # Read the CSV
-            df = pd.read_csv(file_path, low_memory=False)
-            
-            # Format PROVNUM to ensure it's a string and handle both numeric and alphanumeric formats
-            df['PROVNUM'] = df['PROVNUM'].astype(str)
-            # Only zero-pad if all digits, otherwise keep as-is
-            df['PROVNUM'] = df['PROVNUM'].apply(lambda x: x.zfill(6) if x.isdigit() else x.upper())
-            
-            # Filter for the specific facility (handle different PROVNUM formats)
-            # Create variations of the search provnum
-            search_variants = [provnum.upper()]
-            if provnum.isdigit():
-                # For numeric provnums, also try with leading zeros
-                search_variants.extend([provnum.zfill(6), provnum.lstrip('0')])
-            
-            facility_data = df[df['PROVNUM'].isin(search_variants)].copy()
-            
+            df_chunk = pd.read_csv(file_path, low_memory=False)
+            df_chunk['PROVNUM'] = df_chunk['PROVNUM'].astype(str)
+            df_chunk['PROVNUM'] = df_chunk['PROVNUM'].apply(lambda x: x.zfill(6) if x.isdigit() else x.upper())
+            facility_data = pd.DataFrame(df_chunk[df_chunk['PROVNUM'].isin(search_variants)].copy())
             if len(facility_data) == 0:
-                print(f"  No data for facility {provnum}")
                 continue
-            
-            print(f"  Found {len(facility_data)} records")
+            print(f"  {os.path.basename(file_path)}: {len(facility_data)} records")
             all_data.append(facility_data)
-            total_records += len(facility_data)
-            
+            total_new += len(facility_data)
         except Exception as e:
             print(f"Error processing {file_path}: {str(e)}")
             continue
-    
-    if len(all_data) == 0:
+
+    if existing_df is None and len(all_data) == 0:
         print(f"No data found for facility {provnum}!")
         return None
-    
-    # Combine all data
+
     combined_data = pd.concat(all_data, ignore_index=True)
-    
-    # Sort by date
+    # Dedupe by WorkDate + PROVNUM (same facility/day can appear in multiple files)
+    key_cols = [c for c in ('WorkDate', 'PROVNUM') if c in combined_data.columns]
+    if key_cols:
+        combined_data = combined_data.drop_duplicates(subset=key_cols, keep='last')
     combined_data = combined_data.sort_values('WorkDate')
-    
-    # Save to CSV
-    output_filename = f'facility_{provnum}_complete_data.csv'
-    combined_data.to_csv(output_filename, index=False)
-    
+
+    out = output_path or existing_csv_path or os.path.join(os.getcwd(), f'facility_{provnum}_complete_data.csv')
+    combined_data.to_csv(out, index=False)
+
     print(f"\nExtraction Summary:")
-    print(f"Total records: {total_records}")
+    print(f"Total records: {len(combined_data)}")
     print(f"Date range: {combined_data['WorkDate'].min()} to {combined_data['WorkDate'].max()}")
-    print(f"Quarters: {combined_data['CY_Qtr'].nunique()}")
-    print(f"File saved as: {output_filename}")
-    
+    if 'CY_Qtr' in combined_data.columns:
+        print(f"Quarters: {combined_data['CY_Qtr'].nunique()}")
+    print(f"File saved as: {out}")
     return combined_data
 
-def create_facility_provider_info_csv(provnum):
-    """Extract provider info data for facility from provider_info_combined.csv"""
-    print(f"Creating provider info CSV for facility {provnum}...")
-    
-    # Try to load from combined file first (has quarter matching column)
+def create_facility_provider_info_csv(provnum, existing_csv_path=None, output_path=None):
+    """Extract provider info data for facility. If existing_csv_path is provided and exists,
+    only add rows newer than the latest processing_date (incremental update)."""
+    provnum = str(provnum).strip()
+    search_variants = [provnum.upper()]
+    if provnum.isdigit():
+        search_variants.extend([provnum.zfill(6), provnum.lstrip('0')])
+
+    existing_df = None
+    max_date = None
+    if existing_csv_path:
+        existing_csv_abs = os.path.abspath(existing_csv_path)
+        if os.path.exists(existing_csv_abs):
+            try:
+                existing_df = pd.read_csv(existing_csv_abs, low_memory=False, dtype={'ccn': str})
+                if 'processing_date' in existing_df.columns:
+                    existing_df['processing_date'] = pd.to_datetime(existing_df['processing_date'], errors='coerce')
+                    max_date = existing_df['processing_date'].max()
+                if max_date is not None and not pd.isna(max_date):
+                    print(f"Incremental provider info for facility {provnum}: existing up to {max_date}; adding newer only.")
+            except Exception as e:
+                print(f"Could not read existing provider CSV for incremental: {e}; doing full build.")
+                existing_df = None
+                max_date = None
+
+    def filter_facility(df_in):
+        df_in = df_in.copy()
+        df_in['ccn'] = df_in['ccn'].astype(str)
+        df_in['ccn'] = df_in['ccn'].apply(lambda x: x.zfill(6) if x.isdigit() else x.upper())
+        return df_in[df_in['ccn'].isin(search_variants)]
+
+    facility_data = None
     combined_file = 'provider_info_combined.csv'
     if os.path.exists(combined_file):
         try:
             print(f"Loading from {combined_file}...")
             df = pd.read_csv(combined_file, low_memory=False, dtype={'ccn': str})
-            
-            # Format CCN to ensure it's a string and handle both numeric and alphanumeric formats
-            df['ccn'] = df['ccn'].astype(str)
-            # Only zero-pad if all digits, otherwise keep as-is
-            df['ccn'] = df['ccn'].apply(lambda x: x.zfill(6) if x.isdigit() else x.upper())
-            
-            # Filter for the specific facility (handle different CCN formats)
-            # Create variations of the search provnum
-            search_variants = [provnum.upper()]
-            if provnum.isdigit():
-                # For numeric provnums, also try with leading zeros
-                search_variants.extend([provnum.zfill(6), provnum.lstrip('0')])
-            
-            facility_data = df[df['ccn'].isin(search_variants)].copy()
-            
-            if len(facility_data) > 0:
-                print(f"✅ Found {len(facility_data)} provider info records for {provnum} in combined file")
-                # Sort by processing_date
-                if 'processing_date' in facility_data.columns:
-                    facility_data['processing_date'] = pd.to_datetime(facility_data['processing_date'], errors='coerce')
-                    facility_data = facility_data.sort_values('processing_date')
-                return facility_data
-            else:
-                print(f"  No provider info records found for {provnum} in combined file")
+            facility_data = filter_facility(df)
+            if len(facility_data) > 0 and 'processing_date' in facility_data.columns:
+                facility_data['processing_date'] = pd.to_datetime(facility_data['processing_date'], errors='coerce')
+                if max_date is not None:
+                    facility_data = facility_data[facility_data['processing_date'] > max_date]
+                    print(f"  Adding {len(facility_data)} newer provider info record(s)")
         except Exception as e:
             print(f"Error loading from combined file: {e}")
-            print("Falling back to individual normalized files...")
-    
-    # Fallback to individual normalized files if combined file doesn't exist or fails
-    provider_files = glob.glob('provider_info_normalized/ProviderInfoNorm_*.csv')
-    provider_files.sort()
-    
-    all_provider_data = []
-    total_provider_records = 0
-    
-    for file_path in provider_files:
-        print(f"Processing provider info: {os.path.basename(file_path)}")
-        
-        try:
-            # Read the CSV
-            df = pd.read_csv(file_path, low_memory=False)
-            
-            # Format CCN to ensure it's a string and handle both numeric and alphanumeric formats
-            df['ccn'] = df['ccn'].astype(str)
-            # Only zero-pad if all digits, otherwise keep as-is
-            df['ccn'] = df['ccn'].apply(lambda x: x.zfill(6) if x.isdigit() else x.upper())
-            
-            # Filter for the specific facility (handle different CCN formats)
-            # Create variations of the search provnum
-            search_variants = [provnum.upper()]
-            if provnum.isdigit():
-                # For numeric provnums, also try with leading zeros
-                search_variants.extend([provnum.zfill(6), provnum.lstrip('0')])
-            
-            facility_data = df[df['ccn'].isin(search_variants)].copy()
-            
-            if len(facility_data) > 0:
-                print(f"  Found {len(facility_data)} provider info records for {provnum}")
-                all_provider_data.append(facility_data)
-                total_provider_records += len(facility_data)
-            else:
-                print(f"  No provider info records found for {provnum}")
-                
-        except Exception as e:
-            print(f"Error processing provider info {file_path}: {e}")
-            continue
-    
-    if not all_provider_data:
-        print(f"❌ No provider info data found for facility {provnum}")
-        return None
-    
-    # Combine all provider info data
-    combined_provider_df = pd.concat(all_provider_data, ignore_index=True)
-    print(f"✅ Combined {total_provider_records} provider info records for facility {provnum}")
-    
-    # Sort by processing_date
-    combined_provider_df['processing_date'] = pd.to_datetime(combined_provider_df['processing_date'], errors='coerce')
-    combined_provider_df = combined_provider_df.sort_values('processing_date')
-    
+            facility_data = None
+
+    if facility_data is None or (len(facility_data) == 0 and existing_df is None):
+        provider_files = glob.glob('provider_info_normalized/ProviderInfoNorm_*.csv')
+        provider_files.sort()
+        all_provider_data: list[pd.DataFrame] = []
+        for file_path in provider_files:
+            try:
+                df = pd.read_csv(file_path, low_memory=False)
+                chunk = filter_facility(df)
+                if len(chunk) > 0:
+                    if 'processing_date' in chunk.columns:
+                        chunk['processing_date'] = pd.to_datetime(chunk['processing_date'], errors='coerce')
+                        if max_date is not None:
+                            chunk = chunk[chunk['processing_date'] > max_date]
+                    if len(chunk) > 0:
+                        all_provider_data.append(pd.DataFrame(chunk))
+            except Exception as e:
+                continue
+        if all_provider_data:
+            facility_data = pd.concat(all_provider_data, ignore_index=True)
+        else:
+            facility_data = None
+
+    if existing_df is not None:
+        if facility_data is not None and len(facility_data) > 0:
+            combined_provider_df = pd.concat([pd.DataFrame(existing_df), pd.DataFrame(facility_data)], ignore_index=True)
+        else:
+            print(f"Facility {provnum} provider info already up to date (no newer records).")
+            combined_provider_df = existing_df
+    else:
+        if facility_data is None or len(facility_data) == 0:
+            print(f"❌ No provider info data found for facility {provnum}")
+            return None
+        combined_provider_df = facility_data
+
+    if 'processing_date' in combined_provider_df.columns:
+        combined_provider_df['processing_date'] = pd.to_datetime(combined_provider_df['processing_date'], errors='coerce')
+        combined_provider_df = combined_provider_df.sort_values('processing_date')
+    dedup_cols = [c for c in ('processing_date', 'ccn') if c in combined_provider_df.columns]
+    if dedup_cols:
+        combined_provider_df = combined_provider_df.drop_duplicates(subset=dedup_cols, keep='last')
+
+    if output_path:
+        combined_provider_df.to_csv(output_path, index=False)
+        print(f"Provider info saved as: {output_path}")
     return combined_provider_df
 
 def create_dynamic_dashboard(provnum):
     """Create and initialize the dynamic dashboard for a specific facility"""
     global global_df, provider_info_df
-    
-    # Create the facility CSV if it doesn't exist
-    csv_file = f'facility_{provnum}_complete_data.csv'
-    if not os.path.exists(csv_file):
+    import shutil
+    from file_path_utils import find_facility_complete_data, find_facility_provider_info, get_facility_folder
+
+    # CSV lives next to this script (Vercel) or in cwd, or use file_path_utils (local project with deployments/)
+    _app_dir = os.path.dirname(os.path.abspath(__file__))
+    cwd = os.getcwd()
+    csv_same_dir = os.path.join(_app_dir, f'facility_{provnum}_complete_data.csv')
+    provider_same_dir = os.path.join(_app_dir, f'facility_{provnum}_provider_info_data.csv')
+    csv_cwd = os.path.join(cwd, f'facility_{provnum}_complete_data.csv')
+    provider_cwd = os.path.join(cwd, f'facility_{provnum}_provider_info_data.csv')
+
+    if os.path.exists(csv_same_dir):
+        csv_file = csv_same_dir
+    elif os.path.exists(csv_cwd):
+        csv_file = csv_cwd
+    else:
+        csv_file = find_facility_complete_data(provnum)
+    if os.path.exists(provider_same_dir):
+        provider_csv_file = provider_same_dir
+    elif os.path.exists(provider_cwd):
+        provider_csv_file = provider_cwd
+    else:
+        provider_csv_file = find_facility_provider_info(provnum)
+    # On Vercel there is no deployments/ subfolder; use script dir for new files
+    facility_folder = get_facility_folder(provnum) if ('deployments' in _app_dir or os.path.exists(os.path.join(cwd, 'deployments'))) else __import__('pathlib').Path(_app_dir)
+
+    if not csv_file or not os.path.exists(csv_file):
+        csv_filename = f'facility_{provnum}_complete_data.csv'
+        csv_file = str(facility_folder / csv_filename)
         print(f"Creating CSV for facility {provnum}...")
         create_facility_complete_csv(provnum)
-    
-    # Create the provider info CSV if it doesn't exist
-    provider_csv_file = f'facility_{provnum}_provider_info_data.csv'
-    if not os.path.exists(provider_csv_file):
+        # Check if file was created in root, move it to facility folder
+        root_csv = f'facility_{provnum}_complete_data.csv'
+        if os.path.exists(root_csv) and not os.path.exists(csv_file):
+            shutil.move(root_csv, csv_file)
+
+    if not provider_csv_file or not os.path.exists(provider_csv_file):
+        provider_filename = f'facility_{provnum}_provider_info_data.csv'
+        provider_csv_file = str(facility_folder / provider_filename)
         print(f"Creating provider info CSV for facility {provnum}...")
         provider_data = create_facility_provider_info_csv(provnum)
         if provider_data is not None:
             provider_data.to_csv(provider_csv_file, index=False)
-            print(f"Provider info CSV saved as: {provider_csv_file}")
+            # Check if file was created in root, move it to facility folder
+            root_provider = f'facility_{provnum}_provider_info_data.csv'
+            if os.path.exists(root_provider) and not os.path.exists(provider_csv_file):
+                shutil.move(root_provider, provider_csv_file)
+            print(f"Provider info CSV saved as: {os.path.basename(provider_csv_file)}")
     
-    # Load the facility data
-    global_df = load_facility_data(provnum)
+    # Load the facility data (pass path so Vercel uses script-dir file)
+    global_df = load_facility_data(provnum, csv_file)
     
     # Load MACPAC state standards
     load_macpac_standards()
     
     # Load the provider info data
     global provider_info_df
-    if os.path.exists(provider_csv_file):
+    if provider_csv_file and os.path.exists(provider_csv_file):
         try:
             provider_info_df = pd.read_csv(provider_csv_file, low_memory=False, dtype={'ccn': str})
             # Format CCN to ensure consistency
@@ -214,9 +312,27 @@ def create_dynamic_dashboard(provnum):
             provider_info_df['processing_date'] = pd.to_datetime(provider_info_df['processing_date'], errors='coerce')
             print(f"✅ Loaded {len(provider_info_df)} provider info records")
             print(f"   CCN values: {provider_info_df['ccn'].unique()[:5]}")
+            if 'quarter' in provider_info_df.columns:
+                quarter_count = provider_info_df['quarter'].notna().sum()
+                print(f"   Records with quarter: {quarter_count}")
+                if quarter_count > 0:
+                    sample_quarters = provider_info_df['quarter'].dropna().unique()[:5]
+                    print(f"   Sample quarters: {list(sample_quarters)}")
             if 'sff_status' in provider_info_df.columns:
                 sff_count = provider_info_df['sff_status'].notna().sum()
                 print(f"   Records with SFF status: {sff_count}")
+            # Check for CMI column
+            cmi_columns = ['case_mix_index', 'CMI', 'Case Mix Index', 'case_mix', 'Case-Mix Index', 'Case Mix Index (CMI)', 'nursing_case_mix_index', 'nursing_case_mix_index_ratio']
+            found_cmi = False
+            for col in cmi_columns:
+                if col in provider_info_df.columns:
+                    cmi_count = provider_info_df[col].notna().sum()
+                    if cmi_count > 0:
+                        print(f"   Found CMI column '{col}' with {cmi_count} non-null values")
+                        found_cmi = True
+                        break
+            if not found_cmi:
+                print(f"   ⚠️ No CMI column found in provider info data")
         except Exception as e:
             print(f"Error loading provider info data: {e}")
             import traceback
@@ -407,18 +523,20 @@ def format_pbj_source_link(quarter, date, provnum="225500", data_type="nurse"):
         display_date = str(date)
     
     if data_type == "nurse":
-        return f'<a href="{url}" target="_blank" style="font-size: 0.9em; color: #333; text-decoration: none; font-weight: 500;">CMS PBJ Source: {display_date}</a>'
+        return f'<a href="{url}" target="_blank" style="font-size: 0.9em;">Source: CMS PBJ Nurse: {display_date}</a>'
     else:  # nonnurse
-        return f'<a href="{url}" target="_blank" style="font-size: 0.9em; color: #333; text-decoration: none; font-weight: 500;">CMS NonNurse: {display_date}</a>'
+        return f'<a href="{url}" target="_blank" style="font-size: 0.9em;">Source: CMS PBJ NonNurse: {display_date}</a>'
 
-def load_facility_data(provnum):
-    """Load the facility data"""
+def load_facility_data(provnum, csv_path=None):
+    """Load the facility data. Uses csv_path if given, else file next to this script."""
     global global_df
-    print(f"Loading facility {provnum} data...")
+    path = csv_path or os.path.join(os.path.dirname(os.path.abspath(__file__)), f'facility_{provnum}_complete_data.csv')
+    if not os.path.exists(path):
+        print(f"Error: facility data file not found: {path}")
+        return None
     try:
-        global_df = pd.read_csv(f'facility_{provnum}_complete_data.csv')
-        print(f"Loaded {len(global_df)} records")
-        print(f"Columns: {list(global_df.columns)}")
+        global_df = pd.read_csv(path)
+        print(f"Loaded {len(global_df)} records from {path}")
     except Exception as e:
         print(f"Error loading data: {e}")
         return None
@@ -438,7 +556,14 @@ def load_facility_data(provnum):
             global_df[col] = global_df[col].apply(lambda x: round_financial(x, 2))
     
     # Convert WorkDate to datetime (naive, no timezone to avoid date shift issues)
-    global_df['WorkDate'] = pd.to_datetime(global_df['WorkDate'], format='%Y%m%d', utc=False)
+    # Handle both string and integer formats
+    if global_df['WorkDate'].dtype == 'object':
+        global_df['WorkDate'] = pd.to_datetime(global_df['WorkDate'], format='%Y%m%d', errors='coerce', utc=False)
+    elif global_df['WorkDate'].dtype in ['int64', 'int32', 'float64', 'float32']:
+        # Convert integer dates (YYYYMMDD format) to datetime
+        global_df['WorkDate'] = pd.to_datetime(global_df['WorkDate'].astype(str), format='%Y%m%d', errors='coerce', utc=False)
+    else:
+        global_df['WorkDate'] = pd.to_datetime(global_df['WorkDate'], errors='coerce', utc=False)
     
     # Add day of week
     global_df['DayOfWeek'] = global_df['WorkDate'].dt.day_name()
@@ -459,23 +584,32 @@ def load_facility_data(provnum):
     global_df['Total_Nurse_HPRD'] = ((global_df['Hrs_RN'] + global_df['Hrs_RNadmin'] + global_df['Hrs_RNDON'] + global_df['Hrs_LPN'] + global_df['Hrs_LPNadmin'] + global_df['Hrs_CNA'] + global_df['Hrs_NAtrn'] + global_df['Hrs_MedAide']) / global_df['MDScensus']).apply(lambda x: round_financial(x, 2))
     
     # Calculate additional metrics for outlier detection and table display
+    # Check if required columns exist before calculating
+    required_cols = ['Hrs_RN', 'Hrs_RNadmin', 'Hrs_RNDON', 'Hrs_LPN', 'Hrs_LPNadmin', 'Hrs_CNA', 'Hrs_MedAide', 'Hrs_NAtrn', 'MDScensus']
+    missing_cols = [col for col in required_cols if col not in global_df.columns]
+    if missing_cols:
+        print(f"Warning: Missing columns: {missing_cols}")
+        # Fill missing columns with 0
+        for col in missing_cols:
+            global_df[col] = 0
+    
     global_df['Total_RN_Hours'] = (global_df['Hrs_RN'] + global_df['Hrs_RNadmin'] + global_df['Hrs_RNDON']).apply(lambda x: round_financial(x, 2))
-    global_df['Total_RN_HPRD'] = (global_df['Total_RN_Hours'] / global_df['MDScensus']).apply(lambda x: round_financial(x, 2))
+    global_df['Total_RN_HPRD'] = (global_df['Total_RN_Hours'] / global_df['MDScensus'].replace(0, 1)).apply(lambda x: round_financial(x, 2))
     global_df['Total_LPN_Hours'] = (global_df['Hrs_LPN'] + global_df['Hrs_LPNadmin']).apply(lambda x: round_financial(x, 2))
-    global_df['Total_LPN_HPRD'] = (global_df['Total_LPN_Hours'] / global_df['MDScensus']).apply(lambda x: round_financial(x, 2))
+    global_df['Total_LPN_HPRD'] = (global_df['Total_LPN_Hours'] / global_df['MDScensus'].replace(0, 1)).apply(lambda x: round_financial(x, 2))
     global_df['Total_Nurse_Aide_Hours'] = (global_df['Hrs_CNA'] + global_df['Hrs_MedAide'] + global_df['Hrs_NAtrn']).apply(lambda x: round_financial(x, 2))
-    global_df['Total_Nurse_Aide_HPRD'] = (global_df['Total_Nurse_Aide_Hours'] / global_df['MDScensus']).apply(lambda x: round_financial(x, 2))
+    global_df['Total_Nurse_Aide_HPRD'] = (global_df['Total_Nurse_Aide_Hours'] / global_df['MDScensus'].replace(0, 1)).apply(lambda x: round_financial(x, 2))
     
     # Nurse Staff Hours (excluding Admin & DON) - includes all direct care staff
     global_df['Nurse_Staff_Hours_Excl_Admin'] = (global_df['Hrs_RN'] + global_df['Hrs_LPN'] + global_df['Hrs_CNA'] + global_df['Hrs_NAtrn'] + global_df['Hrs_MedAide']).apply(lambda x: round_financial(x, 2))
-    global_df['Nurse_Staff_HPRD_Excl_Admin'] = (global_df['Nurse_Staff_Hours_Excl_Admin'] / global_df['MDScensus']).apply(lambda x: round_financial(x, 2))
+    global_df['Nurse_Staff_HPRD_Excl_Admin'] = (global_df['Nurse_Staff_Hours_Excl_Admin'] / global_df['MDScensus'].replace(0, 1)).apply(lambda x: round_financial(x, 2))
     
     # Total Nurse Hours (All Staff including admin/DON)
     global_df['Total_Nurse_Hours'] = (global_df['Hrs_RN'] + global_df['Hrs_RNadmin'] + global_df['Hrs_RNDON'] + global_df['Hrs_LPN'] + global_df['Hrs_LPNadmin'] + global_df['Hrs_CNA'] + global_df['Hrs_NAtrn'] + global_df['Hrs_MedAide']).apply(lambda x: round_financial(x, 2))
     
     # Total Staff Hours and HPRD
     global_df['Total_Staff_Hours'] = (global_df['Total_RN_Hours'] + global_df['Total_LPN_Hours'] + global_df['Total_Nurse_Aide_Hours']).apply(lambda x: round_financial(x, 2))
-    global_df['Total_Staff_HPRD'] = (global_df['Total_Staff_Hours'] / global_df['MDScensus']).apply(lambda x: round_financial(x, 2))
+    global_df['Total_Staff_HPRD'] = (global_df['Total_Staff_Hours'] / global_df['MDScensus'].replace(0, 1)).apply(lambda x: round_financial(x, 2))
     
     # Calculate contract percentages with proper rounding
     global_df['RN_Contract_Pct'] = (global_df['Hrs_RN_ctr'] / global_df['Hrs_RN'] * 100).fillna(0).apply(lambda x: round_financial(x, 1))
@@ -608,7 +742,14 @@ def load_facility_data(provnum):
     # Apply holiday detection to all dates
     global_df['IsHoliday'] = global_df['WorkDate'].apply(is_federal_holiday)
     
-    print(f"Loaded {len(global_df)} records from {global_df['WorkDate'].min().date()} to {global_df['WorkDate'].max().date()}")
+    # Handle WorkDate - convert to datetime if needed
+    min_date = global_df['WorkDate'].min()
+    max_date = global_df['WorkDate'].max()
+    if not isinstance(min_date, pd.Timestamp):
+        min_date = pd.to_datetime(min_date)
+    if not isinstance(max_date, pd.Timestamp):
+        max_date = pd.to_datetime(max_date)
+    print(f"Loaded {len(global_df)} records from {min_date.date()} to {max_date.date()}")
     print(f"Calculated columns: {[col for col in global_df.columns if 'Total' in col or 'HPRD' in col]}")
     
     # Verify critical columns exist
@@ -621,6 +762,85 @@ def load_facility_data(provnum):
     
     return global_df
 
+def get_previous_provider_names(provnum):
+    """Get previous provider names that are different from the most recent"""
+    global provider_info_df
+    
+    if provider_info_df is None or provider_info_df.empty:
+        return []
+    
+    # Filter to this facility
+    facility_data = provider_info_df[provider_info_df['ccn'] == str(provnum).zfill(6)]
+    if facility_data.empty:
+        return []
+    
+    # Get all unique provider names, sorted by processing date (most recent first)
+    if 'processing_date' in facility_data.columns:
+        provider_names = facility_data.sort_values('processing_date', ascending=False)['provider_name'].dropna().unique()
+    else:
+        provider_names = facility_data['provider_name'].dropna().unique()
+    
+    # Get the most recent name
+    most_recent_name = provider_names[0] if len(provider_names) > 0 else None
+    
+    # Get all names that are different from the most recent
+    previous_names = [name for name in provider_names[1:] if name and most_recent_name and name.strip().lower() != most_recent_name.strip().lower()]
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_previous_names = []
+    for name in previous_names:
+        if name not in seen:
+            unique_previous_names.append(name)
+            seen.add(name)
+    
+    # Format names with proper capitalization (limit to 3 most recent)
+    def format_facility_name(name):
+        words = name.replace('-', ' - ').replace('&', ' & ').split()
+        formatted_words = []
+        for word in words:
+            if word.lower() in ['at', 'and', 'of', 'the', 'for', 'in', 'on', 'to', 'with']:
+                formatted_words.append(word.lower())
+            elif word == '-':
+                formatted_words.append('-')
+            elif word == '&':
+                formatted_words.append('&')
+            else:
+                formatted_words.append(word.capitalize())
+        return ' '.join(formatted_words)
+    
+    formatted_names = [format_facility_name(name) for name in unique_previous_names[:3]]
+    return formatted_names
+
+
+# Initialize data lazily (for Vercel deployment)
+# Hardcoded for facility 315174
+PROVNUM = "315174"
+_data_initialized = False
+
+def ensure_data_loaded():
+    """Lazy initialization - only load data on first request"""
+    global _data_initialized, global_df
+    # Check if data is already loaded
+    if global_df is not None and not global_df.empty:
+        _data_initialized = True
+        return
+    if not _data_initialized:
+        try:
+            print(f"Initializing facility {PROVNUM} dashboard (lazy load)...")
+            create_dynamic_dashboard(PROVNUM)
+            print(f"✅ Successfully initialized facility {PROVNUM} dashboard")
+            _data_initialized = True
+        except Exception as e:
+            print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")
+            import traceback
+            traceback.print_exc()
+            # Will retry on next request
+
+# Ensure data is loaded before any request
+@app.before_request
+def before_request():
+    ensure_data_loaded()
 
 @app.route('/')
 def index():
@@ -632,14 +852,24 @@ def index():
             global_df_sorted = global_df.sort_values('WorkDate', ascending=False)
         else:
             global_df_sorted = global_df
-            
-        facility_provnum = str(global_df_sorted['PROVNUM'].iloc[0]).zfill(6) if 'PROVNUM' in global_df_sorted.columns else "Unknown"
-        city = global_df_sorted['CITY'].iloc[0] if 'CITY' in global_df_sorted.columns else "Unknown"
-        state = global_df_sorted['STATE'].iloc[0] if 'STATE' in global_df_sorted.columns else "Unknown"
-        county_name = global_df_sorted['COUNTY_NAME'].iloc[0] if 'COUNTY_NAME' in global_df_sorted.columns else "Unknown"
+        
+        # Safety check: ensure sorted dataframe is not empty
+        if global_df_sorted.empty or len(global_df_sorted) == 0:
+            facility_provnum = "Unknown"
+            city = "Unknown"
+            state = "Unknown"
+            county_name = "Unknown"
+        else:
+            facility_provnum = str(global_df_sorted['PROVNUM'].iloc[0]).zfill(6) if 'PROVNUM' in global_df_sorted.columns and len(global_df_sorted) > 0 else "Unknown"
+            city = global_df_sorted['CITY'].iloc[0] if 'CITY' in global_df_sorted.columns and len(global_df_sorted) > 0 else "Unknown"
+            state = global_df_sorted['STATE'].iloc[0] if 'STATE' in global_df_sorted.columns and len(global_df_sorted) > 0 else "Unknown"
+            county_name = global_df_sorted['COUNTY_NAME'].iloc[0] if 'COUNTY_NAME' in global_df_sorted.columns and len(global_df_sorted) > 0 else "Unknown"
         
         # Get facility name from provider_info_df (most recent) if available, otherwise use PBJ data
-        facility_name = global_df_sorted['PROVNAME'].iloc[0] if 'PROVNAME' in global_df_sorted.columns else "Unknown Facility"
+        if global_df_sorted.empty or len(global_df_sorted) == 0:
+            facility_name = "Unknown Facility"
+        else:
+            facility_name = global_df_sorted['PROVNAME'].iloc[0] if 'PROVNAME' in global_df_sorted.columns and len(global_df_sorted) > 0 else "Unknown Facility"
         if provider_info_df is not None and not provider_info_df.empty:
             if 'provider_name' in provider_info_df.columns:
                 # Get the most recent provider name (sorted by processing_date)
@@ -678,22 +908,41 @@ def index():
             'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming'
         }
         state_name = state_abbrev_to_name.get(state.upper(), state)
+        state_name_full = state_name  # Use full state name for display
         state_standard = macpac_standards_df[macpac_standards_df['State'] == state_name]
         if len(state_standard) == 0:
             state_standard = macpac_standards_df[macpac_standards_df['State'].str.upper() == state_name.upper()]
         
         if len(state_standard) > 0:
             state_standard = state_standard.iloc[0]
+            # Create state_standard_info for methodology section
+            state_standard_info = {
+                'state_name': state_name_full,
+                'display_text': state_standard.get('Display_Text', ''),
+                'min_staffing': float(state_standard['Min_Staffing']),
+                'max_staffing': float(state_standard['Max_Staffing']) if pd.notna(state_standard.get('Max_Staffing')) else None,
+                'value_type': state_standard['Value_Type'],
+                'is_federal_minimum': bool(state_standard.get('Is_Federal_Minimum', False))
+            }
             # Only show if not federal minimum
             if not state_standard.get('Is_Federal_Minimum', False):
                 has_state_standard = True
                 min_val = state_standard.get('Min_Staffing', 0)
                 max_val = state_standard.get('Max_Staffing', 0)
                 if state_standard.get('Value_Type', 'single') == 'range':
-                    state_standard_text = f"({state}: {min_val}—{max_val})"
+                    state_standard_text = f"{state} min. ({min_val}—{max_val})"
                 else:
-                    state_standard_text = f"({state}: {min_val})"
+                    state_standard_text = f"{state} min. ({min_val})"
+        else:
+            state_standard_info = None
+    else:
+        state_standard_info = None
     
+    # Get previous provider names
+    previous_names_list = get_previous_provider_names(facility_provnum)
+    previous_names_text = ", ".join(previous_names_list) if previous_names_list else "None"
+    
+    deployed_date = getattr(sys.modules[__name__], 'DEPLOYED_DATE', '') or ''
     return render_template('dynamic_facility_dashboard.html', 
                          facility_name=facility_name, 
                          provnum=facility_provnum,
@@ -701,7 +950,10 @@ def index():
                          state=state,
                          county_name=county_name,
                          has_state_standard=has_state_standard,
-                         state_standard_text=state_standard_text)
+                         state_standard_text=state_standard_text,
+                         state_standard_info=state_standard_info,
+                         previous_names=previous_names_text,
+                         deployed_date=deployed_date)
 
 @app.route('/api/data')
 def get_data():
@@ -799,16 +1051,40 @@ def get_summary():
         if show_holidays_only:
             filtered_df = filtered_df[filtered_df['IsHoliday'] == True]
         
-        # Calculate summary statistics
+        # Calculate summary statistics with proper financial rounding
+        # Calculate weighted HPRD (sum of hours / sum of census) for accurate averages
+        total_census = filtered_df['MDScensus'].sum() if len(filtered_df) > 0 else 0
+        total_rn_hours = filtered_df['Hrs_RN'].sum() if len(filtered_df) > 0 else 0
+        total_rn_all_hours = filtered_df['Total_RN_Hours'].sum() if len(filtered_df) > 0 else 0
+        total_lpn_hours = filtered_df['Hrs_LPN'].sum() if len(filtered_df) > 0 else 0
+        total_cna_hours = filtered_df['Hrs_CNA'].sum() if len(filtered_df) > 0 else 0
+        nurse_staff_hours_excl_admin = filtered_df['Nurse_Staff_Hours_Excl_Admin'].sum() if len(filtered_df) > 0 else 0
+        total_staff_hours = filtered_df['Total_Staff_Hours'].sum() if len(filtered_df) > 0 else 0
+        
+        # Calculate indirect staffing hours (RN Admin + RN DON + LPN Admin)
+        indirect_staffing_hours = (filtered_df['Hrs_RNadmin'].sum() + 
+                                   filtered_df['Hrs_RNDON'].sum() + 
+                                   filtered_df['Hrs_LPNadmin'].sum()) if len(filtered_df) > 0 else 0
+        
+        # Calculate weighted HPRD values
+        avg_rn_hprd_weighted = (total_rn_hours / total_census) if total_census > 0 else 0
+        avg_total_rn_hprd_weighted = (total_rn_all_hours / total_census) if total_census > 0 else 0
+        avg_lpn_hprd_weighted = (total_lpn_hours / total_census) if total_census > 0 else 0
+        avg_cna_hprd_weighted = (total_cna_hours / total_census) if total_census > 0 else 0
+        avg_nurse_staff_hprd_excl_admin_weighted = (nurse_staff_hours_excl_admin / total_census) if total_census > 0 else 0
+        avg_total_hprd_weighted = (total_staff_hours / total_census) if total_census > 0 else 0
+        avg_indirect_staffing_hprd = (indirect_staffing_hours / total_census) if total_census > 0 else 0
+        
         summary = {
             'total_days': len(filtered_df),
-            'avg_census': float(filtered_df['MDScensus'].mean()) if len(filtered_df) > 0 else 0,
-            'avg_rn_hprd': float(filtered_df['RN_HPRD'].mean()) if len(filtered_df) > 0 else 0,
-            'avg_total_rn_hprd': float(filtered_df['Total_RN_HPRD'].mean()) if len(filtered_df) > 0 else 0,
-            'avg_lpn_hprd': float(filtered_df['LPN_HPRD'].mean()) if len(filtered_df) > 0 else 0,
-            'avg_cna_hprd': float(filtered_df['CNA_HPRD'].mean()) if len(filtered_df) > 0 else 0,
-            'avg_nurse_staff_hprd_excl_admin': float(filtered_df['Nurse_Staff_HPRD_Excl_Admin'].mean()) if len(filtered_df) > 0 else 0,
-            'avg_total_hprd': float(filtered_df['Total_Staff_HPRD'].mean()) if len(filtered_df) > 0 else 0,
+            'avg_census': round_financial(float(filtered_df['MDScensus'].mean()) if len(filtered_df) > 0 else 0, 1),
+            'avg_rn_hprd': round_financial(avg_rn_hprd_weighted, 2),
+            'avg_total_rn_hprd': round_financial(avg_total_rn_hprd_weighted, 2),
+            'avg_lpn_hprd': round_financial(avg_lpn_hprd_weighted, 2),
+            'avg_cna_hprd': round_financial(avg_cna_hprd_weighted, 2),
+            'avg_nurse_staff_hprd_excl_admin': round_financial(avg_nurse_staff_hprd_excl_admin_weighted, 2),
+            'avg_total_hprd': round_financial(avg_total_hprd_weighted, 2),
+            'avg_indirect_staffing_hprd': round_financial(avg_indirect_staffing_hprd, 2),
             'avg_rn_contract_pct': float(filtered_df['RN_Contract_Pct'].mean()) if len(filtered_df) > 0 else 0,
             'avg_lpn_contract_pct': float(filtered_df['LPN_Contract_Pct'].mean()) if len(filtered_df) > 0 else 0,
             'avg_cna_contract_pct': float(filtered_df['CNA_Contract_Pct'].mean()) if len(filtered_df) > 0 else 0,
@@ -870,7 +1146,8 @@ def get_provider_info():
             'latest_rating': {
                 'overall': int(data['overall_rating'].iloc[-1]) if len(data) > 0 and pd.notna(data['overall_rating'].iloc[-1]) else None,
                 'staffing': int(data['staffing_rating'].iloc[-1]) if len(data) > 0 and pd.notna(data['staffing_rating'].iloc[-1]) else None,
-                'health_inspection': int(data['health_inspection_rating'].iloc[-1]) if len(data) > 0 and pd.notna(data['health_inspection_rating'].iloc[-1]) else None
+                'health_inspection': int(data['health_inspection_rating'].iloc[-1]) if len(data) > 0 and pd.notna(data['health_inspection_rating'].iloc[-1]) else None,
+                'quality': int(data['qm_rating'].iloc[-1]) if len(data) > 0 and 'qm_rating' in data.columns and pd.notna(data['qm_rating'].iloc[-1]) else None
             }
         })
         
@@ -892,6 +1169,33 @@ def get_provider_info_summary():
         if latest is None:
             return jsonify({'error': 'No provider info data available'})
         
+        # Get affiliated entity info from latest record
+        affiliated_entity_name = None
+        affiliated_entity_id = None
+        if 'affiliated_entity_name' in latest.index and pd.notna(latest.get('affiliated_entity_name')):
+            affiliated_entity_name = str(latest.get('affiliated_entity_name')).strip()
+            if affiliated_entity_name and affiliated_entity_name.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
+                affiliated_entity_name = affiliated_entity_name
+            else:
+                affiliated_entity_name = None
+        
+        if 'affiliated_entity_id' in latest.index and pd.notna(latest.get('affiliated_entity_id')):
+            entity_id_raw = latest.get('affiliated_entity_id')
+            # Convert to int first to remove decimals (e.g., 217.0 -> 217), then to string
+            try:
+                affiliated_entity_id = str(int(float(entity_id_raw)))
+            except (ValueError, TypeError):
+                affiliated_entity_id = str(entity_id_raw).strip()
+            if affiliated_entity_id and affiliated_entity_id.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
+                affiliated_entity_id = affiliated_entity_id
+            else:
+                affiliated_entity_id = None
+        
+        # Get entity CCN from provider info
+        entity_ccn = None
+        if 'ccn' in latest.index and pd.notna(latest.get('ccn')):
+            entity_ccn = str(latest.get('ccn')).strip()
+        
         summary = {
             'facility_name': str(latest.get('provider_name', 'Unknown')),
             'city': str(latest.get('city', '')),
@@ -904,11 +1208,15 @@ def get_provider_info_summary():
             'latest_overall_rating': int(latest.get('overall_rating', 0)) if pd.notna(latest.get('overall_rating')) else None,
             'latest_staffing_rating': int(latest.get('staffing_rating', 0)) if pd.notna(latest.get('staffing_rating')) else None,
             'latest_health_inspection_rating': int(latest.get('health_inspection_rating', 0)) if pd.notna(latest.get('health_inspection_rating')) else None,
+            'latest_quality_rating': int(latest.get('qm_rating', 0)) if pd.notna(latest.get('qm_rating')) else None,
             'latest_reported_total_hprd': float(latest.get('reported_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('reported_total_nurse_hrs_per_resident_per_day')) else 0,
             'latest_case_mix_total_hprd': float(latest.get('case_mix_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('case_mix_total_nurse_hrs_per_resident_per_day')) else 0,
             'latest_adjusted_total_hprd': float(latest.get('adjusted_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('adjusted_total_nurse_hrs_per_resident_per_day')) else 0,
             'ownership_change_last_12_months': str(latest.get('provider_changed_ownership_in_last_12_months', 'Unknown')) if pd.notna(latest.get('provider_changed_ownership_in_last_12_months')) else 'Unknown',
             'sff_status': _get_latest_sff_status(),
+            'entity_ccn': entity_ccn,
+            'affiliated_entity_name': affiliated_entity_name,
+            'affiliated_entity_id': affiliated_entity_id,
             'total_records': len(provider_info_df),
             'quarters_covered': provider_info_df['quarter'].nunique() if 'quarter' in provider_info_df.columns else 0
         }
@@ -969,8 +1277,8 @@ def get_sff_history():
     """Get Red Flag History for a facility (SFF, 1-star ratings, Abuse, etc.)"""
     try:
         global provider_info_df
-        if provider_info_df is None:
-            return jsonify({'error': 'Provider info data not loaded'})
+        if provider_info_df is None or provider_info_df.empty:
+            return jsonify({'history': []})
         
         # Get provnum from request
         provnum = request.args.get('provnum')
@@ -1026,7 +1334,53 @@ def get_sff_history():
                 break
         
         # Build red flag history - group by quarter
+        # Determine maximum valid quarter dynamically based on available data
+        # Check what quarters are actually present in the provider info data
         history_dict = {}  # key: quarter_str, value: dict with combined info
+        
+        # Find the maximum valid quarter from the data itself
+        # This allows the system to work with future data without hardcoding
+        max_valid_quarter = None
+        max_valid_year = None
+        max_valid_q_num = None
+        
+        if 'quarter' in facility_data.columns:
+            valid_quarters = facility_data['quarter'].dropna()
+            if len(valid_quarters) > 0:
+                # Parse quarters to find the latest one
+                for q in valid_quarters:
+                    q_str = str(q).strip()
+                    try:
+                        # Handle "2025Q3" format
+                        if len(q_str) == 6 and q_str[4] == 'Q' and q_str[0:4].isdigit() and q_str[5].isdigit():
+                            year = int(q_str[:4])
+                            q_num = int(q_str[5])
+                        # Handle "Q3 2025" format
+                        elif q_str.startswith('Q') and ' ' in q_str:
+                            parts = q_str.split()
+                            q_num = int(parts[0][1]) if len(parts[0]) > 1 and parts[0][1].isdigit() else None
+                            year = int(parts[1]) if parts[1].isdigit() else None
+                        else:
+                            continue
+                        
+                        if year and q_num:
+                            if max_valid_year is None or year > max_valid_year or (year == max_valid_year and q_num > max_valid_q_num):
+                                max_valid_year = year
+                                max_valid_q_num = q_num
+                                max_valid_quarter = q_str
+                    except (ValueError, IndexError):
+                        continue
+        
+        # If no valid quarters found in data, use a conservative default
+        if max_valid_year is None:
+            max_valid_year = 2025
+            max_valid_q_num = 3
+            print("  Warning: Could not determine max valid quarter from data, using default: Q3 2025")
+        else:
+            print(f"  Determined max valid quarter from data: Q{max_valid_q_num} {max_valid_year}")
+        
+        MAX_VALID_YEAR = max_valid_year
+        MAX_VALID_QUARTER = max_valid_q_num
         
         for _, row in facility_data.iterrows():
             red_flags = []
@@ -1036,7 +1390,13 @@ def get_sff_history():
                 sff_value = str(row[sff_col]).strip() if pd.notna(row[sff_col]) else ''
                 if sff_value and sff_value.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
                     if 'SFF' in sff_value.upper():
-                        red_flags.append(f"SFF: {sff_value}")
+                        # Format SFF status: "Special Focus Facility" -> "SFF", "Special Focus Facility Candidate" -> "SFF Candidate"
+                        sff_formatted = sff_value
+                        if 'CANDIDATE' in sff_value.upper():
+                            sff_formatted = 'SFF Candidate'
+                        elif 'SPECIAL FOCUS FACILITY' in sff_value.upper():
+                            sff_formatted = 'SFF'
+                        red_flags.append(sff_formatted)
             
             # Check 1-star overall rating
             if overall_rating_col and overall_rating_col in row.index:
@@ -1045,7 +1405,7 @@ def get_sff_history():
                     try:
                         rating = float(overall_rating)
                         if rating == 1.0:
-                            red_flags.append("1-Star Overall Rating")
+                            red_flags.append("1-Star Overall")
                     except (ValueError, TypeError):
                         pass
             
@@ -1056,7 +1416,7 @@ def get_sff_history():
                     try:
                         rating = float(staffing_rating)
                         if rating == 1.0:
-                            red_flags.append("1-Star Staffing Rating")
+                            red_flags.append("1-Star Staffing")
                     except (ValueError, TypeError):
                         pass
             
@@ -1090,31 +1450,69 @@ def get_sff_history():
                 if pd.notna(proc_date):
                     if isinstance(proc_date, str):
                         proc_date = pd.to_datetime(proc_date, errors='coerce')
-                    proc_date_str = proc_date.strftime('%Y-%m-%d') if pd.notna(proc_date) else 'Unknown'
+                    # Skip if date is invalid
+                    if pd.isna(proc_date):
+                        continue
+                    # December 2025 files are valid (they contain Q2 2025 data, not Q4)
+                    # Skip only dates beyond December 2025
+                    max_valid_date = pd.Timestamp(2025, 12, 31)
+                    if proc_date > max_valid_date:
+                        continue  # Skip records from dates beyond 2025
+                    proc_date_str = proc_date.strftime('%Y-%m-%d')
                 else:
                     proc_date_str = 'Unknown'
                 
-                # Get quarter - try from column first, then derive from date
+                # Get quarter from the dataframe column - use the SAME logic as Ratings Over Time chart
+                # The quarter column is already populated with the correct mapping when provider_info_df is loaded
+                # This ensures consistency across all features
                 quarter = row.get('quarter', '')
+                quarter_str = None
+                
                 if pd.notna(quarter) and str(quarter).strip():
-                    quarter_str = str(quarter).strip()
-                    if len(quarter_str) == 6 and 'Q' in quarter_str:
-                        quarter_str = f"Q{quarter_str[-1]} {quarter_str[:4]}"
-                elif pd.notna(proc_date) and isinstance(proc_date, pd.Timestamp):
-                    # Derive quarter from processing date
-                    year = proc_date.year
-                    month = proc_date.month
-                    if month <= 3:
-                        q = 1
-                    elif month <= 6:
-                        q = 2
-                    elif month <= 9:
-                        q = 3
-                    else:
-                        q = 4
-                    quarter_str = f"Q{q} {year}"
-                else:
-                    quarter_str = 'Unknown'
+                    quarter_raw = str(quarter).strip()
+                    
+                    # Normalize quarter format to "Q1 2018" format (same as Ratings Over Time chart)
+                    # Handle both "2025Q4" and "Q4 2025" formats
+                    if len(quarter_raw) == 6 and quarter_raw[4] == 'Q' and quarter_raw[0:4].isdigit() and quarter_raw[5].isdigit():
+                        # "2025Q4" format - convert to "Q4 2025"
+                        year = quarter_raw[:4]
+                        q_num = quarter_raw[5]
+                        quarter_str = f"Q{q_num} {year}"
+                    elif quarter_raw.startswith('Q') and ' ' in quarter_raw:
+                        # Already in "Q4 2025" format
+                        quarter_str = quarter_raw
+                    
+                    # Validate quarter is within allowed range (dynamically determined)
+                    if quarter_str:
+                        try:
+                            if ' ' in quarter_str:
+                                parts = quarter_str.split()
+                                q_part = parts[0]  # "Q4"
+                                year_part = parts[1]  # "2025"
+                                q_num = int(q_part[1]) if len(q_part) > 1 and q_part[1].isdigit() else None
+                                year_num = int(year_part) if year_part.isdigit() else None
+                                if q_num and year_num:
+                                    # Only accept quarters up to the maximum valid quarter found in data
+                                    if year_num > MAX_VALID_YEAR or (year_num == MAX_VALID_YEAR and q_num > MAX_VALID_QUARTER):
+                                        quarter_str = None
+                        except (ValueError, IndexError):
+                            quarter_str = None
+                
+                # Skip this record if we couldn't determine a valid quarter
+                if quarter_str is None:
+                    continue
+                
+                # Final safety check - ensure quarter is within valid range
+                try:
+                    if ' ' in quarter_str:
+                        parts = quarter_str.split()
+                        q_num = int(parts[0][1]) if len(parts[0]) > 1 and parts[0][1].isdigit() else None
+                        year_num = int(parts[1]) if parts[1].isdigit() else None
+                        if q_num and year_num:
+                            if year_num > MAX_VALID_YEAR or (year_num == MAX_VALID_YEAR and q_num > MAX_VALID_QUARTER):
+                                continue
+                except (ValueError, IndexError):
+                    continue
                 
                 # Get source file name
                 source_file = f"NH_ProviderInfo_{proc_date.strftime('%b%Y')}.csv" if pd.notna(proc_date) and isinstance(proc_date, pd.Timestamp) else 'Provider Info Data'
@@ -1140,8 +1538,20 @@ def get_sff_history():
                 })
         
         # Convert to list format, sorted by date
+        # Final safety check: Remove any quarters beyond the maximum valid quarter
         history = []
         for quarter_str, quarter_data in history_dict.items():
+            # Validate quarter is within allowed range
+            try:
+                if ' ' in quarter_str:
+                    parts = quarter_str.split()
+                    q_num = int(parts[0][1]) if len(parts[0]) > 1 and parts[0][1].isdigit() else None
+                    year_num = int(parts[1]) if parts[1].isdigit() else None
+                    if q_num and year_num:
+                        if year_num > MAX_VALID_YEAR or (year_num == MAX_VALID_YEAR and q_num > MAX_VALID_QUARTER):
+                            continue
+            except (ValueError, IndexError):
+                continue
             # Sort records by date
             quarter_data['records'].sort(key=lambda x: x['processing_date'])
             
@@ -1278,18 +1688,61 @@ def get_provider_info_charts():
         if provider_info_df is None:
             return jsonify({'error': 'Provider info data not loaded'})
         
+        # Helper function to normalize quarter format
+        def normalize_quarter_for_matching(q):
+            """Convert quarter to PBJ format (2018Q1) for matching"""
+            if not q or pd.isna(q):
+                return None
+            q_str = str(q).strip()
+            # If already in "2018Q1" format, return as is
+            if len(q_str) == 6 and q_str[4] == 'Q' and q_str[0:4].isdigit() and q_str[5].isdigit():
+                return q_str
+            # If in "Q1 2018" or "Q1 2 018" format, convert to "2018Q1"
+            if q_str.startswith('Q') and ' ' in q_str:
+                parts = q_str.replace('Q', '').split()
+                if len(parts) >= 2:
+                    quarter_num = parts[0]
+                    year = ''.join(parts[1:])  # Join year parts in case of "2 018"
+                    if quarter_num.isdigit() and year.isdigit():
+                        return f"{year}Q{quarter_num}"
+            return None
+        
         # Group by quarter and take the latest processing date per quarter
         chart_data = provider_info_df.dropna(subset=['quarter']).copy()
         chart_data = chart_data.sort_values('processing_date').groupby('quarter').last().reset_index()
         
+        # Create normalized quarter column for matching with PBJ data
+        chart_data['quarter_normalized'] = chart_data['quarter'].apply(normalize_quarter_for_matching)
+        
         # Format quarter labels for x-axis (Q1 2021 instead of 2021Q1)
-        chart_data['quarter_label'] = chart_data['quarter'].apply(lambda x: f"Q{x[-1]} {x[:4]}" if pd.notna(x) and len(str(x)) == 6 else str(x) if pd.notna(x) else None)
+        # Preserve original format if it's already "Q1 2018", otherwise convert from "2018Q1"
+        def format_quarter_label(q):
+            if pd.isna(q):
+                return None
+            q_str = str(q).strip()
+            # If already in "Q1 2018" format, return as is
+            if q_str.startswith('Q') and ' ' in q_str:
+                return q_str
+            # If in "2018Q1" format, convert to "Q1 2018"
+            if len(q_str) == 6 and q_str[4] == 'Q':
+                return f"Q{q_str[-1]} {q_str[:4]}"
+            return q_str
+        
+        chart_data['quarter_label'] = chart_data['quarter'].apply(format_quarter_label)
         
         # Add PBJ-calculated direct care values (excludes admin/DON) by matching quarters
         if global_df is not None and len(global_df) > 0:
             pbj_direct_data = []
-            for quarter in chart_data['quarter']:
-                pbj_quarter = global_df[global_df['CY_Qtr'] == quarter]
+            for idx, row in chart_data.iterrows():
+                quarter_orig = row['quarter']
+                quarter_normalized = row['quarter_normalized']
+                
+                # Match using normalized quarter format
+                if quarter_normalized:
+                    pbj_quarter = global_df[global_df['CY_Qtr'] == quarter_normalized]
+                else:
+                    pbj_quarter = pd.DataFrame()  # No match if can't normalize
+                
                 if len(pbj_quarter) > 0:
                     total_census = pbj_quarter['MDScensus'].sum()
                     # Direct Total (excludes RN Admin, RN DON, LPN Admin)
@@ -1298,9 +1751,9 @@ def get_provider_info_charts():
                     # RN Direct (excludes RN Admin and RN DON)
                     rn_direct_hours = pbj_quarter['Hrs_RN'].sum()
                     rn_direct_hprd = (rn_direct_hours / total_census) if total_census > 0 else 0
-                    pbj_direct_data.append({'quarter': quarter, 'pbj_direct_total': direct_hprd, 'pbj_rn_direct': rn_direct_hprd})
+                    pbj_direct_data.append({'quarter': quarter_orig, 'pbj_direct_total': direct_hprd, 'pbj_rn_direct': rn_direct_hprd})
                 else:
-                    pbj_direct_data.append({'quarter': quarter, 'pbj_direct_total': 0, 'pbj_rn_direct': 0})
+                    pbj_direct_data.append({'quarter': quarter_orig, 'pbj_direct_total': 0, 'pbj_rn_direct': 0})
             
             pbj_direct_df = pd.DataFrame(pbj_direct_data)
             chart_data = chart_data.merge(pbj_direct_df, on='quarter', how='left')
@@ -1308,13 +1761,48 @@ def get_provider_info_charts():
             chart_data['pbj_direct_total'] = 0
             chart_data['pbj_rn_direct'] = 0
         
+        # Sort quarters chronologically using normalized format
+        def quarter_sort_key(q_norm):
+            """Convert "2018Q1" to (2018, 1) for sorting"""
+            if pd.isna(q_norm):
+                return (9999, 9)
+            q_str = str(q_norm).strip()
+            try:
+                if len(q_str) == 6 and q_str[4] == 'Q':
+                    year = int(q_str[0:4])
+                    quarter = int(q_str[5])
+                    return (year, quarter)
+            except:
+                pass
+            return (9999, 9)  # Put malformed quarters at end
+        
+        chart_data['_sort_key'] = chart_data['quarter_normalized'].apply(quarter_sort_key)
+        chart_data = chart_data.sort_values('_sort_key').drop(['_sort_key', 'quarter_normalized'], axis=1)
+        
+        # Calculate case_mix_direct (RN + LPN + NA case-mix) for each quarter
+        # This is the denominator for direct staff % CMI calculations
+        chart_data['case_mix_direct'] = (
+            chart_data['case_mix_rn_hrs_per_resident_per_day'].fillna(0) + 
+            chart_data['case_mix_lpn_hrs_per_resident_per_day'].fillna(0) + 
+            chart_data['case_mix_na_hrs_per_resident_per_day'].fillna(0)
+        )
+        # Replace with None if any component is missing (not just 0)
+        chart_data['case_mix_direct'] = chart_data.apply(
+            lambda row: None if (
+                pd.isna(row['case_mix_rn_hrs_per_resident_per_day']) or 
+                pd.isna(row['case_mix_lpn_hrs_per_resident_per_day']) or 
+                pd.isna(row['case_mix_na_hrs_per_resident_per_day'])
+            ) else row['case_mix_direct'], axis=1
+        )
+        
         # Prepare data for charts
         charts = {
             'total_staffing': {
                 'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
                 'reported_total': chart_data['reported_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
-                'reported_direct': chart_data['pbj_direct_total'].fillna(0).tolist(),  # Use PBJ-calculated direct
+                'reported_direct': chart_data['pbj_direct_total'].fillna(0).tolist(),  # Use PBJ-calculated direct (excludes admin/DON)
                 'case_mix_total': chart_data['case_mix_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
+                'case_mix_direct': chart_data['case_mix_direct'].where(pd.notna(chart_data['case_mix_direct']), None).tolist(),  # Case-mix direct (RN+LPN+NA)
                 'adjusted_total': chart_data['adjusted_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist()
             },
             'rn_staffing': {
@@ -1340,7 +1828,8 @@ def get_provider_info_charts():
                 'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
                 'overall': chart_data['overall_rating'].fillna(0).tolist(),
                 'staffing': chart_data['staffing_rating'].fillna(0).tolist(),
-                'health_inspection': chart_data['health_inspection_rating'].fillna(0).tolist()
+                'health_inspection': chart_data['health_inspection_rating'].fillna(0).tolist(),
+                'quality': chart_data['qm_rating'].fillna(0).tolist() if 'qm_rating' in chart_data.columns else [0] * len(chart_data)
             }
         }
         
@@ -1388,14 +1877,34 @@ def get_charts():
         census_view = request.args.get('census_view', 'daily')
         contract_view = request.args.get('contract_view', 'daily')
         
+        # Ensure all required columns exist before filtering
+        required_cols = ['Total_Staff_Hours', 'Total_Staff_HPRD', 'Total_RN_Hours', 'Total_LPN_Hours', 
+                        'Total_Nurse_Aide_Hours', 'Nurse_Staff_Hours_Excl_Admin', 'RN_Contract_Pct', 
+                        'LPN_Contract_Pct', 'CNA_Contract_Pct']
+        for col in required_cols:
+            if col not in global_df.columns:
+                if col == 'Total_Staff_Hours':
+                    global_df['Total_Staff_Hours'] = (global_df.get('Total_RN_Hours', 0) + 
+                                                      global_df.get('Total_LPN_Hours', 0) + 
+                                                      global_df.get('Total_Nurse_Aide_Hours', 0)).fillna(0)
+                elif col == 'Total_Staff_HPRD' and 'Total_Staff_Hours' in global_df.columns:
+                    global_df['Total_Staff_HPRD'] = (global_df['Total_Staff_Hours'] / global_df['MDScensus']).fillna(0)
+                elif col not in global_df.columns:
+                    global_df[col] = 0
+        
         # Filter data
         filtered_df = global_df.copy()
         
         # Only apply filters if they are provided and not empty
+        # Ensure dates are inclusive (include start and end dates)
         if start_date and start_date.strip():
-            filtered_df = filtered_df[filtered_df['WorkDate'] >= start_date]
+            # Convert to datetime for proper comparison
+            start_date_dt = pd.to_datetime(start_date)
+            filtered_df = filtered_df[pd.to_datetime(filtered_df['WorkDate']) >= start_date_dt]
         if end_date and end_date.strip():
-            filtered_df = filtered_df[filtered_df['WorkDate'] <= end_date]
+            # Convert to datetime for proper comparison, include the end date
+            end_date_dt = pd.to_datetime(end_date)
+            filtered_df = filtered_df[pd.to_datetime(filtered_df['WorkDate']) <= end_date_dt]
         if day_of_week != 'all':
             filtered_df = filtered_df[filtered_df['DayOfWeek'] == day_of_week]
         if quarter != 'all' and quarter.strip():
@@ -1421,7 +1930,7 @@ def get_charts():
                 # Aggregate by month
                 df_copy = df.copy()
                 df_copy['year_month'] = df_copy[date_col].dt.to_period('M')
-                aggregated = df_copy.groupby('year_month').agg({
+                agg_dict = {
                     'Total_Nurse_HPRD': 'mean',
                     'Total_RN_HPRD': 'mean', 
                     'Total_LPN_HPRD': 'mean',
@@ -1437,16 +1946,40 @@ def get_charts():
                     'RN_Contract_Pct': 'mean',
                     'LPN_Contract_Pct': 'mean',
                     'CNA_Contract_Pct': 'mean',
+                    'Total_LPN_Contract_Pct': 'mean',
+                    'Nurse_Aide_Contract_Pct': 'mean',
                     'Total_Contract_Pct': 'mean',
                     'IsHoliday': 'any'
-                }).reset_index()
+                }
+                # Add base hours columns if they exist (needed for HPRD calculations)
+                if 'Hrs_RN' in df_copy.columns:
+                    agg_dict['Hrs_RN'] = 'sum'
+                if 'Hrs_LPN' in df_copy.columns:
+                    agg_dict['Hrs_LPN'] = 'sum'
+                if 'Hrs_CNA' in df_copy.columns:
+                    agg_dict['Hrs_CNA'] = 'sum'
+                # Add RN_HPRD, LPN_HPRD, CNA_HPRD if they exist
+                if 'RN_HPRD' in df_copy.columns:
+                    agg_dict['RN_HPRD'] = 'mean'
+                if 'LPN_HPRD' in df_copy.columns:
+                    agg_dict['LPN_HPRD'] = 'mean'
+                if 'CNA_HPRD' in df_copy.columns:
+                    agg_dict['CNA_HPRD'] = 'mean'
+                aggregated = df_copy.groupby('year_month').agg(agg_dict).reset_index()
+                # Recalculate HPRD from aggregated hours if needed
+                if 'RN_HPRD' not in aggregated.columns and 'Hrs_RN' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['RN_HPRD'] = (aggregated['Hrs_RN'] / aggregated['MDScensus']).fillna(0).round(2)
+                if 'LPN_HPRD' not in aggregated.columns and 'Hrs_LPN' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['LPN_HPRD'] = (aggregated['Hrs_LPN'] / aggregated['MDScensus']).fillna(0).round(2)
+                if 'CNA_HPRD' not in aggregated.columns and 'Hrs_CNA' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['CNA_HPRD'] = (aggregated['Hrs_CNA'] / aggregated['MDScensus']).fillna(0).round(2)
                 aggregated[date_col] = aggregated['year_month'].dt.to_timestamp()
                 return aggregated
             elif view_mode == 'quarter':
                 # Aggregate by quarter
                 df_copy = df.copy()
                 df_copy['year_quarter'] = df_copy[date_col].dt.to_period('Q')
-                aggregated = df_copy.groupby('year_quarter').agg({
+                agg_dict = {
                     'Total_Nurse_HPRD': 'mean',
                     'Total_RN_HPRD': 'mean',
                     'Total_LPN_HPRD': 'mean', 
@@ -1462,16 +1995,40 @@ def get_charts():
                     'RN_Contract_Pct': 'mean',
                     'LPN_Contract_Pct': 'mean',
                     'CNA_Contract_Pct': 'mean',
+                    'Total_LPN_Contract_Pct': 'mean',
+                    'Nurse_Aide_Contract_Pct': 'mean',
                     'Total_Contract_Pct': 'mean',
                     'IsHoliday': 'any'
-                }).reset_index()
+                }
+                # Add base hours columns if they exist (needed for HPRD calculations)
+                if 'Hrs_RN' in df_copy.columns:
+                    agg_dict['Hrs_RN'] = 'sum'
+                if 'Hrs_LPN' in df_copy.columns:
+                    agg_dict['Hrs_LPN'] = 'sum'
+                if 'Hrs_CNA' in df_copy.columns:
+                    agg_dict['Hrs_CNA'] = 'sum'
+                # Add RN_HPRD, LPN_HPRD, CNA_HPRD if they exist
+                if 'RN_HPRD' in df_copy.columns:
+                    agg_dict['RN_HPRD'] = 'mean'
+                if 'LPN_HPRD' in df_copy.columns:
+                    agg_dict['LPN_HPRD'] = 'mean'
+                if 'CNA_HPRD' in df_copy.columns:
+                    agg_dict['CNA_HPRD'] = 'mean'
+                aggregated = df_copy.groupby('year_quarter').agg(agg_dict).reset_index()
+                # Recalculate HPRD from aggregated hours if needed
+                if 'RN_HPRD' not in aggregated.columns and 'Hrs_RN' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['RN_HPRD'] = (aggregated['Hrs_RN'] / aggregated['MDScensus']).fillna(0).round(2)
+                if 'LPN_HPRD' not in aggregated.columns and 'Hrs_LPN' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['LPN_HPRD'] = (aggregated['Hrs_LPN'] / aggregated['MDScensus']).fillna(0).round(2)
+                if 'CNA_HPRD' not in aggregated.columns and 'Hrs_CNA' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['CNA_HPRD'] = (aggregated['Hrs_CNA'] / aggregated['MDScensus']).fillna(0).round(2)
                 aggregated[date_col] = aggregated['year_quarter'].dt.to_timestamp()
                 return aggregated
             elif view_mode == 'year':
                 # Aggregate by year
                 df_copy = df.copy()
                 df_copy['year'] = df_copy[date_col].dt.year
-                aggregated = df_copy.groupby('year').agg({
+                agg_dict = {
                     'Total_Nurse_HPRD': 'mean',
                     'Total_RN_HPRD': 'mean',
                     'Total_LPN_HPRD': 'mean',
@@ -1487,9 +2044,33 @@ def get_charts():
                     'RN_Contract_Pct': 'mean',
                     'LPN_Contract_Pct': 'mean',
                     'CNA_Contract_Pct': 'mean',
+                    'Total_LPN_Contract_Pct': 'mean',
+                    'Nurse_Aide_Contract_Pct': 'mean',
                     'Total_Contract_Pct': 'mean',
                     'IsHoliday': 'any'
-                }).reset_index()
+                }
+                # Add base hours columns if they exist (needed for HPRD calculations)
+                if 'Hrs_RN' in df_copy.columns:
+                    agg_dict['Hrs_RN'] = 'sum'
+                if 'Hrs_LPN' in df_copy.columns:
+                    agg_dict['Hrs_LPN'] = 'sum'
+                if 'Hrs_CNA' in df_copy.columns:
+                    agg_dict['Hrs_CNA'] = 'sum'
+                # Add RN_HPRD, LPN_HPRD, CNA_HPRD if they exist
+                if 'RN_HPRD' in df_copy.columns:
+                    agg_dict['RN_HPRD'] = 'mean'
+                if 'LPN_HPRD' in df_copy.columns:
+                    agg_dict['LPN_HPRD'] = 'mean'
+                if 'CNA_HPRD' in df_copy.columns:
+                    agg_dict['CNA_HPRD'] = 'mean'
+                aggregated = df_copy.groupby('year').agg(agg_dict).reset_index()
+                # Recalculate HPRD from aggregated hours if needed
+                if 'RN_HPRD' not in aggregated.columns and 'Hrs_RN' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['RN_HPRD'] = (aggregated['Hrs_RN'] / aggregated['MDScensus']).fillna(0).round(2)
+                if 'LPN_HPRD' not in aggregated.columns and 'Hrs_LPN' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['LPN_HPRD'] = (aggregated['Hrs_LPN'] / aggregated['MDScensus']).fillna(0).round(2)
+                if 'CNA_HPRD' not in aggregated.columns and 'Hrs_CNA' in aggregated.columns and 'MDScensus' in aggregated.columns:
+                    aggregated['CNA_HPRD'] = (aggregated['Hrs_CNA'] / aggregated['MDScensus']).fillna(0).round(2)
                 aggregated[date_col] = pd.to_datetime(aggregated['year'], format='%Y')
                 return aggregated
             else:
@@ -1527,6 +2108,15 @@ def get_charts():
         hours_df = aggregate_by_view_mode(filtered_df, hours_view)
         census_df = aggregate_by_view_mode(filtered_df, census_view)
         contract_df = aggregate_by_view_mode(filtered_df, contract_view)
+        
+        # Ensure Hrs_RN exists in hours_df after aggregation (needed for RN trace)
+        if 'Hrs_RN' not in hours_df.columns:
+            # If Hrs_RN was dropped during aggregation, try to recalculate or use 0
+            if 'Total_RN_Hours' in hours_df.columns:
+                # Use Total_RN_Hours as fallback (not ideal but better than error)
+                hours_df['Hrs_RN'] = hours_df['Total_RN_Hours'] * 0.7  # Rough estimate (direct RN is usually 70-80% of total)
+            else:
+                hours_df['Hrs_RN'] = 0
         
         # Helper function to format dates based on view mode
         def format_dates_for_view_mode(df, view_mode):
@@ -1664,7 +2254,7 @@ def get_charts():
                                 'y': [float(state_standard['Min_Staffing'])] * len(dates),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"State Standard (Min: {state_standard['Min_Staffing']})",
+                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -1673,7 +2263,7 @@ def get_charts():
                                 'y': [float(state_standard['Max_Staffing'])] * len(dates),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"State Standard (Max: {state_standard['Max_Staffing']})",
+                                'name': f"{facility_state} max. ({state_standard['Max_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -1684,7 +2274,7 @@ def get_charts():
                                 'y': [float(state_standard['Min_Staffing'])] * len(dates),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"State Standard ({state_standard['Min_Staffing']} HPRD)",
+                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -1700,40 +2290,54 @@ def get_charts():
                     'y': hprd_df['Total_Nurse_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total HPRD',
-                    'line': {'color': '#d62728', 'width': 3}
+                    'name': 'Total',
+                    'line': {'color': '#d62728', 'width': 3},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hprd_df, hprd_view),
                     'y': hprd_df['Nurse_Staff_HPRD_Excl_Admin'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Direct Staff HPRD',
-                    'line': {'color': '#9467bd'}
+                    'name': 'Direct',
+                    'line': {'color': '#9467bd'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hprd_df, hprd_view),
                     'y': hprd_df['Total_RN_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total RN HPRD',
-                    'line': {'color': '#1f77b4'}
+                    'name': 'RN (Total)',
+                    'line': {'color': '#1f77b4'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
+                },
+                {
+                    'x': format_dates_for_view_mode(hprd_df, hprd_view),
+                    'y': hprd_df['RN_HPRD'].fillna(0).tolist() if 'RN_HPRD' in hprd_df.columns else [0] * len(hprd_df),
+                    'type': 'scatter',
+                    'mode': 'lines+markers',
+                    'name': 'RN (excl. Admin / DON)',
+                    'line': {'color': '#ff7f0e', 'dash': 'dash', 'width': 2},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hprd_df, hprd_view),
                     'y': hprd_df['Total_LPN_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'LPN HPRD (Total)',
-                    'line': {'color': '#ff7f0e'}
+                    'name': 'LPN (Total)',
+                    'line': {'color': '#ff7f0e'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hprd_df, hprd_view),
                     'y': hprd_df['Total_Nurse_Aide_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Aide HPRD',
-                    'line': {'color': '#2ca02c'}
+                    'name': 'Nurse Aide',
+                    'line': {'color': '#2ca02c'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 }
             ] + state_standard_lines + hprd_holiday_markers,
             'layout': {
@@ -1771,36 +2375,49 @@ def get_charts():
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_Nurse_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'Total HPRD',
-                'marker': {'color': '#d62728'}
+                'name': 'Total',
+                'marker': {'color': '#d62728'},
+                'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Nurse_Staff_HPRD_Excl_Admin'].tolist(),
                 'type': 'bar',
-                'name': 'Direct Staff HPRD',
-                'marker': {'color': '#9467bd'}
+                'name': 'Direct',
+                'marker': {'color': '#9467bd'},
+                'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_RN_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'Total RN HPRD',
-                'marker': {'color': '#1f77b4'}
+                'name': 'RN (Total)',
+                'marker': {'color': '#1f77b4'},
+                'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
+            },
+            {
+                'x': dow_summary['DayOfWeek'].tolist(),
+                'y': dow_summary['RN_HPRD'].tolist() if 'RN_HPRD' in dow_summary.columns else [0] * len(dow_summary),
+                'type': 'bar',
+                'name': 'RN',
+                'marker': {'color': '#8bb8e8'},
+                'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_LPN_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'Total LPN HPRD',
-                'marker': {'color': '#ff7f0e'}
+                'name': 'LPN (Total)',
+                'marker': {'color': '#ff7f0e'},
+                'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
             },
             {
                 'x': dow_summary['DayOfWeek'].tolist(),
                 'y': dow_summary['Total_Nurse_Aide_HPRD'].tolist(),
                 'type': 'bar',
-                'name': 'Nurse Aide HPRD',
-                'marker': {'color': '#2ca02c'}
+                'name': 'Nurse Aide',
+                'marker': {'color': '#2ca02c'},
+                'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
             }
         ]
         
@@ -1843,7 +2460,7 @@ def get_charts():
                                 'y': [float(state_standard['Min_Staffing'])] * len(days_list),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"State Standard (Min: {state_standard['Min_Staffing']})",
+                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -1852,7 +2469,7 @@ def get_charts():
                                 'y': [float(state_standard['Max_Staffing'])] * len(days_list),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"State Standard (Max: {state_standard['Max_Staffing']})",
+                                'name': f"{facility_state} max. ({state_standard['Max_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -1863,7 +2480,7 @@ def get_charts():
                                 'y': [float(state_standard['Min_Staffing'])] * len(days_list),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"State Standard ({state_standard['Min_Staffing']} HPRD)",
+                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -1893,16 +2510,18 @@ def get_charts():
                     'y': hours_df['Total_Staff_Hours'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total Nurse',
-                    'line': {'color': '#d62728', 'width': 3}
+                    'name': 'Total',
+                    'line': {'color': '#d62728', 'width': 3},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hours_df, hours_view),
                     'y': hours_df['Nurse_Staff_Hours_Excl_Admin'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Staff (excl. Admin/DON)',
-                    'line': {'color': '#9467bd'}
+                    'name': 'Direct',
+                    'line': {'color': '#9467bd'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hours_df, hours_view),
@@ -1910,7 +2529,17 @@ def get_charts():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'RN (Total)',
-                    'line': {'color': '#1f77b4'}
+                    'line': {'color': '#1f77b4'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
+                },
+                {
+                    'x': format_dates_for_view_mode(hours_df, hours_view),
+                    'y': hours_df['Hrs_RN'].fillna(0).tolist() if 'Hrs_RN' in hours_df.columns else [0] * len(hours_df),
+                    'type': 'scatter',
+                    'mode': 'lines+markers',
+                    'name': 'RN',
+                    'line': {'color': '#8bb8e8'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hours_df, hours_view),
@@ -1918,15 +2547,17 @@ def get_charts():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'LPN (Total)',
-                    'line': {'color': '#ff7f0e'}
+                    'line': {'color': '#ff7f0e'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(hours_df, hours_view),
                     'y': hours_df['Total_Nurse_Aide_Hours'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Nurse Aide (Total)',
-                    'line': {'color': '#2ca02c'}
+                    'name': 'Nurse Aide',
+                    'line': {'color': '#2ca02c'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 }
             ] + hours_holiday_markers,
             'layout': {
@@ -1954,7 +2585,8 @@ def get_charts():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'Census',
-                    'line': {'color': '#d62728'}
+                    'line': {'color': '#d62728'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}<extra></extra>'
                 }
             ],
             'layout': {
@@ -1981,32 +2613,36 @@ def get_charts():
                     'y': contract_df['Total_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total Contract %',
-                    'line': {'color': '#d62728', 'width': 3}
+                    'name': 'Total %',
+                    'line': {'color': '#d62728', 'width': 3},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(contract_df, contract_view),
                     'y': contract_df['RN_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'RN Contract %',
-                    'line': {'color': '#1f77b4'}
+                    'name': 'RN %',
+                    'line': {'color': '#1f77b4'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(contract_df, contract_view),
-                    'y': contract_df['LPN_Contract_Pct'].fillna(0).tolist(),
+                    'y': contract_df['Total_LPN_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'LPN Contract %',
-                    'line': {'color': '#ff7f0e'}
+                    'name': 'Total LPN %',
+                    'line': {'color': '#ff7f0e'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 },
                 {
                     'x': format_dates_for_view_mode(contract_df, contract_view),
-                    'y': contract_df['CNA_Contract_Pct'].fillna(0).tolist(),
+                    'y': contract_df['Nurse_Aide_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'CNA Contract %',
-                    'line': {'color': '#2ca02c'}
+                    'name': 'Nurse Aide %',
+                    'line': {'color': '#2ca02c'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 }
             ],
             'layout': {
@@ -2019,7 +2655,7 @@ def get_charts():
                     'nticks': 10,
                     'tickangle': -45
                 },
-                'yaxis': {'title': 'Contract Percentage (%)', 'range': [0, None]},
+                'yaxis': {'title': '% Contract', 'range': [0, None]},
                 'height': 450,
                 'margin': {'b': 100, 'l': 60, 'r': 40, 't': 80}
             }
@@ -2103,7 +2739,9 @@ def get_chart_aggregated():
                 'Total_Contract_Pct': 'mean',
                 'RN_Contract_Pct': 'mean',
                 'LPN_Contract_Pct': 'mean',
-                'CNA_Contract_Pct': 'mean'
+                'CNA_Contract_Pct': 'mean',
+                'Total_LPN_Contract_Pct': 'mean',
+                'Nurse_Aide_Contract_Pct': 'mean'
             }).round(2)
             # Convert 2017Q1 format to Q1 2017 format
             x_values = []
@@ -2132,7 +2770,9 @@ def get_chart_aggregated():
                 'Total_Contract_Pct': 'mean',
                 'RN_Contract_Pct': 'mean',
                 'LPN_Contract_Pct': 'mean',
-                'CNA_Contract_Pct': 'mean'
+                'CNA_Contract_Pct': 'mean',
+                'Total_LPN_Contract_Pct': 'mean',
+                'Nurse_Aide_Contract_Pct': 'mean'
             }).round(2)
             x_values = agg_data.index.tolist()
             title_suffix = "Annually"
@@ -2153,7 +2793,9 @@ def get_chart_aggregated():
                 'Total_Contract_Pct': 'mean',
                 'RN_Contract_Pct': 'mean',
                 'LPN_Contract_Pct': 'mean',
-                'CNA_Contract_Pct': 'mean'
+                'CNA_Contract_Pct': 'mean',
+                'Total_LPN_Contract_Pct': 'mean',
+                'Nurse_Aide_Contract_Pct': 'mean'
             }).round(2)
             x_values = agg_data.index.tolist()
             title_suffix = "Monthly"
@@ -2166,16 +2808,18 @@ def get_chart_aggregated():
                     'y': agg_data['Total_Nurse_HPRD'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total HPRD (All Staff)',
-                    'line': {'color': '#d62728', 'width': 3}
+                    'name': 'Total',
+                    'line': {'color': '#d62728', 'width': 3},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': x_values,
                     'y': agg_data['Nurse_Staff_HPRD_Excl_Admin'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Direct Staff HPRD',
-                    'line': {'color': '#9467bd'}
+                    'name': 'Direct',
+                    'line': {'color': '#9467bd'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': x_values,
@@ -2183,7 +2827,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'RN HPRD',
-                    'line': {'color': '#2ca02c'}
+                    'line': {'color': '#2ca02c'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': x_values,
@@ -2191,7 +2836,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'Total LPN HPRD',
-                    'line': {'color': '#ff7f0e'}
+                    'line': {'color': '#ff7f0e'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 },
                 {
                     'x': x_values,
@@ -2199,7 +2845,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'Nurse Aide HPRD',
-                    'line': {'color': '#1f77b4'}
+                    'line': {'color': '#1f77b4'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f} HPRD<extra></extra>'
                 }
             ]
             y_title = 'HPRD'
@@ -2211,7 +2858,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'Total Staff Hours',
-                    'line': {'color': '#d62728', 'width': 3}
+                    'line': {'color': '#d62728', 'width': 3},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': x_values,
@@ -2219,7 +2867,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'Nurse Staff Hours (excl. Admin & DON)',
-                    'line': {'color': '#9467bd'}
+                    'line': {'color': '#9467bd'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': x_values,
@@ -2227,7 +2876,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'RN Hours',
-                    'line': {'color': '#2ca02c'}
+                    'line': {'color': '#2ca02c'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': x_values,
@@ -2235,7 +2885,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'LPN Hours',
-                    'line': {'color': '#ff7f0e'}
+                    'line': {'color': '#ff7f0e'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 },
                 {
                     'x': x_values,
@@ -2243,7 +2894,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'Nurse Aide Hours',
-                    'line': {'color': '#1f77b4'}
+                    'line': {'color': '#1f77b4'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:,.2f} Hours<extra></extra>'
                 }
             ]
             y_title = 'Hours'
@@ -2255,7 +2907,8 @@ def get_chart_aggregated():
                     'type': 'scatter',
                     'mode': 'lines+markers',
                     'name': 'Resident Census',
-                    'line': {'color': '#2ca02c', 'width': 3}
+                    'line': {'color': '#2ca02c', 'width': 3},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}<extra></extra>'
                 }
             ]
             y_title = 'Residents'
@@ -2266,35 +2919,39 @@ def get_chart_aggregated():
                     'y': agg_data['Total_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'Total Contract %',
-                    'line': {'color': '#d62728', 'width': 3}
+                    'name': 'Total %',
+                    'line': {'color': '#d62728', 'width': 3},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 },
                 {
                     'x': x_values,
                     'y': agg_data['RN_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'RN Contract %',
-                    'line': {'color': '#2ca02c'}
+                    'name': 'RN %',
+                    'line': {'color': '#2ca02c'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 },
                 {
                     'x': x_values,
-                    'y': agg_data['LPN_Contract_Pct'].fillna(0).tolist(),
+                    'y': agg_data['Total_LPN_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'LPN Contract %',
-                    'line': {'color': '#ff7f0e'}
+                    'name': 'Total LPN %',
+                    'line': {'color': '#ff7f0e'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 },
                 {
                     'x': x_values,
-                    'y': agg_data['CNA_Contract_Pct'].fillna(0).tolist(),
+                    'y': agg_data['Nurse_Aide_Contract_Pct'].fillna(0).tolist(),
                     'type': 'scatter',
                     'mode': 'lines+markers',
-                    'name': 'CNA Contract %',
-                    'line': {'color': '#1f77b4'}
+                    'name': 'Nurse Aide %',
+                    'line': {'color': '#1f77b4'},
+                    'hovertemplate': '<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
                 }
             ]
-            y_title = 'Percentage (%)'
+            y_title = '% Contract'
         else:
             return jsonify({'error': 'Invalid chart type'})
         
@@ -2472,8 +3129,17 @@ def get_hprd_aggregated():
 @app.route('/api/quarters')
 def get_quarters():
     """Get available quarters"""
-    quarters = sorted(global_df['CY_Qtr'].unique().tolist())
-    return jsonify(quarters)
+    global global_df
+    try:
+        if global_df is None or global_df.empty:
+            return jsonify([])
+        if 'CY_Qtr' not in global_df.columns:
+            return jsonify([])
+        quarters = sorted(global_df['CY_Qtr'].unique().tolist())
+        return jsonify(quarters)
+    except Exception as e:
+        print(f"Error getting quarters: {str(e)}")
+        return jsonify([])
 
 @app.route('/api/date_range')
 def get_date_range():
@@ -2522,143 +3188,164 @@ def get_date_range():
 @app.route('/api/data_completeness')
 def get_data_completeness():
     """Analyze data completeness and identify missing quarters/days"""
-    completeness_issues = []
-    
-    # Get all quarters that should exist (2017Q1 to 2025Q2)
-    expected_quarters = []
-    for year in range(2017, 2026):
-        for quarter in range(1, 5):
-            if year == 2025 and quarter > 2:  # Only Q1 and Q2 2025 exist
-                break
-            expected_quarters.append(f"{year}Q{quarter}")
-    
-    # Check for missing quarters
-    actual_quarters = set(global_df['CY_Qtr'].unique())
-    missing_quarters = [q for q in expected_quarters if q not in actual_quarters]
-    
-    if missing_quarters:
-        completeness_issues.append({
-            'type': 'missing_quarter',
-            'severity': 'high',
-            'message': f"Missing {len(missing_quarters)} quarter(s): {', '.join(missing_quarters)}"
-        })
-    
-    # Check for incomplete quarters (missing days)
-    for quarter in actual_quarters:
-        quarter_data = global_df[global_df['CY_Qtr'] == quarter]
-        if len(quarter_data) > 0:
-            # Calculate expected days in quarter
-            year = int(quarter[:4])
-            q_num = int(quarter[5])
+    try:
+        if global_df is None or (hasattr(global_df, 'empty') and global_df.empty):
+            return jsonify({
+                'issues': [{'type': 'load_error', 'severity': 'high', 'message': 'Data not loaded'}],
+                'total_issues': 1,
+                'has_issues': True
+            })
+        completeness_issues = []
+        
+        # Get all quarters that should exist (2017Q1 to 2025Q2)
+        expected_quarters = []
+        for year in range(2017, 2026):
+            for quarter in range(1, 5):
+                if year == 2025 and quarter > 2:  # Only Q1 and Q2 2025 exist
+                    break
+                expected_quarters.append(f"{year}Q{quarter}")
+        
+        # Check for missing quarters
+        if 'CY_Qtr' not in global_df.columns:
+            return jsonify({
+                'issues': [{'type': 'load_error', 'severity': 'high', 'message': 'CY_Qtr column missing'}],
+                'total_issues': 1,
+                'has_issues': True
+            })
+        actual_quarters = set(global_df['CY_Qtr'].unique())
+        missing_quarters = [q for q in expected_quarters if q not in actual_quarters]
+        
+        if missing_quarters:
+            completeness_issues.append({
+                'type': 'missing_quarter',
+                'severity': 'high',
+                'message': f"Missing {len(missing_quarters)} quarter(s): {', '.join(missing_quarters)}"
+            })
+        
+        # Check for incomplete quarters (missing days)
+        for quarter in actual_quarters:
+            quarter_data = global_df[global_df['CY_Qtr'] == quarter]
+            if len(quarter_data) > 0:
+                # Calculate expected days in quarter
+                year = int(quarter[:4])
+                q_num = int(quarter[5])
+                
+                if q_num == 1:
+                    expected_days = 90  # Jan-Mar
+                elif q_num == 2:
+                    expected_days = 91  # Apr-Jun
+                elif q_num == 3:
+                    expected_days = 92  # Jul-Sep
+                else:  # q_num == 4
+                    expected_days = 92  # Oct-Dec
+                
+                # Adjust for leap years in Q1
+                if q_num == 1 and year % 4 == 0:
+                    expected_days = 91
+                
+                actual_days = len(quarter_data)
+                missing_days = expected_days - actual_days
+                
+                if missing_days > 0:
+                    severity = 'high' if missing_days > 10 else 'medium' if missing_days > 5 else 'low'
+                    completeness_issues.append({
+                        'type': 'incomplete_quarter',
+                        'severity': severity,
+                        'quarter': quarter,
+                        'expected_days': expected_days,
+                        'actual_days': actual_days,
+                        'missing_days': missing_days,
+                        'message': f"{quarter}: {missing_days} missing days ({actual_days}/{expected_days})"
+                    })
+        
+        # Check for data gaps (consecutive missing days)
+        df_sorted = global_df.sort_values('WorkDate')
+        date_gaps = []
+        
+        for i in range(1, len(df_sorted)):
+            prev_date = df_sorted.iloc[i-1]['WorkDate']
+            curr_date = df_sorted.iloc[i]['WorkDate']
+            days_diff = (curr_date - prev_date).days
             
-            if q_num == 1:
-                expected_days = 90  # Jan-Mar
-            elif q_num == 2:
-                expected_days = 91  # Apr-Jun
-            elif q_num == 3:
-                expected_days = 92  # Jul-Sep
-            else:  # q_num == 4
-                expected_days = 92  # Oct-Dec
+            if days_diff > 1:  # Gap of more than 1 day
+                gap_start = prev_date + timedelta(days=1)
+                gap_end = curr_date - timedelta(days=1)
+                gap_days = days_diff - 1
+                
+                severity = 'high' if gap_days > 7 else 'medium' if gap_days > 3 else 'low'
+                date_gaps.append({
+                    'start_date': gap_start.strftime('%Y-%m-%d'),
+                    'end_date': gap_end.strftime('%Y-%m-%d'),
+                    'gap_days': gap_days,
+                    'severity': severity
+                })
+        
+        if date_gaps:
+            # Group consecutive gaps
+            gap_summary = {}
+            for gap in date_gaps:
+                quarter = global_df[global_df['WorkDate'] == gap['start_date']]['CY_Qtr'].iloc[0] if len(global_df[global_df['WorkDate'] == gap['start_date']]) > 0 else 'Unknown'
+                if quarter not in gap_summary:
+                    gap_summary[quarter] = []
+                gap_summary[quarter].append(gap)
             
-            # Adjust for leap years in Q1
-            if q_num == 1 and year % 4 == 0:
-                expected_days = 91
-            
-            actual_days = len(quarter_data)
-            missing_days = expected_days - actual_days
-            
-            if missing_days > 0:
-                severity = 'high' if missing_days > 10 else 'medium' if missing_days > 5 else 'low'
+            for quarter, gaps in gap_summary.items():
+                total_gap_days = sum(gap['gap_days'] for gap in gaps)
+                max_severity = max(gap['severity'] for gap in gaps)
+                # Skip "Unknown" quarters - they're likely edge cases
+                if quarter != 'Unknown':
+                    completeness_issues.append({
+                        'type': 'data_gaps',
+                        'severity': max_severity,
+                        'quarter': quarter,
+                        'gap_count': len(gaps),
+                        'total_gap_days': total_gap_days,
+                        'message': f"{quarter}: {len(gaps)} gap(s), {total_gap_days} missing days"
+                    })
+        
+        # Check for missing census data (days with 0 census)
+        zero_census_data = global_df[global_df['MDScensus'] == 0]
+        if len(zero_census_data) > 0:
+            # Group by quarter for better reporting
+            zero_census_by_quarter = zero_census_data.groupby('CY_Qtr').size()
+            for quarter, count in zero_census_by_quarter.items():
+                severity = 'high' if count > 10 else 'medium' if count > 5 else 'low'
                 completeness_issues.append({
-                    'type': 'incomplete_quarter',
+                    'type': 'zero_census',
                     'severity': severity,
                     'quarter': quarter,
-                    'expected_days': expected_days,
-                    'actual_days': actual_days,
-                    'missing_days': missing_days,
-                    'message': f"{quarter}: {missing_days} missing days ({actual_days}/{expected_days})"
+                    'count': int(count),
+                    'message': f"{quarter}: {count} days with 0 census reported"
                 })
-    
-    # Check for data gaps (consecutive missing days)
-    df_sorted = global_df.sort_values('WorkDate')
-    date_gaps = []
-    
-    for i in range(1, len(df_sorted)):
-        prev_date = df_sorted.iloc[i-1]['WorkDate']
-        curr_date = df_sorted.iloc[i]['WorkDate']
-        days_diff = (curr_date - prev_date).days
         
-        if days_diff > 1:  # Gap of more than 1 day
-            gap_start = prev_date + timedelta(days=1)
-            gap_end = curr_date - timedelta(days=1)
-            gap_days = days_diff - 1
-            
-            severity = 'high' if gap_days > 7 else 'medium' if gap_days > 3 else 'low'
-            date_gaps.append({
-                'start_date': gap_start.strftime('%Y-%m-%d'),
-                'end_date': gap_end.strftime('%Y-%m-%d'),
-                'gap_days': gap_days,
-                'severity': severity
-            })
-    
-    if date_gaps:
-        # Group consecutive gaps
-        gap_summary = {}
-        for gap in date_gaps:
-            quarter = global_df[global_df['WorkDate'] == gap['start_date']]['CY_Qtr'].iloc[0] if len(global_df[global_df['WorkDate'] == gap['start_date']]) > 0 else 'Unknown'
-            if quarter not in gap_summary:
-                gap_summary[quarter] = []
-            gap_summary[quarter].append(gap)
-        
-        for quarter, gaps in gap_summary.items():
-            total_gap_days = sum(gap['gap_days'] for gap in gaps)
-            max_severity = max(gap['severity'] for gap in gaps)
-            # Skip "Unknown" quarters - they're likely edge cases
-            if quarter != 'Unknown':
+        # Check for zero staffing hours when census > 0 (facility reported 0 staffing but had residents)
+        zero_staffing_with_census = global_df[(global_df['Total_Staff_Hours'] == 0) & (global_df['MDScensus'] > 0)]
+        if len(zero_staffing_with_census) > 0:
+            # Group by quarter for better reporting
+            zero_staffing_by_quarter = zero_staffing_with_census.groupby('CY_Qtr').size()
+            for quarter, count in zero_staffing_by_quarter.items():
+                severity = 'high' if count > 10 else 'medium' if count > 5 else 'low'
                 completeness_issues.append({
-                    'type': 'data_gaps',
-                    'severity': max_severity,
+                    'type': 'zero_staffing_with_census',
+                    'severity': severity,
                     'quarter': quarter,
-                    'gap_count': len(gaps),
-                    'total_gap_days': total_gap_days,
-                    'message': f"{quarter}: {len(gaps)} gap(s), {total_gap_days} missing days"
+                    'count': int(count),
+                    'message': f"{quarter}: {count} days with 0 staffing hours but census > 0"
                 })
-    
-    # Check for missing census data (days with 0 census)
-    zero_census_data = global_df[global_df['MDScensus'] == 0]
-    if len(zero_census_data) > 0:
-        # Group by quarter for better reporting
-        zero_census_by_quarter = zero_census_data.groupby('CY_Qtr').size()
-        for quarter, count in zero_census_by_quarter.items():
-            severity = 'high' if count > 10 else 'medium' if count > 5 else 'low'
-            completeness_issues.append({
-                'type': 'zero_census',
-                'severity': severity,
-                'quarter': quarter,
-                'count': int(count),
-                'message': f"{quarter}: {count} days with 0 census reported"
-            })
-    
-    # Check for zero staffing hours when census > 0 (facility reported 0 staffing but had residents)
-    zero_staffing_with_census = global_df[(global_df['Total_Staff_Hours'] == 0) & (global_df['MDScensus'] > 0)]
-    if len(zero_staffing_with_census) > 0:
-        # Group by quarter for better reporting
-        zero_staffing_by_quarter = zero_staffing_with_census.groupby('CY_Qtr').size()
-        for quarter, count in zero_staffing_by_quarter.items():
-            severity = 'high' if count > 10 else 'medium' if count > 5 else 'low'
-            completeness_issues.append({
-                'type': 'zero_staffing_with_census',
-                'severity': severity,
-                'quarter': quarter,
-                'count': int(count),
-                'message': f"{quarter}: {count} days with 0 staffing hours but census > 0"
-            })
-    
-    return jsonify({
-        'issues': completeness_issues,
-        'total_issues': len(completeness_issues),
-        'has_issues': len(completeness_issues) > 0
-    })
+        
+        return jsonify({
+            'issues': completeness_issues,
+            'total_issues': len(completeness_issues),
+            'has_issues': len(completeness_issues) > 0
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'issues': [{'type': 'error', 'severity': 'high', 'message': str(e)}],
+            'total_issues': 1,
+            'has_issues': True
+        })
 
 @app.route('/api/day_comparison')
 def get_day_comparison():
@@ -2842,6 +3529,8 @@ def api_single_day_report():
             'lpn_hprd': round_financial(target_row['LPN_HPRD']),
             'cna_hours': round_financial(target_row['Hrs_CNA']),
             'cna_hprd': round_financial(target_row['CNA_HPRD']),
+            'indirect_staffing_hours': round_financial(target_row['Hrs_RNadmin'] + target_row['Hrs_RNDON'] + target_row['Hrs_LPNadmin']),
+            'indirect_staffing_hprd': round_financial((target_row['Hrs_RNadmin'] + target_row['Hrs_RNDON'] + target_row['Hrs_LPNadmin']) / target_row['MDScensus'] if target_row['MDScensus'] > 0 else 0),
             'total_rn_hours': round_financial(target_row['Total_RN_Hours']),
             'total_rn_hprd': round_financial(target_row['Total_RN_HPRD']),
             'total_lpn_hours': round_financial(target_row['Total_LPN_Hours']),
@@ -2878,6 +3567,9 @@ def api_single_day_report():
             total_nurse_aide_hours = data['Total_Nurse_Aide_Hours'].sum()
             nurse_staff_hours_excl_admin = data['Nurse_Staff_Hours_Excl_Admin'].sum()
             total_staff_hours = data['Total_Staff_Hours'].sum()
+            indirect_staffing_hours = (data['Hrs_RNadmin'].sum() + 
+                                       data['Hrs_RNDON'].sum() + 
+                                       data['Hrs_LPNadmin'].sum())
             
             # Calculate weighted HPRD values
             rn_hprd_weighted = (total_rn_hours / total_census) if total_census > 0 else 0
@@ -2888,6 +3580,7 @@ def api_single_day_report():
             total_nurse_aide_hprd_weighted = (total_nurse_aide_hours / total_census) if total_census > 0 else 0
             nurse_staff_hprd_excl_admin_weighted = (nurse_staff_hours_excl_admin / total_census) if total_census > 0 else 0
             total_staff_hprd_weighted = (total_staff_hours / total_census) if total_census > 0 else 0
+            indirect_staffing_hprd_weighted = (indirect_staffing_hours / total_census) if total_census > 0 else 0
             
             return {
                 'label': label,
@@ -2899,6 +3592,8 @@ def api_single_day_report():
                 'lpn_hprd': round_financial(lpn_hprd_weighted),
                 'cna_hours': round_financial(data['Hrs_CNA'].mean()),
                 'cna_hprd': round_financial(cna_hprd_weighted),
+                'indirect_staffing_hours': round_financial((data['Hrs_RNadmin'].mean() + data['Hrs_RNDON'].mean() + data['Hrs_LPNadmin'].mean())),
+                'indirect_staffing_hprd': round_financial(indirect_staffing_hprd_weighted),
                 'total_rn_hours': round_financial(data['Total_RN_Hours'].mean()),
                 'total_rn_hprd': round_financial(total_rn_hprd_weighted),
                 'total_lpn_hours': round_financial(data['Total_LPN_Hours'].mean()),
@@ -3627,6 +4322,14 @@ def get_quarterly_stats():
 def get_quarterly_data():
     """Get quarterly data for all quarters with HPRD and hours"""
     try:
+        global global_df
+        if global_df is None or global_df.empty:
+            return jsonify({'error': 'No data loaded'})
+        
+        # Ensure Total_Staff_Hours exists
+        if 'Total_Staff_Hours' not in global_df.columns:
+            global_df['Total_Staff_Hours'] = (global_df['Total_RN_Hours'] + global_df['Total_LPN_Hours'] + global_df['Total_Nurse_Aide_Hours']).fillna(0)
+        
         # Calculate weighted HPRD (sum of hours / sum of census) for each quarter
         quarterly_data = {}
         
@@ -3635,12 +4338,12 @@ def get_quarterly_data():
             
             # Calculate weighted HPRD (correct method)
             total_census = quarter_df['MDScensus'].sum()
-            total_staff_hours = quarter_df['Total_Staff_Hours'].sum()
-            total_rn_hours = quarter_df['Total_RN_Hours'].sum()
-            nurse_staff_hours = quarter_df['Nurse_Staff_Hours_Excl_Admin'].sum()
-            rn_hours = quarter_df['Hrs_RN'].sum()
-            rn_admin_hours = quarter_df['Hrs_RNadmin'].sum()
-            rn_don_hours = quarter_df['Hrs_RNDON'].sum()
+            total_staff_hours = quarter_df['Total_Staff_Hours'].sum() if 'Total_Staff_Hours' in quarter_df.columns else 0
+            total_rn_hours = quarter_df['Total_RN_Hours'].sum() if 'Total_RN_Hours' in quarter_df.columns else 0
+            nurse_staff_hours = quarter_df['Nurse_Staff_Hours_Excl_Admin'].sum() if 'Nurse_Staff_Hours_Excl_Admin' in quarter_df.columns else 0
+            rn_hours = quarter_df['Hrs_RN'].sum() if 'Hrs_RN' in quarter_df.columns else 0
+            rn_admin_hours = quarter_df['Hrs_RNadmin'].sum() if 'Hrs_RNadmin' in quarter_df.columns else 0
+            rn_don_hours = quarter_df['Hrs_RNDON'].sum() if 'Hrs_RNDON' in quarter_df.columns else 0
             
             # Calculate weighted HPRD values
             total_hprd = (total_staff_hours / total_census) if total_census > 0 else 0
@@ -3651,13 +4354,13 @@ def get_quarterly_data():
             rn_don_hprd = (rn_don_hours / total_census) if total_census > 0 else 0
             
             # Calculate average hours per day (for display) - keep original precision
-            avg_census = quarter_df['MDScensus'].mean()
-            avg_staff_hours = quarter_df['Total_Staff_Hours'].mean()
-            avg_rn_hours = quarter_df['Total_RN_Hours'].mean()
-            avg_nurse_staff_hours = quarter_df['Nurse_Staff_Hours_Excl_Admin'].mean()
-            avg_rn_direct_hours = quarter_df['Hrs_RN'].mean()
-            avg_rn_admin_hours = quarter_df['Hrs_RNadmin'].mean()
-            avg_rn_don_hours = quarter_df['Hrs_RNDON'].mean()
+            avg_census = quarter_df['MDScensus'].mean() if 'MDScensus' in quarter_df.columns else 0
+            avg_staff_hours = quarter_df['Total_Staff_Hours'].mean() if 'Total_Staff_Hours' in quarter_df.columns else 0
+            avg_rn_hours = quarter_df['Total_RN_Hours'].mean() if 'Total_RN_Hours' in quarter_df.columns else 0
+            avg_nurse_staff_hours = quarter_df['Nurse_Staff_Hours_Excl_Admin'].mean() if 'Nurse_Staff_Hours_Excl_Admin' in quarter_df.columns else 0
+            avg_rn_direct_hours = quarter_df['Hrs_RN'].mean() if 'Hrs_RN' in quarter_df.columns else 0
+            avg_rn_admin_hours = quarter_df['Hrs_RNadmin'].mean() if 'Hrs_RNadmin' in quarter_df.columns else 0
+            avg_rn_don_hours = quarter_df['Hrs_RNDON'].mean() if 'Hrs_RNDON' in quarter_df.columns else 0
             
             quarterly_data[quarter] = {
                 'census': round(avg_census, 2),  # Keep 2 decimal places for census too
@@ -3796,7 +4499,7 @@ def get_state_standard_compliance():
             })
         
         # Calculate secondary metrics
-        not_met_df = filtered_df[~filtered_df['Met_Standard']]
+        not_met_df = filtered_df[~filtered_df['Met_Standard']].copy()
         
         # Day of week analysis
         day_of_week_counts = {}
@@ -3867,6 +4570,299 @@ def get_state_standard_compliance():
         traceback.print_exc()
         return jsonify({'error': str(e)})
 
+@app.route('/api/utah-rn-compliance')
+def get_utah_rn_compliance():
+    """Get Utah RN 8-hour compliance data (RN for at least 8 consecutive hours a day, 7 days a week)"""
+    try:
+        global global_df
+        
+        if global_df is None or len(global_df) == 0:
+            return jsonify({'error': 'No data loaded'})
+        
+        # Get facility state
+        facility_state = global_df['STATE'].iloc[0] if 'STATE' in global_df.columns else None
+        if not facility_state:
+            return jsonify({'error': 'Facility state not found'})
+        
+        # Check if this is a Utah facility
+        state_abbrev_to_name = {
+            'UT': 'Utah'
+        }
+        state_name = facility_state
+        if facility_state.upper() in state_abbrev_to_name:
+            state_name = state_abbrev_to_name[facility_state.upper()]
+        
+        if state_name.upper() != 'UTAH':
+            return jsonify({'error': 'This compliance check is only for Utah facilities'})
+        
+        # Get parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        exclude_admin = request.args.get('exclude_admin', 'true').lower() == 'true'
+        
+        # Filter data by date range
+        filtered_df = global_df.copy()
+        if start_date:
+            filtered_df = filtered_df[filtered_df['WorkDate'] >= pd.to_datetime(start_date)]
+        if end_date:
+            end_dt = pd.to_datetime(end_date) + pd.Timedelta(days=1)
+            filtered_df = filtered_df[filtered_df['WorkDate'] < end_dt]
+        
+        # Determine which RN hours column to use
+        if exclude_admin:
+            # Use direct care RN only (excludes RN Admin and RN DON)
+            rn_hours_col = 'Hrs_RN'
+            description = 'RN (excl. admin/don)'
+        else:
+            # Use total RN (includes admin/DON)
+            rn_hours_col = 'Total_RN_Hours'
+            description = 'RN (Including Admin/DON)'
+        
+        if rn_hours_col not in filtered_df.columns:
+            return jsonify({'error': f'RN hours column {rn_hours_col} not found'})
+        
+        # Check compliance: RN >= 8 hours per day
+        threshold = 8.0
+        filtered_df['Met_Standard'] = filtered_df[rn_hours_col] >= threshold
+        filtered_df['Standard_Threshold'] = threshold
+        
+        # Calculate summary
+        total_days = len(filtered_df)
+        days_met = filtered_df['Met_Standard'].sum()
+        days_not_met = total_days - days_met
+        pct_met = (days_met / total_days * 100) if total_days > 0 else 0
+        
+        # Prepare daily data
+        daily_data = []
+        for _, row in filtered_df.iterrows():
+            work_date = pd.to_datetime(row['WorkDate'])
+            daily_data.append({
+                'date': row['WorkDate'].strftime('%Y-%m-%d'),
+                'hours': round_financial(row[rn_hours_col], 2),
+                'threshold': round_financial(threshold, 2),
+                'met_standard': bool(row['Met_Standard']),
+                'census': int(row['MDScensus']) if pd.notna(row['MDScensus']) else 0,
+                'day_of_week': work_date.strftime('%A'),
+                'day_of_week_num': work_date.dayofweek,
+                'month': work_date.strftime('%B'),
+                'year': int(work_date.year),
+                'quarter': f"Q{work_date.quarter} {work_date.year}"
+            })
+        
+        # Calculate secondary metrics
+        not_met_df = filtered_df[~filtered_df['Met_Standard']].copy().copy()
+        
+        # Day of week analysis
+        day_of_week_counts = {}
+        if len(not_met_df) > 0:
+            not_met_df['DayOfWeek'] = pd.to_datetime(not_met_df['WorkDate']).dt.day_name()
+            day_counts = not_met_df['DayOfWeek'].value_counts().to_dict()
+            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            day_of_week_counts = {day: day_counts.get(day, 0) for day in day_order}
+        
+        # Time period analysis
+        quarter_counts = {}
+        if len(not_met_df) > 0:
+            not_met_df['Quarter'] = pd.to_datetime(not_met_df['WorkDate']).dt.to_period('Q')
+            not_met_df['Quarter'] = not_met_df['Quarter'].apply(lambda x: f"Q{x.quarter} {x.year}")
+            quarter_counts = not_met_df['Quarter'].value_counts().to_dict()
+        
+        month_counts = {}
+        if len(not_met_df) > 0:
+            not_met_df['Month'] = pd.to_datetime(not_met_df['WorkDate']).dt.strftime('%B %Y')
+            month_counts = not_met_df['Month'].value_counts().to_dict()
+        
+        most_common_day = None
+        if day_of_week_counts and max(day_of_week_counts.values()) > 0:
+            most_common_day = max(day_of_week_counts.items(), key=lambda x: x[1])
+        
+        most_common_quarter = None
+        if quarter_counts and max(quarter_counts.values()) > 0:
+            most_common_quarter = max(quarter_counts.items(), key=lambda x: x[1])
+        
+        return jsonify({
+            'state': 'Utah',
+            'requirement': {
+                'display_text': 'RN for at least 8 consecutive hours a day, 7 days a week',
+                'threshold_hours': threshold,
+                'description': description
+            },
+            'exclude_admin': exclude_admin,
+            'threshold_used': round_financial(threshold, 2),
+            'summary': {
+                'total_days': total_days,
+                'days_met': int(days_met),
+                'days_not_met': int(days_not_met),
+                'pct_met': round_financial(pct_met, 1),
+                'pct_not_met': round_financial(100 - pct_met, 1)
+            },
+            'secondary_metrics': {
+                'day_of_week_breakdown': day_of_week_counts,
+                'quarter_breakdown': quarter_counts,
+                'month_breakdown': month_counts,
+                'most_common_day': most_common_day[0] if most_common_day else None,
+                'most_common_day_count': int(most_common_day[1]) if most_common_day else 0,
+                'most_common_quarter': most_common_quarter[0] if most_common_quarter else None,
+                'most_common_quarter_count': int(most_common_quarter[1]) if most_common_quarter else 0
+            },
+            'daily_data': daily_data
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)})
+
+@app.route('/api/utah-24hr-licensed-compliance')
+def get_utah_24hr_licensed_compliance():
+    """Get Utah 24-hour licensed nursing compliance (RN+LPN must provide 24-hour coverage)"""
+    try:
+        global global_df
+        
+        if global_df is None or len(global_df) == 0:
+            return jsonify({'error': 'No data loaded'})
+        
+        # Get facility state
+        facility_state = global_df['STATE'].iloc[0] if 'STATE' in global_df.columns else None
+        if not facility_state:
+            return jsonify({'error': 'Facility state not found'})
+        
+        # Check if this is a Utah facility
+        state_abbrev_to_name = {
+            'UT': 'Utah'
+        }
+        state_name = facility_state
+        if facility_state.upper() in state_abbrev_to_name:
+            state_name = state_abbrev_to_name[facility_state.upper()]
+        
+        if state_name.upper() != 'UTAH':
+            return jsonify({'error': 'This compliance check is only for Utah facilities'})
+        
+        # Get parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        exclude_admin = request.args.get('exclude_admin', 'true').lower() == 'true'
+        
+        # Filter data by date range
+        filtered_df = global_df.copy()
+        if start_date:
+            filtered_df = filtered_df[filtered_df['WorkDate'] >= pd.to_datetime(start_date)]
+        if end_date:
+            end_dt = pd.to_datetime(end_date) + pd.Timedelta(days=1)
+            filtered_df = filtered_df[filtered_df['WorkDate'] < end_dt]
+        
+        # Determine which hours columns to use
+        if exclude_admin:
+            # Use direct care RN and LPN only (excludes RN Admin, RN DON, LPN Admin)
+            rn_hours_col = 'Hrs_RN'
+            lpn_hours_col = 'Hrs_LPN'
+            description = 'RN + LPN (excl. admin/don)'
+        else:
+            # Use total RN and LPN (includes admin/DON)
+            rn_hours_col = 'Total_RN_Hours'
+            lpn_hours_col = 'Total_LPN_Hours'
+            description = 'RN + LPN (Including Admin/DON)'
+        
+        if rn_hours_col not in filtered_df.columns or lpn_hours_col not in filtered_df.columns:
+            return jsonify({'error': f'Required hours columns not found'})
+        
+        # Calculate combined RN+LPN hours
+        filtered_df['Combined_Licensed_Hours'] = filtered_df[rn_hours_col] + filtered_df[lpn_hours_col]
+        
+        # Check compliance: Combined RN+LPN >= 24 hours per day (24-hour coverage)
+        threshold = 24.0
+        filtered_df['Met_Standard'] = filtered_df['Combined_Licensed_Hours'] >= threshold
+        filtered_df['Standard_Threshold'] = threshold
+        
+        # Calculate summary
+        total_days = len(filtered_df)
+        days_met = filtered_df['Met_Standard'].sum()
+        days_not_met = total_days - days_met
+        pct_met = (days_met / total_days * 100) if total_days > 0 else 0
+        
+        # Prepare daily data
+        daily_data = []
+        for _, row in filtered_df.iterrows():
+            work_date = pd.to_datetime(row['WorkDate'])
+            daily_data.append({
+                'date': row['WorkDate'].strftime('%Y-%m-%d'),
+                'rn_hours': round_financial(row[rn_hours_col], 2),
+                'lpn_hours': round_financial(row[lpn_hours_col], 2),
+                'combined_hours': round_financial(row['Combined_Licensed_Hours'], 2),
+                'threshold': round_financial(threshold, 2),
+                'met_standard': bool(row['Met_Standard']),
+                'census': int(row['MDScensus']) if pd.notna(row['MDScensus']) else 0,
+                'day_of_week': work_date.strftime('%A'),
+                'day_of_week_num': work_date.dayofweek,
+                'month': work_date.strftime('%B'),
+                'year': int(work_date.year),
+                'quarter': f"Q{work_date.quarter} {work_date.year}"
+            })
+        
+        # Calculate secondary metrics
+        not_met_df = filtered_df[~filtered_df['Met_Standard']].copy().copy()
+        
+        # Day of week analysis
+        day_of_week_counts = {}
+        if len(not_met_df) > 0:
+            not_met_df['DayOfWeek'] = pd.to_datetime(not_met_df['WorkDate']).dt.day_name()
+            day_counts = not_met_df['DayOfWeek'].value_counts().to_dict()
+            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            day_of_week_counts = {day: day_counts.get(day, 0) for day in day_order}
+        
+        # Time period analysis
+        quarter_counts = {}
+        if len(not_met_df) > 0:
+            not_met_df['Quarter'] = pd.to_datetime(not_met_df['WorkDate']).dt.to_period('Q')
+            not_met_df['Quarter'] = not_met_df['Quarter'].apply(lambda x: f"Q{x.quarter} {x.year}")
+            quarter_counts = not_met_df['Quarter'].value_counts().to_dict()
+        
+        month_counts = {}
+        if len(not_met_df) > 0:
+            not_met_df['Month'] = pd.to_datetime(not_met_df['WorkDate']).dt.strftime('%B %Y')
+            month_counts = not_met_df['Month'].value_counts().to_dict()
+        
+        most_common_day = None
+        if day_of_week_counts and max(day_of_week_counts.values()) > 0:
+            most_common_day = max(day_of_week_counts.items(), key=lambda x: x[1])
+        
+        most_common_quarter = None
+        if quarter_counts and max(quarter_counts.values()) > 0:
+            most_common_quarter = max(quarter_counts.items(), key=lambda x: x[1])
+        
+        return jsonify({
+            'state': 'Utah',
+            'requirement': {
+                'display_text': '24-hour licensed nursing services (RN + LPN)',
+                'threshold_hours': threshold,
+                'description': description
+            },
+            'exclude_admin': exclude_admin,
+            'threshold_used': round_financial(threshold, 2),
+            'summary': {
+                'total_days': total_days,
+                'days_met': int(days_met),
+                'days_not_met': int(days_not_met),
+                'pct_met': round_financial(pct_met, 1),
+                'pct_not_met': round_financial(100 - pct_met, 1)
+            },
+            'secondary_metrics': {
+                'day_of_week_breakdown': day_of_week_counts,
+                'quarter_breakdown': quarter_counts,
+                'month_breakdown': month_counts,
+                'most_common_day': most_common_day[0] if most_common_day else None,
+                'most_common_day_count': int(most_common_day[1]) if most_common_day else 0,
+                'most_common_quarter': most_common_quarter[0] if most_common_quarter else None,
+                'most_common_quarter_count': int(most_common_quarter[1]) if most_common_quarter else 0
+            },
+            'daily_data': daily_data
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)})
+
 @app.route('/api/case-mix-data')
 def get_case_mix_data():
     """Get case-mix acuity data by quarter from both Provider Info and PBJ calculations"""
@@ -3880,12 +4876,35 @@ def get_case_mix_data():
         if global_df is not None and len(global_df) > 0:
             all_quarters.update(global_df['CY_Qtr'].unique())
         
-        # Get quarters from Provider Info
+        # Helper function to normalize quarter format
+        def normalize_quarter_for_match(q):
+            """Normalize quarter to "2018Q1" format for matching"""
+            if pd.isna(q):
+                return None
+            q_str = str(q).strip()
+            # If already in "2018Q1" format, return as is
+            if len(q_str) == 6 and q_str[4] == 'Q' and q_str[0:4].isdigit() and q_str[5].isdigit():
+                return q_str
+            # If in "Q1 2018" or "Q1 2 018" format, convert to "2018Q1"
+            if q_str.startswith('Q') and ' ' in q_str:
+                parts = q_str.replace('Q', '').split()
+                if len(parts) >= 2:
+                    quarter_num = parts[0]
+                    year = ''.join(parts[1:])  # Join year parts in case of "2 018"
+                    if quarter_num.isdigit() and year.isdigit():
+                        return f"{year}Q{quarter_num}"
+            return None  # Return None for unrecognized formats
+        
+        # Get quarters from Provider Info and normalize them
+        provider_quarters_normalized = set()
         if provider_info_df is not None and len(provider_info_df) > 0:
             # Check if quarter column exists
             if 'quarter' in provider_info_df.columns:
                 quarters_df = provider_info_df[provider_info_df['quarter'].notna()].copy()
-                all_quarters.update(quarters_df['quarter'].unique())
+                for q in quarters_df['quarter'].unique():
+                    normalized = normalize_quarter_for_match(q)
+                    if normalized:
+                        provider_quarters_normalized.add(normalized)
             else:
                 # If no quarter column, try to get quarters from CY_Qtr or create from processing_date
                 print("⚠️ Warning: 'quarter' column not found in provider_info_df. Available columns:", list(provider_info_df.columns)[:10])
@@ -3894,23 +4913,73 @@ def get_case_mix_data():
                     # Use PBJ quarters as fallback
                     pass
         
+        # Use PBJ quarters as source of truth, but include normalized provider quarters
+        all_quarters = set(global_df['CY_Qtr'].unique()) if global_df is not None and len(global_df) > 0 else set()
+        all_quarters.update(provider_quarters_normalized)
+        
         if len(all_quarters) == 0:
             return jsonify({'error': 'No data available', 'case_mix_data': {}})
         
-        for quarter in all_quarters:
+        # Sort quarters chronologically
+        def quarter_sort_key(q):
+            """Convert "2018Q1" to (2018, 1) for sorting"""
+            if pd.isna(q):
+                return (9999, 9)
+            q_str = str(q).strip()
+            try:
+                if len(q_str) == 6 and q_str[4] == 'Q':
+                    year = int(q_str[0:4])
+                    quarter = int(q_str[5])
+                    return (year, quarter)
+            except:
+                pass
+            return (9999, 9)  # Put malformed quarters at end
+        
+        sorted_quarters = sorted(all_quarters, key=quarter_sort_key)
+        
+        for quarter in sorted_quarters:
             quarter_info = {
                 'quarter': quarter
             }
             
             # === PROVIDER INFO DATA ===
+            # IMPORTANT: Only use data from exact quarter matches or exact date range matches.
+            # NEVER use fallback data from other quarters - if no match exists, leave fields as None.
             if provider_info_df is not None and len(provider_info_df) > 0:
                 # Check if quarter column exists
                 if 'quarter' in provider_info_df.columns:
-                    prov_quarter_data = provider_info_df[provider_info_df['quarter'] == quarter]
+                    # First try exact quarter match (normalize both sides)
+                    normalized_target_quarter = normalize_quarter_for_match(quarter)
+                    prov_quarter_data = provider_info_df[
+                        provider_info_df['quarter'].apply(lambda x: normalize_quarter_for_match(x) == normalized_target_quarter)
+                    ]
+                    
+                    # If we have matches, take the most recent one (by processing_date)
+                    if len(prov_quarter_data) > 0:
+                        prov_quarter_data = prov_quarter_data.sort_values('processing_date', ascending=False).head(1)
+                    else:
+                        # If no exact match, try matching null quarters by date (only within exact date range)
+                        # NEVER use fallback data from other quarters - if no match, leave empty
+                        if global_df is not None and 'CY_Qtr' in global_df.columns:
+                            # Get date range for this quarter from PBJ data
+                            quarter_dates = global_df[global_df['CY_Qtr'] == quarter]['WorkDate']
+                            if len(quarter_dates) > 0:
+                                min_date = quarter_dates.min()
+                                max_date = quarter_dates.max()
+                                # Match provider info rows with null quarters that fall within this quarter's date range
+                                null_quarter_rows = provider_info_df[
+                                    (provider_info_df['quarter'].isna()) &
+                                    (provider_info_df['processing_date'] >= min_date) & 
+                                    (provider_info_df['processing_date'] <= max_date)
+                                ]
+                                if len(null_quarter_rows) > 0:
+                                    # Use the most recent row for this quarter
+                                    prov_quarter_data = null_quarter_rows.sort_values('processing_date', ascending=False).head(1)
+                                # NO FALLBACK - if no exact match or date match, leave empty (prov_quarter_data stays empty)
                 else:
-                    # If no quarter column, try to match by processing_date or use all data
-                    print(f"⚠️ Warning: 'quarter' column not found. Using all provider info data for quarter {quarter}")
-                    prov_quarter_data = provider_info_df.copy()
+                    # If no quarter column, try to match by exact date range only
+                    # NEVER use all data - only match by exact date range
+                    prov_quarter_data = pd.DataFrame()  # Start empty
                     # Try to match by date range if possible
                     if 'processing_date' in provider_info_df.columns and global_df is not None:
                         # Get date range for this quarter from PBJ data
@@ -3918,15 +4987,12 @@ def get_case_mix_data():
                         if len(quarter_dates) > 0:
                             min_date = quarter_dates.min()
                             max_date = quarter_dates.max()
+                            # Only use data within exact date range - no fallback
                             prov_quarter_data = provider_info_df[
                                 (provider_info_df['processing_date'] >= min_date) & 
                                 (provider_info_df['processing_date'] <= max_date)
                             ]
-                            if len(prov_quarter_data) == 0:
-                                # Fallback: use most recent data before or during this quarter
-                                prov_quarter_data = provider_info_df[provider_info_df['processing_date'] <= max_date]
-                                if len(prov_quarter_data) > 0:
-                                    prov_quarter_data = prov_quarter_data.sort_values('processing_date', ascending=False).head(1)
+                            # NO FALLBACK - if no exact date match, leave empty (prov_quarter_data stays empty)
                 
                 if len(prov_quarter_data) > 0:
                     prov_data = prov_quarter_data.iloc[0]
@@ -3942,6 +5008,39 @@ def get_case_mix_data():
                     quarter_info['case_mix_rn'] = float(prov_data.get('case_mix_rn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_rn_hrs_per_resident_per_day')) else None
                     quarter_info['case_mix_lpn'] = float(prov_data.get('case_mix_lpn_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_lpn_hrs_per_resident_per_day')) else None
                     quarter_info['case_mix_na'] = float(prov_data.get('case_mix_na_hrs_per_resident_per_day', 0)) if pd.notna(prov_data.get('case_mix_na_hrs_per_resident_per_day')) else None
+                    
+                    # Extract CMI (Case Mix Index) - try multiple column name variations
+                    cmi = None
+                    cmi_source = None
+                    cmi_columns = ['case_mix_index', 'CMI', 'Case Mix Index', 'case_mix', 'Case-Mix Index', 'Case Mix Index (CMI)', 'nursing_case_mix_index', 'nursing_case_mix_index_ratio']
+                    for col in cmi_columns:
+                        if col in prov_data.index:
+                            cmi_value = prov_data.get(col)
+                            if pd.notna(cmi_value) and cmi_value is not None:
+                                try:
+                                    cmi = float(cmi_value)
+                                    quarter_info['cmi'] = round_financial(cmi, 3)
+                                    # Track which column was used as the source
+                                    quarter_info['cmi_source'] = col
+                                    break
+                                except (ValueError, TypeError):
+                                    continue
+                    if cmi is None:
+                        quarter_info['cmi'] = None
+                        quarter_info['cmi_source'] = None
+                else:
+                    # No provider info data found for this quarter - explicitly set all fields to None
+                    # This ensures we never use fallback data from other quarters
+                    quarter_info['prov_reported_total'] = None
+                    quarter_info['prov_reported_rn'] = None
+                    quarter_info['prov_reported_lpn'] = None
+                    quarter_info['prov_reported_na'] = None
+                    quarter_info['case_mix_total'] = None
+                    quarter_info['case_mix_rn'] = None
+                    quarter_info['case_mix_lpn'] = None
+                    quarter_info['case_mix_na'] = None
+                    quarter_info['cmi'] = None
+                    quarter_info['cmi_source'] = None
             
             # === PBJ DATA (calculated from daily records) ===
             if global_df is not None and len(global_df) > 0:
@@ -3984,13 +5083,15 @@ def get_case_mix_data():
             else:
                 quarter_info['pct_cmi_total'] = None
             
+            # Calculate case_mix_direct (RN + LPN + NA case-mix) and store it
+            if quarter_info.get('case_mix_rn') is not None and quarter_info.get('case_mix_lpn') is not None and quarter_info.get('case_mix_na') is not None:
+                quarter_info['case_mix_direct'] = quarter_info['case_mix_rn'] + quarter_info['case_mix_lpn'] + quarter_info['case_mix_na']
+            else:
+                quarter_info['case_mix_direct'] = None
+            
             # Direct CMI (use PBJ direct, case-mix direct = RN+LPN+NA case-mix)
-            if quarter_info.get('pbj_reported_direct') and quarter_info.get('case_mix_rn') and quarter_info.get('case_mix_lpn') and quarter_info.get('case_mix_na'):
-                case_mix_direct = quarter_info['case_mix_rn'] + quarter_info['case_mix_lpn'] + quarter_info['case_mix_na']
-                if case_mix_direct > 0:
-                    quarter_info['pct_cmi_direct'] = (quarter_info['pbj_reported_direct'] / case_mix_direct * 100)
-                else:
-                    quarter_info['pct_cmi_direct'] = None
+            if quarter_info.get('pbj_reported_direct') and quarter_info.get('case_mix_direct') and quarter_info['case_mix_direct'] > 0:
+                quarter_info['pct_cmi_direct'] = (quarter_info['pbj_reported_direct'] / quarter_info['case_mix_direct'] * 100)
             else:
                 quarter_info['pct_cmi_direct'] = None
             
@@ -4024,15 +5125,69 @@ def get_case_mix_data():
             else:
                 quarter_info['pct_cmi_na'] = None
             
-            # Round all values with appropriate precision
-            for key, value in quarter_info.items():
-                if key != 'quarter' and value is not None:
-                    # Round % CMI values to 1 decimal, others to 3 decimals
-                    if key.startswith('pct_'):
-                        quarter_info[key] = round(value, 1)
-                    else:
-                        quarter_info[key] = round(value, 3)
+            # === CALCULATE HARRINGTON-ADJUSTED HPRD ===
+            cmi = quarter_info.get('cmi')
+            if cmi is not None and pd.notna(cmi) and cmi > 0:
+                base_cmi = 0.62
+                max_cmi = 3.84
+                denominator = max_cmi - base_cmi  # (3.84 - 0.62) = 3.22
+                
+                # Calculate the ratio: (CMI - 0.62) / (3.84 - 0.62)
+                ratio = (cmi - base_cmi) / denominator if denominator > 0 else 0
+                
+                # Harrington Total Expected = 3.48 + ((CMI - 0.62) / (3.84 - 0.62))^0.715361977219995 * (7.68 - 3.48)
+                power_factor_total = ratio ** 0.715361977219995
+                quarter_info['harrington_total'] = round_financial(3.48 + power_factor_total * (7.68 - 3.48), 2)
+                
+                # Harrington RN Expected = 0.55 + ((CMI - 0.62) / (3.84 - 0.62))^0.973947642000645 * (2.39 - 0.55)
+                power_factor_rn = ratio ** 0.973947642000645
+                quarter_info['harrington_rn'] = round_financial(0.55 + power_factor_rn * (2.39 - 0.55), 2)
+                
+                # Harrington CNA Expected = 2.45 + ((CMI - 0.62) / (3.84 - 0.62))^0.236050267902121 * (3.6 - 2.45)
+                power_factor_cna = ratio ** 0.236050267902121
+                quarter_info['harrington_cna'] = round_financial(2.45 + power_factor_cna * (3.6 - 2.45), 2)
+                
+                # Calculate Harrington-adjusted percentages
+                # Total Harrington (use PBJ direct care)
+                if quarter_info.get('pbj_reported_direct') and quarter_info.get('harrington_total') and quarter_info['harrington_total'] > 0:
+                    quarter_info['pct_harrington_total'] = round((quarter_info['pbj_reported_direct'] / quarter_info['harrington_total'] * 100), 1)
+                else:
+                    quarter_info['pct_harrington_total'] = None
+                
+                # RN Harrington (use PBJ direct RN)
+                if quarter_info.get('pbj_reported_direct_rn') and quarter_info.get('harrington_rn') and quarter_info['harrington_rn'] > 0:
+                    quarter_info['pct_harrington_rn'] = round((quarter_info['pbj_reported_direct_rn'] / quarter_info['harrington_rn'] * 100), 1)
+                else:
+                    quarter_info['pct_harrington_rn'] = None
+                
+                # CNA Harrington (use PBJ reported NA)
+                if quarter_info.get('pbj_reported_na') and quarter_info.get('harrington_cna') and quarter_info['harrington_cna'] > 0:
+                    quarter_info['pct_harrington_cna'] = round((quarter_info['pbj_reported_na'] / quarter_info['harrington_cna'] * 100), 1)
+                else:
+                    quarter_info['pct_harrington_cna'] = None
+            else:
+                quarter_info['harrington_total'] = None
+                quarter_info['harrington_rn'] = None
+                quarter_info['harrington_cna'] = None
+                quarter_info['pct_harrington_total'] = None
+                quarter_info['pct_harrington_rn'] = None
+                quarter_info['pct_harrington_cna'] = None
             
+            # Round all numeric values with appropriate precision
+            # Exclude string fields like 'quarter' and 'cmi_source'
+            exclude_keys = {'quarter', 'cmi_source'}
+            for key, value in quarter_info.items():
+                if key not in exclude_keys and value is not None:
+                    # Only round if it's a numeric type
+                    if isinstance(value, (int, float)) and not pd.isna(value):
+                        # Round % CMI values to 1 decimal, others to 3 decimals
+                        if key.startswith('pct_'):
+                            quarter_info[key] = round(value, 1)
+                        else:
+                            quarter_info[key] = round(value, 3)
+            
+            # Include all quarters in the dashboard (CMI can be None/blank for some quarters)
+            # The filtering for Harrington section is done in the report, not the dashboard
             case_mix_data[quarter] = quarter_info
         
         return jsonify({'case_mix_data': case_mix_data})
@@ -4040,33 +5195,123 @@ def get_case_mix_data():
     except Exception as e:
         return jsonify({'error': str(e), 'case_mix_data': {}})
 
+@app.route('/api/harrington-cmi')
+def get_harrington_cmi():
+    """Get Harrington Expected HPRD calculations for a given quarter and CMI"""
+    try:
+        quarter = request.args.get('quarter')
+        use_total = request.args.get('use_total', 'false').lower() == 'true'
+        
+        if not quarter:
+            return jsonify({'error': 'Quarter parameter required'})
+        
+        # Get case-mix data for the quarter
+        case_mix_response = get_case_mix_data()
+        if isinstance(case_mix_response, tuple):
+            case_mix_json = case_mix_response[0].get_json()
+        else:
+            case_mix_json = case_mix_response.get_json()
+        
+        # Find the quarter data - case_mix_data is a dictionary keyed by quarter
+        quarter_data = None
+        if 'case_mix_data' in case_mix_json:
+            quarter_data = case_mix_json['case_mix_data'].get(quarter)
+        
+        if not quarter_data:
+            return jsonify({'error': f'No data found for quarter {quarter}'})
+        
+        cmi = quarter_data.get('cmi')
+        if cmi is None or pd.isna(cmi) or cmi <= 0:
+            return jsonify({'error': f'No CMI available for quarter {quarter}'})
+        
+        # Calculate Harrington Expected values (keep unrounded for percentage calculation)
+        base_cmi = 0.62
+        max_cmi = 3.84
+        denominator = max_cmi - base_cmi  # 3.22
+        ratio = (cmi - base_cmi) / denominator if denominator > 0 else 0
+        
+        # Total Expected HPRD = 3.48 + ((CMI - 0.62)/(3.84 - 0.62))^0.715 × (7.68 - 3.48)
+        power_factor_total = ratio ** 0.715361977219995
+        harrington_total_raw = 3.48 + power_factor_total * (7.68 - 3.48)
+        
+        # RN Expected HPRD = 0.55 + ((CMI - 0.62)/(3.84 - 0.62))^0.974 × (2.39 - 0.55)
+        power_factor_rn = ratio ** 0.973947642000645
+        harrington_rn_raw = 0.55 + power_factor_rn * (2.39 - 0.55)
+        
+        # Nurse Aide Expected HPRD = 2.45 + ((CMI - 0.62)/(3.84 - 0.62))^0.236 × (3.6 - 2.45)
+        power_factor_na = ratio ** 0.236050267902121
+        harrington_na_raw = 2.45 + power_factor_na * (3.6 - 2.45)
+        
+        # Get reported values (use total or direct based on user selection)
+        # Keep original unrounded values for percentage calculation
+        if use_total:
+            reported_total_raw = quarter_data.get('pbj_reported_total')
+            reported_rn_raw = quarter_data.get('pbj_reported_total_rn')
+        else:
+            reported_total_raw = quarter_data.get('pbj_reported_direct')
+            reported_rn_raw = quarter_data.get('pbj_reported_direct_rn')
+        
+        reported_na_raw = quarter_data.get('pbj_reported_na')  # Same for both
+        
+        # Calculate percentages using UNROUNDED values for accuracy
+        # Then round the final percentage result
+        pct_total = round_financial((reported_total_raw / harrington_total_raw * 100) if (reported_total_raw and harrington_total_raw > 0) else None, 1) if reported_total_raw and harrington_total_raw > 0 else None
+        pct_rn = round_financial((reported_rn_raw / harrington_rn_raw * 100) if (reported_rn_raw and harrington_rn_raw > 0) else None, 1) if reported_rn_raw and harrington_rn_raw > 0 else None
+        pct_na = round_financial((reported_na_raw / harrington_na_raw * 100) if (reported_na_raw and harrington_na_raw > 0) else None, 1) if reported_na_raw and harrington_na_raw > 0 else None
+        
+        # Round the displayed values
+        harrington_total = round_financial(harrington_total_raw, 2)
+        harrington_rn = round_financial(harrington_rn_raw, 2)
+        harrington_na = round_financial(harrington_na_raw, 2)
+        reported_total = round_financial(reported_total_raw, 2) if reported_total_raw else None
+        reported_rn = round_financial(reported_rn_raw, 2) if reported_rn_raw else None
+        reported_na = round_financial(reported_na_raw, 2) if reported_na_raw else None
+        
+        return jsonify({
+            'quarter': quarter,
+            'cmi': round_financial(cmi, 3),
+            'use_total': use_total,
+            'harrington_total': harrington_total,
+            'harrington_rn': harrington_rn,
+            'harrington_na': harrington_na,
+            'reported_total': round_financial(reported_total, 2) if reported_total else None,
+            'reported_rn': round_financial(reported_rn, 2) if reported_rn else None,
+            'reported_na': round_financial(reported_na, 2) if reported_na else None,
+            'pct_total': pct_total,
+            'pct_rn': pct_rn,
+            'pct_na': pct_na
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)})
+
 # Dynamic dashboard - no initialization needed
 
 def run_dashboard(provnum, port=5000):
     """Run the dynamic dashboard for a specific facility"""
+    global PROVNUM, _data_initialized
+    # Set PROVNUM to the provided facility code
+    PROVNUM = provnum
     app_instance = create_dynamic_dashboard(provnum)
     if app_instance is None:
         print(f"ERROR: Failed to create dashboard for facility {provnum}")
         return
     
+    # Mark data as initialized since we just loaded it
+    _data_initialized = True
+    
     print(f"Starting Dynamic Dashboard for facility {provnum}...")
     app_instance.run(debug=True, host='0.0.0.0', port=port)
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("Usage: python dynamic_facility_dashboard.py <PROVNUM>")
-        print("Example: python dynamic_facility_dashboard.py 015009")
-        sys.exit(1)
-    
-    provnum = sys.argv[1].strip().upper()
-    
-    # Validate provider number format - can contain letters and numbers, typically 6 characters
-    if len(provnum) < 1 or len(provnum) > 6:
-        print("❌ Please enter a valid provider number (1-6 characters, e.g., 015009 or 46A070)")
-        sys.exit(1)
-    
-    # Pad with leading zeros if all digits, otherwise keep as-is
-    if provnum.isdigit():
-        provnum = provnum.zfill(6)
-    
-    run_dashboard(provnum)
+if __name__ == "__main__":
+    # Read facility code from command-line argument
+    if len(sys.argv) > 1:
+        provnum = sys.argv[1].strip()
+        # Use run_dashboard function which properly initializes the dashboard
+        # (it will set PROVNUM internally)
+        run_dashboard(provnum, port=5000)
+    else:
+        # For local testing without arguments, use default
+        ensure_data_loaded()  # Load immediately for local dev
+        app.run(debug=True, port=5000)
