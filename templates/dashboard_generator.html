@@ -1,0 +1,2047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PBJ320 - Staffing Analytics Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1f2e 0%, #16213e 50%, #0f1419 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e8e8e8;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(100, 126, 234, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+            padding: 30px 0;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+            text-shadow: none;
+        }
+        
+        .header h1 .pbj-part {
+            color: #ffffff;
+        }
+        
+        .header h1 .num-part {
+            color: #667eea;
+        }
+
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.85;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            margin-top: 10px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .header .tagline {
+            font-size: 0.9rem;
+            opacity: 0.65;
+            margin-top: 8px;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 14px 30px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 0.02em;
+            position: relative;
+        }
+
+        .tab::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .tab:hover::after {
+            width: 60%;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            font-weight: 600;
+        }
+
+        .tab.active::after {
+            width: 0;
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.9rem;
+            letter-spacing: 0.01em;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 12px;
+            padding-right: 40px;
+            cursor: pointer;
+        }
+
+        select option {
+            background: #1a1f2e;
+            color: #ffffff;
+            padding: 8px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            background-color: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        input:focus,
+        input[type="number"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .help-text {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 6px;
+            font-weight: 300;
+        }
+
+        .btn {
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
+            letter-spacing: 0.02em;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #7688f0 0%, #8655b8 100%);
+        }
+
+        .btn:disabled {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            color: white;
+        }
+        
+        .btn:disabled .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .status.success {
+            background: rgba(102, 126, 234, 0.15);
+            color: #a8b5ff;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .status.error {
+            background: rgba(220, 53, 69, 0.15);
+            color: #ff6b7a;
+            border: 1px solid rgba(220, 53, 69, 0.3);
+        }
+
+        .status.info {
+            background: rgba(23, 162, 184, 0.15);
+            color: #5dade2;
+            border: 1px solid rgba(23, 162, 184, 0.3);
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(26, 31, 46, 0.98);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-top: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+        }
+
+        .autocomplete-item:hover {
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item .primary {
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 4px;
+        }
+
+        .autocomplete-item .secondary {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .status a {
+            color: #a8b5ff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .status a:hover {
+            color: #c5ceff;
+        }
+
+        .download-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            border: none;
+            cursor: pointer;
+        }
+
+        .download-link:hover {
+            background: linear-gradient(135deg, #7688f0 0%, #8655b8 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+
+        .download-link:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .file-path {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+            word-break: break-all;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .checkbox-group:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #667eea;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .checkbox-group label {
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 400;
+            margin-bottom: 0;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .criteria-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .criteria-grid .checkbox-group {
+            margin: 0;
+            padding: 8px 12px;
+        }
+
+        @media (max-width: 768px) {
+            .criteria-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .facility-info {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .facility-info.show {
+            display: block;
+        }
+
+        .facility-info strong {
+            color: #a8b5ff;
+            font-weight: 600;
+        }
+
+        .facility-info .facility-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+            margin-bottom: 8px;
+        }
+
+        .facility-info .facility-details {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+        }
+
+        .facility-info .facility-details span {
+            margin-right: 12px;
+        }
+
+        .facility-info .facility-details span:not(:last-child)::after {
+            content: '•';
+            margin-left: 12px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .date-selection-tabs {
+            display: flex;
+            gap: 0;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .date-tab {
+            flex: 1;
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+        }
+
+        .date-tab:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .date-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .date-mode-content {
+            display: none;
+        }
+
+        .date-mode-content.active {
+            display: block;
+        }
+
+        .key-dates-input {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .key-dates-input-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .key-dates-input input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .add-date-btn {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid rgba(40, 167, 69, 0.4);
+            color: #6fcf97;
+            width: auto;
+            padding: 8px 20px;
+            margin-top: 0;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .add-date-btn:hover {
+            background: rgba(40, 167, 69, 0.3);
+            border-color: rgba(40, 167, 69, 0.6);
+        }
+
+        .add-date-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .date-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(102, 126, 234, 0.4);
+            color: #a8b5ff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            margin: 5px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .date-tag .remove {
+            margin-left: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+
+        .date-tag .remove:hover {
+            color: #ff6b7a;
+            opacity: 1;
+        }
+
+        /* Tech accent elements */
+        .tab-content {
+            position: relative;
+        }
+
+        /* Subtle grid pattern overlay */
+        .container::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span class="pbj-part">PBJ</span><span class="num-part">320</span></h1>
+            <div class="subtitle">Staffing Analytics Platform</div>
+            <div class="tagline">Facility Dashboard & Report Generator</div>
+            <div style="margin-top: 20px;">
+                <a href="/veterans-homes" style="color: #667eea; text-decoration: none; font-size: 0.9rem; padding: 8px 16px; border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 8px; transition: all 0.2s;" onmouseover="this.style.background='rgba(102, 126, 234, 0.1)'; this.style.borderColor='rgba(102, 126, 234, 0.5)'" onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(102, 126, 234, 0.3)'">Veterans Homes Release →</a>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">Generate Dashboard</button>
+            <button class="tab" onclick="switchTab('report')">Attorney Report</button>
+            <button class="tab" onclick="switchTab('entity')">Entity Report</button>
+            <button class="tab" onclick="switchTab('state')">State Report</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content active">
+            <h2 style="margin-bottom: 20px;">Generate Facility Dashboard</h2>
+            
+            <div class="facility-info" id="facility-info">
+                <div class="facility-name" id="facility-name">-</div>
+                <div class="facility-details" id="facility-details"></div>
+            </div>
+
+            <form id="dashboard-form">
+                <div class="form-group">
+                    <label for="dashboard-provnum">Facility Code (CCN) *</label>
+                    <input type="text" id="dashboard-provnum" placeholder="e.g., 335513" maxlength="6" required>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="deploy-vercel" name="deploy-vercel">
+                    <label for="deploy-vercel">Also create Vercel deployment package</label>
+                </div>
+
+                <button type="submit" class="btn" id="dashboard-btn">Generate Dashboard</button>
+            </form>
+
+            <div class="status" id="dashboard-status"></div>
+        </div>
+
+        <!-- Report Tab -->
+        <div id="report-tab" class="tab-content">
+            <h2 style="margin-bottom: 20px;">Generate Facility Report</h2>
+            
+            <div class="facility-info" id="report-facility-info">
+                <div class="facility-name" id="report-facility-name">-</div>
+                <div class="facility-details" id="report-facility-details"></div>
+            </div>
+
+            <form id="report-form">
+                <div class="form-group">
+                    <label for="report-provnum">Facility Code (CCN) *</label>
+                    <input type="text" id="report-provnum" placeholder="e.g., 335513" maxlength="6" required>
+                </div>
+
+                <!-- Date Selection Tabs -->
+                <div class="form-group">
+                    <label>Time Period Selection</label>
+                    <div class="date-selection-tabs">
+                        <button type="button" class="date-tab active" data-mode="date">Search by Date Range</button>
+                        <button type="button" class="date-tab" data-mode="quarter">Quarter(s)</button>
+                        <button type="button" class="date-tab" data-mode="year">Year(s)</button>
+                    </div>
+                    
+                    <!-- Date Range Mode -->
+                    <div id="date-mode" class="date-mode-content active">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                            <div>
+                                <label for="start-date" style="font-size: 0.9rem;">Start Date *</label>
+                                <input type="date" id="start-date" required>
+                            </div>
+                            <div>
+                                <label for="end-date" style="font-size: 0.9rem;">End Date *</label>
+                                <input type="date" id="end-date" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quarter Mode -->
+                    <div id="quarter-mode" class="date-mode-content" style="display: none;">
+                        <div style="margin-top: 15px;">
+                            <label for="quarter-select" style="font-size: 0.9rem;">Select Quarter(s) *</label>
+                            <select id="quarter-select" multiple style="width: 100%; padding: 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: white; min-height: 120px; font-size: 0.9rem; font-family: 'Inter', sans-serif;">
+                                <!-- Will be populated by JavaScript -->
+                            </select>
+                            <style>
+                                #quarter-select option, #year-select option {
+                                    background: rgba(26, 31, 46, 0.95);
+                                    color: white;
+                                    padding: 8px;
+                                }
+                                #quarter-select option:hover, #year-select option:hover {
+                                    background: rgba(102, 126, 234, 0.3);
+                                }
+                                #quarter-select option:checked, #year-select option:checked {
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    color: white;
+                                }
+                            </style>
+                            <div class="help-text">Hold Ctrl/Cmd to select multiple quarters</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Year Mode -->
+                    <div id="year-mode" class="date-mode-content" style="display: none;">
+                        <div style="margin-top: 15px;">
+                            <label for="year-select" style="font-size: 0.9rem;">Select Year(s) *</label>
+                            <select id="year-select" multiple style="width: 100%; padding: 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: white; min-height: 120px; font-size: 0.9rem; font-family: 'Inter', sans-serif;">
+                                <!-- Will be populated by JavaScript -->
+                            </select>
+                            <div class="help-text">Hold Ctrl/Cmd to select multiple years</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Key Dates of Interest (Optional)</label>
+                    <div class="key-dates-input">
+                        <div class="key-dates-input-row">
+                            <input type="date" id="key-date-input" placeholder="Add a key date">
+                            <button type="button" class="btn add-date-btn" onclick="addKeyDate()">Add Date</button>
+                        </div>
+                        <div id="key-dates-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;"></div>
+                    </div>
+                    <div class="help-text">Add specific dates you want highlighted in the report</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Report Options</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="report-watermark" name="watermark">
+                        <label for="report-watermark">Add sample report disclaimer (watermark)</label>
+                    </div>
+                    <div class="help-text">Adds a disclaimer at the top indicating this is a sample report</div>
+                </div>
+
+                <button type="submit" class="btn" id="report-btn">Generate Report</button>
+            </form>
+
+            <div class="status" id="report-status"></div>
+        </div>
+
+        <!-- Entity Report Tab -->
+        <div id="entity-tab" class="tab-content">
+            <h2 style="margin-bottom: 20px;">Generate Entity Report</h2>
+            <p style="margin-bottom: 20px; opacity: 0.8;">Generate comprehensive reports for all facilities in an entity/chain.</p>
+            
+            <form id="entity-form">
+                <div class="form-group">
+                    <label for="entity-id">Entity/Chain *</label>
+                    <div style="position: relative;">
+                        <input type="text" id="entity-id" placeholder="Search by Entity ID or Name (e.g., 217, Good Samaritan)" required autocomplete="off">
+                        <div id="entity-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
+                    </div>
+                    <div class="help-text">Start typing to search entities by ID or name</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Report Options</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="entity-skip-existing" name="skip_existing">
+                        <label for="entity-skip-existing">Skip existing facilities (faster if regenerating)</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Longitudinal Metrics Customization</label>
+                    <div class="help-text" style="margin-bottom: 12px;">Select which metrics to display in the longitudinal charts (defaults shown if none selected)</div>
+                    <div class="criteria-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-facilities" value="number_of_facilities" checked>
+                            <label for="entity-metric-facilities">Number of Facilities</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-rating" value="avg_overall_rating" checked>
+                            <label for="entity-metric-rating">Average Overall Rating</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-sff" value="total_sff" checked>
+                            <label for="entity-metric-sff">Number of SFF</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-hprd" value="avg_total_nurse_hprd" checked>
+                            <label for="entity-metric-hprd">Average Total Nurse HPRD</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-rn-hprd" value="avg_rn_hprd">
+                            <label for="entity-metric-rn-hprd">Average RN HPRD</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-staffing-rating" value="avg_staffing_rating">
+                            <label for="entity-metric-staffing-rating">Average Staffing Rating</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-health-rating" value="avg_health_inspection_rating">
+                            <label for="entity-metric-health-rating">Average Health Inspection Rating</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="entity-metric-turnover" value="avg_nursing_turnover">
+                            <label for="entity-metric-turnover">Average Nursing Turnover</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="entity-min-census">Minimum Census Filter</label>
+                    <select id="entity-min-census">
+                        <option value="">No filter (include all facilities)</option>
+                        <option value="100">Exclude facilities with &lt; 100 residents</option>
+                        <option value="150">Exclude facilities with &lt; 150 residents</option>
+                        <option value="200">Exclude facilities with &lt; 200 residents</option>
+                        <option value="custom">Custom minimum census</option>
+                    </select>
+                    <input type="number" id="entity-custom-census" placeholder="Enter custom minimum census" style="display: none; margin-top: 12px;" min="1">
+                </div>
+
+                <div class="form-group">
+                    <label>Sample Report (Drill-Down)</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="entity-drill-down" name="drill_down">
+                        <label for="entity-drill-down">Generate sample report with selected facilities</label>
+                    </div>
+                    <div id="entity-drill-down-options" style="display: none; margin-top: 12px; padding-left: 24px;">
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="entity-drill-num">Number of facilities:</label>
+                            <input type="number" id="entity-drill-num" value="5" min="1" style="width: 100px; margin-left: 8px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Priority Criteria (select multiple):</label>
+                            <div class="criteria-grid" style="margin-top: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="entity-criteria-risk" value="risk_score" checked>
+                                    <label for="entity-criteria-risk">Highest Risk Score</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="entity-criteria-sff" value="sff" checked>
+                                    <label for="entity-criteria-sff">Special Focus Facility (SFF)</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="entity-criteria-staffing" value="low_staffing" checked>
+                                    <label for="entity-criteria-staffing">Lowest Staffing Levels</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="entity-criteria-onestar" value="one_star" checked>
+                                    <label for="entity-criteria-onestar">1-Star Overall Rating</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="entity-criteria-gplus" value="g_citations" checked>
+                                    <label for="entity-criteria-gplus">Most G+ Citations</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="entity-criteria-abuse" value="abuse" checked>
+                                    <label for="entity-criteria-abuse">Abuse History</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="entity-btn">Generate Entity Report</button>
+            </form>
+
+            <div class="status" id="entity-status"></div>
+        </div>
+
+        <!-- State Report Tab -->
+        <div id="state-tab" class="tab-content">
+            <h2 style="margin-bottom: 20px;">Generate State Report</h2>
+            <p style="margin-bottom: 20px; opacity: 0.8;">Generate SFF facility reports for a specific state.</p>
+            
+            <form id="state-form">
+                <div class="form-group">
+                    <label for="state-code">State *</label>
+                    <div style="position: relative;">
+                        <input type="text" id="state-code" placeholder="Search by state code or name (e.g., NY, New York)" maxlength="50" required autocomplete="off">
+                        <div id="state-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
+                    </div>
+                    <div class="help-text">Start typing to search states by code or name</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Report Options</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="state-skip-existing" name="skip_existing">
+                        <label for="state-skip-existing">Skip existing facilities (faster if regenerating)</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="state-min-census">Minimum Census Filter</label>
+                    <select id="state-min-census">
+                        <option value="">No filter (include all facilities)</option>
+                        <option value="100">Exclude facilities with &lt; 100 residents</option>
+                        <option value="150">Exclude facilities with &lt; 150 residents</option>
+                        <option value="200">Exclude facilities with &lt; 200 residents</option>
+                        <option value="custom">Custom minimum census</option>
+                    </select>
+                    <input type="number" id="state-custom-census" placeholder="Enter custom minimum census" style="display: none; margin-top: 12px;" min="1">
+                </div>
+
+                <div class="form-group">
+                    <label>Sample Report (Drill-Down)</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="state-drill-down" name="drill_down">
+                        <label for="state-drill-down">Generate sample report with selected facilities</label>
+                    </div>
+                    <div id="state-drill-down-options" style="display: none; margin-top: 16px; padding: 16px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label for="state-drill-num">Number of facilities:</label>
+                            <input type="number" id="state-drill-num" value="5" min="1" style="width: 120px; margin-top: 8px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Priority Criteria (select multiple):</label>
+                            <div class="criteria-grid" style="margin-top: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="state-criteria-risk" value="risk_score" checked>
+                                    <label for="state-criteria-risk">Highest Risk Score</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="state-criteria-sff" value="sff" checked>
+                                    <label for="state-criteria-sff">Special Focus Facility (SFF)</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="state-criteria-staffing" value="low_staffing" checked>
+                                    <label for="state-criteria-staffing">Lowest Staffing Levels</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="state-criteria-onestar" value="one_star" checked>
+                                    <label for="state-criteria-onestar">1-Star Overall Rating</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="state-criteria-gplus" value="g_citations" checked>
+                                    <label for="state-criteria-gplus">Most G+ Citations</label>
+                                </div>
+                                <div class="checkbox-group" style="margin: 0;">
+                                    <input type="checkbox" id="state-criteria-abuse" value="abuse" checked>
+                                    <label for="state-criteria-abuse">Abuse History</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="state-btn">Generate State Report</button>
+            </form>
+
+            <div class="status" id="state-status"></div>
+        </div>
+    </div>
+
+    <script>
+        let keyDates = [];
+
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const tabId = tab === 'report' ? 'report-tab' : tab + '-tab';
+            const tabElement = document.getElementById(tabId);
+            if (tabElement) {
+                tabElement.classList.add('active');
+            }
+        }
+
+        function showStatus(elementIdOrElement, message, type) {
+            const status = typeof elementIdOrElement === 'string' 
+                ? document.getElementById(elementIdOrElement)
+                : elementIdOrElement;
+            if (!status) {
+                console.error('Status element not found:', elementIdOrElement);
+                return;
+            }
+            status.textContent = message;
+            status.className = `status ${type} show`;
+        }
+
+        function hideStatus(elementId) {
+            const status = document.getElementById(elementId);
+            status.classList.remove('show');
+        }
+
+        let estimatedTimeSeconds = 90; // Default estimate
+        
+        function formatTimeEstimate(seconds) {
+            if (seconds < 60) {
+                return `~${Math.round(seconds)}s`;
+            } else {
+                const minutes = Math.round(seconds / 60);
+                return `~${minutes} min${minutes > 1 ? 's' : ''}`;
+            }
+        }
+        
+        function setLoading(buttonId, loading, progress = null) {
+            const btn = document.getElementById(buttonId);
+            if (loading) {
+                if (!btn.getAttribute('data-original-text')) {
+                    btn.setAttribute('data-original-text', btn.textContent);
+                }
+                btn.disabled = true;
+                
+                if (progress !== null) {
+                    // Show progress bar
+                    btn.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="loading"></span>
+                                <span>Processing... ${Math.round(progress)}%</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s ease; border-radius: 3px;"></div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const timeEstimate = formatTimeEstimate(estimatedTimeSeconds);
+                    btn.innerHTML = `<span class="loading"></span>Processing... <span style="font-size: 0.85em; opacity: 0.8; margin-left: 8px;">(${timeEstimate})</span>`;
+                }
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = btn.getAttribute('data-original-text') || 'Submit';
+            }
+        }
+        
+        // Simulate progress for long operations
+        // Takes 5 seconds to reach 15%, then accelerates
+        function simulateProgress(buttonId, durationSeconds) {
+            let progress = 0;
+            let elapsed = 0;
+            const startTime = Date.now();
+            const slowPhaseEnd = 5000; // 5 seconds for first 15%
+            const slowPhaseTarget = 15;
+            
+            const interval = setInterval(() => {
+                elapsed = Date.now() - startTime;
+                
+                if (elapsed < slowPhaseEnd) {
+                    // Slow phase: 5 seconds to reach 15%
+                    progress = (elapsed / slowPhaseEnd) * slowPhaseTarget;
+                } else {
+                    // Fast phase: accelerate to 95%
+                    const remainingTime = durationSeconds * 1000 - slowPhaseEnd;
+                    const remainingProgress = 95 - slowPhaseTarget;
+                    const fastElapsed = elapsed - slowPhaseEnd;
+                    progress = slowPhaseTarget + (fastElapsed / remainingTime) * remainingProgress;
+                }
+                
+                if (progress >= 95) {
+                    progress = 95; // Don't go to 100% until actually done
+                }
+                setLoading(buttonId, true, Math.round(progress));
+            }, 100); // Update 10 times per second for smoother animation
+            return interval;
+        }
+
+        // Check facility when CCN is entered
+        async function checkFacility(provnum, type) {
+            if (!provnum || provnum.length !== 6) {
+                // Hide facility info if CCN is not 6 digits
+                const infoDiv = document.getElementById(type === 'dashboard' ? 'facility-info' : 'report-facility-info');
+                if (infoDiv) {
+                    infoDiv.classList.remove('show');
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/check-facility', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provnum })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+                    console.error('Failed to check facility:', response.status, errorData.error || '');
+                    return;
+                }
+
+                const data = await response.json();
+                
+                // Store facility data globally for date validation
+                window.facilityData = {
+                    min_date: data.start_date || '2017-01-01',
+                    max_date: data.end_date || '2025-09-30',
+                    start_date: data.start_date,
+                    end_date: data.end_date
+                };
+                
+                // Update time estimate if provided
+                if (data.estimated_time_seconds) {
+                    estimatedTimeSeconds = data.estimated_time_seconds;
+                }
+                
+                const infoDiv = document.getElementById(type === 'dashboard' ? 'facility-info' : 'report-facility-info');
+                const nameSpan = document.getElementById(type === 'dashboard' ? 'facility-name' : 'report-facility-name');
+                const detailsSpan = document.getElementById(type === 'dashboard' ? 'facility-details' : 'report-facility-details');
+                
+                if (data.facility_name) {
+                    nameSpan.textContent = data.facility_name;
+                    
+                    // Build details string
+                    const details = [];
+                    if (data.city && data.state) {
+                        details.push(`${data.city}, ${data.state}`);
+                    } else if (data.city) {
+                        details.push(data.city);
+                    } else if (data.state) {
+                        details.push(data.state);
+                    }
+                    if (data.entity) {
+                        details.push(data.entity);
+                    }
+                    
+                    if (details.length > 0) {
+                        detailsSpan.innerHTML = details.map(d => `<span>${d}</span>`).join('');
+                    } else {
+                        detailsSpan.textContent = '';
+                    }
+                    
+                    infoDiv.classList.add('show');
+                } else if (data.exists) {
+                    // Facility data exists but no name - show generic message
+                    nameSpan.textContent = `Facility ${provnum}`;
+                    detailsSpan.textContent = '';
+                    infoDiv.classList.add('show');
+                } else {
+                    // No facility data found
+                    infoDiv.classList.remove('show');
+                }
+                
+                // Set default dates for report tab and populate options
+                if (type === 'report') {
+                    if (data.start_date && data.end_date) {
+                        document.getElementById('start-date').value = data.start_date;
+                        document.getElementById('end-date').value = data.end_date;
+                    }
+                    // Always populate options, even if dates come from input fields
+                    populateDateOptions(data);
+                    
+                    // Update date input limits
+                    const keyDateInput = document.getElementById('key-date-input');
+                    if (keyDateInput && window.facilityData) {
+                        if (window.facilityData.min_date) {
+                            keyDateInput.setAttribute('min', window.facilityData.min_date);
+                        }
+                        if (window.facilityData.max_date) {
+                            keyDateInput.setAttribute('max', window.facilityData.max_date);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking facility:', error);
+                // Don't show error for connection resets - they're expected during long operations
+                if (error.message && !error.message.includes('Failed to fetch') && !error.message.includes('ERR_CONNECTION_RESET')) {
+                    // Only log unexpected errors
+                }
+            }
+        }
+
+        // Dashboard form submission
+        document.getElementById('dashboard-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const provnum = document.getElementById('dashboard-provnum').value.trim();
+            const deployVercel = document.getElementById('deploy-vercel').checked;
+
+            if (provnum.length !== 6) {
+                showStatus('dashboard-status', 'Please enter a valid 6-digit facility code', 'error');
+                return;
+            }
+
+            setLoading('dashboard-btn', true);
+            hideStatus('dashboard-status');
+            
+            // Start progress simulation
+            const progressInterval = simulateProgress('dashboard-btn', estimatedTimeSeconds);
+
+            try {
+                // Generate dashboard with longer timeout (5 minutes for large CSV generation)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+                
+                const response = await fetch('/api/generate-dashboard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provnum }),
+                    signal: controller.signal
+                }).finally(() => clearTimeout(timeoutId));
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (deployVercel) {
+                        showStatus('dashboard-status', 'Dashboard created. Creating Vercel package...', 'info');
+                        
+                        // Vercel deployment with longer timeout (10 minutes)
+                        const vercelController = new AbortController();
+                        const vercelTimeoutId = setTimeout(() => vercelController.abort(), 600000); // 10 minutes
+                        
+                        const vercelResponse = await fetch('/api/deploy-vercel', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ provnum }),
+                            signal: vercelController.signal
+                        }).finally(() => clearTimeout(vercelTimeoutId));
+
+                        if (!vercelResponse.ok) {
+                            const errorData = await vercelResponse.json().catch(() => ({ error: `HTTP ${vercelResponse.status}` }));
+                            throw new Error(errorData.error || `Vercel deployment failed: ${vercelResponse.status}`);
+                        }
+
+                        const vercelData = await vercelResponse.json();
+                        if (vercelData.success !== false) {
+                            const facilityName = vercelData.facility_name || data.facility_name || 'Dashboard';
+                            const dashboardUrl = vercelData.vercel_url || `https://pbj320-${provnum}.vercel.app/`;
+                            const statusHtml = `
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div>
+                                        <strong>✓ Dashboard ${vercelData.vercel_url ? 'deployed' : 'created'} successfully!</strong>
+                                    </div>
+                                    ${vercelData.vercel_url ? `
+                                    <div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7);">
+                                        Live at: <code style="background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px;">${vercelData.vercel_url}</code>
+                                    </div>
+                                    ` : `
+                                    <div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7);">
+                                        Deploy directory: <code style="background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px;">${vercelData.deploy_dir}</code>
+                                    </div>
+                                    `}
+                                    <a href="${dashboardUrl}" target="_blank" class="download-link" style="margin-top: 0;">
+                                        📊 ${vercelData.vercel_url ? 'View Live Dashboard' : 'Open Dashboard'}
+                                    </a>
+                                </div>
+                            `;
+                            const statusDiv = document.getElementById('dashboard-status');
+                            statusDiv.innerHTML = statusHtml;
+                            statusDiv.className = 'status success show';
+                        } else {
+                            showStatus('dashboard-status', 
+                                `Dashboard created but Vercel deployment failed: ${vercelData.error}`, 
+                                'error');
+                        }
+                    } else {
+                        const facilityName = data.facility_name || 'Dashboard';
+                        const dashboardUrl = `https://pbj320-${provnum}.vercel.app/`;
+                        const statusHtml = `
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <div>
+                                    <strong>✓ Dashboard files created successfully!</strong>
+                                </div>
+                                <a href="${dashboardUrl}" target="_blank" class="download-link" style="margin-top: 0;">
+                                    📊 Open Dashboard
+                                </a>
+                            </div>
+                        `;
+                        const statusDiv = document.getElementById('dashboard-status');
+                        statusDiv.innerHTML = statusHtml;
+                        statusDiv.className = 'status success show';
+                    }
+                } else {
+                    showStatus('dashboard-status', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Dashboard generation error:', error);
+                let errorMsg = error.message || 'Unknown error occurred';
+                if (error.name === 'AbortError') {
+                    errorMsg = 'Request timed out. CSV generation may take several minutes for large facilities. Please try again or check server logs.';
+                } else if (errorMsg === 'Failed to fetch' || errorMsg.includes('ERR_CONNECTION_RESET') || errorMsg.includes('Connection reset')) {
+                    errorMsg = 'Connection lost. The server may have crashed or the request timed out during CSV generation. Check server logs and try again.';
+                }
+                showStatus('dashboard-status', `Error: ${errorMsg}`, 'error');
+            } finally {
+                clearInterval(progressInterval);
+                setLoading('dashboard-btn', false);
+            }
+        });
+
+        // Entity autocomplete
+        let entitySearchTimeout;
+        const entityInput = document.getElementById('entity-id');
+        const entityAutocomplete = document.getElementById('entity-autocomplete');
+        
+        entityInput.addEventListener('input', async (e) => {
+            const query = e.target.value.trim();
+            clearTimeout(entitySearchTimeout);
+            
+            if (query.length < 1) {
+                entityAutocomplete.style.display = 'none';
+                return;
+            }
+            
+            entitySearchTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/search-entities?q=${encodeURIComponent(query)}&limit=10`);
+                    const data = await response.json();
+                    
+                    if (data.entities && data.entities.length > 0) {
+                        entityAutocomplete.innerHTML = data.entities.map(entity => `
+                            <div class="autocomplete-item" onclick="selectEntity('${entity.id}', '${(entity.name || '').replace(/'/g, "\\'")}')">
+                                <div class="primary">${entity.name}</div>
+                                <div class="secondary">ID: ${entity.id} • ${entity.facility_count} facilities</div>
+                            </div>
+                        `).join('');
+                        entityAutocomplete.style.display = 'block';
+                    } else {
+                        entityAutocomplete.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('Entity search error:', error);
+                }
+            }, 300);
+        });
+        
+        function selectEntity(id, name) {
+            entityInput.value = `${name} (${id})`;
+            entityInput.dataset.entityId = id;
+            entityAutocomplete.style.display = 'none';
+        }
+        
+        // State autocomplete
+        let stateSearchTimeout;
+        const stateInput = document.getElementById('state-code');
+        const stateAutocomplete = document.getElementById('state-autocomplete');
+        
+        stateInput.addEventListener('input', async (e) => {
+            const query = e.target.value.trim();
+            clearTimeout(stateSearchTimeout);
+            
+            if (query.length < 1) {
+                stateAutocomplete.style.display = 'none';
+                return;
+            }
+            
+            stateSearchTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/search-states?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+                    
+                    if (data.states && data.states.length > 0) {
+                        stateAutocomplete.innerHTML = data.states.map(state => `
+                            <div class="autocomplete-item" onclick="selectState('${state.code}', '${state.name}')">
+                                <div class="primary">${state.name}</div>
+                                <div class="secondary">${state.code}</div>
+                            </div>
+                        `).join('');
+                        stateAutocomplete.style.display = 'block';
+                    } else {
+                        stateAutocomplete.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('State search error:', error);
+                }
+            }, 200);
+        });
+        
+        function selectState(code, name) {
+            stateInput.value = `${name} (${code})`;
+            stateInput.dataset.stateCode = code;
+            stateAutocomplete.style.display = 'none';
+        }
+        
+        // Close autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!entityInput.contains(e.target) && !entityAutocomplete.contains(e.target)) {
+                entityAutocomplete.style.display = 'none';
+            }
+            if (!stateInput.contains(e.target) && !stateAutocomplete.contains(e.target)) {
+                stateAutocomplete.style.display = 'none';
+            }
+        });
+
+        // Entity form drill-down toggle
+        document.getElementById('entity-drill-down').addEventListener('change', (e) => {
+            document.getElementById('entity-drill-down-options').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // State form drill-down toggle
+        document.getElementById('state-drill-down').addEventListener('change', (e) => {
+            document.getElementById('state-drill-down-options').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // Custom census inputs
+        document.getElementById('entity-min-census').addEventListener('change', (e) => {
+            document.getElementById('entity-custom-census').style.display = e.target.value === 'custom' ? 'block' : 'none';
+        });
+
+        document.getElementById('state-min-census').addEventListener('change', (e) => {
+            document.getElementById('state-custom-census').style.display = e.target.value === 'custom' ? 'block' : 'none';
+        });
+
+        // Entity form submission
+        document.getElementById('entity-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Extract entity ID from input (could be "Name (ID)" or just ID)
+            let entityId = entityInput.dataset.entityId || entityInput.value.trim();
+            if (entityId.includes('(')) {
+                const match = entityId.match(/\((\d+)\)/);
+                if (match) entityId = match[1];
+            }
+            
+            const statusDiv = document.getElementById('entity-status');
+            const buttonId = 'entity-btn';
+            
+            if (!entityId) {
+                showStatus(statusDiv, 'Please select an Entity', 'error');
+                return;
+            }
+            
+            // Collect all options
+            const skipExisting = document.getElementById('entity-skip-existing').checked;
+            const minCensusSelect = document.getElementById('entity-min-census').value;
+            let minCensus = null;
+            if (minCensusSelect && minCensusSelect !== 'custom') {
+                minCensus = parseInt(minCensusSelect);
+            } else if (minCensusSelect === 'custom') {
+                const customCensus = document.getElementById('entity-custom-census').value;
+                if (customCensus) minCensus = parseInt(customCensus);
+            }
+            
+            const drillDown = document.getElementById('entity-drill-down').checked;
+            let drillDownNum = null;
+            let drillDownCriteria = null;
+            if (drillDown) {
+                drillDownNum = parseInt(document.getElementById('entity-drill-num').value) || 5;
+                drillDownCriteria = Array.from(document.querySelectorAll('#entity-drill-down-options input[type="checkbox"]:checked'))
+                    .map(cb => cb.value);
+            }
+            
+            // Collect selected metrics
+            const selectedMetrics = Array.from(document.querySelectorAll('#entity-tab input[type="checkbox"][id^="entity-metric-"]:checked'))
+                .map(cb => cb.value);
+            
+            setLoading(buttonId, true);
+            showStatus(statusDiv, 'Generating entity report... This may take several minutes.', 'info');
+            
+            // Start progress simulation for entity report (typically 2-5 minutes)
+            const entityProgressInterval = simulateProgress(buttonId, 180); // 3 minutes default
+            
+            try {
+                const response = await fetch('/api/generate-entity-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        entity_id: entityId,
+                        skip_existing: skipExisting,
+                        min_census: minCensus,
+                        drill_down_num: drillDownNum,
+                        drill_down_criteria: drillDownCriteria,
+                        selected_metrics: selectedMetrics.length > 0 ? selectedMetrics : null
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    let statusHtml = `<div style="display: flex; flex-direction: column; gap: 12px;"><div><strong>✓ Entity report generated successfully!</strong></div>`;
+                    
+                    if (data.report_files && data.report_files.length > 0) {
+                        statusHtml += `<div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">Available reports:</div>`;
+                        data.report_files.forEach(file => {
+                            const fileType = file.filename.endsWith('.html') ? '📄' : file.filename.endsWith('.pdf') ? '📕' : '📝';
+                            statusHtml += `<a href="${file.download_url}" target="_blank" class="download-link" style="margin-top: 4px;">${fileType} ${file.filename}</a>`;
+                        });
+                    } else {
+                        statusHtml += `<div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">Reports saved to: ${data.report_folder || 'facility_red_flag_report/reports/ENTITY_' + entityId}</div>`;
+                    }
+                    
+                    statusHtml += `</div>`;
+                    statusDiv.innerHTML = statusHtml;
+                    statusDiv.className = 'status success show';
+                } else {
+                    showStatus(statusDiv, data.error || 'Failed to generate entity report', 'error');
+                }
+            } catch (error) {
+                showStatus(statusDiv, `Error: ${error.message}`, 'error');
+            } finally {
+                clearInterval(entityProgressInterval);
+                setLoading(buttonId, false);
+            }
+        });
+
+        // State form submission
+        document.getElementById('state-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Extract state code from input (could be "Name (CODE)" or just CODE)
+            let stateCode = stateInput.dataset.stateCode || stateInput.value.trim().toUpperCase();
+            if (stateCode.includes('(')) {
+                const match = stateCode.match(/\(([A-Z]{2})\)/);
+                if (match) stateCode = match[1];
+            } else {
+                // Extract just the code if it's mixed
+                stateCode = stateCode.substring(0, 2);
+            }
+            
+            const statusDiv = document.getElementById('state-status');
+            const buttonId = 'state-btn';
+            
+            if (!stateCode || stateCode.length !== 2) {
+                showStatus(statusDiv, 'Please select a valid state', 'error');
+                return;
+            }
+            
+            // Collect all options
+            const skipExisting = document.getElementById('state-skip-existing').checked;
+            const minCensusSelect = document.getElementById('state-min-census').value;
+            let minCensus = null;
+            if (minCensusSelect && minCensusSelect !== 'custom') {
+                minCensus = parseInt(minCensusSelect);
+            } else if (minCensusSelect === 'custom') {
+                const customCensus = document.getElementById('state-custom-census').value;
+                if (customCensus) minCensus = parseInt(customCensus);
+            }
+            
+            const drillDown = document.getElementById('state-drill-down').checked;
+            let drillDownNum = null;
+            let drillDownCriteria = null;
+            if (drillDown) {
+                drillDownNum = parseInt(document.getElementById('state-drill-num').value) || 5;
+                drillDownCriteria = Array.from(document.querySelectorAll('#state-drill-down-options input[type="checkbox"]:checked'))
+                    .map(cb => cb.value);
+            }
+            
+            setLoading(buttonId, true);
+            showStatus(statusDiv, 'Generating state report... This may take several minutes.', 'info');
+            
+            try {
+                const response = await fetch('/api/generate-state-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        state: stateCode,
+                        skip_existing: skipExisting,
+                        min_census: minCensus,
+                        drill_down_num: drillDownNum,
+                        drill_down_criteria: drillDownCriteria
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    let statusHtml = `<div style="display: flex; flex-direction: column; gap: 12px;"><div><strong>✓ State report generated successfully!</strong></div>`;
+                    
+                    if (data.report_files && data.report_files.length > 0) {
+                        statusHtml += `<div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">Available reports:</div>`;
+                        data.report_files.forEach(file => {
+                            const fileType = file.filename.endsWith('.html') ? '📄' : file.filename.endsWith('.pdf') ? '📕' : '📝';
+                            statusHtml += `<a href="${file.download_url}" target="_blank" class="download-link" style="margin-top: 4px;">${fileType} ${file.filename}</a>`;
+                        });
+                    } else {
+                        statusHtml += `<div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">Reports saved to: ${data.report_folder || 'facility_red_flag_report/reports/' + stateCode}</div>`;
+                    }
+                    
+                    statusHtml += `</div>`;
+                    statusDiv.innerHTML = statusHtml;
+                    statusDiv.className = 'status success show';
+                } else {
+                    showStatus(statusDiv, data.error || 'Failed to generate state report', 'error');
+                }
+            } catch (error) {
+                showStatus(statusDiv, `Error: ${error.message}`, 'error');
+            } finally {
+                setLoading(buttonId, false);
+            }
+        });
+
+        // Report form submission
+        document.getElementById('report-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const provnum = document.getElementById('report-provnum').value.trim();
+            
+            // Get active date selection mode
+            const activeTab = document.querySelector('.date-tab.active');
+            const mode = activeTab ? activeTab.getAttribute('data-mode') : 'date';
+            
+            let startDate = null;
+            let endDate = null;
+            let quarters = null;
+            let years = null;
+            
+            if (mode === 'date') {
+                startDate = document.getElementById('start-date').value;
+                endDate = document.getElementById('end-date').value;
+                if (!startDate || !endDate) {
+                    showStatus('report-status', 'Please select both start and end dates', 'error');
+                    return;
+                }
+            } else if (mode === 'quarter') {
+                const selected = Array.from(document.getElementById('quarter-select').selectedOptions).map(o => o.value);
+                if (selected.length === 0) {
+                    showStatus('report-status', 'Please select at least one quarter', 'error');
+                    return;
+                }
+                quarters = selected;
+            } else if (mode === 'year') {
+                const selected = Array.from(document.getElementById('year-select').selectedOptions).map(o => o.value);
+                if (selected.length === 0) {
+                    showStatus('report-status', 'Please select at least one year', 'error');
+                    return;
+                }
+                years = selected;
+            }
+
+            if (provnum.length !== 6) {
+                showStatus('report-status', 'Please enter a valid 6-digit facility code', 'error');
+                return;
+            }
+
+            const watermark = document.getElementById('report-watermark').checked;
+
+            setLoading('report-btn', true);
+            hideStatus('report-status');
+            
+            // Start progress simulation for report (typically 30-60 seconds)
+            const reportProgressInterval = simulateProgress('report-btn', 45);
+
+            try {
+                const response = await fetch('/api/generate-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provnum,
+                        start_date: startDate,
+                        end_date: endDate,
+                        quarters: quarters,
+                        years: years,
+                        key_dates: keyDates.join(','),
+                        watermark: watermark
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const reportFileName = data.report_file.split(/[/\\]/).pop();
+                    const downloadUrl = `/api/download-report/${encodeURIComponent(data.report_file)}`;
+                    const statusHtml = `
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div>
+                                <strong>✓ Report generated successfully!</strong>
+                            </div>
+                            <div class="file-path">${reportFileName}</div>
+                            <a href="${downloadUrl}" download="${reportFileName}" class="download-link">
+                                <span>📥</span>
+                                <span>Download Report</span>
+                            </a>
+                        </div>
+                    `;
+                    const statusDiv = document.getElementById('report-status');
+                    statusDiv.innerHTML = statusHtml;
+                    statusDiv.className = 'status success show';
+                } else {
+                    showStatus('report-status', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Report generation error:', error);
+                let errorMsg = error.message || 'Unknown error occurred';
+                if (errorMsg === 'Failed to fetch') {
+                    errorMsg = 'Unable to connect to server. Please make sure the Flask server is running on port 5001.';
+                }
+                showStatus('report-status', `Error: ${errorMsg}`, 'error');
+            } finally {
+                clearInterval(reportProgressInterval);
+                setLoading('report-btn', false);
+            }
+        });
+
+        // Format date from YYYY-MM-DD to MM/DD/YYYY
+        function formatDateForDisplay(dateStr) {
+            const [year, month, day] = dateStr.split('-');
+            return `${month}/${day}/${year}`;
+        }
+
+        function addKeyDate() {
+            const input = document.getElementById('key-date-input');
+            const date = input.value;
+            
+            if (!date) {
+                return;
+            }
+
+            // Validate date is within range
+            const facilityData = window.facilityData || {};
+            const minDate = facilityData.min_date || '2017-01-01';
+            const maxDate = facilityData.max_date || '2025-09-30';
+            
+            if (date < minDate || date > maxDate) {
+                alert(`Date must be between ${formatDateForDisplay(minDate)} and ${formatDateForDisplay(maxDate)}`);
+                input.value = '';
+                return;
+            }
+
+            if (keyDates.includes(date)) {
+                alert('This date is already added');
+                input.value = '';
+                return;
+            }
+
+            keyDates.push(date);
+            keyDates.sort(); // Keep dates sorted
+            updateKeyDatesList();
+            input.value = '';
+        }
+
+        function removeKeyDate(date) {
+            keyDates = keyDates.filter(d => d !== date);
+            updateKeyDatesList();
+        }
+
+        function updateKeyDatesList() {
+            const list = document.getElementById('key-dates-list');
+            if (keyDates.length === 0) {
+                list.innerHTML = '';
+                return;
+            }
+            list.innerHTML = keyDates.map(date => 
+                `<span class="date-tag">${formatDateForDisplay(date)} <span class="remove" onclick="removeKeyDate('${date}')" style="cursor: pointer; font-weight: bold; margin-left: 4px;">×</span></span>`
+            ).join('');
+        }
+
+        // Prevent Enter key from submitting form when in date input
+        document.addEventListener('DOMContentLoaded', function() {
+            const keyDateInput = document.getElementById('key-date-input');
+            if (keyDateInput) {
+                keyDateInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation(); // Prevent form submission
+                        addKeyDate();
+                    }
+                });
+                
+                // Prevent the key date input from triggering form events
+                keyDateInput.addEventListener('change', function(e) {
+                    e.stopPropagation(); // Don't let this bubble up to form
+                });
+                
+                // Set min/max dates when facility data is available
+                const updateDateLimits = () => {
+                    const facilityData = window.facilityData || {};
+                    if (facilityData.min_date) {
+                        keyDateInput.setAttribute('min', facilityData.min_date);
+                    }
+                    if (facilityData.max_date) {
+                        keyDateInput.setAttribute('max', facilityData.max_date);
+                    }
+                };
+                
+                // Update limits when facility data changes
+                const originalCheckFacility = window.checkFacility;
+                if (originalCheckFacility) {
+                    window.checkFacility = function(...args) {
+                        const result = originalCheckFacility.apply(this, args);
+                        setTimeout(updateDateLimits, 100);
+                        return result;
+                    };
+                }
+                updateDateLimits();
+            }
+        });
+
+        // Check facility on input
+        // Add debounce to avoid too many API calls
+        let dashboardCheckTimeout;
+        let reportCheckTimeout;
+        
+        document.getElementById('dashboard-provnum').addEventListener('input', (e) => {
+            clearTimeout(dashboardCheckTimeout);
+            const provnum = e.target.value.trim().replace(/\D/g, ''); // Remove non-digits
+            if (provnum.length === 6) {
+                // Wait 300ms after user stops typing
+                dashboardCheckTimeout = setTimeout(() => {
+                    console.log('Checking facility with provnum:', provnum);
+                    checkFacility(provnum, 'dashboard');
+                }, 300);
+            } else {
+                // Hide facility info if not 6 digits
+                const infoDiv = document.getElementById('facility-info');
+                if (infoDiv) {
+                    infoDiv.classList.remove('show');
+                }
+            }
+        });
+
+        document.getElementById('report-provnum').addEventListener('input', (e) => {
+            clearTimeout(reportCheckTimeout);
+            const provnum = e.target.value.trim().replace(/\D/g, ''); // Remove non-digits
+            if (provnum.length === 6) {
+                // Wait 300ms after user stops typing
+                reportCheckTimeout = setTimeout(() => {
+                    console.log('Checking facility with provnum:', provnum);
+                    checkFacility(provnum, 'report');
+                }, 300);
+            } else {
+                // Hide facility info if not 6 digits
+                const infoDiv = document.getElementById('report-facility-info');
+                if (infoDiv) {
+                    infoDiv.classList.remove('show');
+                }
+            }
+        });
+
+        // Date selection tab handlers
+        document.querySelectorAll('.date-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const mode = e.target.getAttribute('data-mode');
+                
+                // Update tab states
+                document.querySelectorAll('.date-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Update content visibility
+                document.querySelectorAll('.date-mode-content').forEach(c => {
+                    c.classList.remove('active');
+                    c.style.display = 'none';
+                });
+                
+                const content = document.getElementById(`${mode}-mode`);
+                if (content) {
+                    content.classList.add('active');
+                    content.style.display = 'block';
+                }
+                
+                // Update required fields
+                if (mode === 'date') {
+                    document.getElementById('start-date').required = true;
+                    document.getElementById('end-date').required = true;
+                    document.getElementById('quarter-select').required = false;
+                    document.getElementById('year-select').required = false;
+                } else if (mode === 'quarter') {
+                    document.getElementById('start-date').required = false;
+                    document.getElementById('end-date').required = false;
+                    document.getElementById('quarter-select').required = true;
+                    document.getElementById('year-select').required = false;
+                } else if (mode === 'year') {
+                    document.getElementById('start-date').required = false;
+                    document.getElementById('end-date').required = false;
+                    document.getElementById('quarter-select').required = false;
+                    document.getElementById('year-select').required = true;
+                }
+            });
+        });
+        
+        // Populate quarters and years when facility is checked
+        function populateDateOptions(facilityData, preserveSelections = false) {
+            // Get dates from facilityData or fall back to input field values
+            let startDate, endDate;
+            
+            if (facilityData && facilityData.start_date && facilityData.end_date) {
+                startDate = facilityData.start_date;
+                endDate = facilityData.end_date;
+            } else {
+                // Fall back to input field values
+                const startInput = document.getElementById('start-date');
+                const endInput = document.getElementById('end-date');
+                if (startInput && endInput && startInput.value && endInput.value) {
+                    startDate = startInput.value;
+                    endDate = endInput.value;
+                } else {
+                    // Use defaults if nothing is available (PBJ data starts in 2017)
+                    startDate = '2017-01-01';
+                    endDate = '2025-09-30';
+                }
+            }
+            
+            if (!startDate || !endDate) return;
+            
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            
+            // Validate dates
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                console.warn('Invalid dates for populateDateOptions:', startDate, endDate);
+                return;
+            }
+            
+            // Preserve selected values if requested
+            const quarterSelect = document.getElementById('quarter-select');
+            let preservedQuarters = [];
+            if (preserveSelections && quarterSelect) {
+                preservedQuarters = Array.from(quarterSelect.selectedOptions).map(o => o.value);
+            }
+            
+            // Populate quarters
+            if (quarterSelect) {
+                quarterSelect.innerHTML = '';
+                const quarters = [];
+                let current = new Date(start);
+                
+                // Set to first day of the quarter
+                const startQuarter = Math.floor(start.getMonth() / 3);
+                current.setMonth(startQuarter * 3);
+                current.setDate(1);
+                
+                // Only include quarters from 2017 onwards (PBJ data starts in 2017)
+                while (current <= end) {
+                    const year = current.getFullYear();
+                    // Skip 2016 and earlier
+                    if (year < 2017) {
+                        current.setFullYear(2017);
+                        current.setMonth(0);
+                        current.setDate(1);
+                        continue;
+                    }
+                    const quarter = Math.floor(current.getMonth() / 3) + 1;
+                    const quarterStr = `${year}Q${quarter}`;
+                    if (!quarters.includes(quarterStr)) {
+                        quarters.push(quarterStr);
+                        const option = document.createElement('option');
+                        option.value = quarterStr;
+                        option.textContent = `Q${quarter} ${year}`;
+                        if (preserveSelections && preservedQuarters.includes(quarterStr)) {
+                            option.selected = true;
+                        }
+                        quarterSelect.appendChild(option);
+                    }
+                    // Move to next quarter
+                    current.setMonth(current.getMonth() + 3);
+                }
+            }
+            
+            // Preserve selected years if requested
+            const yearSelect = document.getElementById('year-select');
+            let preservedYears = [];
+            if (preserveSelections && yearSelect) {
+                preservedYears = Array.from(yearSelect.selectedOptions).map(o => o.value);
+            }
+            
+            // Populate years
+            if (yearSelect) {
+                yearSelect.innerHTML = '';
+                const years = [];
+                // Only include years from 2017 onwards (PBJ data starts in 2017)
+                const minYear = Math.max(2017, start.getFullYear());
+                const maxYear = end.getFullYear();
+                for (let year = minYear; year <= maxYear; year++) {
+                    if (!years.includes(year)) {
+                        years.push(year);
+                        const option = document.createElement('option');
+                        option.value = year.toString();
+                        option.textContent = year.toString();
+                        if (preserveSelections && preservedYears.includes(year.toString())) {
+                            option.selected = true;
+                        }
+                        yearSelect.appendChild(option);
+                    }
+                }
+            }
+        }
+        
+        // Default dates will be set when facility is checked
+        // PBJ data starts in 2017, ends at Q3 2025
+        const defaultEndDate = new Date('2025-09-30');
+        const defaultStartDate = new Date('2017-01-01');
+        
+        document.getElementById('end-date').value = defaultEndDate.toISOString().split('T')[0];
+        document.getElementById('start-date').value = defaultStartDate.toISOString().split('T')[0];
+        
+        // Populate dropdowns with default dates on page load
+        populateDateOptions({ start_date: defaultStartDate.toISOString().split('T')[0], end_date: defaultEndDate.toISOString().split('T')[0] });
+        
+        // Also populate when date inputs change, but preserve selections
+        document.getElementById('start-date').addEventListener('change', () => {
+            populateDateOptions(null, true);
+        });
+        document.getElementById('end-date').addEventListener('change', () => {
+            populateDateOptions(null, true);
+        });
+    </script>
+</body>
+</html>

@@ -763,38 +763,29 @@ def load_facility_data(provnum, csv_path=None):
     return global_df
 
 def get_previous_provider_names(provnum):
-    """Get previous provider names that are different from the most recent"""
+    """Get previous provider names that are different from the most recent, with year ranges (e.g. 'Name (2017-23)')."""
     global provider_info_df
-    
+
     if provider_info_df is None or provider_info_df.empty:
         return []
-    
+
     # Filter to this facility
-    facility_data = provider_info_df[provider_info_df['ccn'] == str(provnum).zfill(6)]
+    facility_data = provider_info_df[provider_info_df['ccn'] == str(provnum).zfill(6)].copy()
     if facility_data.empty:
         return []
-    
-    # Get all unique provider names, sorted by processing date (most recent first)
-    if 'processing_date' in facility_data.columns:
-        provider_names = facility_data.sort_values('processing_date', ascending=False)['provider_name'].dropna().unique()
-    else:
-        provider_names = facility_data['provider_name'].dropna().unique()
-    
-    # Get the most recent name
-    most_recent_name = provider_names[0] if len(provider_names) > 0 else None
-    
-    # Get all names that are different from the most recent
-    previous_names = [name for name in provider_names[1:] if name and most_recent_name and name.strip().lower() != most_recent_name.strip().lower()]
-    
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_previous_names = []
-    for name in previous_names:
-        if name not in seen:
-            unique_previous_names.append(name)
-            seen.add(name)
-    
-    # Format names with proper capitalization (limit to 3 most recent)
+
+    if 'processing_date' not in facility_data.columns:
+        facility_data = facility_data.assign(processing_date=pd.NaT)
+    facility_data['processing_date'] = pd.to_datetime(facility_data['processing_date'], errors='coerce')
+
+    # Get the most recent name (by processing_date)
+    facility_sorted = facility_data.sort_values('processing_date', ascending=False)
+    most_recent_name = None
+    if len(facility_sorted) > 0 and 'provider_name' in facility_sorted.columns:
+        first = facility_sorted['provider_name'].dropna().iloc[0]
+        if pd.notna(first) and str(first).strip():
+            most_recent_name = str(first).strip()
+
     def format_facility_name(name):
         words = name.replace('-', ' - ').replace('&', ' & ').split()
         formatted_words = []
@@ -808,9 +799,53 @@ def get_previous_provider_names(provnum):
             else:
                 formatted_words.append(word.capitalize())
         return ' '.join(formatted_words)
-    
-    formatted_names = [format_facility_name(name) for name in unique_previous_names[:3]]
-    return formatted_names
+
+    def year_range_str(dates_series):
+        """Format a series of dates as 'YYYY-YY' (e.g. 2017-23)."""
+        valid = dates_series.dropna()
+        if len(valid) == 0:
+            return None
+        min_d = valid.min()
+        max_d = valid.max()
+        if pd.isna(min_d) or pd.isna(max_d):
+            return None
+        try:
+            y1, y2 = int(min_d.year), int(max_d.year)
+            if y1 == y2:
+                return str(y1)
+            return f"{y1}-{str(y2)[-2:]}"
+        except (ValueError, TypeError):
+            return None
+
+    # Group by provider_name and get date range for each
+    name_dates = facility_data.groupby(
+        facility_data['provider_name'].astype(str).str.strip().str.lower()
+    )['processing_date'].apply(lambda s: year_range_str(s)).to_dict()
+
+    # Build list of (name_display, year_str) for names that are not the most recent
+    seen_normalized = set()
+    previous_with_years = []
+    for _, row in facility_sorted.iterrows():
+        name = row.get('provider_name')
+        if pd.isna(name) or not str(name).strip():
+            continue
+        name_str = str(name).strip()
+        name_lower = name_str.lower()
+        if name_lower == (most_recent_name or '').lower():
+            continue
+        if name_lower in seen_normalized:
+            continue
+        seen_normalized.add(name_lower)
+        year_str = name_dates.get(name_lower)
+        display_name = format_facility_name(name_str)
+        if year_str:
+            previous_with_years.append(f"{display_name} ({year_str})")
+        else:
+            previous_with_years.append(display_name)
+        if len(previous_with_years) >= 3:
+            break
+
+    return previous_with_years
 
 
 # Initialize data lazily (for Vercel deployment)
@@ -1144,15 +1179,39 @@ def get_provider_info():
             'data': data.to_dict('records'),
             'facility_name': data['provider_name'].iloc[0] if len(data) > 0 else 'Unknown',
             'latest_rating': {
-                'overall': int(data['overall_rating'].iloc[-1]) if len(data) > 0 and pd.notna(data['overall_rating'].iloc[-1]) else None,
-                'staffing': int(data['staffing_rating'].iloc[-1]) if len(data) > 0 and pd.notna(data['staffing_rating'].iloc[-1]) else None,
-                'health_inspection': int(data['health_inspection_rating'].iloc[-1]) if len(data) > 0 and pd.notna(data['health_inspection_rating'].iloc[-1]) else None,
-                'quality': int(data['qm_rating'].iloc[-1]) if len(data) > 0 and 'qm_rating' in data.columns and pd.notna(data['qm_rating'].iloc[-1]) else None
+                'overall': _rating_or_none(data['overall_rating'].iloc[-1]) if len(data) > 0 else None,
+                'staffing': _rating_or_none(data['staffing_rating'].iloc[-1]) if len(data) > 0 else None,
+                'health_inspection': _rating_or_none(data['health_inspection_rating'].iloc[-1]) if len(data) > 0 else None,
+                'quality': _rating_or_none(data['qm_rating'].iloc[-1]) if len(data) > 0 and 'qm_rating' in data.columns else None
             }
         })
         
     except Exception as e:
         return jsonify({'error': str(e)})
+
+def _rating_or_none(val):
+    """Return int rating 1-5, or None if missing or 0 (no data)."""
+    if pd.isna(val):
+        return None
+    try:
+        r = int(float(val))
+        return r if 1 <= r <= 5 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _rating_series_for_chart(series):
+    """Convert rating series to list; 0 or missing -> None (no data)."""
+    def one_val(x):
+        if pd.isna(x):
+            return None
+        try:
+            v = float(x)
+            return None if v == 0 else int(v)
+        except (ValueError, TypeError):
+            return None
+    return [one_val(x) for x in series]
+
 
 @app.route('/api/provider_info_summary')
 def get_provider_info_summary():
@@ -1205,10 +1264,11 @@ def get_provider_info_summary():
             'latest_processing_date': latest['processing_date'].strftime('%Y-%m-%d') if pd.notna(latest.get('processing_date')) else '',
             'latest_quarter': str(latest.get('quarter', '')),
             'latest_census': float(latest.get('avg_residents_per_day', 0)) if pd.notna(latest.get('avg_residents_per_day')) else 0,
-            'latest_overall_rating': int(latest.get('overall_rating', 0)) if pd.notna(latest.get('overall_rating')) else None,
-            'latest_staffing_rating': int(latest.get('staffing_rating', 0)) if pd.notna(latest.get('staffing_rating')) else None,
-            'latest_health_inspection_rating': int(latest.get('health_inspection_rating', 0)) if pd.notna(latest.get('health_inspection_rating')) else None,
-            'latest_quality_rating': int(latest.get('qm_rating', 0)) if pd.notna(latest.get('qm_rating')) else None,
+            # Rating 0 = no data; return None so UI shows "-" instead of 0
+            'latest_overall_rating': _rating_or_none(latest.get('overall_rating')),
+            'latest_staffing_rating': _rating_or_none(latest.get('staffing_rating')),
+            'latest_health_inspection_rating': _rating_or_none(latest.get('health_inspection_rating')),
+            'latest_quality_rating': _rating_or_none(latest.get('qm_rating')),
             'latest_reported_total_hprd': float(latest.get('reported_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('reported_total_nurse_hrs_per_resident_per_day')) else 0,
             'latest_case_mix_total_hprd': float(latest.get('case_mix_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('case_mix_total_nurse_hrs_per_resident_per_day')) else 0,
             'latest_adjusted_total_hprd': float(latest.get('adjusted_total_nurse_hrs_per_resident_per_day', 0)) if pd.notna(latest.get('adjusted_total_nurse_hrs_per_resident_per_day')) else 0,
@@ -1274,7 +1334,9 @@ def _get_latest_sff_status():
 
 @app.route('/api/sff_history')
 def get_sff_history():
-    """Get Red Flag History for a facility (SFF, 1-star ratings, Abuse, etc.)"""
+    """Get Red Flag History for a facility (SFF, 1-star ratings, Abuse, Administrator Turnover, Ownership Change).
+    Provider info columns used: sff_status, overall_rating, staffing_rating, abuse_icon, administrator_turnover,
+    provider_changed_ownership_in_last_12_months; quarter and processing_date for mapping to quarters."""
     try:
         global provider_info_df
         if provider_info_df is None or provider_info_df.empty:
@@ -1331,6 +1393,12 @@ def get_sff_history():
         for col in ['abuse_icon', 'Abuse Icon', 'abuse']:
             if col in facility_data.columns:
                 abuse_col = col
+                break
+        
+        admin_turnover_col = None
+        for col in ['administrator_turnover', 'Administrator Turnover']:
+            if col in facility_data.columns:
+                admin_turnover_col = col
                 break
         
         # Build red flag history - group by quarter
@@ -1425,7 +1493,19 @@ def get_sff_history():
                 abuse_value = str(row[abuse_col]).strip() if pd.notna(row[abuse_col]) else ''
                 abuse_upper = abuse_value.upper()
                 if abuse_upper in ['Y', 'YES', 'TRUE', '1', 'TRUE', 'Y']:
-                    red_flags.append("Abuse Icon: Yes")
+                    red_flags.append("Abuse Icon")
+            
+            # Check Administrator Turnover (provider info: administrator_turnover = number of admins who left NH in 12 months; display as integer)
+            if admin_turnover_col and admin_turnover_col in row.index:
+                at_val = row[admin_turnover_col]
+                if pd.notna(at_val) and str(at_val).strip():
+                    try:
+                        at_float = float(at_val)
+                        if at_float > 0:
+                            red_flags.append(f"Admin TO: {int(at_float)}")
+                    except (ValueError, TypeError):
+                        if str(at_val).strip().upper() in ['Y', 'YES', 'TRUE', '1']:
+                            red_flags.append("Admin TO")
             
             # Check Ownership Change
             ownership_change = False
@@ -1592,7 +1672,8 @@ def get_sff_history():
                 sff_value = str(latest_record[sff_col]).strip() if pd.notna(latest_record[sff_col]) else ''
                 if sff_value and sff_value.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
                     if 'SFF' in sff_value.upper():
-                        latest_red_flags.append(f"SFF: {sff_value}")
+                        sff_formatted = 'SFF Candidate' if 'CANDIDATE' in sff_value.upper() else 'SFF'
+                        latest_red_flags.append(sff_formatted)
             
             if overall_rating_col and overall_rating_col in latest_record.index:
                 overall_rating = latest_record[overall_rating_col]
@@ -1615,7 +1696,18 @@ def get_sff_history():
             if abuse_col and abuse_col in latest_record.index:
                 abuse_value = str(latest_record[abuse_col]).strip() if pd.notna(latest_record[abuse_col]) else ''
                 if abuse_value.upper() in ['Y', 'YES', 'TRUE', '1']:
-                    latest_red_flags.append("Abuse Icon: Yes")
+                    latest_red_flags.append("Abuse Icon")
+            
+            if admin_turnover_col and admin_turnover_col in latest_record.index:
+                at_val = latest_record[admin_turnover_col]
+                if pd.notna(at_val) and str(at_val).strip():
+                    try:
+                        at_float = float(at_val)
+                        if at_float > 0:
+                            latest_red_flags.append(f"Admin TO: {int(at_float)}")
+                    except (ValueError, TypeError):
+                        if str(at_val).strip().upper() in ['Y', 'YES', 'TRUE', '1']:
+                            latest_red_flags.append("Admin TO")
             
             # Check Ownership Change for latest record
             for col in ['provider_changed_ownership_in_last_12_months', 'Provider Changed Ownership In Last 12 Months', 'ownership_change']:
@@ -1679,6 +1771,28 @@ def get_sff_history():
         traceback.print_exc()
         return jsonify({'error': str(e)})
 
+def _quarter_from_processing_date(processing_date):
+    """Map processing_date to quarter using prov_info mapping when available; fallback to calendar quarter."""
+    if pd.isna(processing_date):
+        return None
+    try:
+        from prov_info import get_quarter_from_processing_month
+        proc_month = pd.to_datetime(processing_date).strftime('%Y-%m')
+        q = get_quarter_from_processing_month(proc_month)
+        if q:
+            return q
+    except Exception:
+        pass
+    # Fallback: calendar quarter from date (so rows with null quarter still map to a quarter)
+    try:
+        dt = pd.to_datetime(processing_date)
+        y, m = dt.year, dt.month
+        q_num = (m - 1) // 3 + 1
+        return f"Q{q_num} {y}"
+    except Exception:
+        return None
+
+
 @app.route('/api/provider_info_charts')
 def get_provider_info_charts():
     """Get provider info chart data"""
@@ -1687,6 +1801,17 @@ def get_provider_info_charts():
         
         if provider_info_df is None:
             return jsonify({'error': 'Provider info data not loaded'})
+        
+        # Apply quarter mapping for rows with null quarter (same mapping as prov_info / normalize_provider_info)
+        chart_data = provider_info_df.copy()
+        if 'quarter' not in chart_data.columns:
+            chart_data['quarter'] = None
+        if 'processing_date' in chart_data.columns:
+            null_quarter = chart_data['quarter'].isna()
+            if null_quarter.any():
+                chart_data.loc[null_quarter, 'quarter'] = chart_data.loc[null_quarter, 'processing_date'].apply(
+                    _quarter_from_processing_date
+                )
         
         # Helper function to normalize quarter format
         def normalize_quarter_for_matching(q):
@@ -1707,8 +1832,8 @@ def get_provider_info_charts():
                         return f"{year}Q{quarter_num}"
             return None
         
-        # Group by quarter and take the latest processing date per quarter
-        chart_data = provider_info_df.dropna(subset=['quarter']).copy()
+        # Group by quarter and take the latest processing date per quarter (null quarters already filled above)
+        chart_data = chart_data.dropna(subset=['quarter']).copy()
         chart_data = chart_data.sort_values('processing_date').groupby('quarter').last().reset_index()
         
         # Create normalized quarter column for matching with PBJ data
@@ -1826,10 +1951,11 @@ def get_provider_info_charts():
             },
             'ratings': {
                 'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
-                'overall': chart_data['overall_rating'].fillna(0).tolist(),
-                'staffing': chart_data['staffing_rating'].fillna(0).tolist(),
-                'health_inspection': chart_data['health_inspection_rating'].fillna(0).tolist(),
-                'quality': chart_data['qm_rating'].fillna(0).tolist() if 'qm_rating' in chart_data.columns else [0] * len(chart_data)
+                # 0 = no data; use None so chart shows gap and UI shows "-"
+                'overall': _rating_series_for_chart(chart_data['overall_rating']),
+                'staffing': _rating_series_for_chart(chart_data['staffing_rating']),
+                'health_inspection': _rating_series_for_chart(chart_data['health_inspection_rating']),
+                'quality': _rating_series_for_chart(chart_data['qm_rating']) if 'qm_rating' in chart_data.columns else [None] * len(chart_data)
             }
         }
         
