@@ -18,3 +18,11 @@ ENV
 
 # Ignore large data files
 provider_info_combined.csv
+provider_info_extracted/
+.vercel
+.env*.local
+
+# Ignore API keys and secrets
+.env
+donor/.env
+*.env

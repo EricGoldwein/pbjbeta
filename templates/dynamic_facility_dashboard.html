@@ -953,10 +953,10 @@
                 </h1>
                 <p style="margin-bottom: 0.5rem; color: rgba(255,255,255,0.95); font-weight: 500; font-size: 1.1rem; letter-spacing: 0.5px;">PBJ320 Dashboard</p>
                 <p class="mb-1" style="font-size: 0.9rem; color: rgba(255,255,255,0.85); font-weight: 400;">{{ city | title }}, {{ state }} - {{ county_name | title }}</p>
-                <!-- Entity Information Section -->
+                <!-- Entity Information Section (server-rendered when available to avoid N/A flash) -->
                 <div class="entity-info-section" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.25); font-style: italic;">
                     <p class="mb-1" style="font-size: 0.8rem; color: rgba(255,255,255,0.8); line-height: 1.4; font-weight: 300;">
-                        <span id="affiliatedEntityInfo">Affiliated Entity: <span id="affiliatedEntityDisplay" style="font-weight: 400;">N/A</span></span>
+                        <span id="affiliatedEntityInfo">Affiliated Entity: <span id="affiliatedEntityDisplay" style="font-weight: 400;">{% if affiliated_entity_name and affiliated_entity_id %}<a href="/entity/{{ affiliated_entity_id }}" target="_blank" rel="noopener" style="color: white; text-decoration: underline;">{{ affiliated_entity_name }}</a>{% if affiliated_entity_prev_name and affiliated_entity_prev_id %} <span style="font-weight: 400;">(prev: <a href="/entity/{{ affiliated_entity_prev_id }}" target="_blank" rel="noopener" style="color: white; text-decoration: underline;">{{ affiliated_entity_prev_name }}</a>{% if affiliated_entity_prev_years %}, {{ affiliated_entity_prev_years }}{% endif %})</span>{% endif %}{% else %}N/A{% endif %}</span></span>
                     </p>
                     {% if previous_names and previous_names != "None" %}
                     <p class="mb-0" style="font-size: 0.8rem; color: rgba(255,255,255,0.8); line-height: 1.4; font-weight: 300;">
@@ -971,7 +971,9 @@
                 <!-- Analysis Filters -->
                 <div class="col-lg-5 analysis-filters">
                     <h5>Staffing by Time Period</h5>
-                
+                    {% if cms_pbj_facility_url %}
+                    <p class="mb-2"><a href="{{ cms_pbj_facility_url }}" target="_blank" rel="noopener" class="small text-muted" title="Opens data.cms.gov PBJ data filtered by this facility">View raw CMS PBJ data</a></p>
+                    {% endif %}
                 <!-- Filter Type Selection -->
                 <div class="row mb-3">
                     <div class="col-12">
@@ -1098,7 +1100,7 @@
                                     <div class="stat-card text-center p-3 bg-light rounded" 
                                          title="Nurse Staff HPRD excluding RN Admin, RN DON, and LPN Admin hours">
                                         <h3 id="totalDirectHPRD" class="mb-1 text-dark">-</h3>
-                                        <small class="text-muted">Direct HPRD <i class="fas fa-info-circle text-info ms-1"></i></small>
+                                        <small class="text-muted">Direct HPRD <i class="fas fa-info-circle text-info ms-1" title="Excludes Admin/DON" aria-label="Excludes Admin/DON"></i></small>
                                     </div>
                                 </div>
                                 <div style="flex: 0 0 20%; max-width: 20%;">
@@ -1117,7 +1119,7 @@
                                 <div style="flex: 0 0 20%; max-width: 20%;">
                                     <div class="stat-card text-center p-3 bg-light rounded">
                                         <h3 id="indirectStaffingHPRD" class="mb-1 text-dark">-</h3>
-                                        <small class="text-muted">Indirect Staffing HPRD <i class="fas fa-info-circle text-info ms-1" title="RN Admin + RN DON + LPN Admin"></i></small>
+                                        <small class="text-muted">Non-Direct Staff HPRD <i class="fas fa-info-circle text-info ms-1" title="RN Admin/DON & LPN Admin" aria-label="RN Admin/DON & LPN Admin"></i></small>
                                     </div>
                                 </div>
                                 <div style="flex: 0 0 20%; max-width: 20%;">
@@ -1134,10 +1136,9 @@
                                     </div>
                                 </div>
                                 <div style="flex: 0 0 20%; max-width: 20%;">
-                                    <div class="stat-card text-center p-3 bg-light rounded" style="border: 2px solid #e9ecef;" 
-                                         title="Days facility provided less than 8 RN hours (excluding Admin/DON)">
+                                    <div class="stat-card text-center p-3 bg-light rounded" style="border: 2px solid #e9ecef;">
                                         <h3 id="directRNSub8" class="mb-1 text-dark">-</h3>
-                                        <small class="text-muted">Days: RN < 8 <i class="fas fa-info-circle text-info ms-1"></i></small>
+                                        <small class="text-muted">Days RN < 8 <i class="fas fa-info-circle text-info ms-1" title="Days facility provided less than 8 RN hours (excluding Admin/DON)" aria-label="Days facility provided less than 8 RN hours (excluding Admin/DON)"></i></small>
                                     </div>
                                 </div>
                             </div>
@@ -1178,11 +1179,13 @@
                                 <option value="direct_care">Direct Care (Excl. Admin/DON)</option>
                             </select>
                         </div>
-                        <div class="col-md-6 col-lg-3 mb-3 mb-md-0" id="complianceRangeChoiceContainer" style="display: none;">
-                            <label for="complianceRangeChoice" class="form-label">Range Choice:</label>
-                            <select class="form-select" id="complianceRangeChoice">
-                                <option value="min">Minimum</option>
-                                <option value="max">Maximum</option>
+                        <div class="col-md-6 col-lg-3 mb-3 mb-md-0" id="complianceRangeChoiceContainer" style="display: {% if state_standard_info and state_standard_info.value_type == 'range' %}block{% else %}none{% endif %};">
+                            <label for="complianceRangeChoice" class="form-label">State threshold (HPRD):</label>
+                            <select class="form-select" id="complianceRangeChoice" data-default-range-choice="{% if state_standard_info and state_standard_info.value_type == 'range' %}max{% else %}min{% endif %}">
+                                <option value="min" {% if not state_standard_info or state_standard_info.value_type != 'range' %}selected{% endif %}>{% if state_standard_info %}{{ state_standard_info.min_staffing }}{% else %}1.56{% endif %} HPRD</option>
+                                {% if state_standard_info and state_standard_info.value_type == 'range' and state_standard_info.max_staffing is not none %}
+                                <option value="max" selected>{{ state_standard_info.max_staffing }} HPRD</option>
+                                {% endif %}
                             </select>
                         </div>
                         <div class="col-md-6 col-lg-3 mb-3 mb-md-0">
@@ -1209,6 +1212,7 @@
                         <div class="row mb-3">
                             <div class="col-md-12">
                                 <p class="mb-0" id="complianceSummarySentence" style="font-size: 1.1rem; font-weight: 500; line-height: 1.6;"></p>
+                                <p class="mt-2 mb-0 text-muted small" id="complianceExclusionNote">Days with zero census are excluded from total days and from met/not met counts (rare).</p>
                             </div>
                         </div>
                         
@@ -1507,7 +1511,7 @@
                 <div class="col-md-12">
                     <div class="chart-container">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Nursing Staff HPRD Trends</h5>
+                        <h5 class="mb-0">Nursing Staff HPRD</h5>
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group btn-group-sm" role="group" aria-label="HPRD view toggle" style="font-size: 0.75rem;">
                                 <input type="radio" class="btn-check" name="hprdView" id="hprdDaily" value="daily">
@@ -1533,7 +1537,6 @@
                 <div class="col-md-6">
                     <div class="chart-container">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">Total Nursing Staff Hours</h6>
                             <div class="d-flex align-items-center gap-2">
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Hours view toggle" style="font-size: 0.7rem;">
                                     <input type="radio" class="btn-check" name="hoursView" id="hoursDaily" value="daily">
@@ -1558,7 +1561,7 @@
                 <div class="col-md-6">
                     <div class="chart-container">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">Resident Census</h6>
+                            <h6 class="mb-0 d-none">Resident Census</h6>
                             <div class="btn-group btn-group-sm" role="group" aria-label="Census view toggle" style="font-size: 0.7rem;">
                                 <input type="radio" class="btn-check" name="censusView" id="censusDaily" value="daily">
                                 <label class="btn btn-outline-secondary" for="censusDaily" style="box-shadow: none !important; border-color: #6c757d;">Daily</label>
@@ -1589,7 +1592,6 @@
                 <div class="col-md-6">
                     <div class="chart-container">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">Contract Staff %</h6>
                             <div class="d-flex align-items-center gap-2">
                                 <div class="btn-group btn-group-sm" role="group" aria-label="Contract view toggle" style="font-size: 0.7rem;">
                                     <input type="radio" class="btn-check" name="contractView" id="contractDaily" value="daily">
@@ -1676,6 +1678,9 @@
                             </div>
                         </div>
                     </div>
+                    <div id="sffNoRatingNote" class="alert alert-info py-2 mt-2 small mb-0" style="display: none;">
+                        <i class="fas fa-info-circle me-1"></i> Special Focus Facilities (SFF) may not have star ratings displayed by CMS.
+                    </div>
                     
                     <!-- SFF History Table -->
                     <div class="card mt-3 mb-3">
@@ -1689,13 +1694,15 @@
                             </div>
                             <div class="mt-3 pt-3 border-top">
                                 <small class="text-muted">
-                                    <strong style="font-size: 0.9em; color: #495057;">Red Flag Criteria:</strong><br/>
-                                    <span style="margin-left: 0.5rem; display: inline-block;">• Special Focus Facility or SFF Candidate</span><br/>
-                                    <span style="margin-left: 0.5rem; display: inline-block;">• 1-Star Overall Rating</span><br/>
-                                    <span style="margin-left: 0.5rem; display: inline-block;">• 1-Star Staffing Rating</span><br/>
-                                    <span style="margin-left: 0.5rem; display: inline-block;">• Abuse Icon</span><br/>
-                                    <span style="margin-left: 0.5rem; display: inline-block;">• Ownership Change (Last 12 Months)</span><br/>
-                                    <span style="margin-left: 0.5rem; display: inline-block;">• Admins who left NH (12 months)</span>
+                                    <strong style="font-size: 0.9em; color: #495057;">Red Flag Criteria:</strong>
+                                    <span class="d-inline-flex flex-wrap gap-1 ms-2" style="vertical-align: middle;">
+                                        <span class="badge rounded-pill bg-light text-dark border border-secondary" style="font-weight: 500;">SFF / SFF candidate</span>
+                                        <span class="badge rounded-pill bg-light text-dark border border-secondary" style="font-weight: 500;">1-star overall</span>
+                                        <span class="badge rounded-pill bg-light text-dark border border-secondary" style="font-weight: 500;">1-star staffing</span>
+                                        <span class="badge rounded-pill bg-light text-dark border border-secondary" style="font-weight: 500;">abuse icon</span>
+                                        <span class="badge rounded-pill bg-light text-dark border border-secondary" style="font-weight: 500;">ownership change</span>
+                                        <span class="badge rounded-pill bg-light text-dark border border-secondary" style="font-weight: 500;">admin turnover (12 mo)</span>
+                                    </span>
                                 </small>
                             </div>
                         </div>
@@ -1716,7 +1723,7 @@
                             <div class="card">
                                 <div class="card-header">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0">Total Staff: <span style="color: #0066cc;">Total</span> vs. <span style="color: #808080;">Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
+                                        <h6 class="mb-0">Total: <span style="color: #0066cc;">Total</span> vs. <span style="color: #808080;">Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
                                     </div>
                                 </div>
                                 <div class="card-body">
@@ -1728,7 +1735,7 @@
                             <div class="card">
                                 <div class="card-header">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0">RN Staff: <span style="color: #0066cc;">Total</span> vs. <span style="color: #808080;">Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
+                                        <h6 class="mb-0">RN: <span style="color: #0066cc;">Total</span> vs. <span style="color: #808080;">Direct</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
                                     </div>
                                 </div>
                                 <div class="card-body">
@@ -1739,7 +1746,7 @@
                         <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0">Nurse Aide Staff: <span style="color: #0066cc;">Total</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
+                                    <h6 class="mb-0">Nurse Aide: <span style="color: #0066cc;">Total</span> vs. <span style="color: #dc3545;">Case-Mix</span> vs. <span style="color: #28a745;">Adjusted</span></h6>
                                 </div>
                                 <div class="card-body">
                                     <div id="providerInfoCNAChart"></div>
@@ -1783,6 +1790,20 @@
                                 </div>
                                 <div class="card-body">
                                     <div id="providerInfoRatingsChart"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Occupancy Rate Chart (below Ratings) -->
+                    <div class="row">
+                        <div class="col-lg-12 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0" style="line-height: 1.3;">Occupancy Rate Over Time</h6>
+                                    <small class="text-muted">Resident census ÷ certified beds (from Provider Info, quarter-matched). Quarters with 0 beds or 0 census are omitted.</small>
+                                </div>
+                                <div class="card-body">
+                                    <div id="providerInfoOccupancyChart"></div>
                                 </div>
                             </div>
                         </div>
@@ -2077,7 +2098,7 @@
                                 <th rowspan="3" class="text-center align-middle sortable" style="min-width: 80px;" data-sort="quarter">Quarter</th>
                                 <th colspan="11" class="text-center" style="background-color: #0d6efd;">Reported HPRD</th>
                                 <th colspan="4" class="text-center" style="background-color: #dc3545;">Case-Mix HPRD</th>
-                                <th rowspan="3" class="text-center align-middle sortable" style="min-width: 80px; background-color: #ffc107;" data-sort="cmi">CMI<br/><span style="font-size: 0.7em;">(Source)</span></th>
+                                <th rowspan="3" class="text-center align-middle sortable" style="min-width: 80px; background-color: #ffc107;" data-sort="cmi">CMI</th>
                                 <th colspan="7" class="text-center" style="background-color: #28a745;">% Case-Mix (Reported/Case-Mix)</th>
                             </tr>
                             <tr>
@@ -2130,7 +2151,7 @@
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
                         <strong>Data Sources:</strong> 
-                        <span class="fw-bold">Reported values</span> from both Provider Information files (Prov Info) and PBJ daily records (PBJ). Provider Info matched to PBJ quarters by reported total staffing. 
+                        <span class="fw-bold">Reported values</span> from both Provider Information files (Prov Info) and PBJ daily records (PBJ). Provider Info matched to PBJ quarters by reported total staffing.{% if cms_pbj_facility_url %} <a href="{{ cms_pbj_facility_url }}" target="_blank" rel="noopener" title="Opens data.cms.gov PBJ data filtered by this facility">View raw CMS PBJ data</a>.{% endif %} 
                         <span class="fw-bold">Case-Mix values</span> from Provider Information files represent CMS expected staffing based on resident acuity.
                         <span class="fw-bold">CMI (Case-Mix Index)</span> from Provider Information files indicates the source column name used (e.g., "nursing_case_mix_index").
                         <br/>
@@ -2231,7 +2252,7 @@
                         <li><strong>Averages:</strong> Weighted by census when applicable</li>
                         <li><strong>Rounding:</strong> Financial rounding (ROUND_HALF_UP) for all displayed metrics</li>
                         <li><strong>% Case-Mix HPRD:</strong> Reported ÷ CMS Case-Mix. Values below 1.0 indicate staffing deficit relative to <a href="https://www.cms.gov/medicare/provider-enrollment-and-certification/certificationandcomplianc/downloads/usersguide.pdf" target="_blank">CMS benchmark</a> expectations; values above 1.0 indicate surplus staffing. Case-mix is a CMS benchmark for staffing based on resident acuity.</li>
-                        <li><strong>Indirect Staffing HPRD:</strong> RN Admin + RN DON + LPN Admin hours per resident day</li>
+                        <li><strong>Non-Direct Staff HPRD:</strong> RN Admin/DON & LPN Admin hours per resident day</li>
                     </ul>
                 </div>
             </div>
@@ -2262,23 +2283,26 @@
             <div class="row mt-3">
                 <div class="col-12">
                     <h6><i class="fas fa-database me-2"></i>Data Sources</h6>
-                    <p>This Nursing Home Staffing Dashboard uses CMS Payroll-Based Journal (PBJ) data from 2017 to 2025, covering all nursing positions, including contract staff (<a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank">https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing</a>). CMS first published PBJ data in 2017. It also uses Provider Information datasets from 2018 to 2025 (<a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank">https://data.cms.gov/provider-data/dataset/4pq5-n9py</a>).</p>
-                    <p>Unlike PBJ data, which is released quarterly, provider info files are published on a rolling monthly basis without a clear reference quarter. To align them with PBJ datasets, we matched the "reported total staffing" metric, which is available in both sources, to the corresponding quarter. This approach is not exact—health inspection data, for example, is updated on a different schedule—but it offers a reasonable best-guess for quarter assignment.</p>
-                    {% if state_standard_info %}
-                    <p class="mt-3"><strong>State Legislation:</strong> 
-                    {% if state == 'UT' or state|upper == 'UT' %}
-                    For Utah nursing homes, state legislation requires:
-                    <ul>
-                        <li>"(b) The facility shall employ a RN for at least eight consecutive hours a day, seven days a week. (c) The facility shall designate a RN to serve as the DON on a full-time basis. A person may not concurrently serve as the DON and as a charge nurse."</li>
-                        <li>"A skilled level of care facility must provide 24-hour licensed nursing services. (a) The facility shall ensure that nursing staff are present on the premises at all times to meet the needs of residents. A licensed nurse shall serve as charge nurse on each shift."</li>
-                    </ul>
-                    {% elif state == 'WV' or state|upper == 'WV' %}
-                    West Virginia requires at least 2.25 HPRD total nursing personnel (RNs, LPNs, CNAs) per resident per day statewide (WVC Title 64, §8.14). An RN must be on duty 8 consecutive hours every day; in facilities with fewer than 60 beds the DON may satisfy this. The DON must be an RN on duty full-time at least 5 days per week, 8 hours per day on day shift. Licensed nurse and nurse aide time may be combined so long as total meets the 2.25 HPRD minimum; a licensed nurse must serve as charge nurse on each shift.
-                    {% else %}
-                    For {{ state_standard_info.state_name }} nursing homes, the state requires {% if state_standard_info.value_type == 'range' %}a minimum of {{ state_standard_info.min_staffing }} HPRD and a maximum of {{ state_standard_info.max_staffing }} HPRD{% else %}a minimum of {{ state_standard_info.min_staffing }} HPRD{% endif %} (Hours Per Resident Day) for total staffing.
-                    {% endif %}
+                    {% if cms_pbj_facility_url or provider_info_download_available %}
+                    <p class="mb-2"><strong>Quick links:</strong>
+                        {% if cms_pbj_facility_url %}<a href="{{ cms_pbj_facility_url }}" target="_blank" rel="noopener" title="Opens data.cms.gov PBJ daily nurse staffing filtered by this facility's CCN">View raw CMS PBJ data for this facility</a>{% endif %}{% if cms_pbj_facility_url and provider_info_download_available %} | {% endif %}{% if provider_info_download_available %}<a href="/api/provider-info/download" target="_blank" rel="noopener" title="Download raw CSV (ratings, ownership, case-mix, CMI)">Download CMS Provider File</a>{% endif %}
                     </p>
-                    <p class="mt-2"><small class="text-muted">Source: MACPAC State Standards Database (2022)</small></p>
+                    {% endif %}
+                    <p>This Nursing Home Staffing Dashboard uses CMS Payroll-Based Journal (PBJ) data from 2017 to 2025, covering all nursing positions, including contract staff (<a href="https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing" target="_blank" rel="noopener">PBJ daily nurse staffing</a>). CMS first published PBJ data in 2017. It also uses Provider Information datasets from 2018 to 2025 (<a href="https://data.cms.gov/provider-data/dataset/4pq5-n9py" target="_blank" rel="noopener">4pq5-n9py</a>).{% if cms_pbj_facility_url %} <a href="{{ cms_pbj_facility_url }}" target="_blank" rel="noopener" title="Opens data.cms.gov filtered by this facility's CCN">View raw CMS PBJ data for this facility</a>.{% endif %}</p>
+                    <p>Unlike PBJ data, which is released quarterly, provider info files are published on a rolling monthly basis without a clear reference quarter. To align them with PBJ datasets, we matched the "reported total staffing" metric, which is available in both sources, to the corresponding quarter. This approach is not exact—health inspection data, for example, is updated on a different schedule—but it offers a reasonable best-guess for quarter assignment.{% if provider_info_download_available %} <a href="/api/provider-info/download" target="_blank" rel="noopener">Download CMS Provider File</a> (raw CSV).{% endif %}</p>
+                    <p class="small text-muted mb-0">Provider file download (Quick links above) and clickable source filenames in the Red Flag History table appear when raw CMS provider CSVs are present in <code>provider_info_extracted</code> or <code>static/data/provider_info</code> next to the app.</p>
+                    {% if state_standard_info %}
+                    <p class="mt-3"><strong>State legislation</strong></p>
+                    {% if state_standard_info.legislation_text %}
+                    <p class="mb-1">{{ state_standard_info.legislation_text }}</p>
+                    {% else %}
+                    <p class="mb-1">For {{ state_standard_info.state_name }} nursing homes, the state requires {% if state_standard_info.value_type == 'range' %}a staffing range of {{ state_standard_info.min_staffing }}–{{ state_standard_info.max_staffing }} HPRD{% else %}a minimum of {{ state_standard_info.min_staffing }} HPRD{% endif %} (Hours Per Resident Day) for total staffing.</p>
+                    {% endif %}
+                    <p class="mt-2 mb-0"><small class="text-muted"><strong>Sources:</strong>
+                    {% if state_standard_info.state_code_url and state_standard_info.state_code_citation %}
+                    <a href="{{ state_standard_info.state_code_url }}" target="_blank" rel="noopener">{{ state_standard_info.state_code_citation }}</a> (state code or rule).
+                    {% endif %}
+                    <a href="https://www.macpac.gov/publication/state-policies-related-to-nursing-facility-staffing/" target="_blank" rel="noopener">MACPAC – State Policies Related to Nursing Facility Staffing</a> (summary and state-by-state comparison).</small></p>
                     {% endif %}
                 </div>
             </div>
@@ -2338,6 +2362,16 @@
         let pageSize = 50;
         let sortColumn = '';
         let sortDirection = 'asc';
+        const providerInfoDownloadAvailable = {{ 'true' if provider_info_download_available else 'false' }};
+        
+        // Half-up rounding for all HPRD/percentage display (legal accuracy: 1.535 -> 1.54, not 1.53)
+        function roundHalfUpDisplay(val, decimals) {
+            if (val === null || val === undefined) return '';
+            const n = parseFloat(val);
+            if (isNaN(n)) return '';
+            const factor = Math.pow(10, decimals);
+            return (Math.round(n * factor + 1e-10) / factor).toFixed(decimals);
+        }
         
         // RN Sub 8 Modal Functions - Defined early to avoid reference errors
         function showRNSub8Modal(type) {
@@ -2354,13 +2388,13 @@
                 // Total RN hours < 8
                 filteredData = data.filter(row => parseFloat(row.Total_RN_Hours) < 8);
                 const totalDays = data.length;
-                const percentage = ((filteredData.length / totalDays) * 100).toFixed(1);
+                const percentage = roundHalfUpDisplay((filteredData.length / totalDays) * 100, 1);
                 title = `${filteredData.length} Days with Total RN Hours < 8 (${percentage}%, n = ${totalDays})`;
             } else if (type === 'direct') {
                 // Direct RN hours < 8
                 filteredData = data.filter(row => parseFloat(row.Hrs_RN) < 8);
                 const totalDays = data.length;
-                const percentage = ((filteredData.length / totalDays) * 100).toFixed(1);
+                const percentage = roundHalfUpDisplay((filteredData.length / totalDays) * 100, 1);
                 title = `${filteredData.length} Days with Direct RN Hours < 8 (${percentage}%, n = ${totalDays})`;
             }
             
@@ -2407,13 +2441,13 @@
                     html += '<tr>';
                     html += `<td data-sort="${row.WorkDate}"><a href="#" onclick="showDateOptions('${row.WorkDate}', '${formattedDate}'); return false;" style="color: #007bff; text-decoration: none; font-weight: 500;" title="Click for options for ${formattedDate}">${formattedDate}</a></td>`;
                     html += `<td>${dayOfWeek}</td>`;
-                    html += `<td data-sort="${parseFloat(row.Total_RN_Hours)}">${parseFloat(row.Total_RN_Hours).toFixed(2)}</td>`;
-                    html += `<td data-sort="${parseFloat(row.Hrs_RN)}">${parseFloat(row.Hrs_RN).toFixed(2)}</td>`;
-                    html += `<td data-sort="${parseFloat(row.Hrs_RNadmin)}">${parseFloat(row.Hrs_RNadmin).toFixed(2)}</td>`;
-                    html += `<td data-sort="${parseFloat(row.Hrs_RNDON)}">${parseFloat(row.Hrs_RNDON).toFixed(2)}</td>`;
-                    html += `<td data-sort="${parseFloat(row.Total_Staff_Hours)}">${parseFloat(row.Total_Staff_Hours).toFixed(2)}</td>`;
-                    html += `<td data-sort="${parseFloat(row.MDScensus)}">${parseFloat(row.MDScensus).toFixed(0)}</td>`;
-                    html += `<td data-sort="${parseFloat(row.RN_Contract_Pct)}">${parseFloat(row.RN_Contract_Pct).toFixed(1)}%</td>`;
+                    html += `<td data-sort="${parseFloat(row.Total_RN_Hours)}">${roundHalfUpDisplay(row.Total_RN_Hours, 2)}</td>`;
+                    html += `<td data-sort="${parseFloat(row.Hrs_RN)}">${roundHalfUpDisplay(row.Hrs_RN, 2)}</td>`;
+                    html += `<td data-sort="${parseFloat(row.Hrs_RNadmin)}">${roundHalfUpDisplay(row.Hrs_RNadmin, 2)}</td>`;
+                    html += `<td data-sort="${parseFloat(row.Hrs_RNDON)}">${roundHalfUpDisplay(row.Hrs_RNDON, 2)}</td>`;
+                    html += `<td data-sort="${parseFloat(row.Total_Staff_Hours)}">${roundHalfUpDisplay(row.Total_Staff_Hours, 2)}</td>`;
+                    html += `<td data-sort="${parseFloat(row.MDScensus)}">${roundHalfUpDisplay(row.MDScensus, 0)}</td>`;
+                    html += `<td data-sort="${parseFloat(row.RN_Contract_Pct)}">${roundHalfUpDisplay(row.RN_Contract_Pct, 1)}%</td>`;
                     html += `<td data-sort="${isHoliday}">${isHoliday}</td>`;
                     html += '</tr>';
                 });
@@ -2633,17 +2667,15 @@
                             
                             const outlierStyle = isOutlier ? 'style="color: red; font-weight: bold;"' : '';
                             
-                            // Helper function to format numbers - special handling for census row
+                            // Helper function to format numbers (half-up for accuracy)
                             const formatNumber = (value, metricName, isTargetValue = false) => {
                                 if (value === null || value === undefined || value === '-') return '-';
                                 const num = parseFloat(value);
                                 if (isNaN(num)) return '-';
-                                // For census row: target value (first column) stays as integer, others get 2 decimals
                                 if (metricName === 'Census') {
-                                    return isTargetValue ? num.toFixed(0) : num.toFixed(2);
+                                    return isTargetValue ? roundHalfUpDisplay(num, 0) : roundHalfUpDisplay(num, 2);
                                 }
-                                // All other metrics use 2 decimal places
-                                return num.toFixed(2);
+                                return roundHalfUpDisplay(num, 2);
                             };
                             
                             // Create tooltip attribute for outlier values
@@ -3249,6 +3281,12 @@
                      if (qualityEl) qualityEl.textContent = data.latest_quality_rating != null ? data.latest_quality_rating : '-';
                      document.getElementById('ownershipStatus').textContent = data.ownership_type || '-';
                      document.getElementById('sffStatus').textContent = data.sff_status || '-';
+                     const sffNote = document.getElementById('sffNoRatingNote');
+                     if (sffNote) {
+                         const isSFF = data.sff_status && String(data.sff_status).toUpperCase().includes('SFF');
+                         const noRating = data.latest_overall_rating == null || data.latest_overall_rating === '' || data.latest_overall_rating === '-';
+                         sffNote.style.display = (isSFF && noRating) ? 'block' : 'none';
+                     }
                      
                      // Update ownership change display and tooltip
                      const ownershipChangeValue = data.ownership_change_last_12_months || 'Unknown';
@@ -3405,8 +3443,8 @@
                 return;
             }
             
-            let tableHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-hover mb-0">';
-            tableHtml += '<thead class="table-light"><tr><th style="width: 12%;">Quarter</th><th>Red Flags</th><th style="width: 25%;">Date & Source</th></tr></thead>';
+           let tableHtml = '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">';
+           tableHtml += '<thead class="table-light"><tr><th style="width: 12%;">Quarter</th><th>Red Flags</th><th style="width: 28%;">Date &amp; Source</th></tr></thead>';
             tableHtml += '<tbody>';
             
             history.forEach((item, index) => {
@@ -3473,12 +3511,23 @@
                     ? `<span class="badge bg-secondary ms-2">${recordCount} records</span>`
                     : '';
                 
-                // Combine date and source in smaller text
-                const dateSourceHtml = `<div style="font-size: 0.75rem; line-height: 1.2;"><div>${procDate}</div><div class="text-muted" style="font-size: 0.7rem;">${sourceFile}</div></div>`;
+                // Combine date and source (tight, attorney-friendly)
+                const fmtDate = (d) => (d || '').toString().replaceAll(' to ', '–');
+                const srcName = (sourceFile || '').toString();
+                const srcIsFile = srcName.toLowerCase().endsWith('.csv');
+                const srcLink = (providerInfoDownloadAvailable && srcIsFile)
+                    ? `<a href="/api/provider-info/download?file=${encodeURIComponent(srcName)}" target="_blank" rel="noopener" class="text-decoration-none">${srcName}</a>`
+                    : srcName;
+                const dateSourceHtml = `
+                    <div class="small" style="line-height: 1.15;">
+                        <div>${fmtDate(procDate)}</div>
+                        <div class="text-muted font-monospace" style="font-size: 0.75rem;">${srcLink}</div>
+                    </div>
+                `;
                 
                 tableHtml += `<tr class="${statusClass}" id="${rowId}">`;
-                tableHtml += `<td>${quarter}${expandIcon}</td>`;
-                tableHtml += `<td>${statusHtml}${recordCountBadge}${note ? '<br/><small class="text-muted">' + note + '</small>' : ''}</td>`;
+                tableHtml += `<td class="align-top">${quarter}${expandIcon}</td>`;
+                tableHtml += `<td class="align-top">${statusHtml}${recordCountBadge}${note ? '<div class="text-muted small mt-1" style="line-height: 1.15;">' + note + '</div>' : ''}</td>`;
                 tableHtml += `<td>${dateSourceHtml}</td>`;
                 tableHtml += '</tr>';
                 
@@ -3486,7 +3535,7 @@
                 if (hasMultipleRecords) {
                     tableHtml += `<tr id="${rowId}-details" style="display: none;" class="table-light">`;
                     tableHtml += `<td colspan="3" class="p-2">`;
-                    tableHtml += `<div class="ms-4"><strong>Individual Records:</strong><ul class="mb-0 mt-2">`;
+                    tableHtml += `<div class="ms-4"><div class="fw-semibold">Records</div><ul class="mb-0 mt-2">`;
                     records.forEach(record => {
                         const recordFlags = record.red_flags || [];
                         const recordFlagBadges = recordFlags.map(flag => {
@@ -3514,9 +3563,16 @@
                             }
                             return `<span class="${badgeClass} me-1" style="font-size: 0.75rem;">${cleanFlag}</span>`;
                         }).join(' ');
-                        tableHtml += `<li class="mb-2">`;
-                        tableHtml += `<strong>${record.processing_date}</strong>: ${recordFlagBadges || 'No flags'} `;
-                        tableHtml += `<small class="text-muted">(${record.source_file})</small>`;
+                        const rDate = record.processing_date ? fmtDate(record.processing_date) : '';
+                        const rSrc = record.source_file || '';
+                        const rSrcName = rSrc.toString();
+                        const rSrcIsFile = rSrcName.toLowerCase().endsWith('.csv');
+                        const rSrcLink = (providerInfoDownloadAvailable && rSrcIsFile)
+                            ? `<a href="/api/provider-info/download?file=${encodeURIComponent(rSrcName)}" target="_blank" rel="noopener" class="text-decoration-none">${rSrcName}</a>`
+                            : rSrcName;
+                        tableHtml += `<li class="mb-2" style="line-height: 1.2;">`;
+                        tableHtml += `<span class="fw-semibold">${rDate}</span>: ${recordFlagBadges || '<span class="text-muted">No flags</span>'} `;
+                        tableHtml += `<span class="text-muted font-monospace" style="font-size: 0.8em;">(${rSrcLink})</span>`;
                         tableHtml += `</li>`;
                     });
                     tableHtml += `</ul></div>`;
@@ -3654,18 +3710,25 @@
         }
 
          function updateEntityInfo(data) {
-             // Update affiliated entity display only
              const affiliatedEntityDisplay = document.getElementById('affiliatedEntityDisplay');
-             if (affiliatedEntityDisplay) {
-                 if (data.affiliated_entity_name && data.affiliated_entity_id) {
-                     // Convert to integer to remove decimal (e.g., 217.0 -> 217)
-                     const entityId = parseInt(data.affiliated_entity_id, 10);
-                     const entityLink = `https://pbjdashboard.com/?entity=${entityId}`;
-                     affiliatedEntityDisplay.innerHTML = `<a href="${entityLink}" target="_blank" style="color: white; text-decoration: underline;">${data.affiliated_entity_name}</a>`;
-                 } else {
-                     affiliatedEntityDisplay.textContent = 'N/A';
+             if (!affiliatedEntityDisplay) return;
+             const entityLink = (id) => `/entity/${id}`;
+             if (data.affiliated_entity_name && data.affiliated_entity_id) {
+                 let html = `<a href="${entityLink(data.affiliated_entity_id)}" target="_blank" rel="noopener" style="color: white; text-decoration: underline;">${escapeHtml(data.affiliated_entity_name)}</a>`;
+                 if (data.affiliated_entity_prev_name && data.affiliated_entity_prev_id) {
+                     const prevYears = data.affiliated_entity_prev_years ? `, ${data.affiliated_entity_prev_years}` : '';
+                     html += ` <span style="font-weight: 400;">(prev: <a href="${entityLink(data.affiliated_entity_prev_id)}" target="_blank" rel="noopener" style="color: white; text-decoration: underline;">${escapeHtml(data.affiliated_entity_prev_name)}</a>${prevYears})</span>`;
                  }
+                 affiliatedEntityDisplay.innerHTML = html;
+             } else {
+                 affiliatedEntityDisplay.textContent = 'N/A';
              }
+         }
+         function escapeHtml(text) {
+             if (!text) return '';
+             const div = document.createElement('div');
+             div.textContent = text;
+             return div.innerHTML;
          }
          
          function updateSFFTooltip(content) {
@@ -3708,9 +3771,12 @@
                  originalChartData = JSON.parse(JSON.stringify(chartData));
              }
              
-             // Store in global
-             window.providerChartData = chartData;
-             
+            // Store in global
+            window.providerChartData = chartData;
+            
+            // 515086: discrete events (Did Not Meet) = markers only; quarterly staffing = lines only, connectgaps
+            const is515086 = '{{ provnum }}' === '515086';
+            
              // Filter out zero HPRD data points for total staffing only
              const filterZeroData = (data) => data.map((value, index) => value > 0 ? value : null);
              
@@ -3726,19 +3792,19 @@
             const calculateRatioRange = () => {
                 const allRatios = [];
                 
-                // Get all ratio values from Total Staff
+                // Get all ratio values from Total Staff (skip null so partial data doesn't push NaN)
                 chartData.total_staffing.reported_total.forEach((reported, i) => {
                     const caseMix = chartData.total_staffing.case_mix_total[i];
-                    if (caseMix > 0) allRatios.push(reported / caseMix);
+                    if (reported != null && caseMix != null && caseMix > 0) allRatios.push(reported / caseMix);
                 });
                 
                 // Get all ratio values from Direct Staff
                 chartData.total_staffing.reported_direct.forEach((reported, i) => {
-                    const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
-                    const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
-                    const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
-                    const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
-                    if (caseMixDirect > 0) allRatios.push(reported / caseMixDirect);
+                    const caseMixRN = chartData.rn_staffing.case_mix_rn[i];
+                    const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i];
+                    const caseMixNA = chartData.cna_staffing.case_mix_cna[i];
+                    const caseMixDirect = (caseMixRN != null ? caseMixRN : 0) + (caseMixLPN != null ? caseMixLPN : 0) + (caseMixNA != null ? caseMixNA : 0);
+                    if (reported != null && caseMixDirect > 0) allRatios.push(reported / caseMixDirect);
                 });
                 
                 if (allRatios.length === 0) return [0, 2];
@@ -3757,15 +3823,15 @@
             const calculateDirectRatioRange = () => {
                 const allRatios = [];
                 
-                // Get all ratio values from Total RN and RN direct data
+                // Get all ratio values from Total RN and RN direct data (skip null for partial data)
                 chartData.rn_staffing.reported_rn.forEach((reported, i) => {
                     const caseMix = chartData.rn_staffing.case_mix_rn[i];
-                    if (caseMix > 0) allRatios.push(reported / caseMix);
+                    if (reported != null && caseMix != null && caseMix > 0) allRatios.push(reported / caseMix);
                 });
                 
                 chartData.rn_staffing.reported_rn_direct.forEach((reported, i) => {
                     const caseMix = chartData.rn_staffing.case_mix_rn[i];
-                    if (caseMix > 0) allRatios.push(reported / caseMix);
+                    if (reported != null && caseMix != null && caseMix > 0) allRatios.push(reported / caseMix);
                 });
                 
                 if (allRatios.length === 0) return [0, 2];
@@ -3879,6 +3945,9 @@
             // Total Staffing Chart
             const isMobile = window.innerWidth < 768;
             const isMobileCaseMix = window.innerWidth < 768;
+            // Global quarterly x-axis: use ISO quarter-start dates so all quarters (e.g. Q4 2023, Q1 2020) appear with uniform spacing; null y where a series has no data (connectgaps: false).
+            // Use quarter labels (Q1 2021) for x-axis and hovers instead of dates (Jan 2021)
+            const totalX = chartData.total_staffing.quarters;
             const totalLayout = {
                 xaxis: { 
                     title: '', 
@@ -3937,39 +4006,39 @@
             
             const totalData = [
                 {
-                    x: chartData.total_staffing.quarters,
-                    y: filterZeroData(totalReportedData),
+                    x: totalX,
+                    y: chartData.total_staffing.reported_total,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Total',
-                    line: { color: 'blue', width: 2 },
+                    line: { color: 'blue', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.total_staffing.quarters,
-                    y: filterZeroData(chartData.total_staffing.reported_direct),
+                    x: totalX,
+                    y: chartData.total_staffing.reported_direct,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Direct',
-                    line: { color: 'gray', width: 2 },
+                    line: { color: 'gray', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.total_staffing.quarters,
-                    y: filterZeroData(chartData.total_staffing.case_mix_total),
+                    x: totalX,
+                    y: chartData.total_staffing.case_mix_total,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Case-Mix',
-                    line: { color: 'red', width: 2 },
+                    line: { color: 'red', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.total_staffing.quarters,
-                    y: filterZeroData(chartData.total_staffing.adjusted_total),
+                    x: totalX,
+                    y: chartData.total_staffing.adjusted_total,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Adjusted',
-                    line: { color: 'green', width: 2, dash: 'dash' },
+                    line: { color: 'green', width: 2, dash: 'dash', connectgaps: true },
                     marker: { size: 6 }
                 }
             ];
@@ -3977,6 +4046,7 @@
             Plotly.newPlot('providerInfoTotalChart', totalData, totalLayout);
             
             // RN Staffing Chart
+            const rnX = chartData.rn_staffing.quarters;
             const rnLayout = {
                 xaxis: { 
                     title: '', 
@@ -4035,39 +4105,39 @@
             
             const rnData = [
                 {
-                    x: chartData.rn_staffing.quarters,
-                    y: filterNullData(rnReportedData),
+                    x: rnX,
+                    y: chartData.rn_staffing.reported_rn,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Total',
-                    line: { color: 'blue', width: 2 },
+                    line: { color: 'blue', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.rn_staffing.quarters,
-                    y: filterZeroData(chartData.rn_staffing.reported_rn_direct),
+                    x: rnX,
+                    y: chartData.rn_staffing.reported_rn_direct,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Direct',
-                    line: { color: 'gray', width: 2 },
+                    line: { color: 'gray', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.rn_staffing.quarters,
-                    y: filterNullData(chartData.rn_staffing.case_mix_rn),
+                    x: rnX,
+                    y: chartData.rn_staffing.case_mix_rn,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Case-Mix',
-                    line: { color: 'red', width: 2 },
+                    line: { color: 'red', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.rn_staffing.quarters,
-                    y: filterNullData(chartData.rn_staffing.adjusted_rn),
+                    x: rnX,
+                    y: chartData.rn_staffing.adjusted_rn,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Adjusted',
-                    line: { color: 'green', width: 2, dash: 'dash' },
+                    line: { color: 'green', width: 2, dash: 'dash', connectgaps: true },
                     marker: { size: 6 }
                 }
             ];
@@ -4075,6 +4145,7 @@
             Plotly.newPlot('providerInfoRNChart', rnData, rnLayout);
             
             // Nurse Aide Staffing Chart
+            const cnaX = chartData.cna_staffing.quarters;
             const cnaLayout = {
                 xaxis: { 
                     title: '', 
@@ -4133,30 +4204,30 @@
             
             const cnaData = [
                 {
-                    x: chartData.cna_staffing.quarters,
-                    y: filterNullData(chartData.cna_staffing.reported_cna),
+                    x: cnaX,
+                    y: chartData.cna_staffing.reported_cna,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Reported',
-                    line: { color: 'blue', width: 2 },
+                    line: { color: 'blue', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.cna_staffing.quarters,
-                    y: filterNullData(chartData.cna_staffing.case_mix_cna),
+                    x: cnaX,
+                    y: chartData.cna_staffing.case_mix_cna,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Case-Mix',
-                    line: { color: 'red', width: 2 },
+                    line: { color: 'red', width: 2, connectgaps: true },
                     marker: { size: 6 }
                 },
                 {
-                    x: chartData.cna_staffing.quarters,
-                    y: filterNullData(chartData.cna_staffing.adjusted_cna),
+                    x: cnaX,
+                    y: chartData.cna_staffing.adjusted_cna,
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Adjusted',
-                    line: { color: 'green', width: 2, dash: 'dash' },
+                    line: { color: 'green', width: 2, dash: 'dash', connectgaps: true },
                     marker: { size: 6 }
                 }
             ];
@@ -4178,9 +4249,9 @@
                     ticktext: chartData.ratings.quarters,
                     tickfont: { size: isMobileRating ? 9 : 10 }
                 },
-                yaxis: { title: 'Rating (1-5)', range: [0, 5] },
+                yaxis: { title: 'Rating (1-5)', range: [0.5, 5.5], dtick: 1 },
                 height: chartHeight,
-                margin: { b: isMobileRating ? 220 : 150, l: 70, r: isMobileRating ? 20 : 80, t: 20 },
+                margin: { b: isMobileRating ? 220 : 150, l: 70, r: isMobileRating ? 20 : 80, t: 50 },
                 showlegend: true,
                 legend: {
                     bgcolor: 'white',
@@ -4310,64 +4381,135 @@
                     y: chartData.ratings.overall,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: window.innerWidth < 768 ? 'Overall' : 'Overall Rating',
-                    line: { color: '#1f77b4', width: 4 },
-                    marker: { size: 8 }
+                    name: 'Overall',
+                    line: { color: '#1f77b4', width: 4, connectgaps: true },
+                    marker: { size: 10, symbol: 'circle' }
                 },
                 {
                     x: chartData.ratings.quarters,
                     y: chartData.ratings.staffing,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: window.innerWidth < 768 ? 'Staffing' : 'Staffing Rating',
-                    line: { color: '#2ca02c', width: 1.5 },
-                    marker: { size: 5 }
+                    name: 'Staffing',
+                    line: { color: '#2ca02c', width: 2, dash: 'dot', connectgaps: true },
+                    marker: { size: 6, symbol: 'square' }
                 },
                 {
                     x: chartData.ratings.quarters,
                     y: chartData.ratings.health_inspection,
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: window.innerWidth < 768 ? 'Health Inspection' : 'Health Inspection Rating',
-                    line: { color: '#ff7f0e', width: 1.5 },
-                    marker: { size: 5 }
+                    name: 'Health Inspection',
+                    line: { color: '#ff7f0e', width: 2, dash: 'dash', connectgaps: true },
+                    marker: { size: 6, symbol: 'diamond' }
                 },
                 {
                     x: chartData.ratings.quarters,
-                    y: (chartData.ratings.quality || []).length ? filterNullData(chartData.ratings.quality) : [],
+                    y: (chartData.ratings.quality || []).length ? chartData.ratings.quality : [],
                     type: 'scatter',
                     mode: 'lines+markers',
-                    name: window.innerWidth < 768 ? 'Quality' : 'Quality Measures Rating',
-                    line: { color: '#9467bd', width: 1.5 },
-                    marker: { size: 5 }
+                    name: 'Quality Measures',
+                    line: { color: '#9467bd', width: 2, dash: 'dashdot', connectgaps: true },
+                    marker: { size: 6, symbol: 'cross' }
                 }
             ];
             
             Plotly.newPlot('providerInfoRatingsChart', ratingsData, ratingsLayout);
 
+            // Occupancy Rate Chart (same x-axis as other provider charts; y = % occupancy; skip 0s)
+            if (chartData.occupancy && chartData.occupancy.quarters && chartData.occupancy.occupancy_pct) {
+                const occQuarters = chartData.occupancy.quarters;
+                const occPct = chartData.occupancy.occupancy_pct;
+                const occCensus = chartData.occupancy.avg_census || [];
+                const occBeds = chartData.occupancy.certified_beds || [];
+                const occCustomdata = occQuarters.map((q, i) => {
+                    const pct = occPct[i];
+                    const census = occCensus[i];
+                    const beds = occBeds[i];
+                    const pctLabel = (pct != null && pct !== '') ? pct.toFixed(2) + '%' : '—';
+                    const censusLabel = (census != null && census !== '') ? census.toFixed(1) : '—';
+                    const bedsLabel = (beds != null && beds !== '') ? String(beds) : '—';
+                    return [pctLabel, censusLabel, bedsLabel];
+                });
+                const occupancyData = [{
+                    x: occQuarters,
+                    y: occPct,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Occupancy %',
+                    line: { color: '#17a2b8', width: 2, connectgaps: true },
+                    marker: { size: 6 },
+                    hovertemplate: '<b>%{x}</b><br>' +
+                        '%{customdata[0]} occupancy<br>' +
+                        '%{customdata[1]} Residents, %{customdata[2]} Beds<br>' +
+                        '<extra></extra>',
+                    customdata: occCustomdata
+                }];
+                const occLayout = {
+                    xaxis: {
+                        title: '',
+                        nticks: 8,
+                        tickangle: -45,
+                        type: 'category',
+                        categoryorder: 'array',
+                        categoryarray: occQuarters,
+                        tickfont: { size: window.innerWidth < 768 ? 9 : 10 }
+                    },
+                    yaxis: {
+                        title: 'Occupancy (%)',
+                        tickformat: ',.1f',
+                        autorange: true,
+                        rangemode: 'normal',
+                        tickfont: { size: 10 }
+                    },
+                    height: chartHeight,
+                    margin: { b: 150, l: 70, r: 40, t: 50 },
+                    showlegend: false,
+                    annotations: [{
+                        text: '<b>Source:</b> CMS Provider Info • Chart by <a href="https://www.320insight.com/" target="_blank" style="color: inherit;">320 Consulting</a>',
+                        showarrow: false,
+                        x: 0.5,
+                        y: -0.22,
+                        xref: 'paper',
+                        yref: 'paper',
+                        xanchor: 'center',
+                        yanchor: 'top',
+                        font: { size: 9, color: '#333' },
+                        bgcolor: '#f8f9fa',
+                        bordercolor: '#dee2e6',
+                        borderwidth: 1,
+                        borderpad: 3
+                    }]
+                };
+                Plotly.newPlot('providerInfoOccupancyChart', occupancyData, occLayout);
+            }
+
             // Delta Total Nurse Chart (Dual Y-Axis)
             const deltaTotalData = [
                 {
-                    x: chartData.total_staffing.quarters,
+                    x: totalX,
                     y: chartData.total_staffing.reported_total.map((reported, i) => {
                         const caseMix = chartData.total_staffing.case_mix_total[i];
-                        return caseMix > 0 ? ((reported - caseMix) / caseMix) * 100 : null;
+                        return (reported != null && caseMix != null && caseMix > 0) ? ((reported - caseMix) / caseMix) * 100 : null;
                     }),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'Percentage Difference (%)',
-                    line: { color: '#ff7f0e', width: 3 },
+                    line: { color: '#ff7f0e', width: 3, connectgaps: true },
                     marker: { size: 8 },
                     hovertemplate: '<b>%{x}</b><br>' +
-                                  'Reported: %{customdata[0]:.2f} HPRD<br>' +
-                                  'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
-                                  'Actual Difference: %{customdata[2]:.2f} HPRD<br>' +
+                                  'Reported: %{customdata[3]}<br>' +
+                                  'Case-Mix: %{customdata[4]}<br>' +
+                                  'Actual Difference: %{customdata[5]}<br>' +
                                   'Percentage: %{y:.1f}%<br>' +
                                   '<extra></extra>',
                     customdata: chartData.total_staffing.reported_total.map((reported, i) => {
                         const caseMix = chartData.total_staffing.case_mix_total[i];
-                        const actualDiff = caseMix > 0 ? reported - caseMix : null;
-                        return [reported, caseMix, actualDiff];
+                        const actualDiff = (reported != null && caseMix != null && caseMix > 0) ? reported - caseMix : null;
+                        const reportedLabel = (reported == null || reported === 0) ? 'No data' : reported.toFixed(2) + ' HPRD';
+                        const caseMixLabel = (caseMix == null || caseMix === 0) ? 'No data' : caseMix.toFixed(2) + ' HPRD';
+                        const diffLabel = (actualDiff == null) ? 'No data' : actualDiff.toFixed(2) + ' HPRD';
+                        return [reported, caseMix, actualDiff, reportedLabel, caseMixLabel, diffLabel];
                     })
                 }
             ];
@@ -4375,10 +4517,10 @@
              // Combined Delta Chart (Total + Direct Total) - Ratio based (reported/case-mix)
              const combinedDeltaData = [
                  {
-                     x: chartData.total_staffing.quarters,
+                     x: totalX,
                      y: chartData.total_staffing.reported_total.map((reported, i) => {
                          const caseMix = chartData.total_staffing.case_mix_total[i];
-                         return caseMix > 0 ? reported / caseMix : null;
+                         return (reported != null && caseMix != null && caseMix > 0) ? reported / caseMix : null;
                      }),
                      type: 'scatter',
                      mode: 'lines+markers',
@@ -4389,36 +4531,35 @@
                          color: 'rgba(0, 102, 204, 0.6)',
                          line: { color: '#0066cc', width: 2 }
                      },
-                     hovertemplate: '<b>%{x}</b><br>' +
-                                   '<b>Total Staff:</b><br>' +
-                                   'Reported: %{customdata[0]:.2f} HPRD<br>' +
-                                   'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
-                                   'Ratio: %{y:.2f}<br>' +
-                                   '<b>Status:</b> %{customdata[3]}<br>' +
-                                   '<extra></extra>',
-                     customdata: chartData.total_staffing.reported_total.map((reported, i) => {
-                         const caseMix = chartData.total_staffing.case_mix_total[i];
-                         const ratio = caseMix > 0 ? reported / caseMix : 1;
-                         let status = 'Meets Case-Mix';
-                         if (ratio < 0.5) status = 'Super Severe (<0.5)';
-                         else if (ratio < 0.8) status = 'Severe (<0.8)';
-                         else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
-                         return [reported, caseMix, ratio, status];
-                     })
+                    hovertemplate: '<b>%{x}</b><br>' +
+                                  '<b>Total Staff:</b><br>' +
+                                  'Reported: %{customdata[4]}<br>' +
+                                  'Case-Mix: %{customdata[5]}<br>' +
+                                  'Ratio: %{y:.2f}<br>' +
+                                  '<b>Status:</b> %{customdata[3]}<br>' +
+                                  '<extra></extra>',
+                    customdata: chartData.total_staffing.reported_total.map((reported, i) => {
+                        const caseMix = chartData.total_staffing.case_mix_total[i];
+                        const ratio = (reported != null && caseMix != null && caseMix > 0) ? reported / caseMix : null;
+                        let status = (reported == null || reported === 0 || caseMix == null || caseMix <= 0) ? 'No data' : (ratio >= 1.0 ? 'Meets Case-Mix' : (ratio < 0.5 ? 'Super Severe (<0.5)' : (ratio < 0.8 ? 'Severe (<0.8)' : 'Below Case-Mix (<1.0)')));
+                        const reportedLabel = (reported == null || reported === 0) ? 'No data' : reported.toFixed(2) + ' HPRD';
+                        const caseMixLabel = (caseMix == null || caseMix === 0) ? 'No data' : caseMix.toFixed(2) + ' HPRD';
+                        return [reported, caseMix, ratio, status, reportedLabel, caseMixLabel];
+                    })
                  },
                  {
-                     x: chartData.total_staffing.quarters,
+                     x: totalX,
                      y: chartData.total_staffing.reported_direct.map((reported, i) => {
-                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
-                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
-                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
-                         const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
-                         return caseMixDirect > 0 ? reported / caseMixDirect : null;
+                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i];
+                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i];
+                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i];
+                         const caseMixDirect = (caseMixRN != null ? caseMixRN : 0) + (caseMixLPN != null ? caseMixLPN : 0) + (caseMixNA != null ? caseMixNA : 0);
+                         return (reported != null && caseMixDirect > 0) ? reported / caseMixDirect : null;
                      }),
                      type: 'scatter',
                      mode: 'lines+markers',
                      name: 'Direct',
-                     line: { color: '#808080', width: 3 },
+                     line: { color: '#808080', width: 3, connectgaps: true },
                      marker: { 
                          size: 6,
                          color: 'rgba(128, 128, 128, 0.6)',
@@ -4432,11 +4573,11 @@
                                    '<b>Status:</b> %{customdata[3]}<br>' +
                                    '<extra></extra>',
                      customdata: chartData.total_staffing.reported_direct.map((reported, i) => {
-                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i] || 0;
-                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i] || 0;
-                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i] || 0;
-                         const caseMixDirect = caseMixRN + caseMixLPN + caseMixNA;
-                         const ratio = caseMixDirect > 0 ? reported / caseMixDirect : 1;
+                         const caseMixRN = chartData.rn_staffing.case_mix_rn[i];
+                         const caseMixLPN = chartData.cna_staffing.case_mix_lpn[i];
+                         const caseMixNA = chartData.cna_staffing.case_mix_cna[i];
+                         const caseMixDirect = (caseMixRN != null ? caseMixRN : 0) + (caseMixLPN != null ? caseMixLPN : 0) + (caseMixNA != null ? caseMixNA : 0);
+                         const ratio = (reported != null && caseMixDirect > 0) ? reported / caseMixDirect : 1;
                          let status = 'Meets Case-Mix';
                          if (ratio < 0.5) status = 'Super Severe (<0.5)';
                          else if (ratio < 0.8) status = 'Severe (<0.8)';
@@ -4620,10 +4761,10 @@
             // Direct SER Chart (Total RN + RN Direct) - Ratio based (reported/case-mix)
             const directDeltaData = [
                 {
-                    x: chartData.rn_staffing.quarters,
+                    x: rnX,
                     y: chartData.rn_staffing.reported_rn.map((reported, i) => {
                         const caseMix = chartData.rn_staffing.case_mix_rn[i];
-                        return caseMix > 0 ? reported / caseMix : null;
+                        return (reported != null && caseMix != null && caseMix > 0) ? reported / caseMix : null;
                     }),
                     type: 'scatter',
                     mode: 'lines+markers',
@@ -4636,31 +4777,30 @@
                     },
                     hovertemplate: '<b>%{x}</b><br>' +
                                   '<b>Total RN:</b><br>' +
-                                  'Reported: %{customdata[0]:.2f} HPRD<br>' +
-                                  'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
+                                  'Reported: %{customdata[4]}<br>' +
+                                  'Case-Mix: %{customdata[5]}<br>' +
                                   'Ratio: %{y:.2f}<br>' +
                                   '<b>Status:</b> %{customdata[3]}<br>' +
                                   '<extra></extra>',
                     customdata: chartData.rn_staffing.reported_rn.map((reported, i) => {
                         const caseMix = chartData.rn_staffing.case_mix_rn[i];
-                        const ratio = caseMix > 0 ? reported / caseMix : 1;
-                        let status = 'Meets Case-Mix';
-                        if (ratio < 0.5) status = 'Super Severe (<0.5)';
-                        else if (ratio < 0.8) status = 'Severe (<0.8)';
-                        else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
-                        return [reported, caseMix, ratio, status];
+                        const ratio = (reported != null && caseMix != null && caseMix > 0) ? reported / caseMix : null;
+                        let status = (reported == null || reported === 0 || caseMix == null || caseMix <= 0) ? 'No data' : (ratio >= 1.0 ? 'Meets Case-Mix' : (ratio < 0.5 ? 'Super Severe (<0.5)' : (ratio < 0.8 ? 'Severe (<0.8)' : 'Below Case-Mix (<1.0)')));
+                        const reportedLabel = (reported == null || reported === 0) ? 'No data' : reported.toFixed(2) + ' HPRD';
+                        const caseMixLabel = (caseMix == null || caseMix === 0) ? 'No data' : caseMix.toFixed(2) + ' HPRD';
+                        return [reported, caseMix, ratio, status, reportedLabel, caseMixLabel];
                     })
                 },
                 {
-                    x: chartData.rn_staffing.quarters,
+                    x: rnX,
                     y: chartData.rn_staffing.reported_rn_direct.map((reported, i) => {
                         const caseMix = chartData.rn_staffing.case_mix_rn[i];
-                        return caseMix > 0 ? reported / caseMix : null;
+                        return (reported != null && caseMix != null && caseMix > 0) ? reported / caseMix : null;
                     }),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: 'RN',
-                    line: { color: '#ff8c00', width: 3 },
+                    line: { color: '#ff8c00', width: 3, connectgaps: true },
                     marker: { 
                         size: 5,
                         color: 'rgba(255, 140, 0, 0.6)',
@@ -4668,19 +4808,18 @@
                     },
                     hovertemplate: '<b>%{x}</b><br>' +
                                   '<b>RN Direct (excl. admin/DON):</b><br>' +
-                                  'Reported: %{customdata[0]:.2f} HPRD<br>' +
-                                  'Case-Mix: %{customdata[1]:.2f} HPRD<br>' +
+                                  'Reported: %{customdata[4]}<br>' +
+                                  'Case-Mix: %{customdata[5]}<br>' +
                                   'Ratio: %{y:.2f}<br>' +
                                   '<b>Status:</b> %{customdata[3]}<br>' +
                                   '<extra></extra>',
                     customdata: chartData.rn_staffing.reported_rn_direct.map((reported, i) => {
                         const caseMix = chartData.rn_staffing.case_mix_rn[i];
-                        const ratio = caseMix > 0 ? reported / caseMix : 1;
-                        let status = 'Meets Case-Mix';
-                        if (ratio < 0.5) status = 'Super Severe (<0.5)';
-                        else if (ratio < 0.8) status = 'Severe (<0.8)';
-                        else if (ratio < 1.0) status = 'Below Case-Mix (<1.0)';
-                        return [reported, caseMix, ratio, status];
+                        const ratio = (reported != null && caseMix != null && caseMix > 0) ? reported / caseMix : null;
+                        let status = (reported == null || reported === 0 || caseMix == null || caseMix <= 0) ? 'No data' : (ratio >= 1.0 ? 'Meets Case-Mix' : (ratio < 0.5 ? 'Super Severe (<0.5)' : (ratio < 0.8 ? 'Severe (<0.8)' : 'Below Case-Mix (<1.0)')));
+                        const reportedLabel = (reported == null || reported === 0) ? 'No data' : reported.toFixed(2) + ' HPRD';
+                        const caseMixLabel = (caseMix == null || caseMix === 0) ? 'No data' : caseMix.toFixed(2) + ' HPRD';
+                        return [reported, caseMix, ratio, status, reportedLabel, caseMixLabel];
                     })
                 }
             ];
@@ -5267,13 +5406,13 @@
             console.log('DEBUG: updateSummaryStats called with:', summary);
             console.log('DEBUG: total_days =', summary.total_days);
             document.getElementById('totalDays').textContent = summary.total_days.toLocaleString();
-            document.getElementById('avgCensus').textContent = summary.avg_census.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            document.getElementById('totalHPRD').textContent = summary.avg_total_hprd.toFixed(2);
-            document.getElementById('totalDirectHPRD').textContent = summary.avg_nurse_staff_hprd_excl_admin.toFixed(2);
-            document.getElementById('totalRNHPRD').textContent = summary.avg_total_rn_hprd.toFixed(2);
-            document.getElementById('directRNHPRD').textContent = summary.avg_rn_hprd.toFixed(2);
-            document.getElementById('indirectStaffingHPRD').textContent = (summary.avg_indirect_staffing_hprd || 0).toFixed(2);
-            document.getElementById('contractPct').textContent = summary.avg_total_contract_pct.toFixed(1) + '%';
+            document.getElementById('avgCensus').textContent = roundHalfUpDisplay(summary.avg_census, 1).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('totalHPRD').textContent = roundHalfUpDisplay(summary.avg_total_hprd, 2);
+            document.getElementById('totalDirectHPRD').textContent = roundHalfUpDisplay(summary.avg_nurse_staff_hprd_excl_admin, 2);
+            document.getElementById('totalRNHPRD').textContent = roundHalfUpDisplay(summary.avg_total_rn_hprd, 2);
+            document.getElementById('directRNHPRD').textContent = roundHalfUpDisplay(summary.avg_rn_hprd, 2);
+            document.getElementById('indirectStaffingHPRD').textContent = roundHalfUpDisplay(summary.avg_indirect_staffing_hprd || 0, 2);
+            document.getElementById('contractPct').textContent = roundHalfUpDisplay(summary.avg_total_contract_pct, 1) + '%';
            document.getElementById('totalRNSub8').textContent = summary.total_rn_sub8.toLocaleString();
            document.getElementById('directRNSub8').textContent = summary.direct_rn_sub8.toLocaleString();
             
@@ -5727,22 +5866,25 @@
             });
         }
 
-        // Helper function to format numbers - special handling for census row
+        // Helper function to format numbers - special handling for census row; uses half-up for accuracy.
         const formatNumber = (value, metricName, isTargetValue = false) => {
             if (value === null || value === undefined || value === '-') return '-';
             const num = parseFloat(value);
             if (isNaN(num)) return '-';
-            // For census row: target value (first column) stays as integer, others get 2 decimals
+            if (typeof metricName === 'number') return roundHalfUpDisplay(num, metricName);
             if (metricName === 'Census') {
-                return isTargetValue ? num.toFixed(0) : num.toFixed(2);
+                return isTargetValue ? roundHalfUpDisplay(num, 0) : roundHalfUpDisplay(num, 2);
             }
-            // All other metrics use 2 decimal places
-            return num.toFixed(2);
+            return roundHalfUpDisplay(num, 2);
         };
 
         async function loadQuarterlyData() {
             try {
                 const response = await fetch('/api/quarterly-data');
+                if (!response.ok) {
+                    console.error('Error loading quarterly data: HTTP ' + response.status);
+                    return;
+                }
                 const data = await response.json();
                 
                 if (data.error) {
@@ -5750,7 +5892,9 @@
                     return;
                 }
                 
-                populateQuarterlyDataTable(data.quarterly_data);
+                if (data.quarterly_data) {
+                    populateQuarterlyDataTable(data.quarterly_data);
+                }
             } catch (error) {
                 console.error('Error fetching quarterly data:', error);
             }
@@ -5828,17 +5972,31 @@
                     return `<td class="text-center ${boldClass} ${colorClass}" data-${metric}="${value}">${valueText} <span class="text-muted">(${formatNumber(hours)})</span></td>`;
                 };
                 
+                const qd = quarterData;
+                const census = qd.census ?? qd.Census ?? null;
+                const totalHprd = qd.total_hprd ?? qd.Total_HPRD ?? null;
+                const totalHours = qd.total_hours ?? qd.Total_Staff_Hours ?? null;
+                const directHprd = qd.direct_hprd ?? qd.Direct_Care_HPRD ?? null;
+                const directHours = qd.direct_hours ?? qd.Nurse_Staff_Hours_Excl_Admin ?? null;
+                const totalRnHprd = qd.total_rn_hprd ?? qd.Total_RN_HPRD ?? null;
+                const totalRnHours = qd.total_rn_hours ?? qd.Total_RN_Hours ?? null;
+                const rnHprd = qd.rn_hprd ?? qd.RN_HPRD ?? null;
+                const rnHours = qd.rn_hours ?? qd.Hrs_RN ?? null;
+                const rnAdminHprd = qd.rn_admin_hprd ?? null;
+                const rnAdminHours = qd.rn_admin_hours ?? qd.Hrs_RNadmin ?? null;
+                const rnDonHprd = qd.rn_don_hprd ?? null;
+                const rnDonHours = qd.rn_don_hours ?? qd.Hrs_RNDON ?? null;
                 row.innerHTML = `
                     <td class="fw-bold text-center quarter-cell" data-quarter="${quarter}" style="white-space: nowrap;">
                         <a href="${cmsUrl}" target="_blank" class="text-decoration-none">${quarterDisplay}</a>
                     </td>
-                    <td class="text-center" data-census="${quarterData.census}">${formatNumber(quarterData.census, 'Census', true)}</td>
-                    ${formatCell(quarterData.total_hprd, quarterData.total_hours, 'total_hprd', quarter)}
-                    ${formatCell(quarterData.direct_hprd, quarterData.direct_hours, 'direct_hprd', quarter)}
-                    ${formatCell(quarterData.total_rn_hprd, quarterData.total_rn_hours, 'total_rn_hprd', quarter)}
-                    ${formatCell(quarterData.rn_hprd, quarterData.rn_hours, 'rn_hprd', quarter)}
-                    ${formatCell(quarterData.rn_admin_hprd, quarterData.rn_admin_hours, 'rn_admin_hprd', quarter)}
-                    ${formatCell(quarterData.rn_don_hprd, quarterData.rn_don_hours, 'rn_don_hprd', quarter)}
+                    <td class="text-center" data-census="${census}">${formatNumber(census, 'Census', true)}</td>
+                    ${formatCell(totalHprd, totalHours, 'total_hprd', quarter)}
+                    ${formatCell(directHprd, directHours, 'direct_hprd', quarter)}
+                    ${formatCell(totalRnHprd, totalRnHours, 'total_rn_hprd', quarter)}
+                    ${formatCell(rnHprd, rnHours, 'rn_hprd', quarter)}
+                    ${formatCell(rnAdminHprd, rnAdminHours, 'rn_admin_hprd', quarter)}
+                    ${formatCell(rnDonHprd, rnDonHours, 'rn_don_hprd', quarter)}
                 `;
                 tbody.appendChild(row);
             });
@@ -6093,12 +6251,12 @@
                     cmsUrl = `https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data/${quarterUrl}?query=%7B%22filters%22%3A%7B%22list%22%3A%5B%7B%22conditions%22%3A%5B%7B%22column%22%3A%7B%22value%22%3A%22${provnumCol}%22%7D%2C%22comparator%22%3A%7B%22value%22%3A%22%3D%22%7D%2C%22filterValue%22%3A%5B%22${provnum}%22%5D%7D%5D%7D%5D%2C%22rootConjunction%22%3A%7B%22value%22%3A%22AND%22%7D%7D%2C%22keywords%22%3A%22%22%2C%22offset%22%3A0%2C%22limit%22%3A10%2C%22sort%22%3A%7B%22sortBy%22%3Anull%2C%22sortOrder%22%3Anull%7D%2C%22columns%22%3A%5B%5D%7D`;
                 }
                 
-                // Helper function to format value cell (3 decimals)
+                // Helper function to format value cell (2 decimals, half-up for accuracy)
                 const formatValueCell = (value, dataAttr) => {
                     if (value === null || value === undefined) {
                         return `<td class="text-center" data-${dataAttr}="0">-</td>`;
                     }
-                    return `<td class="text-center" data-${dataAttr}="${value}">${formatNumber(value, 3)}</td>`;
+                    return `<td class="text-center" data-${dataAttr}="${value}">${formatNumber(value, 2)}</td>`;
                 };
                 
                 // Helper function to format percentage cells with color coding (1 decimal)
@@ -6117,7 +6275,7 @@
                         colorClass = 'text-info'; // Blue for above expected
                     }
                     const tooltip = reported !== undefined && caseMix !== undefined && caseMix > 0
-                        ? `${quarterDisplay} - ${metricName}\nReported: ${formatNumber(reported, 3)} / Case-Mix: ${formatNumber(caseMix, 3)} = ${formatNumber(value, 1)}%`
+                        ? `${quarterDisplay} - ${metricName}\nReported: ${formatNumber(reported, 2)} / Case-Mix: ${formatNumber(caseMix, 2)} = ${formatNumber(value, 1)}%`
                         : '';
                     return `<td class="text-center ${colorClass}" data-${dataAttr}="${value}" title="${tooltip}" style="cursor: help;">${formatNumber(value, 1)}%</td>`;
                 };
@@ -6149,21 +6307,18 @@
                     ${formatValueCell(quarterData.case_mix_lpn, 'case_mix_lpn')}
                     ${formatValueCell(quarterData.case_mix_na, 'case_mix_na')}
                     
-                    <!-- CMI column with source -->
+                    <!-- CMI column (numeric only; source label removed per request) -->
                     ${(() => {
                         if (quarterData.cmi === null || quarterData.cmi === undefined) {
                             return '<td class="text-center" data-cmi="0">-</td>';
                         }
-                        const cmiValue = parseFloat(quarterData.cmi).toFixed(3);
-                        const cmiSource = quarterData.cmi_source || 'Provider Info';
-                        // Format source name for display (convert snake_case to Title Case)
-                        const sourceDisplay = cmiSource.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                        return `<td class="text-center" data-cmi="${quarterData.cmi}" title="CMI Source: ${sourceDisplay} (Provider Info file)">${cmiValue}<br/><small class="text-muted" style="font-size: 0.7em;">${sourceDisplay}</small></td>`;
+                        const cmiValue = roundHalfUpDisplay(quarterData.cmi, 3);
+                        return `<td class="text-center" data-cmi="${quarterData.cmi}">${cmiValue}</td>`;
                     })()}
                     
                     <!-- % CMI columns (7 total) -->
                     ${formatPctCell(quarterData.pct_cmi_total, 'pct_cmi_total', quarterData.prov_reported_total, quarterData.case_mix_total, 'Total Case-Mix')}
-                    ${formatPctCell(quarterData.pct_cmi_direct, 'pct_cmi_direct', quarterData.pbj_reported_direct, (quarterData.case_mix_rn || 0) + (quarterData.case_mix_lpn || 0) + (quarterData.case_mix_na || 0), 'Direct Case-Mix')}
+                    ${formatPctCell(quarterData.pct_cmi_direct, 'pct_cmi_direct', quarterData.pbj_reported_direct, quarterData.case_mix_total, 'Direct Case-Mix')}
                     ${formatPctCell(quarterData.pct_cmi_total_rn, 'pct_cmi_total_rn', quarterData.pbj_reported_total_rn, quarterData.case_mix_rn, 'Total RN Case-Mix')}
                     ${formatPctCell(quarterData.pct_cmi_direct_rn, 'pct_cmi_direct_rn', quarterData.pbj_reported_direct_rn, quarterData.case_mix_rn, 'Direct RN Case-Mix')}
                     ${formatPctCell(quarterData.pct_cmi_total_lpn, 'pct_cmi_total_lpn', quarterData.pbj_reported_total_lpn, quarterData.case_mix_lpn, 'Total LPN Case-Mix')}
@@ -6371,28 +6526,28 @@
                 const q = quarter.substring(4);
                 const quarterDisplay = `${q} ${year}`;
                 
-                // CMI value (same for all rows)
-                const cmiDisplay = data.cmi !== null && data.cmi !== undefined ? data.cmi.toFixed(3) : 'N/A';
+                // CMI value (same for all rows); HPRD/percentages use half-up for accuracy
+                const cmiDisplay = data.cmi !== null && data.cmi !== undefined ? roundHalfUpDisplay(data.cmi, 3) : 'N/A';
                 
                 tableBody.innerHTML = `
                     <tr>
                         <td><strong>Total HPRD</strong></td>
                         <td class="text-center" rowspan="3" style="vertical-align: middle;">${cmiDisplay}</td>
-                        <td class="text-center">${data.harrington_total !== null ? data.harrington_total.toFixed(2) : 'N/A'}</td>
-                        <td class="text-center">${data.reported_total !== null ? data.reported_total.toFixed(2) : 'N/A'}</td>
-                        <td class="text-center">${data.pct_total !== null ? data.pct_total.toFixed(1) + '%' : 'N/A'}</td>
+                        <td class="text-center">${data.harrington_total !== null ? roundHalfUpDisplay(data.harrington_total, 2) : 'N/A'}</td>
+                        <td class="text-center">${data.reported_total !== null ? roundHalfUpDisplay(data.reported_total, 2) : 'N/A'}</td>
+                        <td class="text-center">${data.pct_total !== null ? roundHalfUpDisplay(data.pct_total, 1) + '%' : 'N/A'}</td>
                     </tr>
                     <tr>
                         <td><strong>RN HPRD</strong></td>
-                        <td class="text-center">${data.harrington_rn !== null ? data.harrington_rn.toFixed(2) : 'N/A'}</td>
-                        <td class="text-center">${data.reported_rn !== null ? data.reported_rn.toFixed(2) : 'N/A'}</td>
-                        <td class="text-center">${data.pct_rn !== null ? data.pct_rn.toFixed(1) + '%' : 'N/A'}</td>
+                        <td class="text-center">${data.harrington_rn !== null ? roundHalfUpDisplay(data.harrington_rn, 2) : 'N/A'}</td>
+                        <td class="text-center">${data.reported_rn !== null ? roundHalfUpDisplay(data.reported_rn, 2) : 'N/A'}</td>
+                        <td class="text-center">${data.pct_rn !== null ? roundHalfUpDisplay(data.pct_rn, 1) + '%' : 'N/A'}</td>
                     </tr>
                     <tr>
                         <td><strong>Nurse Aide HPRD</strong></td>
-                        <td class="text-center">${data.harrington_na !== null ? data.harrington_na.toFixed(2) : 'N/A'}</td>
-                        <td class="text-center">${data.reported_na !== null ? data.reported_na.toFixed(2) : 'N/A'}</td>
-                        <td class="text-center">${data.pct_na !== null ? data.pct_na.toFixed(1) + '%' : 'N/A'}</td>
+                        <td class="text-center">${data.harrington_na !== null ? roundHalfUpDisplay(data.harrington_na, 2) : 'N/A'}</td>
+                        <td class="text-center">${data.reported_na !== null ? roundHalfUpDisplay(data.reported_na, 2) : 'N/A'}</td>
+                        <td class="text-center">${data.pct_na !== null ? roundHalfUpDisplay(data.pct_na, 1) + '%' : 'N/A'}</td>
                     </tr>
                 `;
                 
@@ -6580,7 +6735,7 @@
                     (formattedProviderName.length > 20 ? formattedProviderName.substring(0, 20) + '...' : formattedProviderName) :
                     formattedProviderName;
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Total Nursing Staff Hours</span></b><br><span style="font-size: ${isMobileTitle2 ? '0.75em' : '0.9em'}; font-weight: normal;">${titleProviderName2} • ${cleanFilterInfo}</span>`,
+                   text: `<b><span style="color: #1f4e79;">${cleanFilterInfo}</span></b><br><span style="font-size: ${isMobileTitle2 ? '0.75em' : '0.9em'}; font-weight: normal;">${titleProviderName2}</span>`,
                     x: 0.5,
                     xanchor: 'center'
                 };
@@ -6772,6 +6927,9 @@
                 
                 // Remove n= part and "Quarters:" prefix from filterInfo for title
                 let cleanFilterInfo = filterInfo.replace(/\s*\(n = [\d,]+\)/, '').replace(/^Quarters:\s*/, '');
+                // Initial load (no date/quarter filter): use " - " e.g. "Staffing HPRD by Day of Week - All Data (2017-2025)"
+                const isInitialAllData = /^All Data \(\d{4}-\d{4}\)$/.test(cleanFilterInfo.trim());
+                const dowTitleSuffix = isInitialAllData ? ` - ${cleanFilterInfo}` : ` (${cleanFilterInfo})`;
                 
                 // G: Mobile-friendly chart title - shorter on mobile
                 const isMobileTitle4 = window.innerWidth < 768;
@@ -6779,7 +6937,7 @@
                     (formattedProviderName.length > 20 ? formattedProviderName.substring(0, 20) + '...' : formattedProviderName) :
                     formattedProviderName;
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Staffing HPRD by Day of Week</span></b><br><span style="font-size: ${isMobileTitle4 ? '0.75em' : '0.9em'}; font-weight: normal;">${titleProviderName4} • ${cleanFilterInfo}</span>`,
+                   text: `<b><span style="color: #1f4e79;">Staffing HPRD by Day of Week${dowTitleSuffix}</span></b><br><span style="font-size: ${isMobileTitle4 ? '0.75em' : '0.9em'}; font-weight: normal;">${titleProviderName4}</span>`,
                     x: 0.5,
                     xanchor: 'center'
                 };
@@ -6917,7 +7075,7 @@
                     (formattedProviderName.length > 20 ? formattedProviderName.substring(0, 20) + '...' : formattedProviderName) :
                     formattedProviderName;
                 layout.title = {
-                   text: `<b><span style="color: #1f4e79;">Contract Staffing Percentage</span></b><br><span style="font-size: ${isMobileTitle5 ? '0.75em' : '0.9em'}; font-weight: normal;">${titleProviderName5} • ${cleanFilterInfo}</span>`,
+                   text: `<b><span style="color: #1f4e79;">${cleanFilterInfo}</span></b><br><span style="font-size: ${isMobileTitle5 ? '0.75em' : '0.9em'}; font-weight: normal;">${titleProviderName5}</span>`,
                     x: 0.5,
                     xanchor: 'center'
                 };
@@ -7184,35 +7342,35 @@
                      <td>${i + 1}</td>
                      <td><a href="#" onclick="openSingleDayReport('${row.WorkDate}'); return false;" class="text-primary" style="text-decoration: none; cursor: pointer;">${formattedDate}</a></td>
                      <td>${row.DayOfWeek}</td>
-                     <td>${row.MDScensus.toFixed(0)}</td>
-                     <td>${row.Total_Staff_HPRD.toFixed(2)}</td>
-                     <td>${row.Total_Staff_Hours.toFixed(2)}</td>
-                     <td>${row.Nurse_Staff_HPRD_Excl_Admin.toFixed(2)}</td>
-                     <td>${row.Total_RN_HPRD.toFixed(2)}</td>
-                     <td>${row.Total_RN_Hours.toFixed(2)}</td>
-                     <td>${row.Total_LPN_HPRD.toFixed(2)}</td>
-                     <td>${row.Total_LPN_Hours.toFixed(2)}</td>
-                     <td>${row.Total_Nurse_Aide_HPRD.toFixed(2)}</td>
-                     <td>${row.Total_Nurse_Aide_Hours.toFixed(2)}</td>
-                     <td>${row.RN_Contract_Pct.toFixed(1)}%</td>
-                     <td>${row.LPN_Contract_Pct.toFixed(1)}%</td>
-                     <td>${row.CNA_Contract_Pct.toFixed(1)}%</td>
+                     <td>${roundHalfUpDisplay(row.MDScensus, 0)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_Staff_HPRD, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_Staff_Hours, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Nurse_Staff_HPRD_Excl_Admin, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_RN_HPRD, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_RN_Hours, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_LPN_HPRD, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_LPN_Hours, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_Nurse_Aide_HPRD, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.Total_Nurse_Aide_Hours, 2)}</td>
+                     <td>${roundHalfUpDisplay(row.RN_Contract_Pct, 1)}%</td>
+                     <td>${roundHalfUpDisplay(row.LPN_Contract_Pct, 1)}%</td>
+                     <td>${roundHalfUpDisplay(row.CNA_Contract_Pct, 1)}%</td>
                      <td>${row.IsHoliday ? 'Yes' : 'No'}</td>
                      <!-- Expanded columns - Position Breakdown -->
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RN || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.RN_HPRD || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RNadmin || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RNDON || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_LPN || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.LPN_HPRD || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_LPNadmin || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_CNA || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.CNA_HPRD || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_NAtrn || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_MedAide || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_RN_ctr || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_LPN_ctr || 0).toFixed(2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${(row.Hrs_CNA_ctr || 0).toFixed(2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_RN || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.RN_HPRD || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_RNadmin || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_RNDON || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_LPN || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.LPN_HPRD || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_LPNadmin || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_CNA || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.CNA_HPRD || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_NAtrn || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_MedAide || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_RN_ctr || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_LPN_ctr || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.Hrs_CNA_ctr || 0, 2)}</td>
                `;
                 tbody.appendChild(tr);
             }
@@ -7827,12 +7985,12 @@
                     <td><a href="#" onclick="openSingleDayReport('${outlier.date}'); return false;" class="text-primary" style="text-decoration: none; cursor: pointer;">${formatDate(outlier.date)}</a></td>
                     <td>${outlier.dayOfWeek}</td>
                     <td>${getMetricDisplayName(outlier.metric)}</td>
-                    <td>${outlier.value.toFixed(3)}</td>
-                    <td>${outlier.sampleMean.toFixed(3)}</td>
-                    <td>${outlier.sampleMedian.toFixed(3)}</td>
-                    <td>${outlier.zScore.toFixed(2)}</td>
+                    <td>${roundHalfUpDisplay(outlier.value, 3)}</td>
+                    <td>${roundHalfUpDisplay(outlier.sampleMean, 3)}</td>
+                    <td>${roundHalfUpDisplay(outlier.sampleMedian, 3)}</td>
+                    <td>${roundHalfUpDisplay(outlier.zScore, 2)}</td>
                     <td><span class="badge bg-${outlier.severity === 'extreme' ? 'danger' : 'warning'}">${outlier.severity.toUpperCase()}</span></td>
-                    <td>${outlier.percentile.toFixed(1)}th</td>
+                    <td>${roundHalfUpDisplay(outlier.percentile, 1)}th</td>
                 `;
                 tbody.appendChild(row);
             }
@@ -8026,28 +8184,28 @@
                 const census = parseFloat(d.MDScensus || 0);
                 return sum + (isNaN(census) ? 0 : census);
             }, 0);
-            const avgTotalHPRD = totalCensus > 0 ? (totalStaffHours / totalCensus).toFixed(2) : '0.00';
+            const avgTotalHPRD = totalCensus > 0 ? roundHalfUpDisplay(totalStaffHours / totalCensus, 2) : '0.00';
             
             // RN HPRD calculation
             const totalRNHours = data.reduce((sum, d) => {
                 const rnHours = parseFloat(d.Total_RN_Hours || d.RN_Hours || 0);
                 return sum + (isNaN(rnHours) ? 0 : rnHours);
             }, 0);
-            const avgRNHPRD = totalCensus > 0 ? (totalRNHours / totalCensus).toFixed(2) : '0.00';
+            const avgRNHPRD = totalCensus > 0 ? roundHalfUpDisplay(totalRNHours / totalCensus, 2) : '0.00';
             
             // LPN HPRD calculation
             const totalLPNHours = data.reduce((sum, d) => {
                 const lpnHours = parseFloat(d.Total_LPN_Hours || d.LPN_Hours || 0);
                 return sum + (isNaN(lpnHours) ? 0 : lpnHours);
             }, 0);
-            const avgLPNHPRD = totalCensus > 0 ? (totalLPNHours / totalCensus).toFixed(2) : '0.00';
+            const avgLPNHPRD = totalCensus > 0 ? roundHalfUpDisplay(totalLPNHours / totalCensus, 2) : '0.00';
             
             // CNA HPRD calculation
             const totalCNAHours = data.reduce((sum, d) => {
                 const cnaHours = parseFloat(d.Total_Nurse_Aide_Hours || d.CNA_Hours || 0);
                 return sum + (isNaN(cnaHours) ? 0 : cnaHours);
             }, 0);
-            const avgCNAHPRD = totalCensus > 0 ? (totalCNAHours / totalCensus).toFixed(2) : '0.00';
+            const avgCNAHPRD = totalCensus > 0 ? roundHalfUpDisplay(totalCNAHours / totalCensus, 2) : '0.00';
             
             // Keep daily HPRD values for outlier detection (still needed for statistics)
             const totalHPRDValues = data.map(d => {
@@ -8073,14 +8231,14 @@
             // Calculate contract percentages
             const contractPercents = data.map(d => parseFloat(d.Contract_Percentage)).filter(val => !isNaN(val) && val >= 0);
             const avgContractPercent = contractPercents.length > 0 ? 
-                (contractPercents.reduce((sum, p) => sum + p, 0) / contractPercents.length).toFixed(1) : '0.0';
+                roundHalfUpDisplay(contractPercents.reduce((sum, p) => sum + p, 0) / contractPercents.length, 1) : '0.0';
             const maxContractPercent = contractPercents.length > 0 ? 
-                Math.max(...contractPercents).toFixed(1) : '0.0';
+                roundHalfUpDisplay(Math.max(...contractPercents), 1) : '0.0';
             
             // Calculate days under 3.50 Total HPRD
             const daysUnder350 = totalHPRDValues.filter(val => val < 3.50).length;
             const daysUnder350Percent = totalHPRDValues.length > 0 ? 
-                ((daysUnder350 / totalHPRDValues.length) * 100).toFixed(1) : '0.0';
+                roundHalfUpDisplay((daysUnder350 / totalHPRDValues.length) * 100, 1) : '0.0';
             
             // Debug logging to help troubleshoot
             console.log('Total HPRD Values:', totalHPRDValues.slice(0, 10)); // First 10 values
@@ -8343,17 +8501,24 @@
                 };
                 
                 // Use the actual input dates, or fall back to data range
-                const startDateStr = startDate ? formatDateString(startDate) : formatDateString(data.daily_data[0].date);
-                const endDateStr = endDate ? formatDateString(endDate) : formatDateString(data.daily_data[data.daily_data.length - 1].date);
+                const dailyData = data.daily_data;
+                if (!dailyData || !Array.isArray(dailyData) || dailyData.length === 0) {
+                    document.getElementById('complianceError').textContent = 'No daily compliance data available.';
+                    document.getElementById('complianceError').style.display = 'block';
+                    document.getElementById('complianceResults').style.display = 'none';
+                    return;
+                }
+                const startDateStr = startDate ? formatDateString(startDate) : formatDateString(dailyData[0].date);
+                const endDateStr = endDate ? formatDateString(endDate) : formatDateString(dailyData[dailyData.length - 1].date);
                 
+                const thresholdHprd = data.threshold_used != null ? Number(data.threshold_used) : null;
+                const thresholdStr = thresholdHprd != null ? `the ${thresholdHprd} HPRD (the state threshold)` : 'the state threshold';
                 let summarySentence;
                 if (data.summary.days_not_met === 0) {
-                    // Met threshold all days
-                    summarySentence = `${facilityName} (${provnum}) met the state threshold ${formatNumber(data.summary.days_met)} of ${formatNumber(data.summary.total_days)} days (100.0%) from ${startDateStr} to ${endDateStr}.`;
+                    summarySentence = `${facilityName} (${provnum}) met ${thresholdStr} ${formatNumber(data.summary.days_met)} of ${formatNumber(data.summary.total_days)} days (100.0%) from ${startDateStr} to ${endDateStr}.`;
                 } else {
-                    // Fell below threshold
-                    const pctBelow = ((data.summary.days_not_met / data.summary.total_days) * 100).toFixed(1);
-                    summarySentence = `${facilityName} (${provnum}) fell below the state threshold ${formatNumber(data.summary.days_not_met)} of ${formatNumber(data.summary.total_days)} days (${pctBelow}%) from ${startDateStr} to ${endDateStr}.`;
+                    const pctBelow = roundHalfUpDisplay((data.summary.days_not_met / data.summary.total_days) * 100, 1);
+                    summarySentence = `${facilityName} (${provnum}) fell below ${thresholdStr} ${formatNumber(data.summary.days_not_met)} of ${formatNumber(data.summary.total_days)} days (${pctBelow}%) from ${startDateStr} to ${endDateStr}.`;
                 }
                 
                 const summarySentenceEl = document.getElementById('complianceSummarySentence');
@@ -8376,7 +8541,11 @@
         }
         
         function createComplianceChart(data, facilityName) {
-            const dailyData = data.daily_data;
+            const dailyData = data && data.daily_data;
+            if (!dailyData || !Array.isArray(dailyData) || dailyData.length === 0) {
+                return;
+            }
+            const is515086 = '{{ provnum }}' === '515086';
             const dates = dailyData.map(d => d.date);
             const hprdValues = dailyData.map(d => d.hprd);
             const threshold = data.threshold_used;
@@ -8398,7 +8567,7 @@
                 }
             });
             
-            // Create traces - using lines instead of markers
+            // Met = continuous line; Did Not Meet = markers only (discrete non-compliant days), no connecting line.
             const traces = [
                 {
                     x: dates,
@@ -8406,23 +8575,18 @@
                     type: 'scatter',
                     mode: 'lines',
                     name: 'Met Standard',
-                    line: { 
-                        color: '#28a745',
-                        width: 2
-                    },
-                    connectgaps: false
+                    line: { color: '#28a745', width: 2 },
+                    connectgaps: true
                 },
                 {
                     x: dates,
                     y: hprdValues.map((val, idx) => !metStandard[idx] ? val : null),
                     type: 'scatter',
-                    mode: 'lines',
+                    mode: 'markers',
                     name: 'Did Not Meet',
-                    line: { 
-                        color: '#dc3545',
-                        width: 2
-                    },
-                    connectgaps: false
+                    line: { width: 0 },
+                    connectgaps: false,
+                    marker: { color: '#dc3545', size: 6, symbol: 'circle', line: { color: '#a71d2a', width: 1 } }
                 },
                 {
                     x: dates,
@@ -8433,7 +8597,7 @@
                     line: { color: '#6c757d', width: 2, dash: 'dash' },
                     hoverinfo: 'name+y'
                 }
-            ];
+            ].filter(Boolean);
             
             const layout = {
                 title: {
@@ -8615,10 +8779,12 @@
                     document.getElementById('complianceEndDate').value = '2025-05-31';
                 });
             document.getElementById('complianceHprdType').value = 'total';
-            document.getElementById('complianceRangeChoice').value = 'min';
+            const rangeSelect = document.getElementById('complianceRangeChoice');
+            rangeSelect.value = rangeSelect.getAttribute('data-default-range-choice') || 'min';
             document.getElementById('complianceResults').style.display = 'none';
             document.getElementById('complianceError').style.display = 'none';
-            document.getElementById('complianceRangeChoiceContainer').style.display = 'none';
+            const rangeContainerEl = document.getElementById('complianceRangeChoiceContainer');
+            if (rangeContainerEl) rangeContainerEl.style.display = (document.getElementById('complianceRangeChoice').getAttribute('data-default-range-choice') === 'max') ? 'block' : 'none';
         }
 
         // Utah RN 8-Hour Compliance Functions
@@ -8684,7 +8850,7 @@
                 if (data.summary.days_not_met === 0) {
                     summarySentence = `${facilityName} (${provnum}) met the Utah RN 8-hour requirement ${formatNumber(data.summary.days_met)} of ${formatNumber(data.summary.total_days)} days (100.0%) from ${startDateStr} to ${endDateStr}.`;
                 } else {
-                    const pctBelow = ((data.summary.days_not_met / data.summary.total_days) * 100).toFixed(1);
+                    const pctBelow = roundHalfUpDisplay((data.summary.days_not_met / data.summary.total_days) * 100, 1);
                     summarySentence = `${facilityName} (${provnum}) did not meet the Utah RN 8-hour requirement ${formatNumber(data.summary.days_not_met)} of ${formatNumber(data.summary.total_days)} days (${pctBelow}%) from ${startDateStr} to ${endDateStr}.`;
                 }
                 
@@ -8708,6 +8874,7 @@
             const threshold = data.threshold_used;
             const metStandard = dailyData.map(d => d.met_standard);
             
+            const is515086 = '{{ provnum }}' === '515086';
             const traces = [
                 {
                     x: dates,
@@ -8716,16 +8883,17 @@
                     mode: 'lines',
                     name: 'Met Standard',
                     line: { color: '#28a745', width: 2 },
-                    connectgaps: false
+                    connectgaps: true
                 },
                 {
                     x: dates,
                     y: hoursValues.map((val, idx) => !metStandard[idx] ? val : null),
                     type: 'scatter',
-                    mode: 'lines',
+                    mode: is515086 ? 'markers' : 'lines',
                     name: 'Did Not Meet',
-                    line: { color: '#dc3545', width: 2 },
-                    connectgaps: false
+                    line: is515086 ? { width: 0 } : { color: '#dc3545', width: 2 },
+                    connectgaps: is515086 ? false : true,
+                    marker: is515086 ? { color: '#dc3545', size: 8 } : undefined
                 },
                 {
                     x: dates,
@@ -8893,7 +9061,7 @@
                 if (data.summary.days_not_met === 0) {
                     summarySentence = `${facilityName} (${provnum}) met the Utah 24-hour licensed nursing requirement ${formatNumber(data.summary.days_met)} of ${formatNumber(data.summary.total_days)} days (100.0%) from ${startDateStr} to ${endDateStr}.`;
                 } else {
-                    const pctBelow = ((data.summary.days_not_met / data.summary.total_days) * 100).toFixed(1);
+                    const pctBelow = roundHalfUpDisplay((data.summary.days_not_met / data.summary.total_days) * 100, 1);
                     summarySentence = `${facilityName} (${provnum}) did not meet the Utah 24-hour licensed nursing requirement ${formatNumber(data.summary.days_not_met)} of ${formatNumber(data.summary.total_days)} days (${pctBelow}%) from ${startDateStr} to ${endDateStr}.`;
                 }
                 
@@ -8917,6 +9085,7 @@
             const threshold = data.threshold_used;
             const metStandard = dailyData.map(d => d.met_standard);
             
+            const is515086 = '{{ provnum }}' === '515086';
             const traces = [
                 {
                     x: dates,
@@ -8925,16 +9094,17 @@
                     mode: 'lines',
                     name: 'Met Standard',
                     line: { color: '#28a745', width: 2 },
-                    connectgaps: false
+                    connectgaps: true
                 },
                 {
                     x: dates,
                     y: combinedHoursValues.map((val, idx) => !metStandard[idx] ? val : null),
                     type: 'scatter',
-                    mode: 'lines',
+                    mode: is515086 ? 'markers' : 'lines',
                     name: 'Did Not Meet',
-                    line: { color: '#dc3545', width: 2 },
-                    connectgaps: false
+                    line: is515086 ? { width: 0 } : { color: '#dc3545', width: 2 },
+                    connectgaps: is515086 ? false : true,
+                    marker: is515086 ? { color: '#dc3545', size: 8 } : undefined
                 },
                 {
                     x: dates,

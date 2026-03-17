@@ -6,7 +6,7 @@ Uses the complete CSV file for any facility for fast, detailed analysis
 
 import pandas as pd
 import numpy as np
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from datetime import datetime, timedelta
 import json
 from decimal import Decimal, ROUND_HALF_UP
@@ -15,6 +15,8 @@ import glob
 import re
 import sys
 
+from facility_report_lib import calculate_harrington_adjusted_hprd
+
 app = Flask(__name__)
 
 # Global variables
@@ -22,7 +24,12 @@ df = None
 global_df = None
 provider_info_df = None
 macpac_standards_df = None
-DEPLOYED_DATE = ''  # Set by create_vercel_deployment when building package (MM/DD/YYYY)
+# Set at app load so "Deployed" reflects the date this process started (e.g. after a deploy)
+DEPLOYED_DATE = datetime.now().strftime('%m/%d/%Y')
+# Raw CMS provider info files for download links. Prefer provider_info_extracted at repo root; fallback to static/data/provider_info
+_app_root = os.path.dirname(os.path.abspath(__file__))
+PROVIDER_INFO_EXTRACTED = os.path.join(_app_root, 'provider_info_extracted')
+PROVIDER_INFO_DATA_DIR = PROVIDER_INFO_EXTRACTED if os.path.isdir(PROVIDER_INFO_EXTRACTED) else os.path.join(_app_root, 'static', 'data', 'provider_info')
 
 def _quarter_from_nurse_filename(path):
     """Parse quarter from nurse file name, e.g. PBJ_dailynursestaffing_CY2025Q3.csv -> 'CY2025Q3'."""
@@ -508,6 +515,43 @@ def generate_pbj_source_link(quarter, date, provnum="225500", data_type="nurse")
     
     return url
 
+
+def generate_cms_pbj_facility_link(provnum, data_type="nurse"):
+    """
+    Reusable: build CMS data.cms.gov link for a facility filtered by provnum (no date).
+    Opens main PBJ dataset with provnum pre-filter. Use for 'View raw CMS data' anchor.
+    """
+    import urllib.parse
+    provnum = str(provnum).strip()
+    if provnum.isdigit():
+        provnum = provnum.zfill(6)
+    # CMS uses PROVNUM for current datasets
+    query_params = {
+        "filters": {
+            "list": [{
+                "conditions": [{
+                    "column": {"value": "PROVNUM"},
+                    "comparator": {"value": "="},
+                    "filterValue": [provnum]
+                }]
+            }],
+            "rootConjunction": {"value": "AND"}
+        },
+        "keywords": "",
+        "offset": 0,
+        "limit": 10,
+        "sort": {"sortBy": None, "sortOrder": None},
+        "columns": []
+    }
+    query_json = json.dumps(query_params)
+    encoded_query = urllib.parse.quote(query_json)
+    if data_type == "nurse":
+        base_url = "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data"
+    else:
+        base_url = "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-non-nurse-staffing/data"
+    return f"{base_url}?query={encoded_query}"
+
+
 def format_pbj_source_link(quarter, date, provnum="225500", data_type="nurse"):
     """Generate formatted PBJ source link with display text."""
     url = generate_pbj_source_link(quarter, date, provnum, data_type)
@@ -950,14 +994,17 @@ def index():
         
         if len(state_standard) > 0:
             state_standard = state_standard.iloc[0]
-            # Create state_standard_info for methodology section
+            # Create state_standard_info for methodology section (include state rule link and thorough legislation text when in CSV)
             state_standard_info = {
                 'state_name': state_name_full,
                 'display_text': state_standard.get('Display_Text', ''),
                 'min_staffing': float(state_standard['Min_Staffing']),
                 'max_staffing': float(state_standard['Max_Staffing']) if pd.notna(state_standard.get('Max_Staffing')) else None,
                 'value_type': state_standard['Value_Type'],
-                'is_federal_minimum': bool(state_standard.get('Is_Federal_Minimum', False))
+                'is_federal_minimum': bool(state_standard.get('Is_Federal_Minimum', False)),
+                'state_code_url': state_standard.get('State_Code_URL') if pd.notna(state_standard.get('State_Code_URL')) and str(state_standard.get('State_Code_URL', '')).strip() else None,
+                'state_code_citation': state_standard.get('State_Code_Citation') if pd.notna(state_standard.get('State_Code_Citation')) and str(state_standard.get('State_Code_Citation', '')).strip() else None,
+                'legislation_text': state_standard.get('Legislation_Text') if pd.notna(state_standard.get('Legislation_Text')) and str(state_standard.get('Legislation_Text', '')).strip() else None,
             }
             # Only show if not federal minimum
             if not state_standard.get('Is_Federal_Minimum', False):
@@ -977,7 +1024,29 @@ def index():
     previous_names_list = get_previous_provider_names(facility_provnum)
     previous_names_text = ", ".join(previous_names_list) if previous_names_list else "None"
     
+    # Entity line: server-render so no N/A flash (provider_info_df already loaded by before_request)
+    entity_history = _parse_entity_history(provider_info_df, facility_provnum) if provider_info_df is not None and facility_provnum and facility_provnum != 'Unknown' else None
+    affiliated_entity_id = affiliated_entity_name = affiliated_entity_prev_id = affiliated_entity_prev_name = affiliated_entity_prev_years = None
+    if entity_history:
+        affiliated_entity_id = entity_history.get('current_entity_id')
+        affiliated_entity_name = entity_history.get('current_entity_name')
+        affiliated_entity_prev_id = entity_history.get('prev_entity_id')
+        affiliated_entity_prev_name = entity_history.get('prev_entity_name')
+        affiliated_entity_prev_years = entity_history.get('prev_years')
+    
+    # Only show Download CMS Provider File when files exist in static/data/provider_info/
+    provider_info_download_available = False
+    if os.path.isdir(PROVIDER_INFO_DATA_DIR):
+        try:
+            provider_info_download_available = any(
+                os.path.isfile(os.path.join(PROVIDER_INFO_DATA_DIR, f)) and not f.startswith('.')
+                for f in os.listdir(PROVIDER_INFO_DATA_DIR)
+            )
+        except OSError:
+            pass
+    
     deployed_date = getattr(sys.modules[__name__], 'DEPLOYED_DATE', '') or ''
+    cms_pbj_facility_url = generate_cms_pbj_facility_link(facility_provnum) if facility_provnum and facility_provnum != 'Unknown' else None
     return render_template('dynamic_facility_dashboard.html', 
                          facility_name=facility_name, 
                          provnum=facility_provnum,
@@ -988,7 +1057,14 @@ def index():
                          state_standard_text=state_standard_text,
                          state_standard_info=state_standard_info,
                          previous_names=previous_names_text,
-                         deployed_date=deployed_date)
+                         deployed_date=deployed_date,
+                         cms_pbj_facility_url=cms_pbj_facility_url,
+                         affiliated_entity_id=affiliated_entity_id,
+                         affiliated_entity_name=affiliated_entity_name,
+                         affiliated_entity_prev_id=affiliated_entity_prev_id,
+                         affiliated_entity_prev_name=affiliated_entity_prev_name,
+                         affiliated_entity_prev_years=affiliated_entity_prev_years,
+                         provider_info_download_available=provider_info_download_available)
 
 @app.route('/api/data')
 def get_data():
@@ -1213,6 +1289,102 @@ def _rating_series_for_chart(series):
     return [one_val(x) for x in series]
 
 
+def _parse_entity_history(provider_info_df, provnum):
+    """
+    Parse facility entity history from provider info: current entity and most recent prior entity.
+    Uses quarter/processing_date order; does not imply data completeness before 2017.
+    Returns dict: current_entity_id, current_entity_name, prev_entity_id, prev_entity_name, prev_years (e.g. '2018–2022' or None).
+    """
+    if provider_info_df is None or provider_info_df.empty:
+        return None
+    id_col = 'affiliated_entity_id'
+    name_col = 'affiliated_entity_name'
+    if id_col not in provider_info_df.columns or name_col not in provider_info_df.columns:
+        return None
+    provnum = str(provnum).strip()
+    if provnum.isdigit():
+        provnum = provnum.zfill(6)
+    ccn_col = 'ccn'
+    if ccn_col not in provider_info_df.columns:
+        return None
+    facility = provider_info_df[provider_info_df[ccn_col].astype(str).str.strip().str.zfill(6) == provnum].copy()
+    if facility.empty:
+        return None
+
+    def _quarter_sort_key(q):
+        if pd.isna(q) or not str(q).strip():
+            return (0, 0)
+        s = str(q).strip().upper()
+        m = re.search(r'(\d{4})Q(\d)', s)
+        if m:
+            return (int(m.group(1)), int(m.group(2)))
+        return (0, 0)
+
+    if 'quarter' in facility.columns:
+        facility = facility.dropna(subset=['quarter'])
+        facility = facility.sort_values('quarter', key=lambda x: x.map(_quarter_sort_key))
+        # One row per quarter (last occurrence per quarter)
+        by_q = facility.groupby('quarter', sort=False).agg({
+            id_col: 'last',
+            name_col: 'last',
+        }).reset_index()
+        by_q['year'] = by_q['quarter'].apply(lambda q: int(str(q)[:4]) if str(q)[:4].isdigit() else None)
+        by_q = by_q.dropna(subset=['year'])
+    else:
+        if 'processing_date' not in facility.columns:
+            return None
+        facility = facility.sort_values('processing_date')
+        by_q = facility[[id_col, name_col]].copy()
+        by_q['year'] = pd.to_datetime(facility['processing_date'], errors='coerce').dt.year
+        by_q = by_q.dropna(subset=['year'])
+    if by_q.empty:
+        return None
+
+    def _norm_entity(eid, ename):
+        if pd.isna(eid) or str(eid).strip().upper() in ['', 'N', 'N/A', 'NAN', 'NONE']:
+            return None, None
+        try:
+            eid = str(int(float(eid)))
+        except (ValueError, TypeError):
+            eid = str(eid).strip()
+        if not eid:
+            return None, None
+        ename = ename if pd.notna(ename) and str(ename).strip() else eid
+        return eid, str(ename).strip()
+
+    periods = []
+    for _, row in by_q.iterrows():
+        eid, ename = _norm_entity(row.get(id_col), row.get(name_col))
+        y = int(row['year']) if pd.notna(row.get('year')) else None
+        if eid is None:
+            continue
+        if periods and periods[-1][0] == eid:
+            periods[-1][3] = y  # extend end year
+        else:
+            periods.append([eid, ename, y, y])  # start_year at 2, end_year at 3
+
+    if not periods:
+        return None
+    current_id, current_name = periods[-1][0], periods[-1][1]
+    result = {
+        'current_entity_id': current_id,
+        'current_entity_name': current_name,
+        'prev_entity_id': None,
+        'prev_entity_name': None,
+        'prev_years': None,
+    }
+    if len(periods) >= 2 and periods[-2][0] != current_id:
+        prev = periods[-2]
+        result['prev_entity_id'] = prev[0]
+        result['prev_entity_name'] = prev[1]
+        start_y, end_y = prev[2], prev[3]
+        if start_y and end_y:
+            result['prev_years'] = f'{start_y}–{end_y}'
+        elif start_y:
+            result['prev_years'] = str(start_y)
+    return result
+
+
 @app.route('/api/provider_info_summary')
 def get_provider_info_summary():
     """Get provider info summary statistics"""
@@ -1228,25 +1400,31 @@ def get_provider_info_summary():
         if latest is None:
             return jsonify({'error': 'No provider info data available'})
         
-        # Get affiliated entity info from latest record
+        provnum = request.args.get('provnum')
+        if not provnum and 'ccn' in latest.index and pd.notna(latest.get('ccn')):
+            provnum = str(latest.get('ccn')).strip().zfill(6)
+        entity_history = _parse_entity_history(provider_info_df, provnum) if provnum else None
+
+        # Get affiliated entity info from latest record (or from entity history for consistency)
         affiliated_entity_name = None
         affiliated_entity_id = None
-        if 'affiliated_entity_name' in latest.index and pd.notna(latest.get('affiliated_entity_name')):
+        if entity_history:
+            affiliated_entity_id = entity_history.get('current_entity_id')
+            affiliated_entity_name = entity_history.get('current_entity_name')
+        if affiliated_entity_id is None and 'affiliated_entity_name' in latest.index and pd.notna(latest.get('affiliated_entity_name')):
             affiliated_entity_name = str(latest.get('affiliated_entity_name')).strip()
             if affiliated_entity_name and affiliated_entity_name.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
-                affiliated_entity_name = affiliated_entity_name
+                pass
             else:
                 affiliated_entity_name = None
-        
-        if 'affiliated_entity_id' in latest.index and pd.notna(latest.get('affiliated_entity_id')):
+        if affiliated_entity_id is None and 'affiliated_entity_id' in latest.index and pd.notna(latest.get('affiliated_entity_id')):
             entity_id_raw = latest.get('affiliated_entity_id')
-            # Convert to int first to remove decimals (e.g., 217.0 -> 217), then to string
             try:
                 affiliated_entity_id = str(int(float(entity_id_raw)))
             except (ValueError, TypeError):
                 affiliated_entity_id = str(entity_id_raw).strip()
             if affiliated_entity_id and affiliated_entity_id.upper() not in ['N', 'N/A', 'NAN', 'NONE', '']:
-                affiliated_entity_id = affiliated_entity_id
+                pass
             else:
                 affiliated_entity_id = None
         
@@ -1277,6 +1455,9 @@ def get_provider_info_summary():
             'entity_ccn': entity_ccn,
             'affiliated_entity_name': affiliated_entity_name,
             'affiliated_entity_id': affiliated_entity_id,
+            'affiliated_entity_prev_id': entity_history.get('prev_entity_id') if entity_history else None,
+            'affiliated_entity_prev_name': entity_history.get('prev_entity_name') if entity_history else None,
+            'affiliated_entity_prev_years': entity_history.get('prev_years') if entity_history else None,
             'total_records': len(provider_info_df),
             'quarters_covered': provider_info_df['quarter'].nunique() if 'quarter' in provider_info_df.columns else 0
         }
@@ -1285,6 +1466,48 @@ def get_provider_info_summary():
         
     except Exception as e:
         return jsonify({'error': str(e)})
+
+
+@app.route('/api/provider-info/list')
+def provider_info_list():
+    """List available raw CMS provider info files in static/data/provider_info/."""
+    if not os.path.isdir(PROVIDER_INFO_DATA_DIR):
+        return jsonify({'files': []})
+    try:
+        names = [f for f in os.listdir(PROVIDER_INFO_DATA_DIR)
+                 if os.path.isfile(os.path.join(PROVIDER_INFO_DATA_DIR, f)) and not f.startswith('.')]
+        names.sort()
+        return jsonify({'files': names})
+    except Exception as e:
+        return jsonify({'error': str(e), 'files': []})
+
+
+@app.route('/api/provider-info/download')
+def provider_info_download():
+    """Serve a raw CMS provider info file. ?file=filename or omit to download latest by name."""
+    file_param = request.args.get('file')
+    if not os.path.isdir(PROVIDER_INFO_DATA_DIR):
+        return jsonify({'error': 'Provider info files not configured'}), 404
+    if file_param:
+        # Restrict to filename only (no path traversal)
+        name = os.path.basename(file_param).strip()
+        if not name or '..' in name or os.path.sep in name:
+            return jsonify({'error': 'Invalid file name'}), 400
+        path = os.path.join(PROVIDER_INFO_DATA_DIR, name)
+        if not os.path.isfile(path):
+            return jsonify({'error': 'File not found'}), 404
+        return send_from_directory(PROVIDER_INFO_DATA_DIR, name, as_attachment=True)
+    # No file param: send most recent file by name (e.g. latest extract)
+    try:
+        names = [f for f in os.listdir(PROVIDER_INFO_DATA_DIR)
+                 if os.path.isfile(os.path.join(PROVIDER_INFO_DATA_DIR, f)) and not f.startswith('.')]
+        if not names:
+            return jsonify({'error': 'No provider info files available'}), 404
+        names.sort()
+        return send_from_directory(PROVIDER_INFO_DATA_DIR, names[-1], as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 def _get_latest_sff_status():
     """Get the most recent SFF status from provider info data."""
@@ -1521,7 +1744,7 @@ def get_sff_history():
             
             # Include ownership change even if no other red flags
             if ownership_change:
-                red_flags.append("Ownership Change (Last 12 Months)")
+                red_flags.append("Ownership Change")
             
             # Only process if there are red flags or ownership change
             if red_flags:
@@ -1715,7 +1938,7 @@ def get_sff_history():
                     ownership_value = str(latest_record[col]).strip() if pd.notna(latest_record[col]) else ''
                     ownership_upper = ownership_value.upper()
                     if ownership_upper in ['Y', 'YES', 'TRUE', '1']:
-                        latest_red_flags.append("Ownership Change (Last 12 Months)")
+                        latest_red_flags.append("Ownership Change")
                         break
             
             # If latest record has red flags but not in history, add it
@@ -1902,60 +2125,178 @@ def get_provider_info_charts():
             return (9999, 9)  # Put malformed quarters at end
         
         chart_data['_sort_key'] = chart_data['quarter_normalized'].apply(quarter_sort_key)
-        chart_data = chart_data.sort_values('_sort_key').drop(['_sort_key', 'quarter_normalized'], axis=1)
+        chart_data = chart_data.sort_values('_sort_key').drop(['_sort_key'], axis=1)
         
-        # Calculate case_mix_direct (RN + LPN + NA case-mix) for each quarter
-        # This is the denominator for direct staff % CMI calculations
-        chart_data['case_mix_direct'] = (
-            chart_data['case_mix_rn_hrs_per_resident_per_day'].fillna(0) + 
-            chart_data['case_mix_lpn_hrs_per_resident_per_day'].fillna(0) + 
-            chart_data['case_mix_na_hrs_per_resident_per_day'].fillna(0)
-        )
-        # Replace with None if any component is missing (not just 0)
-        chart_data['case_mix_direct'] = chart_data.apply(
-            lambda row: None if (
-                pd.isna(row['case_mix_rn_hrs_per_resident_per_day']) or 
-                pd.isna(row['case_mix_lpn_hrs_per_resident_per_day']) or 
-                pd.isna(row['case_mix_na_hrs_per_resident_per_day'])
-            ) else row['case_mix_direct'], axis=1
-        )
+        # Use case_mix_total for "direct" case-mix in chart too (same as table); no combined RN+LPN+NA
+        chart_data['case_mix_direct'] = chart_data['case_mix_total_nurse_hrs_per_resident_per_day']
         
-        # Prepare data for charts
+        # Global quarter list: union of all quarters present in any series (PBJ + provider info) so partial data shows all quarters on x-axis with null where a series has no data.
+        chart_by_q = chart_data.set_index('quarter_normalized')
+        provider_quarters_norm = chart_data['quarter_normalized'].dropna().unique().tolist()
+        if global_df is not None and len(global_df) > 0 and 'CY_Qtr' in global_df.columns:
+            pbj_quarters_norm = global_df['CY_Qtr'].dropna().unique().tolist()
+            all_quarters_norm = sorted(set(pbj_quarters_norm) | set(provider_quarters_norm), key=quarter_sort_key)
+        else:
+            all_quarters_norm = sorted(provider_quarters_norm, key=quarter_sort_key)
+        full_quarter_norm = all_quarters_norm
+        def quarter_to_iso_start(q_norm):
+            """Convert normalized quarter e.g. 2023Q4 to ISO quarter-start date 2023-10-01."""
+            if pd.isna(q_norm):
+                return None
+            q_str = str(q_norm).strip()
+            try:
+                if len(q_str) == 6 and q_str[4] == 'Q':
+                    y, q = int(q_str[:4]), int(q_str[5])
+                    month = (q - 1) * 3 + 1
+                    return f"{y}-{month:02d}-01"
+            except (ValueError, TypeError):
+                pass
+            return None
+        quarter_start_dates = [quarter_to_iso_start(q) for q in full_quarter_norm]
+        def _full_quarter_labels():
+            return [chart_by_q.loc[q, 'quarter_label'] if q in chart_by_q.index and pd.notna(chart_by_q.loc[q, 'quarter_label']) else format_quarter_label(q) for q in full_quarter_norm]
+        def _val_at(q, col, default=None):
+            if q not in chart_by_q.index:
+                return default
+            v = chart_by_q.loc[q, col]
+            return default if pd.isna(v) else v
+        def _series(column, fill_missing=0):
+            out = []
+            for q in full_quarter_norm:
+                if q in chart_by_q.index:
+                    v = chart_by_q.loc[q, column]
+                    out.append(fill_missing if (pd.isna(v) or v is None) else v)
+                else:
+                    out.append(None)
+            return out
+        def _series_none(column):
+            out = []
+            for q in full_quarter_norm:
+                if q in chart_by_q.index:
+                    v = chart_by_q.loc[q, column]
+                    out.append(None if pd.isna(v) else v)
+                else:
+                    out.append(None)
+            return out
+        def _series_none_reported(column):
+            """Provider-info reported columns (same as _series_none: value or None for missing/NaN)."""
+            return _series_none(column)
+        def _pbj_direct_at(q):
+            """Get (direct_total_hprd, rn_direct_hprd) from PBJ for quarter q when q is in global_df; else (None, None). So quarters that exist only in PBJ still get direct series values."""
+            if global_df is None or len(global_df) == 0:
+                return (None, None)
+            pbj_quarter = global_df[global_df['CY_Qtr'] == q]
+            if len(pbj_quarter) == 0:
+                return (None, None)
+            total_census = pbj_quarter['MDScensus'].sum()
+            if total_census <= 0:
+                return (None, None)
+            direct_hours = pbj_quarter['Nurse_Staff_Hours_Excl_Admin'].sum()
+            rn_direct_hours = pbj_quarter['Hrs_RN'].sum()
+            return (direct_hours / total_census, rn_direct_hours / total_census)
+        def _series_direct_total():
+            out = []
+            for q in full_quarter_norm:
+                if q in chart_by_q.index:
+                    v = chart_by_q.loc[q, 'pbj_direct_total']
+                    out.append(None if pd.isna(v) else v)
+                else:
+                    out.append(_pbj_direct_at(q)[0])
+            return out
+        def _series_direct_rn():
+            out = []
+            for q in full_quarter_norm:
+                if q in chart_by_q.index:
+                    v = chart_by_q.loc[q, 'pbj_rn_direct']
+                    out.append(None if pd.isna(v) else v)
+                else:
+                    out.append(_pbj_direct_at(q)[1])
+            return out
+        provider_quarters = _full_quarter_labels()
+        # Ratings: same full quarter list; null for missing (no 0). 1-5 or None so lines connect with connectgaps: true.
+        def _rating_val(v):
+            if v is None or pd.isna(v):
+                return None
+            try:
+                f = float(v)
+                return int(f) if 1 <= f <= 5 else None
+            except (ValueError, TypeError):
+                return None
+        ratings_overall = [_rating_val(_val_at(q, 'overall_rating')) for q in full_quarter_norm]
+        ratings_staffing = [_rating_val(_val_at(q, 'staffing_rating')) for q in full_quarter_norm]
+        ratings_health = [_rating_val(_val_at(q, 'health_inspection_rating')) for q in full_quarter_norm]
+        ratings_quality = [_rating_val(_val_at(q, 'qm_rating')) for q in full_quarter_norm] if 'qm_rating' in chart_data.columns else [None] * len(full_quarter_norm)
+        # Occupancy: census / certified_beds from provider info (same quarter matching as PBJ)
+        def _occupancy_series():
+            out_pct, out_census, out_beds = [], [], []
+            beds_col = next((c for c in chart_data.columns if str(c).strip().lower() == 'certified_beds'), None)
+            for q in full_quarter_norm:
+                census = _val_at(q, 'avg_residents_per_day')
+                beds = _val_at(q, beds_col) if beds_col else None
+                if census is not None and pd.notna(census) and beds is not None and pd.notna(beds) and float(beds) > 0:
+                    try:
+                        c, b = float(census), float(beds)
+                        if b > 0 and c >= 0:
+                            out_pct.append(round(c / b * 100, 2))
+                            out_census.append(round(c, 1))
+                            out_beds.append(int(b))
+                        else:
+                            out_pct.append(None)
+                            out_census.append(None)
+                            out_beds.append(None)
+                    except (TypeError, ValueError):
+                        out_pct.append(None)
+                        out_census.append(None)
+                        out_beds.append(None)
+                else:
+                    out_pct.append(None)
+                    out_census.append(None)
+                    out_beds.append(None)
+            return out_pct, out_census, out_beds
+        _occ_pct, _occ_census, _occ_beds = _occupancy_series()
         charts = {
             'total_staffing': {
-                'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
-                'reported_total': chart_data['reported_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
-                'reported_direct': chart_data['pbj_direct_total'].fillna(0).tolist(),  # Use PBJ-calculated direct (excludes admin/DON)
-                'case_mix_total': chart_data['case_mix_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist(),
-                'case_mix_direct': chart_data['case_mix_direct'].where(pd.notna(chart_data['case_mix_direct']), None).tolist(),  # Case-mix direct (RN+LPN+NA)
-                'adjusted_total': chart_data['adjusted_total_nurse_hrs_per_resident_per_day'].fillna(0).tolist()
+                'quarters': provider_quarters,
+                'quarter_start_dates': quarter_start_dates,
+                'reported_total': _series_none_reported('reported_total_nurse_hrs_per_resident_per_day'),
+                'reported_direct': _series_direct_total(),
+                'case_mix_total': _series_none('case_mix_total_nurse_hrs_per_resident_per_day'),
+                'case_mix_direct': _series_none('case_mix_direct'),
+                'adjusted_total': _series_none('adjusted_total_nurse_hrs_per_resident_per_day')
             },
             'rn_staffing': {
-                'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
-                'reported_rn': chart_data['reported_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['reported_rn_hrs_per_resident_per_day']), None).tolist(),
-                'reported_rn_total': chart_data['reported_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['reported_rn_hrs_per_resident_per_day']), None).tolist(),
-                'reported_rn_direct': chart_data['pbj_rn_direct'].where(pd.notna(chart_data['pbj_rn_direct']), None).tolist(),  # Use PBJ-calculated RN direct
-                'case_mix_rn': chart_data['case_mix_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['case_mix_rn_hrs_per_resident_per_day']), None).tolist(),
-                'adjusted_rn': chart_data['adjusted_rn_hrs_per_resident_per_day'].where(pd.notna(chart_data['adjusted_rn_hrs_per_resident_per_day']), None).tolist()
+                'quarters': provider_quarters,
+                'quarter_start_dates': quarter_start_dates,
+                'reported_rn': _series_none('reported_rn_hrs_per_resident_per_day'),
+                'reported_rn_total': _series_none('reported_rn_hrs_per_resident_per_day'),
+                'reported_rn_direct': _series_direct_rn(),
+                'case_mix_rn': _series_none('case_mix_rn_hrs_per_resident_per_day'),
+                'adjusted_rn': _series_none('adjusted_rn_hrs_per_resident_per_day')
             },
             'cna_staffing': {
-                'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
-                'reported_cna': chart_data['reported_na_hrs_per_resident_per_day'].where(pd.notna(chart_data['reported_na_hrs_per_resident_per_day']), None).tolist(),
-                'case_mix_cna': chart_data['case_mix_na_hrs_per_resident_per_day'].where(pd.notna(chart_data['case_mix_na_hrs_per_resident_per_day']), None).tolist(),
-                'case_mix_lpn': chart_data['case_mix_lpn_hrs_per_resident_per_day'].where(pd.notna(chart_data['case_mix_lpn_hrs_per_resident_per_day']), None).tolist(),
-                'adjusted_cna': chart_data['adjusted_na_hrs_per_resident_per_day'].where(pd.notna(chart_data['adjusted_na_hrs_per_resident_per_day']), None).tolist()
+                'quarters': provider_quarters,
+                'quarter_start_dates': quarter_start_dates,
+                'reported_cna': _series_none_reported('reported_na_hrs_per_resident_per_day'),
+                'case_mix_cna': _series_none('case_mix_na_hrs_per_resident_per_day'),
+                'case_mix_lpn': _series_none('case_mix_lpn_hrs_per_resident_per_day'),
+                'adjusted_cna': _series_none('adjusted_na_hrs_per_resident_per_day')
             },
             'census': {
-                'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
-                'census': chart_data['avg_residents_per_day'].fillna(0).tolist()
+                'quarters': provider_quarters,
+                'census': _series('avg_residents_per_day')
             },
             'ratings': {
-                'quarters': chart_data['quarter_label'].where(pd.notna(chart_data['quarter_label']), None).tolist(),
-                # 0 = no data; use None so chart shows gap and UI shows "-"
-                'overall': _rating_series_for_chart(chart_data['overall_rating']),
-                'staffing': _rating_series_for_chart(chart_data['staffing_rating']),
-                'health_inspection': _rating_series_for_chart(chart_data['health_inspection_rating']),
-                'quality': _rating_series_for_chart(chart_data['qm_rating']) if 'qm_rating' in chart_data.columns else [None] * len(chart_data)
+                'quarters': provider_quarters,
+                'overall': ratings_overall,
+                'staffing': ratings_staffing,
+                'health_inspection': ratings_health,
+                'quality': ratings_quality
+            },
+            'occupancy': {
+                'quarters': provider_quarters,
+                'occupancy_pct': _occ_pct,
+                'avg_census': _occ_census,
+                'certified_beds': _occ_beds
             }
         }
         
@@ -2374,22 +2715,15 @@ def get_charts():
                     if not state_standard.get('Is_Federal_Minimum', False):
                         dates = format_dates_for_view_mode(hprd_df, hprd_view)
                         if state_standard['Value_Type'] == 'range':
-                            # Add both min and max lines for range states
+                            # One line at the upper bound (e.g. 2.31), labeled as range (e.g. "WY min (1.56—2.31)")
+                            min_val = state_standard['Min_Staffing']
+                            max_val = state_standard['Max_Staffing']
                             state_standard_lines.append({
                                 'x': dates,
-                                'y': [float(state_standard['Min_Staffing'])] * len(dates),
+                                'y': [float(max_val)] * len(dates),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
-                                'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
-                                'hoverinfo': 'name+y'
-                            })
-                            state_standard_lines.append({
-                                'x': dates,
-                                'y': [float(state_standard['Max_Staffing'])] * len(dates),
-                                'type': 'scatter',
-                                'mode': 'lines',
-                                'name': f"{facility_state} max. ({state_standard['Max_Staffing']})",
+                                'name': f"{facility_state} min. ({min_val}—{max_val})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -2400,7 +2734,7 @@ def get_charts():
                                 'y': [float(state_standard['Min_Staffing'])] * len(dates),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
+                                'name': f"{facility_state} min. (~{state_standard['Min_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -2580,22 +2914,15 @@ def get_charts():
                     if not state_standard.get('Is_Federal_Minimum', False):
                         days_list = dow_summary['DayOfWeek'].tolist()
                         if state_standard['Value_Type'] == 'range':
-                            # Add both min and max lines for range states
+                            # One line at the upper bound, labeled as range (e.g. "WY min (1.56—2.31)")
+                            min_val = state_standard['Min_Staffing']
+                            max_val = state_standard['Max_Staffing']
                             dow_data.append({
                                 'x': days_list,
-                                'y': [float(state_standard['Min_Staffing'])] * len(days_list),
+                                'y': [float(max_val)] * len(days_list),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
-                                'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
-                                'hoverinfo': 'name+y'
-                            })
-                            dow_data.append({
-                                'x': days_list,
-                                'y': [float(state_standard['Max_Staffing'])] * len(days_list),
-                                'type': 'scatter',
-                                'mode': 'lines',
-                                'name': f"{facility_state} max. ({state_standard['Max_Staffing']})",
+                                'name': f"{facility_state} min. ({min_val}—{max_val})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -2606,7 +2933,7 @@ def get_charts():
                                 'y': [float(state_standard['Min_Staffing'])] * len(days_list),
                                 'type': 'scatter',
                                 'mode': 'lines',
-                                'name': f"{facility_state} min. ({state_standard['Min_Staffing']})",
+                                'name': f"{facility_state} min. (~{state_standard['Min_Staffing']})",
                                 'line': {'color': '#ffc107', 'width': 2, 'dash': 'dash'},
                                 'hoverinfo': 'name+y'
                             })
@@ -4452,9 +4779,15 @@ def get_quarterly_data():
         if global_df is None or global_df.empty:
             return jsonify({'error': 'No data loaded'})
         
-        # Ensure Total_Staff_Hours exists
+        # Ensure derived hours columns exist (in case CSV was loaded without full load_facility_data)
+        if 'Total_RN_Hours' not in global_df.columns and all(c in global_df.columns for c in ['Hrs_RN', 'Hrs_RNadmin', 'Hrs_RNDON']):
+            global_df['Total_RN_Hours'] = (global_df['Hrs_RN'] + global_df['Hrs_RNadmin'] + global_df['Hrs_RNDON']).fillna(0).apply(lambda x: round_financial(x, 2))
+        if 'Total_LPN_Hours' not in global_df.columns and all(c in global_df.columns for c in ['Hrs_LPN', 'Hrs_LPNadmin']):
+            global_df['Total_LPN_Hours'] = (global_df['Hrs_LPN'] + global_df['Hrs_LPNadmin']).fillna(0).apply(lambda x: round_financial(x, 2))
+        if 'Total_Nurse_Aide_Hours' not in global_df.columns and all(c in global_df.columns for c in ['Hrs_CNA', 'Hrs_MedAide', 'Hrs_NAtrn']):
+            global_df['Total_Nurse_Aide_Hours'] = (global_df['Hrs_CNA'] + global_df.get('Hrs_MedAide', 0) + global_df.get('Hrs_NAtrn', 0)).fillna(0).apply(lambda x: round_financial(x, 2))
         if 'Total_Staff_Hours' not in global_df.columns:
-            global_df['Total_Staff_Hours'] = (global_df['Total_RN_Hours'] + global_df['Total_LPN_Hours'] + global_df['Total_Nurse_Aide_Hours']).fillna(0)
+            global_df['Total_Staff_Hours'] = (global_df.get('Total_RN_Hours', 0) + global_df.get('Total_LPN_Hours', 0) + global_df.get('Total_Nurse_Aide_Hours', 0)).fillna(0)
         
         # Calculate weighted HPRD (sum of hours / sum of census) for each quarter
         quarterly_data = {}
@@ -4489,19 +4822,19 @@ def get_quarterly_data():
             avg_rn_don_hours = quarter_df['Hrs_RNDON'].mean() if 'Hrs_RNDON' in quarter_df.columns else 0
             
             quarterly_data[quarter] = {
-                'census': round(avg_census, 2),  # Keep 2 decimal places for census too
-                'total_hprd': round(total_hprd, 2),
-                'total_hours': round(avg_staff_hours, 2),  # Keep 2 decimal places for hours
-                'direct_hprd': round(nurse_staff_hprd, 2),
-                'direct_hours': round(avg_nurse_staff_hours, 2),  # Keep 2 decimal places for hours
-                'total_rn_hprd': round(total_rn_hprd, 2),
-                'total_rn_hours': round(avg_rn_hours, 2),  # Keep 2 decimal places for hours
-                'rn_hprd': round(rn_hprd, 2),
-                'rn_hours': round(avg_rn_direct_hours, 2),  # Keep 2 decimal places for hours
-                'rn_admin_hprd': round(rn_admin_hprd, 2),
-                'rn_admin_hours': round(avg_rn_admin_hours, 2),  # Keep 2 decimal places for hours
-                'rn_don_hprd': round(rn_don_hprd, 2),
-                'rn_don_hours': round(avg_rn_don_hours, 2)  # Keep 2 decimal places for hours
+                'census': round_financial(avg_census, 2),
+                'total_hprd': round_financial(total_hprd, 2),
+                'total_hours': round_financial(avg_staff_hours, 2),
+                'direct_hprd': round_financial(nurse_staff_hprd, 2),
+                'direct_hours': round_financial(avg_nurse_staff_hours, 2),
+                'total_rn_hprd': round_financial(total_rn_hprd, 2),
+                'total_rn_hours': round_financial(avg_rn_hours, 2),
+                'rn_hprd': round_financial(rn_hprd, 2),
+                'rn_hours': round_financial(avg_rn_direct_hours, 2),
+                'rn_admin_hprd': round_financial(rn_admin_hprd, 2),
+                'rn_admin_hours': round_financial(avg_rn_admin_hours, 2),
+                'rn_don_hprd': round_financial(rn_don_hprd, 2),
+                'rn_don_hours': round_financial(avg_rn_don_hours, 2)
             }
         
         return jsonify({'quarterly_data': quarterly_data})
@@ -4563,7 +4896,7 @@ def get_state_standard_compliance():
         hprd_type = request.args.get('hprd_type', 'total')  # 'total' or 'direct_care'
         range_choice = request.args.get('range_choice', 'min')  # 'min' or 'max' for states with ranges
         
-        # Filter data by date range
+        # Filter data by date range (same as attorney report)
         filtered_df = global_df.copy()
         if start_date:
             filtered_df = filtered_df[filtered_df['WorkDate'] >= pd.to_datetime(start_date)]
@@ -4572,14 +4905,33 @@ def get_state_standard_compliance():
             end_dt = pd.to_datetime(end_date) + pd.Timedelta(days=1)
             filtered_df = filtered_df[filtered_df['WorkDate'] < end_dt]
         
-        # Determine which HPRD column to use
-        if hprd_type == 'direct_care':
-            hprd_col = 'Direct_Care_HPRD'  # Excludes RN admin, RN DON, LPN admin
-        else:
-            hprd_col = 'Total_Nurse_HPRD'  # Includes all staff
+        # Restrict to days with census > 0 (match attorney report: calculate_days_under_state_minimum)
+        filtered_df = filtered_df[filtered_df['MDScensus'] > 0].copy()
         
-        if hprd_col not in filtered_df.columns:
-            return jsonify({'error': f'HPRD column {hprd_col} not found'})
+        # Compute unrounded HPRD for compliance comparison (match attorney report logic exactly)
+        # Total = all staff; Direct = excluding admin/DON
+        filtered_df['_Total_Nurse_Hours'] = (
+            filtered_df['Hrs_RNDON'].fillna(0) + filtered_df['Hrs_RNadmin'].fillna(0) + filtered_df['Hrs_RN'].fillna(0) +
+            filtered_df['Hrs_LPNadmin'].fillna(0) + filtered_df['Hrs_LPN'].fillna(0) + filtered_df['Hrs_CNA'].fillna(0) +
+            filtered_df['Hrs_NAtrn'].fillna(0) + filtered_df['Hrs_MedAide'].fillna(0)
+        )
+        filtered_df['_Total_HPRD_raw'] = filtered_df['_Total_Nurse_Hours'] / filtered_df['MDScensus']
+        filtered_df['_Direct_Care_Hours'] = (
+            filtered_df['Hrs_RN'].fillna(0) + filtered_df['Hrs_LPN'].fillna(0) + filtered_df['Hrs_CNA'].fillna(0) +
+            filtered_df['Hrs_NAtrn'].fillna(0) + filtered_df['Hrs_MedAide'].fillna(0)
+        )
+        filtered_df['_Direct_Care_HPRD_raw'] = filtered_df['_Direct_Care_Hours'] / filtered_df['MDScensus']
+        
+        # Which HPRD to use for compliance (same definitions as report)
+        if hprd_type == 'direct_care':
+            hprd_col_raw = '_Direct_Care_HPRD_raw'
+            hprd_col_display = 'Direct_Care_HPRD'  # for rounded display
+        else:
+            hprd_col_raw = '_Total_HPRD_raw'
+            hprd_col_display = 'Total_Nurse_HPRD'
+        
+        if hprd_col_display not in filtered_df.columns:
+            filtered_df[hprd_col_display] = filtered_df[hprd_col_raw]  # fallback
         
         # Get standard threshold
         if state_standard['Value_Type'] == 'range':
@@ -4597,8 +4949,8 @@ def get_state_standard_compliance():
                 'is_federal_minimum': True
             })
         
-        # Check compliance for each day
-        filtered_df['Met_Standard'] = filtered_df[hprd_col] >= threshold
+        # Check compliance using unrounded HPRD (match attorney report: strict < threshold = below)
+        filtered_df['Met_Standard'] = filtered_df[hprd_col_raw] >= threshold
         filtered_df['Standard_Threshold'] = threshold
         
         # Calculate summary
@@ -4607,13 +4959,14 @@ def get_state_standard_compliance():
         days_not_met = total_days - days_met
         pct_met = (days_met / total_days * 100) if total_days > 0 else 0
         
-        # Prepare daily data
+        # Prepare daily data (display rounded HPRD)
         daily_data = []
         for _, row in filtered_df.iterrows():
             work_date = pd.to_datetime(row['WorkDate'])
+            hprd_display = round_financial(row[hprd_col_display], 2) if hprd_col_display in row.index else round_financial(row[hprd_col_raw], 2)
             daily_data.append({
                 'date': row['WorkDate'].strftime('%Y-%m-%d'),
-                'hprd': round_financial(row[hprd_col], 2),
+                'hprd': hprd_display,
                 'threshold': round_financial(threshold, 2),
                 'met_standard': bool(row['Met_Standard']),
                 'census': int(row['MDScensus']) if pd.notna(row['MDScensus']) else 0,
@@ -4679,6 +5032,7 @@ def get_state_standard_compliance():
                 'pct_met': round_financial(pct_met, 1),
                 'pct_not_met': round_financial(100 - pct_met, 1)
             },
+            'exclusion_note': 'Days with zero census are excluded from total days and from met/not met counts (rare).',
             'secondary_metrics': {
                 'day_of_week_breakdown': day_of_week_counts,
                 'quarter_breakdown': quarter_counts,
@@ -5080,9 +5434,24 @@ def get_case_mix_data():
                         provider_info_df['quarter'].apply(lambda x: normalize_quarter_for_match(x) == normalized_target_quarter)
                     ]
                     
-                    # If we have matches, take the most recent one (by processing_date)
+                    # If we have matches, prefer a row that has CMI (nursing_case_mix_index); CMS often adds CMI in later snapshots
                     if len(prov_quarter_data) > 0:
-                        prov_quarter_data = prov_quarter_data.sort_values('processing_date', ascending=False).head(1)
+                        cmi_col = None
+                        for c in prov_quarter_data.columns:
+                            if c is None or not isinstance(c, str):
+                                continue
+                            if 'nursing_case_mix_index' in c.lower() and 'ratio' not in c.lower():
+                                if prov_quarter_data[c].notna().any() and (prov_quarter_data[c].fillna(0) > 0).any():
+                                    cmi_col = c
+                                    break
+                        if cmi_col is not None:
+                            with_cmi = prov_quarter_data[prov_quarter_data[cmi_col].notna() & (prov_quarter_data[cmi_col] > 0)]
+                            if len(with_cmi) > 0:
+                                prov_quarter_data = with_cmi.sort_values('processing_date', ascending=False).head(1)
+                            else:
+                                prov_quarter_data = prov_quarter_data.sort_values('processing_date', ascending=False).head(1)
+                        else:
+                            prov_quarter_data = prov_quarter_data.sort_values('processing_date', ascending=False).head(1)
                     else:
                         # If no exact match, try matching null quarters by date (only within exact date range)
                         # NEVER use fallback data from other quarters - if no match, leave empty
@@ -5145,7 +5514,8 @@ def get_case_mix_data():
                             if pd.notna(cmi_value) and cmi_value is not None:
                                 try:
                                     cmi = float(cmi_value)
-                                    quarter_info['cmi'] = round_financial(cmi, 3)
+                                    quarter_info['cmi'] = round_financial(cmi, 5)  # full precision for display consistency with Harrington formula
+                                    quarter_info['cmi_raw'] = cmi  # full precision for Harrington formula
                                     # Track which column was used as the source
                                     quarter_info['cmi_source'] = col
                                     break
@@ -5153,6 +5523,7 @@ def get_case_mix_data():
                                     continue
                     if cmi is None:
                         quarter_info['cmi'] = None
+                        quarter_info['cmi_raw'] = None
                         quarter_info['cmi_source'] = None
                 else:
                     # No provider info data found for this quarter - explicitly set all fields to None
@@ -5166,6 +5537,7 @@ def get_case_mix_data():
                     quarter_info['case_mix_lpn'] = None
                     quarter_info['case_mix_na'] = None
                     quarter_info['cmi'] = None
+                    quarter_info['cmi_raw'] = None
                     quarter_info['cmi_source'] = None
             
             # === PBJ DATA (calculated from daily records) ===
@@ -5203,21 +5575,36 @@ def get_case_mix_data():
                     quarter_info['pbj_reported_na'] = (na_hours / total_census) if total_census > 0 else None
             
             # === CALCULATE % CASE-MIX ===
+            # Use raw (unrounded) direct hours / census for % so display matches full precision (e.g. 89.7% not 89.0%).
+            raw_direct_hprd = None
+            if global_df is not None and len(global_df) > 0:
+                pbj_q = global_df[global_df['CY_Qtr'] == quarter]
+                if len(pbj_q) > 0:
+                    total_census = pbj_q['MDScensus'].sum()
+                    if total_census > 0:
+                        hrs_rn = pbj_q['Hrs_RN'].fillna(0)
+                        hrs_lpn = pbj_q['Hrs_LPN'].fillna(0)
+                        hrs_cna = pbj_q['Hrs_CNA'].fillna(0)
+                        hrs_na = pbj_q['Hrs_NAtrn'].fillna(0) if 'Hrs_NAtrn' in pbj_q.columns else 0
+                        hrs_med = pbj_q['Hrs_MedAide'].fillna(0) if 'Hrs_MedAide' in pbj_q.columns else 0
+                        raw_direct_hprd = (hrs_rn + hrs_lpn + hrs_cna + hrs_na + hrs_med).sum() / total_census
             # Total CMI
             if quarter_info.get('prov_reported_total') and quarter_info.get('case_mix_total') and quarter_info['case_mix_total'] > 0:
                 quarter_info['pct_cmi_total'] = (quarter_info['prov_reported_total'] / quarter_info['case_mix_total'] * 100)
             else:
                 quarter_info['pct_cmi_total'] = None
             
-            # Calculate case_mix_direct (RN + LPN + NA case-mix) and store it
-            if quarter_info.get('case_mix_rn') is not None and quarter_info.get('case_mix_lpn') is not None and quarter_info.get('case_mix_na') is not None:
-                quarter_info['case_mix_direct'] = quarter_info['case_mix_rn'] + quarter_info['case_mix_lpn'] + quarter_info['case_mix_na']
-            else:
-                quarter_info['case_mix_direct'] = None
+            # Use provider-info case_mix_total as the single denominator for both Total and Direct
+            # (do not use combined RN+LPN+NA so hover shows same Case-Mix value from provider info)
+            quarter_info['case_mix_direct'] = quarter_info.get('case_mix_total')  # same as total for display/denominator
             
-            # Direct CMI (use PBJ direct, case-mix direct = RN+LPN+NA case-mix)
-            if quarter_info.get('pbj_reported_direct') and quarter_info.get('case_mix_direct') and quarter_info['case_mix_direct'] > 0:
-                quarter_info['pct_cmi_direct'] = (quarter_info['pbj_reported_direct'] / quarter_info['case_mix_direct'] * 100)
+            # Direct CMI: use raw direct HPRD when available so % matches full precision (e.g. 89.7% not 89.0%)
+            if quarter_info.get('case_mix_total') and quarter_info['case_mix_total'] > 0:
+                numer = raw_direct_hprd if raw_direct_hprd is not None else quarter_info.get('pbj_reported_direct')
+                if numer is not None:
+                    quarter_info['pct_cmi_direct'] = (numer / quarter_info['case_mix_total'] * 100)
+                else:
+                    quarter_info['pct_cmi_direct'] = None
             else:
                 quarter_info['pct_cmi_direct'] = None
             
@@ -5251,27 +5638,12 @@ def get_case_mix_data():
             else:
                 quarter_info['pct_cmi_na'] = None
             
-            # === CALCULATE HARRINGTON-ADJUSTED HPRD ===
-            cmi = quarter_info.get('cmi')
+            # === CALCULATE HARRINGTON-ADJUSTED HPRD (single source: facility_report_lib) ===
+            cmi = quarter_info.get('cmi_raw') if quarter_info.get('cmi_raw') is not None else quarter_info.get('cmi')
             if cmi is not None and pd.notna(cmi) and cmi > 0:
-                base_cmi = 0.62
-                max_cmi = 3.84
-                denominator = max_cmi - base_cmi  # (3.84 - 0.62) = 3.22
-                
-                # Calculate the ratio: (CMI - 0.62) / (3.84 - 0.62)
-                ratio = (cmi - base_cmi) / denominator if denominator > 0 else 0
-                
-                # Harrington Total Expected = 3.48 + ((CMI - 0.62) / (3.84 - 0.62))^0.715361977219995 * (7.68 - 3.48)
-                power_factor_total = ratio ** 0.715361977219995
-                quarter_info['harrington_total'] = round_financial(3.48 + power_factor_total * (7.68 - 3.48), 2)
-                
-                # Harrington RN Expected = 0.55 + ((CMI - 0.62) / (3.84 - 0.62))^0.973947642000645 * (2.39 - 0.55)
-                power_factor_rn = ratio ** 0.973947642000645
-                quarter_info['harrington_rn'] = round_financial(0.55 + power_factor_rn * (2.39 - 0.55), 2)
-                
-                # Harrington CNA Expected = 2.45 + ((CMI - 0.62) / (3.84 - 0.62))^0.236050267902121 * (3.6 - 2.45)
-                power_factor_cna = ratio ** 0.236050267902121
-                quarter_info['harrington_cna'] = round_financial(2.45 + power_factor_cna * (3.6 - 2.45), 2)
+                quarter_info['harrington_total'] = calculate_harrington_adjusted_hprd(cmi, 'total')
+                quarter_info['harrington_rn'] = calculate_harrington_adjusted_hprd(cmi, 'rn')
+                quarter_info['harrington_cna'] = calculate_harrington_adjusted_hprd(cmi, 'cna')
                 
                 # Calculate Harrington-adjusted percentages
                 # Total Harrington (use PBJ direct care)
@@ -5299,18 +5671,26 @@ def get_case_mix_data():
                 quarter_info['pct_harrington_rn'] = None
                 quarter_info['pct_harrington_cna'] = None
             
-            # Round all numeric values with appropriate precision
-            # Exclude string fields like 'quarter' and 'cmi_source'
-            exclude_keys = {'quarter', 'cmi_source'}
+            # Round all numeric values with appropriate precision for display.
+            # Use round_financial (half-up) so values like 1.535 display as 1.54, not 1.53
+            # (JS .toFixed(2) on 1.535 can show 1.53 due to float representation).
+            exclude_keys = {'quarter', 'cmi_source', 'cmi', 'cmi_raw'}  # cmi/cmi_raw use 5 decimals, set above
+            hprd_keys = {
+                'prov_reported_total', 'prov_reported_rn', 'prov_reported_lpn', 'prov_reported_na',
+                'case_mix_total', 'case_mix_rn', 'case_mix_lpn', 'case_mix_na', 'case_mix_direct',
+                'pbj_reported_total', 'pbj_reported_direct', 'pbj_reported_total_rn', 'pbj_reported_direct_rn',
+                'pbj_reported_total_lpn', 'pbj_reported_direct_lpn', 'pbj_reported_na',
+                'harrington_total', 'harrington_rn', 'harrington_cna'
+            }
             for key, value in quarter_info.items():
                 if key not in exclude_keys and value is not None:
-                    # Only round if it's a numeric type
                     if isinstance(value, (int, float)) and not pd.isna(value):
-                        # Round % CMI values to 1 decimal, others to 3 decimals
                         if key.startswith('pct_'):
-                            quarter_info[key] = round(value, 1)
+                            quarter_info[key] = round_financial(value, 1)
+                        elif key in hprd_keys:
+                            quarter_info[key] = round_financial(value, 2)
                         else:
-                            quarter_info[key] = round(value, 3)
+                            quarter_info[key] = round_financial(value, 3)
             
             # Include all quarters in the dashboard (CMI can be None/blank for some quarters)
             # The filtering for Harrington section is done in the report, not the dashboard
@@ -5346,56 +5726,85 @@ def get_harrington_cmi():
         if not quarter_data:
             return jsonify({'error': f'No data found for quarter {quarter}'})
         
-        cmi = quarter_data.get('cmi')
+        cmi = quarter_data.get('cmi_raw') if quarter_data.get('cmi_raw') is not None else quarter_data.get('cmi')
+        # Fallback: if case_mix_data had no CMI for this quarter (e.g. wrong row chosen), look up CMI directly from provider info
+        if (cmi is None or pd.isna(cmi) or cmi <= 0) and provider_info_df is not None and len(provider_info_df) > 0:
+            def _norm_q(q):
+                if pd.isna(q):
+                    return None
+                s = str(q).strip()
+                if len(s) == 6 and s[4] == 'Q' and s[:4].isdigit() and s[5].isdigit():
+                    return s
+                if s.startswith('Q') and ' ' in s:
+                    parts = s.replace('Q', '').split()
+                    if len(parts) >= 2:
+                        qn, yr = parts[0], ''.join(parts[1:])
+                        if qn.isdigit() and yr.isdigit():
+                            return f"{yr}Q{qn}"
+                return None
+            facility_ccn = None
+            if global_df is not None and len(global_df) > 0:
+                for col in ['PROVNUM', 'provnum', 'ccn']:
+                    if col in global_df.columns:
+                        facility_ccn = str(global_df[col].iloc[0]).strip().zfill(6)
+                        break
+            if facility_ccn and 'ccn' in provider_info_df.columns:
+                prov_sub = provider_info_df[provider_info_df['ccn'].astype(str).str.strip().str.zfill(6) == facility_ccn]
+                if 'quarter' in prov_sub.columns:
+                    target = _norm_q(quarter)
+                    match = prov_sub[prov_sub['quarter'].apply(lambda x: _norm_q(x) == target)]
+                    if len(match) > 0:
+                        # Prefer row that has nursing_case_mix_index
+                        for c in match.columns:
+                            if c and isinstance(c, str) and 'nursing_case_mix_index' in c.lower() and 'ratio' not in c.lower():
+                                has_cmi = match[match[c].notna() & (match[c] > 0)]
+                                if len(has_cmi) > 0:
+                                    row = has_cmi.sort_values('processing_date', ascending=False).iloc[0]
+                                    try:
+                                        cmi = float(row[c])
+                                        break
+                                    except (ValueError, TypeError):
+                                        pass
+                        if cmi is None or pd.isna(cmi) or cmi <= 0:
+                            row = match.sort_values('processing_date', ascending=False).iloc[0]
+                            for c in match.columns:
+                                if c and isinstance(c, str) and 'nursing_case_mix_index' in c.lower() and 'ratio' not in c.lower():
+                                    try:
+                                        v = row.get(c)
+                                        if pd.notna(v) and v is not None and float(v) > 0:
+                                            cmi = float(v)
+                                            break
+                                    except (ValueError, TypeError):
+                                        pass
         if cmi is None or pd.isna(cmi) or cmi <= 0:
-            return jsonify({'error': f'No CMI available for quarter {quarter}'})
+            return jsonify({'error': f'No CMI available for quarter {quarter}. Case Mix Index (CMI) comes from CMS Provider Info; it may be missing or not yet published for this quarter.'})
         
-        # Calculate Harrington Expected values (keep unrounded for percentage calculation)
-        base_cmi = 0.62
-        max_cmi = 3.84
-        denominator = max_cmi - base_cmi  # 3.22
-        ratio = (cmi - base_cmi) / denominator if denominator > 0 else 0
-        
-        # Total Expected HPRD = 3.48 + ((CMI - 0.62)/(3.84 - 0.62))^0.715 × (7.68 - 3.48)
-        power_factor_total = ratio ** 0.715361977219995
-        harrington_total_raw = 3.48 + power_factor_total * (7.68 - 3.48)
-        
-        # RN Expected HPRD = 0.55 + ((CMI - 0.62)/(3.84 - 0.62))^0.974 × (2.39 - 0.55)
-        power_factor_rn = ratio ** 0.973947642000645
-        harrington_rn_raw = 0.55 + power_factor_rn * (2.39 - 0.55)
-        
-        # Nurse Aide Expected HPRD = 2.45 + ((CMI - 0.62)/(3.84 - 0.62))^0.236 × (3.6 - 2.45)
-        power_factor_na = ratio ** 0.236050267902121
-        harrington_na_raw = 2.45 + power_factor_na * (3.6 - 2.45)
+        # Harrington Expected values from single source (facility_report_lib; full formula, round-half-up)
+        harrington_total = calculate_harrington_adjusted_hprd(cmi, 'total')
+        harrington_rn = calculate_harrington_adjusted_hprd(cmi, 'rn')
+        harrington_na = calculate_harrington_adjusted_hprd(cmi, 'cna')
         
         # Get reported values (use total or direct based on user selection)
-        # Keep original unrounded values for percentage calculation
         if use_total:
             reported_total_raw = quarter_data.get('pbj_reported_total')
             reported_rn_raw = quarter_data.get('pbj_reported_total_rn')
         else:
             reported_total_raw = quarter_data.get('pbj_reported_direct')
             reported_rn_raw = quarter_data.get('pbj_reported_direct_rn')
+        reported_na_raw = quarter_data.get('pbj_reported_na')
         
-        reported_na_raw = quarter_data.get('pbj_reported_na')  # Same for both
+        # Percentages using same rounded Harrington values for consistency
+        pct_total = round_financial((reported_total_raw / harrington_total * 100) if (reported_total_raw and harrington_total and harrington_total > 0) else None, 1) if reported_total_raw and harrington_total and harrington_total > 0 else None
+        pct_rn = round_financial((reported_rn_raw / harrington_rn * 100) if (reported_rn_raw and harrington_rn and harrington_rn > 0) else None, 1) if reported_rn_raw and harrington_rn and harrington_rn > 0 else None
+        pct_na = round_financial((reported_na_raw / harrington_na * 100) if (reported_na_raw and harrington_na and harrington_na > 0) else None, 1) if reported_na_raw and harrington_na and harrington_na > 0 else None
         
-        # Calculate percentages using UNROUNDED values for accuracy
-        # Then round the final percentage result
-        pct_total = round_financial((reported_total_raw / harrington_total_raw * 100) if (reported_total_raw and harrington_total_raw > 0) else None, 1) if reported_total_raw and harrington_total_raw > 0 else None
-        pct_rn = round_financial((reported_rn_raw / harrington_rn_raw * 100) if (reported_rn_raw and harrington_rn_raw > 0) else None, 1) if reported_rn_raw and harrington_rn_raw > 0 else None
-        pct_na = round_financial((reported_na_raw / harrington_na_raw * 100) if (reported_na_raw and harrington_na_raw > 0) else None, 1) if reported_na_raw and harrington_na_raw > 0 else None
-        
-        # Round the displayed values
-        harrington_total = round_financial(harrington_total_raw, 2)
-        harrington_rn = round_financial(harrington_rn_raw, 2)
-        harrington_na = round_financial(harrington_na_raw, 2)
         reported_total = round_financial(reported_total_raw, 2) if reported_total_raw else None
         reported_rn = round_financial(reported_rn_raw, 2) if reported_rn_raw else None
         reported_na = round_financial(reported_na_raw, 2) if reported_na_raw else None
         
         return jsonify({
             'quarter': quarter,
-            'cmi': round_financial(cmi, 3),
+            'cmi': round_financial(cmi, 5),
             'use_total': use_total,
             'harrington_total': harrington_total,
             'harrington_rn': harrington_rn,
