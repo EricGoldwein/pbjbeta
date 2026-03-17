@@ -6,7 +6,7 @@ Uses the complete CSV file for any facility for fast, detailed analysis
 
 import pandas as pd
 import numpy as np
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, redirect
 from datetime import datetime, timedelta
 import json
 from decimal import Decimal, ROUND_HALF_UP
@@ -30,6 +30,40 @@ DEPLOYED_DATE = datetime.now().strftime('%m/%d/%Y')
 _app_root = os.path.dirname(os.path.abspath(__file__))
 PROVIDER_INFO_EXTRACTED = os.path.join(_app_root, 'provider_info_extracted')
 PROVIDER_INFO_DATA_DIR = PROVIDER_INFO_EXTRACTED if os.path.isdir(PROVIDER_INFO_EXTRACTED) else os.path.join(_app_root, 'static', 'data', 'provider_info')
+
+_CMS_PROVIDER_INFO_DATASET_PAGE = "https://data.cms.gov/provider-data/dataset/4pq5-n9py"
+
+
+def _cms_provider_info_archive_zip_url(source_filename: str) -> str | None:
+    """
+    Map a provider info source file name (e.g. 'NH_ProviderInfo_Oct2018.csv') to the CMS archive ZIP URL.
+    CMS provider info is published as monthly ZIP archives. This lets attorneys pull the exact snapshot
+    referenced in the red-flag table even when we don't host the raw CSV.
+    """
+    if not source_filename:
+        return None
+    name = os.path.basename(str(source_filename).strip())
+    m = re.search(r'NH_ProviderInfo_([A-Za-z]{3})(\d{4})\.csv$', name)
+    if not m:
+        return None
+    mon_abbr = m.group(1).title()
+    year = int(m.group(2))
+    month_map = {
+        "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+        "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+    }
+    month = month_map.get(mon_abbr)
+    if not month:
+        return None
+
+    base = "https://data.cms.gov/provider-data/sites/default/files/archive"
+    folder = f"Nursing%20homes%20including%20rehab%20services/{year}"
+    # Observed CMS naming: 2019 uses nh_archive_MM_YYYY.zip; newer uses nursing_homes_including_rehab_services_MM_YYYY.zip
+    if year <= 2019:
+        zip_name = f"nh_archive_{month:02d}_{year}.zip"
+    else:
+        zip_name = f"nursing_homes_including_rehab_services_{month:02d}_{year}.zip"
+    return f"{base}/{folder}/{zip_name}"
 
 def _quarter_from_nurse_filename(path):
     """Parse quarter from nurse file name, e.g. PBJ_dailynursestaffing_CY2025Q3.csv -> 'CY2025Q3'."""
@@ -1484,27 +1518,35 @@ def provider_info_list():
 
 @app.route('/api/provider-info/download')
 def provider_info_download():
-    """Serve a raw CMS provider info file. ?file=filename or omit to download latest by name."""
+    """
+    Serve a raw CMS provider info file.
+    - If file exists locally in PROVIDER_INFO_DATA_DIR: download it.
+    - If missing locally but looks like NH_ProviderInfo_MmmYYYY.csv: redirect to the CMS archive ZIP.
+    - If no file param: download latest local file; if none, redirect to CMS dataset page.
+    """
     file_param = request.args.get('file')
-    if not os.path.isdir(PROVIDER_INFO_DATA_DIR):
-        return jsonify({'error': 'Provider info files not configured'}), 404
     if file_param:
         # Restrict to filename only (no path traversal)
         name = os.path.basename(file_param).strip()
         if not name or '..' in name or os.path.sep in name:
             return jsonify({'error': 'Invalid file name'}), 400
-        path = os.path.join(PROVIDER_INFO_DATA_DIR, name)
-        if not os.path.isfile(path):
-            return jsonify({'error': 'File not found'}), 404
-        return send_from_directory(PROVIDER_INFO_DATA_DIR, name, as_attachment=True)
+        if os.path.isdir(PROVIDER_INFO_DATA_DIR):
+            path = os.path.join(PROVIDER_INFO_DATA_DIR, name)
+            if os.path.isfile(path):
+                return send_from_directory(PROVIDER_INFO_DATA_DIR, name, as_attachment=True)
+        cms_zip = _cms_provider_info_archive_zip_url(name)
+        if cms_zip:
+            return redirect(cms_zip, code=302)
+        return jsonify({'error': 'File not found'}), 404
     # No file param: send most recent file by name (e.g. latest extract)
     try:
-        names = [f for f in os.listdir(PROVIDER_INFO_DATA_DIR)
-                 if os.path.isfile(os.path.join(PROVIDER_INFO_DATA_DIR, f)) and not f.startswith('.')]
-        if not names:
-            return jsonify({'error': 'No provider info files available'}), 404
-        names.sort()
-        return send_from_directory(PROVIDER_INFO_DATA_DIR, names[-1], as_attachment=True)
+        if os.path.isdir(PROVIDER_INFO_DATA_DIR):
+            names = [f for f in os.listdir(PROVIDER_INFO_DATA_DIR)
+                     if os.path.isfile(os.path.join(PROVIDER_INFO_DATA_DIR, f)) and not f.startswith('.')]
+            if names:
+                names.sort()
+                return send_from_directory(PROVIDER_INFO_DATA_DIR, names[-1], as_attachment=True)
+        return redirect(_CMS_PROVIDER_INFO_DATASET_PAGE, code=302)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

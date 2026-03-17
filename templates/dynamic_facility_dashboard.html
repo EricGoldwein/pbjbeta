@@ -3515,7 +3515,8 @@
                 const fmtDate = (d) => (d || '').toString().replaceAll(' to ', '–');
                 const srcName = (sourceFile || '').toString();
                 const srcIsFile = srcName.toLowerCase().endsWith('.csv');
-                const srcLink = (providerInfoDownloadAvailable && srcIsFile)
+                // Always point to our endpoint; server serves local file or redirects to CMS archive ZIP.
+                const srcLink = srcIsFile
                     ? `<a href="/api/provider-info/download?file=${encodeURIComponent(srcName)}" target="_blank" rel="noopener" class="text-decoration-none">${srcName}</a>`
                     : srcName;
                 const dateSourceHtml = `
@@ -3567,7 +3568,7 @@
                         const rSrc = record.source_file || '';
                         const rSrcName = rSrc.toString();
                         const rSrcIsFile = rSrcName.toLowerCase().endsWith('.csv');
-                        const rSrcLink = (providerInfoDownloadAvailable && rSrcIsFile)
+                        const rSrcLink = rSrcIsFile
                             ? `<a href="/api/provider-info/download?file=${encodeURIComponent(rSrcName)}" target="_blank" rel="noopener" class="text-decoration-none">${rSrcName}</a>`
                             : rSrcName;
                         tableHtml += `<li class="mb-2" style="line-height: 1.2;">`;
