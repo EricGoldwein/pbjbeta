@@ -105,6 +105,32 @@ def _pbj_favicon_path() -> Optional[str]:
     return p if os.path.isfile(p) else None
 
 
+
+# Initialize data lazily (for Vercel deployment)
+# Hardcoded for facility 335513
+PROVNUM = "335513"
+EIN_DASHBOARD_MODE = "all"
+EIN_SELECTED_QUARTERS = []
+_data_initialized = False
+
+def ensure_data_loaded():
+    """Lazy initialization - only load data on first request"""
+    global _data_initialized
+    if not _data_initialized:
+        try:
+            print(f"Initializing facility {PROVNUM} dashboard (lazy load)...")
+            create_dynamic_dashboard(PROVNUM)
+            print(f"[OK] Successfully initialized facility {PROVNUM} dashboard")
+            _data_initialized = True
+        except Exception as e:
+            print(f"[WARNING] Error initializing facility {PROVNUM} dashboard: {e}")
+            import traceback
+            traceback.print_exc()
+
+@app.before_request
+def before_request():
+    ensure_data_loaded()
+
 @app.route("/pbj_favicon.png")
 def pbj_favicon_png():
     """Serve ``pbj_favicon.png`` from the application directory (repo root for facility apps)."""
@@ -1764,16 +1790,6 @@ def get_previous_provider_names(provnum, limit: int | None = 3):
     return previous_with_years
 
 
-# Initialize data lazily (for Vercel deployment)
-# Hardcoded for facility 315174
-PROVNUM = "315174"
-_data_initialized = False
-EIN_DASHBOARD_MODE = os.getenv("EIN_DASHBOARD_MODE", "all").strip().lower() or "all"
-EIN_SELECTED_QUARTERS = [
-    q.strip() for q in os.getenv("EIN_SELECTED_QUARTERS", "").split(",") if q.strip()
-]
-
-
 def _ein_active_ccn() -> str:
     """CCN for EIN CSV filenames and CMS links (from loaded PBJ data or PROVNUM)."""
     global global_df, PROVNUM
@@ -1874,32 +1890,6 @@ def _load_ein_position_csvs(provnum: str | None = None) -> None:
         ein_employee_detail_df = None
         ein_nursing_summaries_df = None
 
-
-def ensure_data_loaded():
-    """Lazy initialization - only load data on first request"""
-    global _data_initialized, global_df
-    # Check if data is already loaded
-    if global_df is not None and not global_df.empty:
-        _data_initialized = True
-        if ein_job_quarterly_df is None:
-            _load_ein_position_csvs()
-        return
-    if not _data_initialized:
-        try:
-            print(f"Initializing facility {PROVNUM} dashboard (lazy load)...")
-            create_dynamic_dashboard(PROVNUM)
-            print(f"[OK] Successfully initialized facility {PROVNUM} dashboard")
-            _data_initialized = True
-        except Exception as e:
-            print(f"⚠️ Error initializing facility {PROVNUM} dashboard: {e}")
-            import traceback
-            traceback.print_exc()
-            # Will retry on next request
-
-# Ensure data is loaded before any request
-@app.before_request
-def before_request():
-    ensure_data_loaded()
 
 @app.route('/')
 def index():
@@ -2454,7 +2444,9 @@ def get_summary():
             'total_lpn_contract_hours': float(filtered_df['Hrs_LPN_ctr'].sum()) if len(filtered_df) > 0 else 0,
             'total_cna_contract_hours': float(filtered_df['Hrs_CNA_ctr'].sum()) if len(filtered_df) > 0 else 0,
             # Align profile CMS ratings with the same filtered PBJ span as this summary (not client table state).
-            'provider_info_match_quarter': _provider_match_quarter_param_from_pbj_df(filtered_df),
+            'provider_info_match_quarter': _provider_match_quarter_param_from_pbj_df(
+                cast(pd.DataFrame, filtered_df)
+            ),
         }
         
         return jsonify(summary)
@@ -9276,12 +9268,6 @@ def run_dashboard(
     app_instance.run(debug=True, host='0.0.0.0', port=port, threaded=True)
 
 if __name__ == "__main__":
-    # Read facility code from command-line argument
-    if len(sys.argv) > 1:
-        provnum = sys.argv[1].strip()
-        # Internal/local default: full Employee Detail (all EIN quarters in files)
-        run_dashboard(provnum, port=5000, ein_mode="all")
-    else:
-        # For local testing without arguments, use default
-        ensure_data_loaded()  # Load immediately for local dev
-        app.run(debug=True, port=5000, threaded=True)
+    # For local testing
+    ensure_data_loaded()  # Load immediately for local dev
+    app.run(debug=True, port=5000, threaded=True)

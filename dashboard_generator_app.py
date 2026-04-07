@@ -14,9 +14,186 @@ import os
 import sys
 import subprocess
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 import threading
 import time
+from typing import cast, Dict, Optional, Sequence, Tuple, Union
 import pandas as pd
+
+
+def round_financial(value, decimals=2):
+    """Round using half-up (required for legal/report accuracy; avoid Python's banker's rounding)."""
+    if value is None or (hasattr(pd, 'isna') and pd.isna(value)):
+        return 0.0
+    try:
+        return float(Decimal(str(value)).quantize(Decimal('0.' + '0' * decimals), rounding=ROUND_HALF_UP))
+    except Exception:
+        return value
+
+
+def _resolve_optional_filesystem_path(project_root: str, user_path: Optional[str]) -> Optional[str]:
+    """
+    Turn an optional UI/API path into an absolute path.
+
+    Relative paths are resolved against ``project_root`` (repo root).
+    """
+    if user_path is None:
+        return None
+    raw = str(user_path).strip().strip('"')
+    if not raw:
+        return None
+    p = os.path.expandvars(os.path.expanduser(raw))
+    if not os.path.isabs(p):
+        p = os.path.abspath(os.path.join(project_root, p))
+    else:
+        p = os.path.abspath(p)
+    return p
+
+
+def _optional_str_field(value: object) -> Optional[str]:
+    """Normalize JSON text fields: None/blank → None."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
+
+
+def _coerce_request_bool(value, default=True):
+    """Parse booleans from JSON (checkboxes) or string query/body values."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        s = value.strip().lower()
+        if s in ('false', '0', 'no', 'off'):
+            return False
+        if s in ('true', '1', 'yes', 'on'):
+            return True
+        return default
+    return bool(value)
+
+
+def run_ein_extract_if_needed(
+    provnum: str,
+    project_root: str,
+    ein_mode: str,
+    *,
+    ein_zip_path: Optional[str] = None,
+    ein_archive_dir: Optional[str] = None,
+) -> Tuple[bool, Optional[bool], Optional[str]]:
+    """
+    If EIN mode is ``all`` or ``selected`` and required EIN artifacts are missing,
+    run ``scripts/extract_facility_ein_from_zip.py`` into ``deployments/pbj320-<CCN>/``.
+
+    Optional ``ein_zip_path`` (absolute or repo-relative path to the monolithic PUF) and
+    ``ein_archive_dir`` (folder scanned for ``*.zip``) apply only to this subprocess—use when
+    the CMS archive lives outside ``EIN/``. ``ein_zip_path`` wins if both are set.
+
+    Skips only when job **and** category **and** (row-level ``employee_detail`` **or**
+    ``nursing_summaries``) already exist—so a prior ``--detail-only-summarize`` run
+    (aggregates only) still triggers a full re-extract for roster/daily charts.
+
+    Returns:
+        attempted: True if the extract script was executed.
+        ok: True if attempted and exit code 0; False if attempted and failed;
+            None if not attempted (already had tables or ein_mode is none).
+        message: Human-readable summary or error tail.
+    """
+    ein_mode = str(ein_mode or "all").strip().lower()
+    if ein_mode not in {"all", "selected"}:
+        return False, None, None
+
+    try:
+        from file_path_utils import find_facility_ein_table_base
+    except ImportError:
+        return True, False, "Could not import file_path_utils for EIN path lookup."
+
+    job = find_facility_ein_table_base(provnum, "job_quarterly")
+    cat = find_facility_ein_table_base(provnum, "category_quarterly")
+    detail = find_facility_ein_table_base(provnum, "employee_detail")
+    summ = find_facility_ein_table_base(provnum, "nursing_summaries")
+    has_job_cat = bool(job and cat)
+    has_row_or_summ = bool(detail or summ)
+    if has_job_cat and has_row_or_summ:
+        return False, None, (
+            "Employee Detail (EIN) job/category and row-level (or nursing summaries) "
+            "files already present; extract skipped."
+        )
+    if has_job_cat and not has_row_or_summ:
+        print(
+            f"[EIN] {provnum}: job/category found but row-level employee_detail (or "
+            "nursing_summaries) missing — running full extract for roster/daily features."
+        )
+
+    script = os.path.join(project_root, "scripts", "extract_facility_ein_from_zip.py")
+    if not os.path.isfile(script):
+        return True, False, (
+            f"EIN extract script not found: {script}. "
+            "Clone the full repo or add scripts/extract_facility_ein_from_zip.py."
+        )
+
+    deploy_dir = os.path.abspath(os.path.join(project_root, "deployments", f"pbj320-{provnum}"))
+    os.makedirs(deploy_dir, exist_ok=True)
+
+    zip_resolved = _resolve_optional_filesystem_path(project_root, ein_zip_path)
+    dir_resolved = _resolve_optional_filesystem_path(project_root, ein_archive_dir)
+    if zip_resolved and not os.path.isfile(zip_resolved):
+        return True, False, f"EIN zip path not found or not a file: {zip_resolved}"
+    if dir_resolved and not os.path.isdir(dir_resolved):
+        return True, False, f"EIN archive folder not found or not a directory: {dir_resolved}"
+
+    cmd = [
+        sys.executable,
+        script,
+        provnum,
+        "--out-dir",
+        deploy_dir,
+    ]
+    if zip_resolved:
+        cmd.extend(["--zip", zip_resolved])
+    child_env = None
+    if dir_resolved and not zip_resolved:
+        child_env = os.environ.copy()
+        child_env["PBJ_EIN_ARCHIVE_DIR"] = dir_resolved
+
+    loc = zip_resolved or dir_resolved or "(default EIN/ + resolver)"
+    print(f"Running EIN extract for {provnum} → {deploy_dir} (source: {loc}) ...")
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=project_root,
+            env=child_env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=7200,
+        )
+    except subprocess.TimeoutExpired:
+        return True, False, "EIN extract timed out after 2 hours."
+    except OSError as exc:
+        return True, False, f"Could not start EIN extract: {exc}"
+
+    out = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    if proc.returncode == 0:
+        tail = (out or err)[-1200:] if (out or err) else ""
+        msg = "Employee Detail (EIN) extracted into the deployment folder."
+        if tail:
+            msg += f" Log (tail): {tail}"
+        return True, True, msg
+
+    combined = f"{out}\n{err}".strip()
+    tail = combined[-2500:] if combined else "(no output)"
+    hint = (
+        " Usual causes: CMS Employee Detail ZIP not found (set PUF path or folder in the generator UI, "
+        "or env PBJ_EIN_DETAIL_ZIP / PBJ_EIN_ARCHIVE_DIR), or pyarrow not installed (pip install pyarrow). "
+        "See script docstring."
+    )
+    return True, False, f"EIN extract failed (exit {proc.returncode}).{hint} Output (tail): {tail}"
+
+
 try:
     from dateutil.relativedelta import relativedelta
 except ImportError:
@@ -36,6 +213,8 @@ except ImportError:
 
 # Import functions from existing modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from entity_longitudinal_metrics import get_entity_key_metrics_over_time, load_entity_longitudinal_metrics
 
 try:
     from dynamic_facility_dashboard import create_facility_complete_csv, create_facility_provider_info_csv
@@ -87,7 +266,7 @@ except ImportError:
         return ''.join(c for c in entity_id if c.isdigit()) or None
     
     def generate_dashboard_url(facility=None, state=None, entity=None):
-        base = "https://pbjdashboard.com/"
+        base = "https://www.pbj320.com/"
         params = []
         if facility:
             params.append(f"facility={normalize_ccn(facility)}")
@@ -104,168 +283,6 @@ except ImportError:
         ccn_norm = normalize_ccn(ccn)
         state_norm = normalize_state_code(state)
         return f"https://www.medicare.gov/care-compare/details/nursing-home/{ccn_norm}/view-all/?state={state_norm}"
-
-def load_entity_longitudinal_metrics(entity_id: str):
-    """
-    Load longitudinal metrics for a specific entity.
-    
-    This function loads the normalized longitudinal chain performance data
-    for a given entity_id. If entity_id is numeric (like "52"), it will
-    look up the hash-based entity_id from entity_lookup.csv.
-    
-    Args:
-        entity_id: Entity ID (hash-based identifier from entity_lookup.csv, or numeric chain_id)
-        
-    Returns:
-        pd.DataFrame with columns: entity_id, entity_name, chain_id, report_period,
-        period_type, metric_name, metric_value, source_file, ingested_at
-        Returns None if file missing or entity not found.
-    """
-    try:
-        # If entity_id is numeric, look up the hash-based entity_id
-        if entity_id.isdigit():
-            entity_lookup_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership', 'entity_lookup.csv')
-            if os.path.exists(entity_lookup_file):
-                entity_lookup = pd.read_csv(entity_lookup_file)
-                chain_id = float(entity_id)
-                entity_row = entity_lookup[entity_lookup['chain_id'] == chain_id]
-                if not entity_row.empty:
-                    entity_id = entity_row.iloc[0]['entity_id']
-        
-        ownership_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ownership')
-        parquet_path = os.path.join(ownership_dir, 'chain_performance_longitudinal.parquet')
-        csv_path = os.path.join(ownership_dir, 'chain_performance_longitudinal.csv')
-        
-        # Try parquet first
-        if os.path.exists(parquet_path):
-            try:
-                df = pd.read_parquet(parquet_path)
-                entity_data = df[df['entity_id'] == entity_id].copy()
-                if not entity_data.empty:
-                    return entity_data
-            except ImportError:
-                # PyArrow not available, try CSV
-                pass
-            except Exception as e:
-                # Log error but don't raise
-                print(f"Warning: Error loading parquet for entity {entity_id}: {e}")
-        
-        # Fallback to CSV
-        if os.path.exists(csv_path):
-            try:
-                df = pd.read_csv(csv_path, low_memory=False)
-                entity_data = df[df['entity_id'] == entity_id].copy()
-                if not entity_data.empty:
-                    return entity_data
-            except Exception as e:
-                print(f"Warning: Error loading CSV for entity {entity_id}: {e}")
-        
-        # No data found - return None (non-breaking)
-        return None
-        
-    except Exception as e:
-        # Graceful degradation - don't raise exceptions
-        print(f"Warning: Error in load_entity_longitudinal_metrics for {entity_id}: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-def get_entity_key_metrics_over_time(entity_id: str):
-    """
-    Extract key metrics over time for an entity from longitudinal data.
-    
-    Returns key metrics like number of facilities, ratings, SFFs, staffing levels
-    organized by report period.
-    
-    Args:
-        entity_id: Entity ID (hash-based identifier)
-        
-    Returns:
-        Dict with structure:
-        {
-            'entity_name': str,
-            'metrics_by_period': [
-                {
-                    'period': 'YYYY-MM',
-                    'number_of_facilities': int,
-                    'avg_overall_rating': float,
-                    'avg_staffing_rating': float,
-                    'total_sff': int,
-                    'avg_total_nurse_hprd': float,
-                    'avg_rn_hprd': float,
-                    ...
-                },
-                ...
-            ]
-        }
-        Returns None if data not available.
-    """
-    try:
-        df = load_entity_longitudinal_metrics(entity_id)
-        if df is None or df.empty:
-            return None
-        
-        # Get entity name
-        entity_name = df['entity_name'].iloc[0] if 'entity_name' in df.columns else None
-        
-        # Key metrics to extract
-        key_metrics = {
-            'Number of facilities': 'number_of_facilities',
-            'Average overall 5-star rating': 'avg_overall_rating',
-            'Average health inspection rating': 'avg_health_inspection_rating',
-            'Average staffing rating': 'avg_staffing_rating',
-            'Average quality rating': 'avg_quality_rating',
-            'Number of Special Focus Facilities (SFF)': 'total_sff',
-            'Average total nurse hours per resident day': 'avg_total_nurse_hprd',
-            'Average total Registered Nurse hours per resident day': 'avg_rn_hprd',
-            'Average total weekend nurse hours per resident day': 'avg_weekend_nurse_hprd',
-            'Average total nursing staff turnover percentage': 'avg_nursing_turnover',
-            'Average Registered Nurse turnover percentage': 'avg_rn_turnover',
-            'Total number of fines': 'total_fines',
-            'Total amount of fines in dollars': 'total_fine_amount',
-            'Number of facilities with an abuse icon': 'facilities_with_abuse_icon',
-            'Percent of facilities classified as for-profit': 'pct_for_profit',
-        }
-        
-        # Group by period
-        metrics_by_period = []
-        for period in sorted(df['report_period'].unique()):
-            period_data = df[df['report_period'] == period].copy()
-            
-            period_metrics = {'period': period}
-            
-            # Extract each key metric
-            for metric_name, metric_key in key_metrics.items():
-                metric_rows = period_data[period_data['metric_name'] == metric_name]
-                if not metric_rows.empty:
-                    value = metric_rows.iloc[0]['metric_value']
-                    # Convert to appropriate type
-                    try:
-                        if pd.notna(value):
-                            if isinstance(value, str):
-                                # Try to convert string to number
-                                value = float(value.replace(',', '').replace('$', ''))
-                            else:
-                                value = float(value)
-                        else:
-                            value = None
-                    except (ValueError, TypeError):
-                        value = None
-                    period_metrics[metric_key] = value
-                else:
-                    period_metrics[metric_key] = None
-            
-            metrics_by_period.append(period_metrics)
-        
-        return {
-            'entity_id': entity_id,
-            'entity_name': entity_name,
-            'metrics_by_period': metrics_by_period
-        }
-        
-    except Exception as e:
-        print(f"Warning: Error extracting key metrics for entity {entity_id}: {e}")
-        return None
 
 def get_entity_chow_status(entity_id: str):
     """
@@ -539,6 +556,48 @@ def index():
     """Serve the main HTML page"""
     return render_template('dashboard_generator.html')
 
+@app.route('/view-dashboard/<provnum>/')
+def view_facility_dashboard(provnum):
+    """Serve a page with links to open the facility dashboard (Vercel or local)."""
+    provnum = str(provnum).strip()
+    if not provnum.isdigit() or len(provnum) != 6:
+        return jsonify({'error': 'Invalid facility code'}), 400
+    # Local dashboard assumes the main PBJ dashboard app is running on 127.0.0.1:5000
+    # and accepts a ?facility=CCN query param.
+    local_url = f'http://127.0.0.1:5000/?facility={provnum}'
+    vercel_url = f'https://pbj320-{provnum}.vercel.app/'
+    html = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Facility {provnum} Dashboard</title>
+    <style>
+        body {{ font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 20px; line-height: 1.5; }}
+        h1 {{ font-size: 1.25rem; }}
+        .links {{ display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }}
+        a {{ color: #2980b9; }}
+        a.button {{ display: inline-block; padding: 12px 20px; background: #2980b9; color: white; text-decoration: none; border-radius: 6px; text-align: center; }}
+        a.button:hover {{ background: #1a5276; }}
+        a.button.local {{ background: #555; }}
+        a.button.local:hover {{ background: #333; }}
+        .muted {{ color: #666; font-size: 0.9rem; margin-top: 24px; }}
+    </style>
+</head>
+<body>
+    <h1>Facility {provnum} Dashboard</h1>
+    <div class="links">
+        <a href="{vercel_url}" target="_blank" class="button">Open live dashboard (Vercel)</a>
+        <a href="{local_url}" target="_blank" class="button local">Open local dashboard</a>
+    </div>
+    <p class="muted">
+        Open live dashboard after you deploy to Vercel.<br>
+        Open local dashboard only after starting the PBJ app (e.g. <code>python run_facility_dashboard.py</code>).
+    </p>
+    <p class="muted"><a href="/">← Back to Dashboard Generator</a></p>
+</body>
+</html>'''
+    return html
+
 @app.route('/veterans-homes')
 def veterans_homes():
     """Serve the Veterans Homes batch deployment page"""
@@ -678,11 +737,11 @@ def veterans_homes_stats():
                                 if values:
                                     avg_val = sum(values) / len(values)
                                     if metric_type == 'total':
-                                        avg_total_hprd = round(avg_val, 2)
+                                        avg_total_hprd = round_financial(avg_val, 2)
                                     elif metric_type == 'rn':
-                                        avg_rn_hprd = round(avg_val, 2)
+                                        avg_rn_hprd = round_financial(avg_val, 2)
                                     elif metric_type == 'cna':
-                                        avg_cna_hprd = round(avg_val, 2)
+                                        avg_cna_hprd = round_financial(avg_val, 2)
                                     staffing_facilities = len(values)
         except Exception as e:
             print(f"Error loading quarterly metrics: {e}")
@@ -741,8 +800,8 @@ def batch_deploy_veterans():
             if not result:
                 return False, None, 'Failed to create Vercel deployment package'
             
-            deploy_dir = f"pbj320-{provnum}"
-            deploy_path = os.path.join(os.getcwd(), deploy_dir)
+            deploy_dir = os.path.join("deployments", f"pbj320-{provnum}")
+            deploy_path = os.path.join(_root, deploy_dir)
             
             if not os.path.exists(deploy_path):
                 return False, None, f'Deployment directory not found: {deploy_dir}'
@@ -997,7 +1056,18 @@ def generate_dashboard():
         except (ValueError, TypeError) as e:
             return jsonify({'error': f'Invalid facility code: {str(e)}'}), 400
         
-        print(f"Starting dashboard generation for facility {provnum}...")
+        ein_mode = str(data.get('ein_mode', 'all')).strip().lower()
+        if ein_mode not in {'all', 'selected', 'none'}:
+            ein_mode = 'all'
+        ein_selected_quarters = data.get('ein_selected_quarters') or []
+        if not isinstance(ein_selected_quarters, list):
+            ein_selected_quarters = []
+        include_entity_longitudinal = _coerce_request_bool(
+            data.get('include_entity_longitudinal'), True
+        )
+        create_local_app = bool(data.get('create_local_app', True))
+
+        print(f"Starting dashboard generation for facility {provnum} (EIN mode: {ein_mode})...")
         
         if not provnum.isdigit() or len(provnum) != 6:
             return jsonify({'error': 'Invalid facility code. Must be 6 digits.'}), 400
@@ -1009,72 +1079,126 @@ def generate_dashboard():
         from file_path_utils import find_facility_complete_data, find_facility_provider_info, get_facility_folder
         import shutil
         
-        # Get facility folder
         facility_folder = get_facility_folder(provnum)
-        
-        # Create facility CSV
-        csv_file = find_facility_complete_data(provnum)
-        if not csv_file or not os.path.exists(csv_file):
-            csv_filename = f'facility_{provnum}_complete_data.csv'
-            csv_file = str(facility_folder / csv_filename)
-            try:
-                print(f"Creating facility CSV for {provnum}...")
-                create_facility_complete_csv(provnum, output_path=csv_file)
-                # Fallback: if created in root (no output_path support), move to facility folder
-                root_csv = f'facility_{provnum}_complete_data.csv'
-                if os.path.exists(root_csv) and not os.path.exists(csv_file):
-                    shutil.move(root_csv, csv_file)
-                print(f"Successfully created facility CSV for {provnum}")
-            except (PermissionError, OSError) as pe:
-                error_str = str(pe)
-                if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
-                    return jsonify({
-                        'error': f'File is locked. Please close any programs that have {csv_filename} open (e.g., Excel) and try again.'
-                    }), 500
-                raise
-            except Exception as e:
-                error_str = str(e)
-                if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
-                    return jsonify({
-                        'error': f'File is locked. Please close any programs that have {csv_filename} open (e.g., Excel) and try again.'
-                    }), 500
-                raise
-        
-        # Create or refresh provider info CSV (full build so all past quarters from provider_info_combined are included)
+        csv_filename = f'facility_{provnum}_complete_data.csv'
         provider_filename = f'facility_{provnum}_provider_info_data.csv'
         provider_csv_file = str(facility_folder / provider_filename)
-        if create_facility_provider_info_csv is not None:
+        files_created: list[str] = []
+
+        defer_csv_to_package = (
+            create_local_app and create_facility_vercel_package is not None
+        )
+        if defer_csv_to_package:
+            # Single CSV refresh inside create_facility_vercel_package Step 1 (avoids duplicate incremental work).
+            csv_file = str(facility_folder / csv_filename)
+            print(
+                f"PBJ/provider CSVs for {provnum} will be built once in the deployment package step "
+                f"(not duplicated here)."
+            )
+        else:
+            # CSVs only — no local app package
+            csv_file = find_facility_complete_data(provnum)
+            if not csv_file or not os.path.exists(csv_file):
+                csv_file = str(facility_folder / csv_filename)
+                try:
+                    print(f"Creating facility CSV for {provnum}...")
+                    create_facility_complete_csv(provnum, output_path=csv_file)
+                    root_csv = f'facility_{provnum}_complete_data.csv'
+                    if os.path.exists(root_csv) and not os.path.exists(csv_file):
+                        shutil.move(root_csv, csv_file)
+                    print(f"Successfully created facility CSV for {provnum}")
+                except (PermissionError, OSError) as pe:
+                    error_str = str(pe)
+                    if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
+                        return jsonify({
+                            'error': f'File is locked. Please close any programs that have {csv_filename} open (e.g., Excel) and try again.'
+                        }), 500
+                    raise
+                except Exception as e:
+                    error_str = str(e)
+                    if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
+                        return jsonify({
+                            'error': f'File is locked. Please close any programs that have {csv_filename} open (e.g., Excel) and try again.'
+                        }), 500
+                    raise
+
+            if create_facility_provider_info_csv is not None:
+                try:
+                    provider_data = create_facility_provider_info_csv(provnum)
+                    if provider_data is not None and len(provider_data) > 0:
+                        provider_data.to_csv(provider_csv_file, index=False)
+                        root_provider = f'facility_{provnum}_provider_info_data.csv'
+                        if os.path.exists(root_provider) and not os.path.exists(provider_csv_file):
+                            shutil.move(root_provider, provider_csv_file)
+                except (PermissionError, OSError) as pe:
+                    error_str = str(pe)
+                    if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
+                        print(f"Warning: Could not create provider info CSV - file may be locked: {error_str}")
+                except Exception as e:
+                    error_str = str(e)
+                    if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
+                        print(f"Warning: Could not create provider info CSV - file may be locked: {error_str}")
+
+            if csv_file and os.path.exists(csv_file):
+                files_created.append(os.path.basename(csv_file))
+            if provider_csv_file and os.path.exists(provider_csv_file):
+                files_created.append(os.path.basename(provider_csv_file))
+
+        _root = os.path.dirname(os.path.abspath(__file__))
+        ein_extract_attempted = False
+        ein_extract_ok = None
+        ein_extract_message = None
+        # Whenever EIN UI is enabled, ensure tables exist (extract runs only if missing; see run_ein_extract_if_needed).
+        skip_ein_extract = _coerce_request_bool(data.get('skip_ein_extract'), False)
+        if ein_mode in {'all', 'selected'} and not skip_ein_extract:
+            ein_extract_attempted, ein_extract_ok, ein_extract_message = run_ein_extract_if_needed(
+                provnum,
+                _root,
+                ein_mode,
+                ein_zip_path=_optional_str_field(data.get("ein_zip_path")),
+                ein_archive_dir=_optional_str_field(data.get("ein_archive_dir")),
+            )
+            if ein_extract_message:
+                print(ein_extract_message)
+        elif ein_mode in {'all', 'selected'} and skip_ein_extract:
+            ein_extract_message = (
+                "EIN extract skipped (skip_ein_extract=true). "
+                "Employee Detail in the dashboard only appears if job/category files already exist."
+            )
+            print(ein_extract_message)
+
+        # Optionally create a local runnable Flask app package (no Vercel deploy)
+        local_app_created = False
+        local_app_path = None
+        local_url = None
+        local_run_cmd = None
+        if create_local_app and create_facility_vercel_package is not None:
             try:
-                provider_data = create_facility_provider_info_csv(provnum)  # No existing path = full build, all quarters
-                if provider_data is not None and len(provider_data) > 0:
-                    provider_data.to_csv(provider_csv_file, index=False)
-                    # Check if file was created in root, move it to facility folder
-                    root_provider = f'facility_{provnum}_provider_info_data.csv'
-                    if os.path.exists(root_provider) and not os.path.exists(provider_csv_file):
-                        shutil.move(root_provider, provider_csv_file)
-            except (PermissionError, OSError) as pe:
-                error_str = str(pe)
-                if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
-                    # Provider info is optional, so warn but don't fail
-                    print(f"Warning: Could not create provider info CSV - file may be locked: {error_str}")
-                else:
-                    # Provider info is optional, so don't fail
-                    pass
+                # This creates the facility_<provnum>_flask_app.py + templates/ in deployments/pbj320-<provnum>/
+                ok = create_facility_vercel_package(
+                    provnum,
+                    project_root=_root,
+                    ein_mode=ein_mode,
+                    ein_selected_quarters=ein_selected_quarters,
+                    include_entity_longitudinal=include_entity_longitudinal,
+                )
+                if ok:
+                    local_app_created = True
+                    deploy_sub = os.path.join("deployments", f"pbj320-{provnum}")
+                    deploy_abs = os.path.join(_root, deploy_sub)
+                    for nm in (csv_filename, provider_filename):
+                        if os.path.isfile(os.path.join(deploy_abs, nm)) and nm not in files_created:
+                            files_created.append(nm)
+                    local_app_path = os.path.join(deploy_sub, f"facility_{provnum}_flask_app.py")
+                    local_url = "http://127.0.0.1:5000"
+                    abs_deploy_dir = os.path.abspath(os.path.join(_root, deploy_sub))
+                    # PowerShell-safe (&& not supported consistently depending on PS version/settings)
+                    local_run_cmd = f'cd "{abs_deploy_dir}"; python facility_{provnum}_flask_app.py'
+                    # Provide a cmd.exe alternative as well
+                    local_run_cmd_cmdexe = f'cd /d "{abs_deploy_dir}" && python facility_{provnum}_flask_app.py'
             except Exception as e:
-                error_str = str(e)
-                if '32' in error_str or 'being used' in error_str.lower() or 'WinError 32' in error_str:
-                    # Provider info is optional, so warn but don't fail
-                    print(f"Warning: Could not create provider info CSV - file may be locked: {error_str}")
-                else:
-                    # Provider info is optional, so don't fail
-                    pass
-        
-        # Verify files were created
-        files_created = []
-        if csv_file and os.path.exists(csv_file):
-            files_created.append(os.path.basename(csv_file))
-        if provider_csv_file and os.path.exists(provider_csv_file):
-            files_created.append(os.path.basename(provider_csv_file))
+                # Don't fail the CSV generation if local app packaging fails
+                print(f"Warning: local app package creation failed for {provnum}: {e}")
         
         # Get facility name for the link
         facility_name = None
@@ -1093,7 +1217,18 @@ def generate_dashboard():
             'provnum': provnum,
             'files': files_created,
             'facility_name': facility_name,
-            'message': f'Dashboard files created for facility {provnum}'
+            'message': f'Dashboard files created for facility {provnum}',
+            'local_app_created': local_app_created,
+            'local_app_path': local_app_path,
+            'local_url': local_url,
+            'local_run_cmd': local_run_cmd,
+            'local_run_cmd_cmdexe': locals().get('local_run_cmd_cmdexe'),
+            'ein_mode': ein_mode,
+            'ein_selected_quarters': ein_selected_quarters,
+            'include_entity_longitudinal': include_entity_longitudinal,
+            'ein_extract_attempted': ein_extract_attempted,
+            'ein_extract_ok': ein_extract_ok,
+            'ein_extract_message': ein_extract_message,
         })
         
     except Exception as e:
@@ -1113,7 +1248,13 @@ def generate_dashboard():
 
 @app.route('/api/deploy-vercel', methods=['POST'])
 def deploy_vercel():
-    """Create Vercel deployment package and deploy to Vercel"""
+    """
+    Build (optional) and deploy to Vercel.
+
+    JSON body may include ``skip_package_build`` and ``skip_ein_extract`` (e.g. after
+    ``/api/generate-dashboard`` already built ``deployments/pbj320-<CCN>/``) to avoid
+    duplicating CSV refresh, EIN extract, and file copies before ``vercel --prod``.
+    """
     import subprocess
     import os
     
@@ -1133,16 +1274,74 @@ def deploy_vercel():
             return jsonify({'error': 'Vercel deployment functions not available'}), 500
         
         # Step 1: Create the Vercel deployment package (pass our dir as project root so paths work regardless of cwd)
-        print(f"Creating Vercel package for facility {provnum}...")
+        ein_mode = str(data.get('ein_mode', 'all')).strip().lower()
+        if ein_mode not in {'all', 'selected', 'none'}:
+            ein_mode = 'all'
+        ein_selected_quarters = data.get('ein_selected_quarters') or []
+        if not isinstance(ein_selected_quarters, list):
+            ein_selected_quarters = []
+        include_entity_longitudinal = _coerce_request_bool(
+            data.get('include_entity_longitudinal'), True
+        )
+
         _root = os.path.dirname(os.path.abspath(__file__))
-        result = create_facility_vercel_package(provnum, project_root=_root)
-        
+        deploy_dir = os.path.join("deployments", f"pbj320-{provnum}")
+        deploy_path = os.path.join(_root, deploy_dir)
+
+        skip_package_build = _coerce_request_bool(data.get('skip_package_build'), False)
+        ein_extract_attempted = False
+        ein_extract_ok = None
+        ein_extract_message = None
+        result = True
+
+        if skip_package_build:
+            flask_bn = f"facility_{provnum}_flask_app.py"
+            if not os.path.isdir(deploy_path) or not os.path.isfile(os.path.join(deploy_path, flask_bn)):
+                return jsonify({
+                    'error': (
+                        f"No deployment package at {deploy_dir}. "
+                        "Run Generate Dashboard with the local app option first, "
+                        "or omit skip_package_build to build the package now."
+                    )
+                }), 400
+            print(
+                f"Skipping EIN extract and package rebuild (skip_package_build); "
+                f"deploying from {deploy_path}"
+            )
+            ein_extract_message = (
+                "EIN and package rebuild skipped — using the deployment folder from the generate step."
+            )
+        else:
+            print(f"Creating Vercel package for facility {provnum} (EIN mode: {ein_mode})...")
+            skip_ein_extract = _coerce_request_bool(data.get('skip_ein_extract'), False)
+            if ein_mode in {'all', 'selected'} and not skip_ein_extract:
+                ein_extract_attempted, ein_extract_ok, ein_extract_message = run_ein_extract_if_needed(
+                    provnum,
+                    _root,
+                    ein_mode,
+                    ein_zip_path=_optional_str_field(data.get("ein_zip_path")),
+                    ein_archive_dir=_optional_str_field(data.get("ein_archive_dir")),
+                )
+                if ein_extract_message:
+                    print(ein_extract_message)
+            elif ein_mode in {'all', 'selected'} and skip_ein_extract:
+                ein_extract_message = (
+                    "EIN extract skipped (skip_ein_extract=true). "
+                    "Deploy package will not include new Employee Detail tables."
+                )
+                print(ein_extract_message)
+
+            result = create_facility_vercel_package(
+                provnum,
+                project_root=_root,
+                ein_mode=ein_mode,
+                ein_selected_quarters=ein_selected_quarters,
+                include_entity_longitudinal=include_entity_longitudinal,
+            )
+
         if not result:
             return jsonify({'error': 'Failed to create Vercel deployment package'}), 500
-        
-        deploy_dir = os.path.join("deployments", f"pbj320-{provnum}")
-        deploy_path = os.path.join(os.getcwd(), deploy_dir)
-        
+
         if not os.path.exists(deploy_path):
             return jsonify({'error': f'Deployment directory not found: {deploy_dir}'}), 500
         
@@ -1474,6 +1673,9 @@ def deploy_vercel():
             'provnum': provnum,
             'deploy_dir': deploy_dir,
             'facility_name': facility_name,
+            'ein_extract_attempted': ein_extract_attempted,
+            'ein_extract_ok': ein_extract_ok,
+            'ein_extract_message': ein_extract_message,
         }
         
         if vercel_url:
@@ -1525,7 +1727,8 @@ def generate_report():
         quarters = data.get('quarters', [])
         years = data.get('years', [])
         key_dates_str = data.get('key_dates', '')
-        
+        date_ranges_of_interest_raw = data.get('date_ranges_of_interest') or []
+
         if not provnum.isdigit() or len(provnum) != 6:
             return jsonify({'error': 'Invalid facility code. Must be 6 digits.'}), 400
         
@@ -1586,13 +1789,34 @@ def generate_report():
                         continue
         
         print(f"  Total key dates parsed: {len(key_dates)}")
-        
+
+        # Parse date ranges of interest (primary/secondary)
+        date_ranges_of_interest = []
+        for item in date_ranges_of_interest_raw:
+            if not isinstance(item, dict):
+                continue
+            start_s = (item.get('start_date') or '').strip()
+            end_s = (item.get('end_date') or '').strip()
+            role = (item.get('role') or 'primary').strip().lower()
+            if role not in ('primary', 'secondary'):
+                role = 'primary'
+            if not start_s or not end_s:
+                continue
+            try:
+                start_d = parse_date(start_s)
+                end_d = parse_date(end_s)
+                date_ranges_of_interest.append({'start': start_d, 'end': end_d, 'role': role})
+            except (ValueError, TypeError):
+                continue
+        print(f"  Date ranges of interest: {len(date_ranges_of_interest)}")
+
         # Generate report by calling the report generation functions directly
         from facility_report_lib import (
             load_facility_data,
             get_facility_info,
+            get_previous_names_with_years,
             calculate_quarterly_metrics,
-            get_state_averages,
+            get_state_averages_batch,
             calculate_period_metrics,
             calculate_days_under_state_minimum,
             get_daily_staffing,
@@ -1620,16 +1844,13 @@ def generate_report():
         all_quarters = sorted(df['CY_Qtr'].unique())
         quarters_in_range = [q for q in all_quarters if q >= start_quarter and q <= end_quarter]
         
-        # Calculate quarterly metrics
+        # Calculate quarterly metrics (batch state averages: load CSVs once)
         quarterly_data = {}
-        state_comparisons = {}
         for quarter in quarters_in_range:
             q_metrics = calculate_quarterly_metrics(df, quarter)
             if q_metrics:
                 quarterly_data[quarter] = q_metrics
-            state_avg = get_state_averages(facility_info['state'], quarter)
-            if state_avg:
-                state_comparisons[quarter] = state_avg
+        state_comparisons = get_state_averages_batch(facility_info['state'], quarters_in_range)
         
         period_metrics = calculate_period_metrics(df, start_date, end_date)
         if period_metrics is None:
@@ -1667,14 +1888,36 @@ def generate_report():
                 red_flags_history = []
             
             try:
-                case_mix_data = extract_case_mix_data(provider_info_df, start_date, end_date, list(quarterly_data.keys()))
+                # Use date range only: case-mix should include all quarters with data in provider info,
+                # not just quarters that have PBJ data (Harrington may only be Q1/Q2; case-mix is all quarters).
+                case_mix_data = extract_case_mix_data(provider_info_df, start_date, end_date, quarters_in_range=None)
             except Exception as e:
                 print(f"Error extracting case mix: {e}")
                 case_mix_data = []
         
-        # Get watermark option
+        # Get watermark and section options
         watermark = data.get('watermark', False)
-        
+        include_sections = data.get('include_sections')
+        if include_sections is None:
+            include_sections = {
+                'key_dates': True, 'date_ranges_of_interest': True, 'quarterly_staffing': True, 'case_mix': True, 'red_flags': True,
+                'period_summary': True, 'state_compliance': True, 'daily_staffing_table': True, 'appendix': True
+            }
+        for k in ('key_dates', 'date_ranges_of_interest', 'quarterly_staffing', 'case_mix', 'red_flags', 'period_summary', 'state_compliance', 'daily_staffing_table', 'appendix'):
+            if k not in include_sections:
+                include_sections[k] = True
+        staffing_emphasis = (data.get('staffing_emphasis') or 'total_first').strip() or 'total_first'
+        include_total_staffing = staffing_emphasis != 'direct_only'
+        direct_first = staffing_emphasis == 'direct_first'
+
+        # Previous names: use provider-info years when available, else PBJ list
+        if provider_info_df is not None and not provider_info_df.empty:
+            previous_names = get_previous_names_with_years(provnum, provider_info_df, facility_info['name'])
+            if not previous_names:
+                previous_names = facility_info.get('previous_names') or []
+        else:
+            previous_names = facility_info.get('previous_names') or []
+
         # Generate report
         try:
             html_report = generate_attorney_report(
@@ -1685,6 +1928,7 @@ def generate_report():
                 start_date=start_date,
                 end_date=end_date,
                 key_dates=key_dates,
+                date_ranges_of_interest=date_ranges_of_interest,
                 quarterly_data=quarterly_data,
                 state_comparisons=state_comparisons,
                 period_metrics=period_metrics,
@@ -1693,8 +1937,11 @@ def generate_report():
                 red_flags_history=red_flags_history,
                 case_mix_data=case_mix_data,
                 pbj_df=df,
-                include_total_staffing=True,  # Include total nurse metrics (not just direct)
-                watermark=watermark
+                include_total_staffing=include_total_staffing,
+                direct_first=direct_first,
+                watermark=watermark,
+                include_sections=include_sections,
+                previous_names=cast(Sequence[Union[str, Dict[str, str]]], previous_names),
             )
         except Exception as report_error:
             import traceback
@@ -1714,7 +1961,7 @@ def generate_report():
         else:
             facility_name_formatted = facility_name_raw
         facility_name_safe = facility_name_formatted.lower().replace(' ', '_').replace('&', 'and').replace(',', '').replace('.', '').replace('/', '_').replace("'", '').replace('-', '_')
-        report_folder = f"reports/facility_{provnum}_{facility_name_safe}"
+        report_folder = os.path.join("reports", f"facility_{provnum}_{facility_name_safe}")
         os.makedirs(report_folder, exist_ok=True)
         
         output_filename = f"pbj320_report_{provnum}_{facility_name_safe}.html"
@@ -1723,13 +1970,37 @@ def generate_report():
         with open(report_file, 'w', encoding='utf-8') as f:
             f.write(html_report)
         
-        return jsonify({
+        report_file_docx = None
+        report_file_pdf = None
+        try:
+            from report_export import generate_docx_from_html
+            docx_filename = f"pbj320_report_{provnum}_{facility_name_safe}.docx"
+            report_file_docx = os.path.join(report_folder, docx_filename)
+            report_file_docx = generate_docx_from_html(report_file, report_file_docx, reference_docx_path=None)
+        except Exception as docx_err:
+            print(f"Word export (HTML→DOCX) failed: {docx_err}")
+            report_file_docx = None
+        try:
+            from report_export import generate_pdf_from_html
+            pdf_filename = f"pbj320_report_{provnum}_{facility_name_safe}.pdf"
+            report_file_pdf = os.path.join(report_folder, pdf_filename)
+            generate_pdf_from_html(report_file, report_file_pdf)
+        except Exception as pdf_err:
+            print(f"PDF export (HTML→PDF) failed: {pdf_err}")
+            report_file_pdf = None
+        
+        resp = {
             'success': True,
             'provnum': provnum,
             'report_file': report_file,
             'report_folder': report_folder,
-            'message': f'Report generated successfully'
-        })
+            'message': 'Report generated successfully'
+        }
+        if report_file_docx:
+            resp['report_file_docx'] = report_file_docx
+        if report_file_pdf:
+            resp['report_file_pdf'] = report_file_pdf
+        return jsonify(resp)
             
     except Exception as e:
         import traceback
@@ -1743,13 +2014,12 @@ def download_report(filename):
         # Decode the filename (it's URL encoded)
         import urllib.parse
         filename = urllib.parse.unquote(filename)
-        
-        # Security: only allow files from reports directory or facility_red_flag_report/reports
-        if not (filename.startswith('reports/') or filename.startswith('facility_red_flag_report/reports/')):
-            return jsonify({'error': 'Invalid file path'}), 400
-        
-        # Normalize path separators for Windows
+        # Normalize path separators before security check (client may send Windows backslashes)
         filename = filename.replace('\\', '/')
+        
+        # Security: only allow files from reports, deployments/pbj320-*, or facility_red_flag_report/reports
+        if not (filename.startswith('reports/') or filename.startswith('deployments/') or filename.startswith('facility_red_flag_report/reports/')):
+            return jsonify({'error': 'Invalid file path'}), 400
         
         # Handle facility_red_flag_report paths
         actual_path = filename
@@ -2230,26 +2500,28 @@ def generate_entity_report_api():
         drill_down_num = data.get('drill_down_num')
         drill_down_criteria = data.get('drill_down_criteria', [])
         selected_metrics = data.get('selected_metrics')  # List of metric keys to display
-        
-        # Get longitudinal metrics and CHOW data with detailed facility information
-        longitudinal_metrics = load_entity_longitudinal_metrics(entity_id)
-        
-        # Get CHOW data safely
+        include_entity_context = _coerce_request_bool(data.get('include_entity_context'), True)
+
+        longitudinal_metrics = None
         chow_status = None
-        try:
-            chow_status = get_entity_chow_status(entity_id)
-            if chow_status:
-                try:
-                    chow_facilities = get_entity_chow_facilities(entity_id)
-                    chow_status['chow_facilities'] = chow_facilities
-                except Exception as chow_error:
-                    print(f"Warning: Error getting CHOW facilities: {chow_error}")
-                    # Continue without CHOW facilities if there's an error
-                    if chow_status:
-                        chow_status['chow_facilities'] = []
-        except Exception as chow_error:
-            print(f"Warning: Error getting CHOW status: {chow_error}")
-            chow_status = None
+        if include_entity_context:
+            # Get longitudinal metrics and CHOW data with detailed facility information
+            longitudinal_metrics = load_entity_longitudinal_metrics(entity_id)
+
+            # Get CHOW data safely
+            try:
+                chow_status = get_entity_chow_status(entity_id)
+                if chow_status:
+                    try:
+                        chow_facilities = get_entity_chow_facilities(entity_id)
+                        chow_status['chow_facilities'] = chow_facilities
+                    except Exception as chow_error:
+                        print(f"Warning: Error getting CHOW facilities: {chow_error}")
+                        if chow_status:
+                            chow_status['chow_facilities'] = []
+            except Exception as chow_error:
+                print(f"Warning: Error getting CHOW status: {chow_error}")
+                chow_status = None
         
         # Import entity report generator
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'facility_red_flag_report'))

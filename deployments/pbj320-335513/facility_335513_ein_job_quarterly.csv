@@ -1,0 +1,341 @@
+CY_Qtr,EMPLEE_JOB_CD_ID,hours_total,hours_employee,hours_contract,row_count,unique_employees,job_title,job_category
+CY2020Q3,1,1309.0,938.0,371.0,187,3,Administrator,Administration
+CY2020Q3,2,455.0,231.0,224.0,65,1,Medical Director,Medical Leadership
+CY2020Q3,3,334.5,166.5,168.0,39,3,Other Physician,Medical
+CY2020Q3,5,413.0,413.0,0.0,59,1,RN Director of Nursing,Nursing Leadership
+CY2020Q3,6,4522.69,4522.69,0.0,618,14,RN with Administrative Duties,Nursing Leadership
+CY2020Q3,7,3271.19,3271.19,0.0,451,9,Registered Nurse,Nursing
+CY2020Q3,9,16110.2,16110.2,0.0,2197,37,Licensed Practical/Vocational Nurse,Nursing
+CY2020Q3,10,57761.87,56943.31,818.56,8671,187,Certified Nurse Aide,Direct Care
+CY2020Q3,16,1095.81,1095.81,0.0,149,4,Dietitian,Support Services
+CY2020Q3,18,5121.92,1990.22,3131.7,702,16,Occupational Therapist,Therapy
+CY2020Q3,19,95.9,0.0,95.9,30,1,Occupational Therapy Assistant,Therapy
+CY2020Q3,21,4867.72,2728.93,2138.79,677,13,Physical Therapist,Therapy
+CY2020Q3,22,2163.52,1638.19,525.33,303,7,Physical Therapy Assistant,Therapy
+CY2020Q3,24,1.25,1.25,0.0,1,1,Respiratory Therapist,Therapy
+CY2020Q3,26,370.32,0.0,370.32,63,1,Speech/Language Pathologist,Therapy
+CY2020Q3,27,1867.2,1867.2,0.0,270,6,Therapeutic Recreation Specialist,Activities
+CY2020Q3,30,1257.36,1257.36,0.0,166,3,Qualified Social Worker,Social Services
+CY2020Q4,1,1365.0,903.0,462.0,195,3,Administrator,Administration
+CY2020Q4,2,462.0,0.0,462.0,66,1,Medical Director,Medical Leadership
+CY2020Q4,3,312.0,0.0,312.0,39,3,Other Physician,Medical
+CY2020Q4,5,322.0,322.0,0.0,46,1,RN Director of Nursing,Nursing Leadership
+CY2020Q4,6,4245.68,4245.68,0.0,575,11,RN with Administrative Duties,Nursing Leadership
+CY2020Q4,7,3602.36,3602.36,0.0,482,9,Registered Nurse,Nursing
+CY2020Q4,9,15470.33,15449.33,21.0,2123,38,Licensed Practical/Vocational Nurse,Nursing
+CY2020Q4,10,56460.77,55982.86,477.91,8425,183,Certified Nurse Aide,Direct Care
+CY2020Q4,16,867.91,867.91,0.0,129,3,Dietitian,Support Services
+CY2020Q4,18,5687.45,1736.19,3951.26,798,16,Occupational Therapist,Therapy
+CY2020Q4,21,5028.18,2687.91,2340.27,707,13,Physical Therapist,Therapy
+CY2020Q4,22,1386.77,1068.39,318.38,192,7,Physical Therapy Assistant,Therapy
+CY2020Q4,24,7.7299999999999995,7.7299999999999995,0.0,5,1,Respiratory Therapist,Therapy
+CY2020Q4,26,354.63,0.0,354.63,58,1,Speech/Language Pathologist,Therapy
+CY2020Q4,27,1720.58,1720.58,0.0,251,5,Therapeutic Recreation Specialist,Activities
+CY2020Q4,30,1298.93,1298.93,0.0,168,3,Qualified Social Worker,Social Services
+CY2021Q1,1,882.0,434.0,448.0,126,2,Administrator,Administration
+CY2021Q1,2,441.0,0.0,441.0,63,1,Medical Director,Medical Leadership
+CY2021Q1,3,312.0,0.0,312.0,39,3,Other Physician,Medical
+CY2021Q1,5,427.0,427.0,0.0,61,3,RN Director of Nursing,Nursing Leadership
+CY2021Q1,6,4136.5,4136.5,0.0,564,11,RN with Administrative Duties,Nursing Leadership
+CY2021Q1,7,2921.48,2921.48,0.0,392,11,Registered Nurse,Nursing
+CY2021Q1,9,16628.85,16098.69,530.16,2227,37,Licensed Practical/Vocational Nurse,Nursing
+CY2021Q1,10,59137.24,58364.48,772.76,8582,169,Certified Nurse Aide,Direct Care
+CY2021Q1,16,1274.4,1274.4,0.0,182,4,Dietitian,Support Services
+CY2021Q1,18,5662.23,1461.15,4201.08,789,16,Occupational Therapist,Therapy
+CY2021Q1,21,4852.39,2821.51,2030.88,680,13,Physical Therapist,Therapy
+CY2021Q1,22,1074.92,787.78,287.14,147,5,Physical Therapy Assistant,Therapy
+CY2021Q1,26,312.37,0.0,312.37,51,1,Speech/Language Pathologist,Therapy
+CY2021Q1,27,2617.64,2617.64,0.0,380,7,Therapeutic Recreation Specialist,Activities
+CY2021Q1,30,1398.79,1398.79,0.0,184,4,Qualified Social Worker,Social Services
+CY2021Q2,1,889.0,434.0,455.0,127,2,Administrator,Administration
+CY2021Q2,2,441.0,0.0,441.0,63,1,Medical Director,Medical Leadership
+CY2021Q2,3,344.0,32.0,312.0,47,4,Other Physician,Medical
+CY2021Q2,5,527.52,527.52,0.0,63,1,RN Director of Nursing,Nursing Leadership
+CY2021Q2,6,4656.44,4656.44,0.0,638,16,RN with Administrative Duties,Nursing Leadership
+CY2021Q2,7,3047.81,3047.81,0.0,409,12,Registered Nurse,Nursing
+CY2021Q2,9,16308.21,15989.78,318.43,2192,42,Licensed Practical/Vocational Nurse,Nursing
+CY2021Q2,10,63056.24,62050.87,1005.37,9023,180,Certified Nurse Aide,Direct Care
+CY2021Q2,16,1411.9,1411.9,0.0,199,4,Dietitian,Support Services
+CY2021Q2,18,4994.36,1139.14,3855.22,676,16,Occupational Therapist,Therapy
+CY2021Q2,19,107.67,0.0,107.67,14,2,Occupational Therapy Assistant,Therapy
+CY2021Q2,21,4475.19,2455.25,2019.94,632,12,Physical Therapist,Therapy
+CY2021Q2,22,1781.2,1460.49,320.71,253,7,Physical Therapy Assistant,Therapy
+CY2021Q2,26,355.49,0.0,355.49,59,1,Speech/Language Pathologist,Therapy
+CY2021Q2,27,2672.67,2672.67,0.0,390,7,Therapeutic Recreation Specialist,Activities
+CY2021Q2,30,1808.61,1808.61,0.0,237,4,Qualified Social Worker,Social Services
+CY2021Q3,1,683.2,406.0,277.2,124,2,Administrator,Administration
+CY2021Q3,2,413.0,0.0,413.0,59,1,Medical Director,Medical Leadership
+CY2021Q3,3,416.0,104.0,312.0,65,4,Other Physician,Medical
+CY2021Q3,5,518.7,518.7,0.0,55,1,RN Director of Nursing,Nursing Leadership
+CY2021Q3,6,5663.31,5373.36,289.95,760,15,RN with Administrative Duties,Nursing Leadership
+CY2021Q3,7,2602.48,2602.48,0.0,357,8,Registered Nurse,Nursing
+CY2021Q3,9,16572.15,16452.38,119.77,2125,38,Licensed Practical/Vocational Nurse,Nursing
+CY2021Q3,10,67341.2,63666.74,3674.46,9371,188,Certified Nurse Aide,Direct Care
+CY2021Q3,16,1262.05,1262.05,0.0,179,4,Dietitian,Support Services
+CY2021Q3,18,5495.73,1945.61,3550.12,750,15,Occupational Therapist,Therapy
+CY2021Q3,19,348.40999999999997,0.0,348.40999999999997,49,2,Occupational Therapy Assistant,Therapy
+CY2021Q3,21,4729.1,2366.36,2362.74,622,12,Physical Therapist,Therapy
+CY2021Q3,22,2076.57,1700.61,375.96,282,6,Physical Therapy Assistant,Therapy
+CY2021Q3,26,346.6,0.0,346.6,58,1,Speech/Language Pathologist,Therapy
+CY2021Q3,27,2735.31,2735.31,0.0,397,9,Therapeutic Recreation Specialist,Activities
+CY2021Q3,30,1705.14,1705.14,0.0,221,4,Qualified Social Worker,Social Services
+CY2021Q4,1,632.8,448.0,184.79999999999998,130,2,Administrator,Administration
+CY2021Q4,2,462.0,0.0,462.0,66,1,Medical Director,Medical Leadership
+CY2021Q4,3,416.0,104.0,312.0,65,4,Other Physician,Medical
+CY2021Q4,5,513.56,513.56,0.0,61,1,RN Director of Nursing,Nursing Leadership
+CY2021Q4,6,5657.26,5391.45,265.81,678,15,RN with Administrative Duties,Nursing Leadership
+CY2021Q4,7,2871.81,2871.81,0.0,379,10,Registered Nurse,Nursing
+CY2021Q4,9,16014.13,14198.39,1815.74,2120,38,Licensed Practical/Vocational Nurse,Nursing
+CY2021Q4,10,68218.38,62290.07,5928.31,9547,193,Certified Nurse Aide,Direct Care
+CY2021Q4,16,1141.0,1141.0,0.0,163,3,Dietitian,Support Services
+CY2021Q4,18,5422.99,1483.6299999999999,3939.36,711,12,Occupational Therapist,Therapy
+CY2021Q4,19,289.7,0.0,289.7,40,1,Occupational Therapy Assistant,Therapy
+CY2021Q4,21,3665.84,2402.4,1263.44,487,9,Physical Therapist,Therapy
+CY2021Q4,22,1593.61,1332.69,260.92,214,6,Physical Therapy Assistant,Therapy
+CY2021Q4,26,321.35,0.0,321.35,55,1,Speech/Language Pathologist,Therapy
+CY2021Q4,27,3184.78,3184.78,0.0,458,9,Therapeutic Recreation Specialist,Activities
+CY2021Q4,30,1663.04,1663.04,0.0,216,4,Qualified Social Worker,Social Services
+CY2022Q1,1,620.2,441.0,179.2,127,2,Administrator,Administration
+CY2022Q1,2,448.0,0.0,448.0,64,1,Medical Director,Medical Leadership
+CY2022Q1,3,416.0,104.0,312.0,65,4,Other Physician,Medical
+CY2022Q1,5,387.0,387.0,0.0,51,1,RN Director of Nursing,Nursing Leadership
+CY2022Q1,6,4744.41,4406.99,337.42,632,13,RN with Administrative Duties,Nursing Leadership
+CY2022Q1,7,3613.89,3613.89,0.0,486,11,Registered Nurse,Nursing
+CY2022Q1,9,14573.89,13407.22,1166.67,1887,37,Licensed Practical/Vocational Nurse,Nursing
+CY2022Q1,10,66987.94,60398.48,6589.46,9378,185,Certified Nurse Aide,Direct Care
+CY2022Q1,16,868.0,868.0,0.0,124,3,Dietitian,Support Services
+CY2022Q1,18,4393.55,1399.49,2994.06,562,11,Occupational Therapist,Therapy
+CY2022Q1,19,58.49,0.0,58.49,8,1,Occupational Therapy Assistant,Therapy
+CY2022Q1,21,3216.19,2259.97,956.22,439,9,Physical Therapist,Therapy
+CY2022Q1,22,1264.8,1123.57,141.23,174,5,Physical Therapy Assistant,Therapy
+CY2022Q1,26,348.46,0.0,348.46,58,1,Speech/Language Pathologist,Therapy
+CY2022Q1,27,2985.59,2985.59,0.0,430,9,Therapeutic Recreation Specialist,Activities
+CY2022Q1,30,1468.94,1468.94,0.0,185,4,Qualified Social Worker,Social Services
+CY2022Q2,1,1372.0,1190.0,182.0,235,4,Administrator,Administration
+CY2022Q2,3,829.0,104.0,725.0,124,5,Other Physician,Medical
+CY2022Q2,5,388.07,388.07,0.0,56,1,RN Director of Nursing,Nursing Leadership
+CY2022Q2,6,4455.57,4163.07,292.5,626,13,RN with Administrative Duties,Nursing Leadership
+CY2022Q2,7,4250.77,3906.4,344.37,573,16,Registered Nurse,Nursing
+CY2022Q2,9,14270.11,12818.88,1451.23,1851,34,Licensed Practical/Vocational Nurse,Nursing
+CY2022Q2,10,68467.7,60432.41,8035.29,9431,193,Certified Nurse Aide,Direct Care
+CY2022Q2,16,2272.21,938.0,1334.21,298,6,Dietitian,Support Services
+CY2022Q2,18,4213.0,1198.96,3014.04,544,11,Occupational Therapist,Therapy
+CY2022Q2,19,334.57,0.0,334.57,46,1,Occupational Therapy Assistant,Therapy
+CY2022Q2,21,3314.4,2046.43,1267.97,442,8,Physical Therapist,Therapy
+CY2022Q2,22,1463.89,1116.0,347.89,196,6,Physical Therapy Assistant,Therapy
+CY2022Q2,26,326.58,0.0,326.58,55,1,Speech/Language Pathologist,Therapy
+CY2022Q2,27,3203.49,3203.49,0.0,452,8,Therapeutic Recreation Specialist,Activities
+CY2022Q2,30,1840.3,1840.3,0.0,240,5,Qualified Social Worker,Social Services
+CY2022Q3,1,1493.8,1309.0,184.79999999999998,253,5,Administrator,Administration
+CY2022Q3,3,864.0,104.0,760.0,129,5,Other Physician,Medical
+CY2022Q3,5,426.5,426.5,0.0,62,2,RN Director of Nursing,Nursing Leadership
+CY2022Q3,6,6062.93,5110.28,952.65,848,18,RN with Administrative Duties,Nursing Leadership
+CY2022Q3,7,3577.23,3571.23,6.0,465,13,Registered Nurse,Nursing
+CY2022Q3,9,14471.84,13080.46,1391.38,1856,34,Licensed Practical/Vocational Nurse,Nursing
+CY2022Q3,10,67386.47,59195.37,8191.1,9087,194,Certified Nurse Aide,Direct Care
+CY2022Q3,16,2164.14,906.56,1257.58,284,6,Dietitian,Support Services
+CY2022Q3,18,3833.41,886.85,2946.56,518,12,Occupational Therapist,Therapy
+CY2022Q3,19,463.22,0.0,463.22,59,1,Occupational Therapy Assistant,Therapy
+CY2022Q3,21,2975.25,2043.74,931.51,390,9,Physical Therapist,Therapy
+CY2022Q3,22,1167.65,892.47,275.18,157,6,Physical Therapy Assistant,Therapy
+CY2022Q3,26,332.53,0.0,332.53,57,1,Speech/Language Pathologist,Therapy
+CY2022Q3,27,3391.3,3391.3,0.0,486,10,Therapeutic Recreation Specialist,Activities
+CY2022Q3,30,1805.65,1805.65,0.0,228,4,Qualified Social Worker,Social Services
+CY2022Q4,1,798.0,616.0,182.0,153,4,Administrator,Administration
+CY2022Q4,3,836.0,104.0,732.0,125,5,Other Physician,Medical
+CY2022Q4,5,406.0,406.0,0.0,58,2,RN Director of Nursing,Nursing Leadership
+CY2022Q4,6,4668.37,4425.58,242.79,674,16,RN with Administrative Duties,Nursing Leadership
+CY2022Q4,7,3338.67,3338.67,0.0,413,11,Registered Nurse,Nursing
+CY2022Q4,9,14806.35,13158.06,1648.29,1947,36,Licensed Practical/Vocational Nurse,Nursing
+CY2022Q4,10,68655.22,56991.58,11663.64,9290,195,Certified Nurse Aide,Direct Care
+CY2022Q4,16,1879.6,763.0,1116.6,268,5,Dietitian,Support Services
+CY2022Q4,18,3870.9,686.97,3183.93,501,12,Occupational Therapist,Therapy
+CY2022Q4,19,15.33,0.0,15.33,2,1,Occupational Therapy Assistant,Therapy
+CY2022Q4,21,2531.26,1014.35,1516.91,337,8,Physical Therapist,Therapy
+CY2022Q4,22,1468.24,1074.83,393.41,195,6,Physical Therapy Assistant,Therapy
+CY2022Q4,24,97.44,0.0,97.44,24,1,Respiratory Therapist,Therapy
+CY2022Q4,26,340.11,0.0,340.11,57,1,Speech/Language Pathologist,Therapy
+CY2022Q4,27,3225.54,3225.54,0.0,452,8,Therapeutic Recreation Specialist,Activities
+CY2022Q4,30,1597.34,1597.34,0.0,213,4,Qualified Social Worker,Social Services
+CY2023Q1,1,630.0,448.0,182.0,129,2,Administrator,Administration
+CY2023Q1,3,871.0,104.0,767.0,130,5,Other Physician,Medical
+CY2023Q1,5,455.0,455.0,0.0,65,2,RN Director of Nursing,Nursing Leadership
+CY2023Q1,6,4398.14,4136.9,261.24,642,15,RN with Administrative Duties,Nursing Leadership
+CY2023Q1,7,2458.43,2458.43,0.0,324,10,Registered Nurse,Nursing
+CY2023Q1,9,17043.21,13122.53,3920.68,2366,54,Licensed Practical/Vocational Nurse,Nursing
+CY2023Q1,10,69069.83,52885.57,16184.26,9719,202,Certified Nurse Aide,Direct Care
+CY2023Q1,15,259.62,0.0,259.62,35,1,Pharmacist,Support Services
+CY2023Q1,16,1794.52,749.0,1045.52,265,5,Dietitian,Support Services
+CY2023Q1,18,3965.0,528.2,3436.8,497,11,Occupational Therapist,Therapy
+CY2023Q1,19,7.5,0.0,7.5,1,1,Occupational Therapy Assistant,Therapy
+CY2023Q1,21,2944.63,1224.89,1719.74,394,10,Physical Therapist,Therapy
+CY2023Q1,22,1579.84,1122.33,457.51,213,6,Physical Therapy Assistant,Therapy
+CY2023Q1,24,97.63,0.0,97.63,26,1,Respiratory Therapist,Therapy
+CY2023Q1,26,171.94,0.0,171.94,28,2,Speech/Language Pathologist,Therapy
+CY2023Q1,27,3240.0,3240.0,0.0,460,8,Therapeutic Recreation Specialist,Activities
+CY2023Q1,30,1609.57,1609.57,0.0,221,4,Qualified Social Worker,Social Services
+CY2023Q2,1,567.0,385.0,182.0,120,2,Administrator,Administration
+CY2023Q2,3,836.0,104.0,732.0,125,5,Other Physician,Medical
+CY2023Q2,5,434.0,434.0,0.0,62,2,RN Director of Nursing,Nursing Leadership
+CY2023Q2,6,4378.39,4088.98,289.41,638,16,RN with Administrative Duties,Nursing Leadership
+CY2023Q2,7,2736.67,2736.67,0.0,352,10,Registered Nurse,Nursing
+CY2023Q2,9,18050.09,11952.18,6097.91,2528,51,Licensed Practical/Vocational Nurse,Nursing
+CY2023Q2,10,69404.06,50173.75,19230.31,9826,206,Certified Nurse Aide,Direct Care
+CY2023Q2,15,425.13,0.0,425.13,51,1,Pharmacist,Support Services
+CY2023Q2,16,1901.25,777.25,1124.0,261,7,Dietitian,Support Services
+CY2023Q2,18,4101.72,380.34,3721.38,519,12,Occupational Therapist,Therapy
+CY2023Q2,19,69.39,0.0,69.39,9,1,Occupational Therapy Assistant,Therapy
+CY2023Q2,21,3205.56,1836.7,1368.86,439,12,Physical Therapist,Therapy
+CY2023Q2,22,1690.99,1241.11,449.88,233,5,Physical Therapy Assistant,Therapy
+CY2023Q2,24,81.8,0.0,81.8,22,1,Respiratory Therapist,Therapy
+CY2023Q2,26,430.25,0.0,430.25,61,1,Speech/Language Pathologist,Therapy
+CY2023Q2,27,3259.75,3259.75,0.0,454,8,Therapeutic Recreation Specialist,Activities
+CY2023Q2,30,1642.24,1642.24,0.0,226,4,Qualified Social Worker,Social Services
+CY2023Q3,1,630.0,448.0,182.0,129,2,Administrator,Administration
+CY2023Q3,3,871.0,104.0,767.0,130,5,Other Physician,Medical
+CY2023Q3,5,434.0,434.0,0.0,62,1,RN Director of Nursing,Nursing Leadership
+CY2023Q3,6,2970.46,2970.46,0.0,424,10,RN with Administrative Duties,Nursing Leadership
+CY2023Q3,7,4522.58,4248.19,274.39,640,24,Registered Nurse,Nursing
+CY2023Q3,9,17251.85,12082.34,5169.51,2323,43,Licensed Practical/Vocational Nurse,Nursing
+CY2023Q3,10,70301.8,58787.56,11514.24,9763,202,Certified Nurse Aide,Direct Care
+CY2023Q3,15,172.98,0.0,172.98,23,1,Pharmacist,Support Services
+CY2023Q3,16,1502.24,886.74,615.5,210,6,Dietitian,Support Services
+CY2023Q3,18,4121.62,384.0,3737.62,555,13,Occupational Therapist,Therapy
+CY2023Q3,19,193.74,0.0,193.74,26,1,Occupational Therapy Assistant,Therapy
+CY2023Q3,21,3378.9,1445.16,1933.74,455,12,Physical Therapist,Therapy
+CY2023Q3,22,1471.04,954.7,516.34,204,5,Physical Therapy Assistant,Therapy
+CY2023Q3,24,99.16,0.0,99.16,27,1,Respiratory Therapist,Therapy
+CY2023Q3,26,392.0,0.0,392.0,56,1,Speech/Language Pathologist,Therapy
+CY2023Q3,27,3333.08,3333.08,0.0,462,8,Therapeutic Recreation Specialist,Activities
+CY2023Q3,30,1729.41,1729.41,0.0,240,6,Qualified Social Worker,Social Services
+CY2023Q4,1,637.0,455.0,182.0,130,2,Administrator,Administration
+CY2023Q4,3,871.0,104.0,767.0,130,5,Other Physician,Medical
+CY2023Q4,5,448.0,448.0,0.0,64,1,RN Director of Nursing,Nursing Leadership
+CY2023Q4,6,3158.02,3158.02,0.0,444,9,RN with Administrative Duties,Nursing Leadership
+CY2023Q4,7,4619.01,4423.01,196.0,698,20,Registered Nurse,Nursing
+CY2023Q4,9,15903.46,12005.6,3897.86,2116,40,Licensed Practical/Vocational Nurse,Nursing
+CY2023Q4,10,70034.63,66194.34,3840.29,9944,184,Certified Nurse Aide,Direct Care
+CY2023Q4,15,327.89,0.0,327.89,47,1,Pharmacist,Support Services
+CY2023Q4,16,1748.67,1282.17,466.5,230,5,Dietitian,Support Services
+CY2023Q4,18,3358.69,264.22,3094.47,485,11,Occupational Therapist,Therapy
+CY2023Q4,19,350.2,0.0,350.2,50,1,Occupational Therapy Assistant,Therapy
+CY2023Q4,21,2246.1,1364.33,881.77,315,9,Physical Therapist,Therapy
+CY2023Q4,22,1172.55,774.49,398.06,166,4,Physical Therapy Assistant,Therapy
+CY2023Q4,24,104.13,0.0,104.13,26,1,Respiratory Therapist,Therapy
+CY2023Q4,26,371.0,0.0,371.0,53,1,Speech/Language Pathologist,Therapy
+CY2023Q4,27,3171.14,3003.97,167.17,439,9,Therapeutic Recreation Specialist,Activities
+CY2023Q4,30,1787.19,1787.19,0.0,255,5,Qualified Social Worker,Social Services
+CY2024Q1,1,637.0,455.0,182.0,130,2,Administrator,Administration
+CY2024Q1,3,871.0,104.0,767.0,130,6,Other Physician,Medical
+CY2024Q1,5,620.5,620.5,0.0,69,1,RN Director of Nursing,Nursing Leadership
+CY2024Q1,6,3893.97,3893.97,0.0,468,10,RN with Administrative Duties,Nursing Leadership
+CY2024Q1,7,3057.29,2719.51,337.78,466,17,Registered Nurse,Nursing
+CY2024Q1,9,15812.52,11221.46,4591.06,2055,44,Licensed Practical/Vocational Nurse,Nursing
+CY2024Q1,10,67096.51,64808.39,2288.12,9367,171,Certified Nurse Aide,Direct Care
+CY2024Q1,15,412.38,0.0,412.38,55,1,Pharmacist,Support Services
+CY2024Q1,16,1614.9,1077.9,537.0,227,6,Dietitian,Support Services
+CY2024Q1,18,3670.66,397.8,3272.86,506,9,Occupational Therapist,Therapy
+CY2024Q1,19,478.69,0.0,478.69,61,1,Occupational Therapy Assistant,Therapy
+CY2024Q1,21,3097.06,1103.17,1993.89,400,8,Physical Therapist,Therapy
+CY2024Q1,22,1015.0,757.12,257.88,140,4,Physical Therapy Assistant,Therapy
+CY2024Q1,24,93.62,0.0,93.62,27,1,Respiratory Therapist,Therapy
+CY2024Q1,26,385.0,0.0,385.0,55,1,Speech/Language Pathologist,Therapy
+CY2024Q1,27,3687.95,3217.86,470.09,521,9,Therapeutic Recreation Specialist,Activities
+CY2024Q1,30,1945.06,1945.06,0.0,275,5,Qualified Social Worker,Social Services
+CY2024Q2,1,595.0,413.0,182.0,124,2,Administrator,Administration
+CY2024Q2,3,857.0,104.0,753.0,128,5,Other Physician,Medical
+CY2024Q2,5,684.36,684.36,0.0,72,1,RN Director of Nursing,Nursing Leadership
+CY2024Q2,6,4188.85,4188.85,0.0,516,11,RN with Administrative Duties,Nursing Leadership
+CY2024Q2,7,3116.1,2801.21,314.89,466,19,Registered Nurse,Nursing
+CY2024Q2,9,16597.95,10361.64,6236.31,2181,41,Licensed Practical/Vocational Nurse,Nursing
+CY2024Q2,10,66685.78,65251.28,1434.5,9187,172,Certified Nurse Aide,Direct Care
+CY2024Q2,16,1728.67,1317.17,411.5,240,5,Dietitian,Support Services
+CY2024Q2,18,2874.22,306.88,2567.34,400,7,Occupational Therapist,Therapy
+CY2024Q2,19,465.43,0.0,465.43,60,1,Occupational Therapy Assistant,Therapy
+CY2024Q2,21,3055.57,1178.5,1877.07,379,7,Physical Therapist,Therapy
+CY2024Q2,22,1170.53,774.27,396.26,159,3,Physical Therapy Assistant,Therapy
+CY2024Q2,24,87.6,0.0,87.6,28,1,Respiratory Therapist,Therapy
+CY2024Q2,26,665.0,0.0,665.0,92,2,Speech/Language Pathologist,Therapy
+CY2024Q2,27,3395.31,3163.94,231.37,477,10,Therapeutic Recreation Specialist,Activities
+CY2024Q2,30,2130.46,2130.46,0.0,301,5,Qualified Social Worker,Social Services
+CY2024Q3,1,639.8,455.0,184.79999999999998,131,2,Administrator,Administration
+CY2024Q3,3,882.0,108.0,774.0,132,5,Other Physician,Medical
+CY2024Q3,5,797.77,797.77,0.0,73,1,RN Director of Nursing,Nursing Leadership
+CY2024Q3,6,3540.14,3540.14,0.0,438,10,RN with Administrative Duties,Nursing Leadership
+CY2024Q3,7,4169.69,3915.62,254.07,619,22,Registered Nurse,Nursing
+CY2024Q3,9,16647.18,10976.16,5671.02,2220,39,Licensed Practical/Vocational Nurse,Nursing
+CY2024Q3,10,68417.52,66788.24,1629.28,9311,177,Certified Nurse Aide,Direct Care
+CY2024Q3,16,1954.34,1272.45,681.89,261,7,Dietitian,Support Services
+CY2024Q3,18,3122.61,412.13,2710.48,416,7,Occupational Therapist,Therapy
+CY2024Q3,19,947.35,0.0,947.35,112,2,Occupational Therapy Assistant,Therapy
+CY2024Q3,21,3677.95,1164.13,2513.82,431,9,Physical Therapist,Therapy
+CY2024Q3,22,1147.92,759.45,388.47,153,3,Physical Therapy Assistant,Therapy
+CY2024Q3,24,93.66,0.0,93.66,25,1,Respiratory Therapist,Therapy
+CY2024Q3,26,825.57,0.0,825.57,112,2,Speech/Language Pathologist,Therapy
+CY2024Q3,27,3716.23,2997.48,718.75,527,10,Therapeutic Recreation Specialist,Activities
+CY2024Q3,30,2050.97,2050.97,0.0,290,5,Qualified Social Worker,Social Services
+CY2024Q4,1,604.8,420.0,184.79999999999998,126,2,Administrator,Administration
+CY2024Q4,3,860.0,104.0,756.0,128,5,Other Physician,Medical
+CY2024Q4,5,525.26,525.26,0.0,55,1,RN Director of Nursing,Nursing Leadership
+CY2024Q4,6,4030.72,4030.72,0.0,485,9,RN with Administrative Duties,Nursing Leadership
+CY2024Q4,7,5744.31,5403.69,340.62,888,19,Registered Nurse,Nursing
+CY2024Q4,9,16161.12,10109.46,6051.66,2200,45,Licensed Practical/Vocational Nurse,Nursing
+CY2024Q4,10,68109.43,67348.46,760.97,9460,181,Certified Nurse Aide,Direct Care
+CY2024Q4,16,2538.01,1309.42,1228.59,322,8,Dietitian,Support Services
+CY2024Q4,18,2947.55,377.69,2569.86,385,7,Occupational Therapist,Therapy
+CY2024Q4,19,1150.55,0.0,1150.55,127,2,Occupational Therapy Assistant,Therapy
+CY2024Q4,21,4109.54,1089.31,3020.23,481,9,Physical Therapist,Therapy
+CY2024Q4,22,724.89,509.04,215.85,103,3,Physical Therapy Assistant,Therapy
+CY2024Q4,24,98.23,0.0,98.23,28,1,Respiratory Therapist,Therapy
+CY2024Q4,26,1002.89,0.0,1002.89,138,3,Speech/Language Pathologist,Therapy
+CY2024Q4,27,3271.9,2825.53,446.37,461,8,Therapeutic Recreation Specialist,Activities
+CY2024Q4,30,1935.29,1935.29,0.0,277,5,Qualified Social Worker,Social Services
+CY2025Q1,1,582.4,448.0,134.39999999999998,112,2,Administrator,Administration
+CY2025Q1,3,840.0,104.0,736.0,126,5,Other Physician,Medical
+CY2025Q1,5,793.34,793.34,0.0,70,1,RN Director of Nursing,Nursing Leadership
+CY2025Q1,6,3464.54,3464.54,0.0,421,9,RN with Administrative Duties,Nursing Leadership
+CY2025Q1,7,5066.8,4767.3,299.5,794,21,Registered Nurse,Nursing
+CY2025Q1,9,15236.73,9171.1,6065.63,2108,42,Licensed Practical/Vocational Nurse,Nursing
+CY2025Q1,10,66169.01,65793.48,375.53,9204,169,Certified Nurse Aide,Direct Care
+CY2025Q1,16,2359.03,1047.15,1311.88,296,7,Dietitian,Support Services
+CY2025Q1,18,2919.18,368.19,2550.99,370,6,Occupational Therapist,Therapy
+CY2025Q1,19,1174.3,0.0,1174.3,126,2,Occupational Therapy Assistant,Therapy
+CY2025Q1,21,3701.86,1164.85,2537.01,452,10,Physical Therapist,Therapy
+CY2025Q1,22,885.15,397.04,488.11,116,2,Physical Therapy Assistant,Therapy
+CY2025Q1,24,89.56,0.0,89.56,25,1,Respiratory Therapist,Therapy
+CY2025Q1,26,938.22,0.0,938.22,134,3,Speech/Language Pathologist,Therapy
+CY2025Q1,27,3427.8,3173.02,254.78,487,8,Therapeutic Recreation Specialist,Activities
+CY2025Q1,30,1639.96,1639.96,0.0,233,5,Qualified Social Worker,Social Services
+CY2025Q2,1,504.0,504.0,0.0,72,2,Administrator,Administration
+CY2025Q2,3,850.0,104.0,746.0,127,5,Other Physician,Medical
+CY2025Q2,5,838.5,838.5,0.0,73,1,RN Director of Nursing,Nursing Leadership
+CY2025Q2,6,3360.92,3360.92,0.0,424,8,RN with Administrative Duties,Nursing Leadership
+CY2025Q2,7,6128.25,5904.26,223.99,932,24,Registered Nurse,Nursing
+CY2025Q2,9,15913.46,8971.44,6942.02,2087,41,Licensed Practical/Vocational Nurse,Nursing
+CY2025Q2,10,66896.2,66602.95,293.25,9411,177,Certified Nurse Aide,Direct Care
+CY2025Q2,16,2259.15,1065.99,1193.16,281,6,Dietitian,Support Services
+CY2025Q2,18,2992.26,355.03,2637.23,376,6,Occupational Therapist,Therapy
+CY2025Q2,19,1110.25,0.0,1110.25,123,2,Occupational Therapy Assistant,Therapy
+CY2025Q2,21,3628.89,1122.38,2506.51,442,8,Physical Therapist,Therapy
+CY2025Q2,22,926.54,442.6,483.94,115,2,Physical Therapy Assistant,Therapy
+CY2025Q2,24,93.31,0.0,93.31,28,1,Respiratory Therapist,Therapy
+CY2025Q2,26,966.87,0.0,966.87,138,3,Speech/Language Pathologist,Therapy
+CY2025Q2,27,3355.71,3355.71,0.0,480,9,Therapeutic Recreation Specialist,Activities
+CY2025Q2,30,1553.63,1553.63,0.0,223,4,Qualified Social Worker,Social Services
+CY2025Q3,1,448.0,448.0,0.0,64,1,Administrator,Administration
+CY2025Q3,3,888.0,104.0,784.0,132,5,Other Physician,Medical
+CY2025Q3,5,454.5,454.5,0.0,63,2,RN Director of Nursing,Nursing Leadership
+CY2025Q3,6,5034.3,5034.3,0.0,618,12,RN with Administrative Duties,Nursing Leadership
+CY2025Q3,7,5571.15,5485.44,85.71,808,24,Registered Nurse,Nursing
+CY2025Q3,9,15413.39,8467.64,6945.75,1952,43,Licensed Practical/Vocational Nurse,Nursing
+CY2025Q3,10,67071.41,66753.37,318.04,9308,171,Certified Nurse Aide,Direct Care
+CY2025Q3,16,1858.06,930.96,927.1,234,6,Dietitian,Support Services
+CY2025Q3,18,2941.36,375.72,2565.64,372,6,Occupational Therapist,Therapy
+CY2025Q3,19,1126.12,0.0,1126.12,126,3,Occupational Therapy Assistant,Therapy
+CY2025Q3,21,3634.56,1040.1,2594.46,419,8,Physical Therapist,Therapy
+CY2025Q3,22,958.67,427.28,531.39,114,2,Physical Therapy Assistant,Therapy
+CY2025Q3,24,89.45,0.0,89.45,27,1,Respiratory Therapist,Therapy
+CY2025Q3,26,926.16,0.0,926.16,134,3,Speech/Language Pathologist,Therapy
+CY2025Q3,27,3550.49,3550.49,0.0,513,9,Therapeutic Recreation Specialist,Activities
+CY2025Q3,30,1600.52,1600.52,0.0,230,5,Qualified Social Worker,Social Services
+CY2025Q3,31,102.8,102.8,0.0,14,1,Other Social Worker,Social Services

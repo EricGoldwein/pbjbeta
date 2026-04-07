@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "facility_335513_flask_app.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": "*.csv,*.parquet,templates/**,static/**,ownership/**"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "facility_335513_flask_app.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": ".",
+    "EIN_DASHBOARD_MODE": "all",
+    "EIN_SELECTED_QUARTERS": ""
+  }
+}

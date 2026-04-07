@@ -654,17 +654,62 @@
             position: relative;
             z-index: 1;
         }
+
+        .options-panel {
+            margin-bottom: 24px;
+            padding: 18px 20px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+
+        .options-panel > .panel-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(255, 255, 255, 0.55);
+            margin-bottom: 14px;
+        }
+
+        .entity-context-block.dimmed {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        .site-footer {
+            margin-top: 48px;
+            padding: 28px 0 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.82rem;
+            line-height: 1.55;
+            color: rgba(255, 255, 255, 0.55);
+        }
+
+        .site-footer a {
+            color: #8b9cf7;
+            text-decoration: none;
+        }
+
+        .site-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .site-footer .footer-brand {
+            margin-top: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .site-footer p + p {
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1><span class="pbj-part">PBJ</span><span class="num-part">320</span></h1>
-            <div class="subtitle">Staffing Analytics Platform</div>
-            <div class="tagline">Facility Dashboard & Report Generator</div>
-            <div style="margin-top: 20px;">
-                <a href="/veterans-homes" style="color: #667eea; text-decoration: none; font-size: 0.9rem; padding: 8px 16px; border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 8px; transition: all 0.2s;" onmouseover="this.style.background='rgba(102, 126, 234, 0.1)'; this.style.borderColor='rgba(102, 126, 234, 0.5)'" onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(102, 126, 234, 0.3)'">Veterans Homes Release →</a>
-            </div>
+            <div class="subtitle">Facility dashboards and reports from CMS PBJ, Provider Info, and related public data</div>
         </div>
 
         <div class="tabs">
@@ -676,7 +721,8 @@
 
         <!-- Dashboard Tab -->
         <div id="dashboard-tab" class="tab-content active">
-            <h2 style="margin-bottom: 20px;">Generate Facility Dashboard</h2>
+            <h2 style="margin-bottom: 12px;">Generate facility dashboard</h2>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 0.95rem;">Build CSVs, a local Flask app, and optionally a Vercel deployment folder for one CCN.</p>
             
             <div class="facility-info" id="facility-info">
                 <div class="facility-name" id="facility-name">-</div>
@@ -689,9 +735,49 @@
                     <input type="text" id="dashboard-provnum" placeholder="e.g., 335513" maxlength="6" required>
                 </div>
 
-                <div class="checkbox-group">
-                    <input type="checkbox" id="deploy-vercel" name="deploy-vercel">
-                    <label for="deploy-vercel">Also create Vercel deployment package</label>
+                <div class="options-panel">
+                    <div class="panel-title">Outputs</div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="create-local-app" name="create-local-app" checked>
+                        <label for="create-local-app">Create local runnable dashboard app (private)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="deploy-vercel" name="deploy-vercel">
+                        <label for="deploy-vercel">Also create Vercel deployment package</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="include-entity-longitudinal" name="include-entity-longitudinal" checked>
+                        <label for="include-entity-longitudinal">Include chain / affiliated-entity longitudinal data in the deploy package</label>
+                    </div>
+                    <div class="help-text">Uncheck for a smaller bundle without ownership slice, chain performance files, or entity lookup. Core PBJ and Provider Info for the facility stay included.</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="ein-mode">Employee detail (EIN)</label>
+                    <select id="ein-mode">
+                        <option value="all" selected>All EIN quarters (full employee detail)</option>
+                        <option value="selected">Selected EIN quarter(s) only</option>
+                        <option value="none">No EIN features (fastest)</option>
+                    </select>
+                    <div class="help-text" style="margin-top: 10px;">Whenever this is <strong>not</strong> “No EIN features,” the generator automatically runs <code>scripts/extract_facility_ein_from_zip.py</code> if <code>facility_&lt;CCN&gt;_ein_job_quarterly</code> / <code>_category_quarterly</code> are missing under <code>deployments/pbj320-&lt;CCN&gt;/</code> (skips instantly if they already exist). The <strong>national</strong> CMS Employee Detail file is the same for every CCN—the script filters rows for the facility you entered; outputs always go to that facility’s <code>deployments/pbj320-&lt;CCN&gt;/</code> folder. If the zip lives outside the repo’s <code>EIN/</code> folder, set a path below for <strong>this run only</strong>. You need <code>pyarrow</code> installed; the first run can take a long time.</div>
+                </div>
+
+                <div id="ein-source-path-wrap">
+                <div class="form-group">
+                    <label for="ein-zip-path">Employee Detail PUF (.zip) — optional</label>
+                    <input type="text" id="ein-zip-path" autocomplete="off" placeholder="e.g. D:\jobs\Acme\Payroll Based Journal Employee Detail Nursing Home Staffing.zip">
+                    <div class="help-text">Full path to the monolithic CMS zip. If empty, the app uses <code>EIN/</code> in the project, env vars, or a single <code>.zip</code> in <code>EIN/</code>.</div>
+                </div>
+                <div class="form-group">
+                    <label for="ein-archive-dir">Or folder to scan for .zip — optional</label>
+                    <input type="text" id="ein-archive-dir" autocomplete="off" placeholder="e.g. D:\jobs\Acme\ein_archives">
+                    <div class="help-text">Used only if the PUF path above is empty. The extractor picks the best <code>*.zip</code> in that folder (same rules as <code>PBJ_EIN_ARCHIVE_DIR</code>). Ignored when PUF path is set.</div>
+                </div>
+                </div>
+
+                <div class="form-group" id="ein-quarter-wrap" style="display:none;">
+                    <label for="ein-selected-quarters">Selected EIN Quarters (comma-separated)</label>
+                    <input type="text" id="ein-selected-quarters" placeholder="CY2025Q1,CY2025Q2">
                 </div>
 
                 <button type="submit" class="btn" id="dashboard-btn">Generate Dashboard</button>
@@ -788,6 +874,77 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Date Ranges of Interest (Optional)</label>
+                    <div id="date-ranges-of-interest-container">
+                        <div class="date-range-row" style="display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div>
+                                <label style="font-size: 0.85rem; opacity: 0.9;">Start</label>
+                                <input type="date" class="range-start" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.85rem; opacity: 0.9;">End</label>
+                                <input type="date" class="range-end" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.85rem; opacity: 0.9;">Type</label>
+                                <select class="range-role" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white;">
+                                    <option value="primary">Primary</option>
+                                    <option value="secondary">Secondary</option>
+                                </select>
+                            </div>
+                            <div style="align-self: end;">
+                                <button type="button" class="btn add-date-btn remove-range-btn" onclick="removeDateRange(this)" title="Remove range" style="padding: 8px 12px;">✕</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn add-date-btn" onclick="addDateRange()" style="margin-top: 6px;">Add another range</button>
+                    <div class="help-text">Focus ranges (e.g. resident stay). Each range can be Primary or Secondary; report will list both.</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Report Sections (include in HTML and Word)</label>
+                    <div class="criteria-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 8px;">
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-key-dates" name="section_key_dates" checked>
+                            <label for="section-key-dates">Key Dates of Interest</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-date-ranges" name="section_date_ranges" checked>
+                            <label for="section-date-ranges">Date Ranges of Interest</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-quarterly" name="section_quarterly" checked>
+                            <label for="section-quarterly">Quarterly Staffing</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-case-mix" name="section_case_mix" checked>
+                            <label for="section-case-mix">Harrington / Case-Mix</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-red-flags" name="section_red_flags" checked>
+                            <label for="section-red-flags">Red Flags History</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-period-summary" name="section_period_summary" checked>
+                            <label for="section-period-summary">Period Summary</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-state-compliance" name="section_state_compliance" checked>
+                            <label for="section-state-compliance">State Compliance / Days Below Min</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-daily-staffing" name="section_daily_staffing" checked>
+                            <label for="section-daily-staffing">Daily Staffing Table</label>
+                        </div>
+                        <div class="checkbox-group" style="margin: 0;">
+                            <input type="checkbox" id="section-appendix" name="section_appendix" checked>
+                            <label for="section-appendix">Appendix / Data Sources</label>
+                        </div>
+                    </div>
+                    <div class="help-text">Uncheck sections to exclude from report (applies to both HTML and Word)</div>
+                </div>
+
+                <div class="form-group">
                     <label>Report Options</label>
                     <div class="checkbox-group">
                         <input type="checkbox" id="report-watermark" name="watermark">
@@ -826,6 +983,15 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Chain and ownership context</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="entity-include-context" checked>
+                        <label for="entity-include-context">Include longitudinal chain metrics and CHOW context in the report</label>
+                    </div>
+                    <div class="help-text">Turn off for a slimmer report without chain trend charts or change-of-ownership sections.</div>
+                </div>
+
+                <div class="form-group entity-context-block" id="entity-longitudinal-block">
                     <label>Longitudinal Metrics Customization</label>
                     <div class="help-text" style="margin-bottom: 12px;">Select which metrics to display in the longitudinal charts (defaults shown if none selected)</div>
                     <div class="criteria-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
@@ -1008,6 +1174,12 @@
 
             <div class="status" id="state-status"></div>
         </div>
+
+        <footer class="site-footer" role="contentinfo">
+            <p><strong>Data sources (summary):</strong> CMS Payroll-Based Journal (PBJ) staffing; CMS Nursing Home Provider Info (ratings, ownership, citations); state minimum staffing references (e.g. MACPAC standards in bundled files); CMS affiliated-entity / chain performance data when the chain bundle is enabled.</p>
+            <p>Metrics are computed from public datasets for informational use; confirm critical values against official CMS tools.</p>
+            <p class="footer-brand"><strong>320 Consulting</strong> — staffing analytics and transparency tooling. <a href="https://www.320insight.com/" rel="noopener noreferrer" target="_blank">320insight.com</a></p>
+        </footer>
     </div>
 
     <script>
@@ -1227,6 +1399,15 @@
             e.preventDefault();
             const provnum = document.getElementById('dashboard-provnum').value.trim();
             const deployVercel = document.getElementById('deploy-vercel').checked;
+            const createLocalApp = document.getElementById('create-local-app')?.checked ?? true;
+            const includeEntityLongitudinal = document.getElementById('include-entity-longitudinal')?.checked ?? true;
+            const einMode = (document.getElementById('ein-mode')?.value || 'all').trim();
+            const einZipPath = (document.getElementById('ein-zip-path')?.value || '').trim();
+            const einArchiveDir = (document.getElementById('ein-archive-dir')?.value || '').trim();
+            const einSelectedQuarters = (document.getElementById('ein-selected-quarters')?.value || '')
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean);
 
             if (provnum.length !== 6) {
                 showStatus('dashboard-status', 'Please enter a valid 6-digit facility code', 'error');
@@ -1240,14 +1421,22 @@
             const progressInterval = simulateProgress('dashboard-btn', estimatedTimeSeconds);
 
             try {
-                // Generate dashboard with longer timeout (5 minutes for large CSV generation)
+                // Generate dashboard with longer timeout (10 minutes for large CSV generation)
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+                const timeoutId = setTimeout(() => controller.abort(), 7200000); // up to 2h (EIN extract can be long)
                 
                 const response = await fetch('/api/generate-dashboard', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ provnum }),
+                    body: JSON.stringify({
+                        provnum,
+                        create_local_app: createLocalApp,
+                        ein_mode: einMode,
+                        ein_selected_quarters: einSelectedQuarters,
+                        include_entity_longitudinal: includeEntityLongitudinal,
+                        ein_zip_path: einZipPath || null,
+                        ein_archive_dir: einArchiveDir || null
+                    }),
                     signal: controller.signal
                 }).finally(() => clearTimeout(timeoutId));
 
@@ -1260,16 +1449,33 @@
 
                 if (response.ok) {
                     if (deployVercel) {
-                        showStatus('dashboard-status', 'Dashboard created. Creating Vercel package...', 'info');
+                        const skipRebuild =
+                            createLocalApp === true && data.local_app_created === true;
+                        showStatus(
+                            'dashboard-status',
+                            skipRebuild
+                                ? 'Deploying to Vercel (reusing package from generate step)...'
+                                : 'Dashboard created. Building package / deploying to Vercel...',
+                            'info'
+                        );
                         
                         // Vercel deployment with longer timeout (10 minutes)
                         const vercelController = new AbortController();
-                        const vercelTimeoutId = setTimeout(() => vercelController.abort(), 600000); // 10 minutes
+                        const vercelTimeoutId = setTimeout(() => vercelController.abort(), 7200000);
                         
                         const vercelResponse = await fetch('/api/deploy-vercel', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ provnum }),
+                            body: JSON.stringify({
+                                provnum,
+                                ein_mode: einMode,
+                                ein_selected_quarters: einSelectedQuarters,
+                                include_entity_longitudinal: includeEntityLongitudinal,
+                                ein_zip_path: einZipPath || null,
+                                ein_archive_dir: einArchiveDir || null,
+                                skip_package_build: skipRebuild,
+                                skip_ein_extract: skipRebuild
+                            }),
                             signal: vercelController.signal
                         }).finally(() => clearTimeout(vercelTimeoutId));
 
@@ -1281,7 +1487,8 @@
                         const vercelData = await vercelResponse.json();
                         if (vercelData.success !== false) {
                             const facilityName = vercelData.facility_name || data.facility_name || 'Dashboard';
-                            const dashboardUrl = vercelData.vercel_url || `https://pbj320-${provnum}.vercel.app/`;
+                            const vercelUrl = vercelData.vercel_url || `https://pbj320-${provnum}.vercel.app/`;
+                            const viewPageUrl = `/view-dashboard/${provnum}/`;
                             const statusHtml = `
                                 <div style="display: flex; flex-direction: column; gap: 12px;">
                                     <div>
@@ -1293,12 +1500,14 @@
                                     </div>
                                     ` : `
                                     <div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.7);">
-                                        Deploy directory: <code style="background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px;">${vercelData.deploy_dir}</code>
+                                        Deploy directory: <code style="background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px;">${vercelData.deploy_dir || 'deployments/pbj320-' + provnum}</code>
                                     </div>
                                     `}
-                                    <a href="${dashboardUrl}" target="_blank" class="download-link" style="margin-top: 0;">
-                                        📊 ${vercelData.vercel_url ? 'View Live Dashboard' : 'Open Dashboard'}
-                                    </a>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        ${vercelData.vercel_url ? `<a href="${vercelUrl}" target="_blank" class="download-link" style="margin-top: 0;">📊 View on Vercel</a>` : ''}
+                                        <a href="${viewPageUrl}" target="_blank" class="download-link" style="margin-top: 0;">📊 ${vercelData.vercel_url ? 'Open locally / options' : 'Open dashboard'}</a>
+                                    </div>
+                                    ${einExtractStatusBlock(vercelData) || einExtractStatusBlock(data)}
                                 </div>
                             `;
                             const statusDiv = document.getElementById('dashboard-status');
@@ -1311,15 +1520,30 @@
                         }
                     } else {
                         const facilityName = data.facility_name || 'Dashboard';
-                        const dashboardUrl = `https://pbj320-${provnum}.vercel.app/`;
+                        const viewPageUrl = `/view-dashboard/${provnum}/`;
+                        const localHint = (data.local_app_created && data.local_url && data.local_run_cmd) ? `
+                            <div style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.8);">
+                                <div style="margin-bottom: 6px;"><strong>Local app ready:</strong></div>
+                                <div style="margin-bottom: 6px;">Run (PowerShell):</div>
+                                <code style="display: block; white-space: pre-wrap; word-break: break-word; background: rgba(255, 255, 255, 0.1); padding: 8px 10px; border-radius: 6px;">${data.local_run_cmd}</code>
+                                ${data.local_run_cmd_cmdexe ? `
+                                <div style="margin-top: 10px; margin-bottom: 6px;">Run (cmd.exe):</div>
+                                <code style="display: block; white-space: pre-wrap; word-break: break-word; background: rgba(255, 255, 255, 0.1); padding: 8px 10px; border-radius: 6px;">${data.local_run_cmd_cmdexe}</code>
+                                ` : ''}
+                                <div style="margin-top: 6px;">Then open: <code style="background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px;">${data.local_url}</code></div>
+                            </div>
+                        ` : '';
                         const statusHtml = `
                             <div style="display: flex; flex-direction: column; gap: 12px;">
                                 <div>
                                     <strong>✓ Dashboard files created successfully!</strong>
                                 </div>
-                                <a href="${dashboardUrl}" target="_blank" class="download-link" style="margin-top: 0;">
-                                    📊 Open Dashboard
+                                ${localHint}
+                                <p style="font-size: 0.9rem; color: rgba(255, 255, 255, 0.8); margin: 0;">Open the dashboard (local or Vercel):</p>
+                                <a href="${viewPageUrl}" target="_blank" class="download-link" style="margin-top: 0;">
+                                    📊 Open dashboard
                                 </a>
+                                ${einExtractStatusBlock(data)}
                             </div>
                         `;
                         const statusDiv = document.getElementById('dashboard-status');
@@ -1333,7 +1557,7 @@
                 console.error('Dashboard generation error:', error);
                 let errorMsg = error.message || 'Unknown error occurred';
                 if (error.name === 'AbortError') {
-                    errorMsg = 'Request timed out. CSV generation may take several minutes for large facilities. Please try again or check server logs.';
+                    errorMsg = 'Request timed out (limit 2 hours). PBJ CSV build or CMS Employee Detail extract can take a long time; check server logs or choose “No EIN features” if you only need a quick package without the zip step.';
                 } else if (errorMsg === 'Failed to fetch' || errorMsg.includes('ERR_CONNECTION_RESET') || errorMsg.includes('Connection reset')) {
                     errorMsg = 'Connection lost. The server may have crashed or the request timed out during CSV generation. Check server logs and try again.';
                 }
@@ -1343,6 +1567,41 @@
                 setLoading('dashboard-btn', false);
             }
         });
+
+        const einModeSelect = document.getElementById('ein-mode');
+        const einQuarterWrap = document.getElementById('ein-quarter-wrap');
+        const einSourcePathWrap = document.getElementById('ein-source-path-wrap');
+        if (einModeSelect && einQuarterWrap) {
+            const syncEinQuarterVisibility = () => {
+                einQuarterWrap.style.display = einModeSelect.value === 'selected' ? 'block' : 'none';
+                if (einSourcePathWrap) {
+                    einSourcePathWrap.style.display = einModeSelect.value === 'none' ? 'none' : 'block';
+                }
+            };
+            einModeSelect.addEventListener('change', syncEinQuarterVisibility);
+            syncEinQuarterVisibility();
+        }
+
+        function escapeHtmlDashboard(s) {
+            if (s == null || s === '') return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function einExtractStatusBlock(data) {
+            if (!data || !data.ein_extract_message) return '';
+            const warn = data.ein_extract_attempted && data.ein_extract_ok === false;
+            const color = warn ? 'rgba(255, 200, 120, 0.95)' : 'rgba(255, 255, 255, 0.78)';
+            const border = warn ? 'rgba(255, 193, 7, 0.5)' : 'rgba(255, 255, 255, 0.15)';
+            return `
+                <div style="font-size: 0.82rem; color: ${color}; border-top: 1px solid ${border}; padding-top: 10px; margin-top: 8px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;">
+                    <strong>${warn ? 'EIN extract issue (dashboard still built):' : 'EIN:'}</strong><br/>
+                    ${escapeHtmlDashboard(data.ein_extract_message)}
+                </div>`;
+        }
 
         // Entity autocomplete
         let entitySearchTimeout;
@@ -1443,6 +1702,14 @@
             document.getElementById('entity-drill-down-options').style.display = e.target.checked ? 'block' : 'none';
         });
 
+        function syncEntityContextUi() {
+            const on = document.getElementById('entity-include-context')?.checked ?? true;
+            const block = document.getElementById('entity-longitudinal-block');
+            if (block) block.classList.toggle('dimmed', !on);
+        }
+        document.getElementById('entity-include-context')?.addEventListener('change', syncEntityContextUi);
+        syncEntityContextUi();
+
         // State form drill-down toggle
         document.getElementById('state-drill-down').addEventListener('change', (e) => {
             document.getElementById('state-drill-down-options').style.display = e.target.checked ? 'block' : 'none';
@@ -1516,7 +1783,8 @@
                         min_census: minCensus,
                         drill_down_num: drillDownNum,
                         drill_down_criteria: drillDownCriteria,
-                        selected_metrics: selectedMetrics.length > 0 ? selectedMetrics : null
+                        selected_metrics: selectedMetrics.length > 0 ? selectedMetrics : null,
+                        include_entity_context: document.getElementById('entity-include-context')?.checked ?? true
                     })
                 });
                 
@@ -1679,6 +1947,26 @@
 
             const watermark = document.getElementById('report-watermark').checked;
 
+            const dateRangesOfInterest = [];
+            document.querySelectorAll('#date-ranges-of-interest-container .date-range-row').forEach(row => {
+                const start = row.querySelector('.range-start')?.value?.trim();
+                const end = row.querySelector('.range-end')?.value?.trim();
+                const role = row.querySelector('.range-role')?.value || 'primary';
+                if (start && end) dateRangesOfInterest.push({ start_date: start, end_date: end, role });
+            });
+
+            const includeSections = {
+                key_dates: document.getElementById('section-key-dates').checked,
+                date_ranges_of_interest: document.getElementById('section-date-ranges').checked,
+                quarterly_staffing: document.getElementById('section-quarterly').checked,
+                case_mix: document.getElementById('section-case-mix').checked,
+                red_flags: document.getElementById('section-red-flags').checked,
+                period_summary: document.getElementById('section-period-summary').checked,
+                state_compliance: document.getElementById('section-state-compliance').checked,
+                daily_staffing_table: document.getElementById('section-daily-staffing').checked,
+                appendix: document.getElementById('section-appendix').checked
+            };
+
             setLoading('report-btn', true);
             hideStatus('report-status');
             
@@ -1696,7 +1984,10 @@
                         quarters: quarters,
                         years: years,
                         key_dates: keyDates.join(','),
-                        watermark: watermark
+                        date_ranges_of_interest: dateRangesOfInterest,
+                        watermark: watermark,
+                        include_sections: includeSections,
+                        staffing_emphasis: document.querySelector('input[name="staffing_emphasis"]:checked')?.value || 'total_first'
                     })
                 });
 
@@ -1710,18 +2001,39 @@
                 if (response.ok) {
                     const reportFileName = data.report_file.split(/[/\\]/).pop();
                     const downloadUrl = `/api/download-report/${encodeURIComponent(data.report_file)}`;
-                    const statusHtml = `
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <div>
-                                <strong>✓ Report generated successfully!</strong>
-                            </div>
-                            <div class="file-path">${reportFileName}</div>
-                            <a href="${downloadUrl}" download="${reportFileName}" class="download-link">
-                                <span>📥</span>
-                                <span>Download Report</span>
-                            </a>
+                    const savePath = data.report_folder || '';
+                    let linksHtml = `
+                        <div>
+                            <strong>✓ Report generated successfully!</strong>
                         </div>
+                        ${savePath ? `<div class="file-path" style="font-size: 0.85em; opacity: 0.9;">Saved to: ${savePath}</div>` : ''}
+                        <div class="file-path">${reportFileName}</div>
+                        <a href="${downloadUrl}" download="${reportFileName}" class="download-link">
+                            <span>📥</span>
+                            <span>Download HTML</span>
+                        </a>
                     `;
+                    if (data.report_file_docx) {
+                        const docxFileName = data.report_file_docx.split(/[/\\]/).pop();
+                        const docxDownloadUrl = `/api/download-report/${encodeURIComponent(data.report_file_docx)}`;
+                        linksHtml += `
+                            <a href="${docxDownloadUrl}" download="${docxFileName}" class="download-link" style="margin-top: 4px;">
+                                <span>📥</span>
+                                <span>Download Word (.docx)</span>
+                            </a>
+                        `;
+                    }
+                    if (data.report_file_pdf) {
+                        const pdfFileName = data.report_file_pdf.split(/[/\\]/).pop();
+                        const pdfDownloadUrl = `/api/download-report/${encodeURIComponent(data.report_file_pdf)}`;
+                        linksHtml += `
+                            <a href="${pdfDownloadUrl}" download="${pdfFileName}" class="download-link" style="margin-top: 4px;">
+                                <span>📥</span>
+                                <span>Download PDF</span>
+                            </a>
+                        `;
+                    }
+                    const statusHtml = `<div style="display: flex; flex-direction: column; gap: 10px;">${linksHtml}</div>`;
                     const statusDiv = document.getElementById('report-status');
                     statusDiv.innerHTML = statusHtml;
                     statusDiv.className = 'status success show';
@@ -1792,6 +2104,27 @@
             list.innerHTML = keyDates.map(date => 
                 `<span class="date-tag">${formatDateForDisplay(date)} <span class="remove" onclick="removeKeyDate('${date}')" style="cursor: pointer; font-weight: bold; margin-left: 4px;">×</span></span>`
             ).join('');
+        }
+
+        function addDateRange() {
+            const container = document.getElementById('date-ranges-of-interest-container');
+            const row = document.createElement('div');
+            row.className = 'date-range-row';
+            row.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 10px; align-items: center; margin-bottom: 8px;';
+            row.innerHTML = `
+                <div><label style="font-size: 0.85rem; opacity: 0.9;">Start</label><input type="date" class="range-start" style="width: 100%;"></div>
+                <div><label style="font-size: 0.85rem; opacity: 0.9;">End</label><input type="date" class="range-end" style="width: 100%;"></div>
+                <div><label style="font-size: 0.85rem; opacity: 0.9;">Type</label><select class="range-role" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: white;"><option value="primary">Primary</option><option value="secondary">Secondary</option></select></div>
+                <div style="align-self: end;"><button type="button" class="btn add-date-btn remove-range-btn" onclick="removeDateRange(this)" title="Remove range" style="padding: 8px 12px;">✕</button></div>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeDateRange(btn) {
+            const row = btn.closest('.date-range-row');
+            if (row && document.querySelectorAll('#date-ranges-of-interest-container .date-range-row').length > 1) {
+                row.remove();
+            }
         }
 
         // Prevent Enter key from submitting form when in date input

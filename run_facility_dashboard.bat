@@ -1,29 +1,27 @@
 @echo off
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
-echo Enter 6-digit facility code:
-set /p provnum=
-echo.
 
-if exist "facility_%provnum%_complete_data.csv" (
-    echo CSV file already exists for facility %provnum%
+REM Internal facility Flask dashboard — Employee Detail defaults to all quarters.
+REM App file is under deployments\pbj320-<CCN>\ ; do not run facility_*_flask_app.py from repo root.
+REM Examples:
+REM   run_facility_dashboard.bat 335581
+REM   run_facility_dashboard.bat 335581 --deployment-bundle
+REM   run_facility_dashboard.bat 335581 --ein-mode none
+
+if "%~1"=="" (
+    echo Enter 6-digit facility code:
+    set /p provnum=
     echo.
+    echo Starting dashboard (EIN: all quarters by default^) ...
+    python run_facility_dashboard.py !provnum!
 ) else (
-    echo Creating CSV for facility %provnum%...
-    python -c "from dynamic_facility_dashboard import create_facility_complete_csv; create_facility_complete_csv('%provnum%')"
+    echo Using args: %*
     echo.
+    echo Starting dashboard (EIN: all quarters by default^) ...
+    python run_facility_dashboard.py %*
 )
 
-if exist "facility_%provnum%_provider_info_data.csv" (
-    echo Provider info CSV already exists for facility %provnum%
-    echo.
-) else (
-    echo Creating provider info CSV for facility %provnum%...
-    python -c "from dynamic_facility_dashboard import create_facility_provider_info_csv; import pandas as pd; data = create_facility_provider_info_csv('%provnum%'); data.to_csv('facility_%provnum%_provider_info_data.csv', index=False) if data is not None else None"
-    echo.
-)
-
-echo Starting dashboard for facility %provnum%...
-echo Dashboard will be available at: http://localhost:5000
 echo.
-python dynamic_facility_dashboard.py %provnum%
+echo Open http://localhost:5000 when the server is ready.
 pause
