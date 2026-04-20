@@ -10,10 +10,12 @@ import sys
 import time
 from pathlib import Path
 from file_path_utils import (
-    find_facility_complete_data, 
+    find_facility_complete_data,
+    find_facility_citations,
+    find_facility_nonnurse_daily,
     find_facility_provider_info,
     find_facility_flask_app,
-    get_facility_folder
+    get_facility_folder,
 )
 
 def _project_root():
@@ -32,7 +34,12 @@ def create_facility_vercel_package(
     CCN (provnum) is the only facility-specific input; all paths, filenames, and generated
     app content are derived from it—do not hardcode a 6-digit CCN.
     project_root: if provided (e.g. by dashboard), use this instead of __file__ so paths work when cwd differs.
-    include_entity_longitudinal: when False, omit chain longitudinal slice/lookup files (smaller deploy; no entity trends section data)."""
+    include_entity_longitudinal: when False, omit chain longitudinal slice/lookup files (smaller deploy; no entity trends section data).
+
+    The facility Flask module is derived from ``dynamic_facility_dashboard.py`` (Step 2–3), so each
+    generated package automatically picks up dashboard features such as ``geo_rollup_series`` /
+    ``lite_hprd_rollup_series_by_quarter`` and the matching ``dynamic_facility_dashboard.html`` /
+    ``pbj320-export-page`` JSON used for the geographic rollup panel (``pbjGeoRollupRefresh``)."""
     
     provnum = str(provnum).strip().zfill(6)
     print(f"\n{'='*60}")
@@ -90,6 +97,55 @@ def create_facility_vercel_package(
             print(f"  WARNING: Incremental update failed: {e}")
         # If file still exists with data, we're done (create_facility_complete_csv skips full rebuild when file has data)
 
+    # Non-nurse + citations before provider info (provider incremental can OOM on huge combined CSVs).
+    nonnurse_filename = f"facility_{provnum}_nonnurse_daily.csv"
+    citations_filename = f"facility_{provnum}_citations.csv"
+    nonnurse_file = find_facility_nonnurse_daily(provnum) or str(facility_folder / nonnurse_filename)
+    citations_file = find_facility_citations(provnum) or str(facility_folder / citations_filename)
+    nonnurse_abs = (
+        os.path.normpath(nonnurse_file)
+        if os.path.isabs(nonnurse_file)
+        else os.path.normpath(os.path.join(root, nonnurse_file))
+    )
+    citations_abs = (
+        os.path.normpath(citations_file)
+        if os.path.isabs(citations_file)
+        else os.path.normpath(os.path.join(root, citations_file))
+    )
+    from nonnurse_staffing_lib import create_facility_nonnurse_csv
+    from citation_lib import build_facility_citations_csv
+
+    if not os.path.exists(nonnurse_abs):
+        print(f"  Creating {nonnurse_filename} (full build)...")
+        try:
+            create_facility_nonnurse_csv(provnum, output_path=nonnurse_abs, root=root)
+            if not os.path.exists(nonnurse_abs):
+                root_nn = os.path.join(root, f"facility_{provnum}_nonnurse_daily.csv")
+                if os.path.exists(root_nn):
+                    shutil.move(root_nn, nonnurse_abs)
+            if not os.path.exists(nonnurse_abs):
+                print(f"  WARNING: {nonnurse_abs} not created (no non-nurse PBJ rows for this CCN?)")
+        except Exception as e:
+            print(f"  WARNING: Non-nurse CSV build failed: {e}")
+    else:
+        print(f"  Updating {nonnurse_filename} (incremental: new quarters only)...")
+        try:
+            create_facility_nonnurse_csv(
+                provnum, existing_csv_path=nonnurse_abs, output_path=nonnurse_abs, root=root
+            )
+        except Exception as e:
+            print(f"  WARNING: Non-nurse incremental update failed: {e}")
+
+    print(f"  Updating {citations_filename} (CCN slice from latest Citations/NH_HealthCitations_*.csv)...")
+    try:
+        n_cit = build_facility_citations_csv(provnum, citations_abs, root=root)
+        if n_cit is None:
+            print("  WARNING: Citations slice not written (missing national file or invalid CCN).")
+        else:
+            print(f"    [OK] {n_cit} citation row(s)")
+    except Exception as e:
+        print(f"  WARNING: Citations slice failed: {e}")
+
     # Provider info: full build if missing, else incremental (only newer records)
     if not os.path.exists(provider_abs):
         print(f"  Creating {provider_filename}...")
@@ -118,7 +174,7 @@ def create_facility_vercel_package(
     with open(dynamic_dashboard_file, 'r', encoding='utf-8') as f:
         dashboard_code = f.read()
     
-    print(f"  [OK] Read {dynamic_dashboard_file}")
+    print(f"  [OK] Read {dynamic_dashboard_file} (includes geo rollup + template JSON for facility packages)")
     
     # Step 3: Create facility-specific Flask app under deployments/pbj320-<CCN>/
     print(f"\nStep 3: Creating facility-specific Flask app...")
@@ -225,6 +281,9 @@ def create_facility_vercel_package(
             '',
             '@app.before_request',
             'def before_request():',
+            '    auth_resp = _dashboard_basic_auth_challenge()',
+            '    if auth_resp is not None:',
+            '        return auth_resp',
             '    ensure_data_loaded()',
             ''
         ]
@@ -279,6 +338,9 @@ def ensure_data_loaded():
 
 @app.before_request
 def before_request():
+    auth_resp = _dashboard_basic_auth_challenge()
+    if auth_resp is not None:
+        return auth_resp
     ensure_data_loaded()
 
 '''
@@ -318,6 +380,9 @@ def ensure_data_loaded():
 
 @app.before_request
 def before_request():
+    auth_resp = _dashboard_basic_auth_challenge()
+    if auth_resp is not None:
+        return auth_resp
     ensure_data_loaded()
 
 if __name__ == "__main__":
@@ -339,7 +404,7 @@ if __name__ == "__main__":
     include_files = "templates/**,macpac_state_standards_clean.csv,static/**"
     if not use_central_csv_host:
         # Parquet: facility_*_ein_*.parquet and similar must ship with the function bundle
-        include_files = "*.csv,*.parquet,templates/**,static/**"
+        include_files = "*.csv,*.parquet,templates/**,static/**,config/**"
     vercel_config = {
         "version": 2,
         "builds": [
@@ -403,6 +468,10 @@ if __name__ == "__main__":
         deployment_files[csv_abs] = csv_filename
         if os.path.exists(provider_abs):
             deployment_files[provider_abs] = os.path.basename(provider_csv_file)
+        if os.path.exists(nonnurse_abs):
+            deployment_files[nonnurse_abs] = os.path.basename(nonnurse_abs)
+        if os.path.exists(citations_abs):
+            deployment_files[citations_abs] = os.path.basename(citations_abs)
     
     # Add prov_info.py if it exists (needed for quarter mapping)
     prov_info_file = "prov_info.py"
@@ -437,6 +506,24 @@ if __name__ == "__main__":
         deployment_files[macpac_clean] = "macpac_state_standards_clean.csv"
     elif os.path.exists(macpac_original):
         deployment_files[macpac_original] = "macpac_state_standards.csv"
+
+    # Quarterly + CMS region HPRD rollups for Summary benchmarks and geographic rollup UI.
+    # On Vercel, _resolve_pbj_lite_csv cannot reach repo ../../ — these must live in the bundle.
+    added_pbj_lite_subdir_csvs = False
+    for geo_name in (
+        "state_quarterly_metrics.csv",
+        "national_quarterly_metrics.csv",
+        "cms_region_quarterly_metrics.csv",
+        "cms_region_state_mapping.csv",
+    ):
+        src_geo = os.path.normpath(os.path.join(root, geo_name))
+        if os.path.isfile(src_geo):
+            deployment_files[src_geo] = geo_name
+    for lite_name in ("state_lite_metrics.csv", "national_lite_metrics.csv"):
+        src_lite = os.path.normpath(os.path.join(root, "pbj_lite", lite_name))
+        if os.path.isfile(src_lite):
+            deployment_files[src_lite] = f"pbj_lite/{lite_name}"
+            added_pbj_lite_subdir_csvs = True
 
     entity_longitudinal_needs_pyarrow = False
     added_ownership_bundle = False
@@ -488,8 +575,33 @@ if __name__ == "__main__":
     else:
         print("  [OK] Skipping entity/chain longitudinal bundle (include_entity_longitudinal=False)")
 
+    for lib_name in ("nonnurse_staffing_lib.py", "citation_lib.py", "pbj_staffing_normalize.py"):
+        lib_src = os.path.normpath(os.path.join(root, lib_name))
+        if os.path.isfile(lib_src):
+            deployment_files[lib_src] = lib_name
+
+    for cfg_name in ("nonnurse_staff_groups.json", "citation_severity_rank.json"):
+        cfg_src = os.path.normpath(os.path.join(root, "config", cfg_name))
+        if os.path.isfile(cfg_src):
+            deployment_files[cfg_src] = f"config/{cfg_name}"
+
+    pbj_identifiers_root = os.path.normpath(os.path.join(root, "pbj_identifiers"))
+    added_pbj_identifiers = False
+    if os.path.isdir(pbj_identifiers_root):
+        for entry in sorted(os.listdir(pbj_identifiers_root)):
+            if entry == "__pycache__" or not entry.endswith(".py"):
+                continue
+            src_p = os.path.join(pbj_identifiers_root, entry)
+            if os.path.isfile(src_p):
+                deployment_files[src_p] = f"pbj_identifiers/{entry}"
+                added_pbj_identifiers = True
+
     if added_ownership_bundle and ",ownership/**" not in include_files:
         include_files = include_files + ",ownership/**"
+    if added_pbj_identifiers and ",pbj_identifiers/**" not in include_files:
+        include_files = include_files + ",pbj_identifiers/**"
+    if added_pbj_lite_subdir_csvs and ",pbj_lite/**" not in include_files:
+        include_files = include_files + ",pbj_lite/**"
     vercel_config["builds"][0]["config"]["includeFiles"] = include_files
 
     ein_prefix = f"facility_{provnum}_ein_"
@@ -504,6 +616,10 @@ if __name__ == "__main__":
         "EIN bundle (already in deploy_dir): "
         + (", ".join(ein_bundle_names) if ein_bundle_names else "(none)")
     )
+    # EIN detail/summary tables are often parquet-only in deploy bundles.
+    # Ensure the runtime can read parquet even when entity longitudinal CSV path
+    # does not trigger the older pyarrow flag.
+    ein_bundle_has_parquet = any(name.lower().endswith(".parquet") for name in ein_bundle_names)
 
     # Copy files to deployment directory
     print("\n  Copying files to deployment directory:")
@@ -610,7 +726,7 @@ scipy==1.14.1
 python-dateutil==2.9.0
 pytz==2023.3
 """
-    if entity_longitudinal_needs_pyarrow:
+    if entity_longitudinal_needs_pyarrow or ein_bundle_has_parquet:
         flask_requirements += "pyarrow>=14.0.0\n"
     with open(deploy_requirements, 'w', encoding='utf-8') as f:
         f.write(flask_requirements)

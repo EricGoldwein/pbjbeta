@@ -1805,7 +1805,8 @@ def calculate_harrington_adjusted_hprd(cmi: float, hprd_type: str = 'total') -> 
 
         power_factor = ratio ** p["exponent"]
         harrington_hprd = p["intercept"] + power_factor * (p["high"] - p["intercept"])
-        return round_half_up(harrington_hprd, 2)
+        # Full float precision for downstream ratios; round only at display/export if needed.
+        return float(harrington_hprd)
     except Exception as e:
         print(f"Error calculating Harrington-adjusted HPRD: {e}")
         return None

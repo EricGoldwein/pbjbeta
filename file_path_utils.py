@@ -5,6 +5,8 @@ All scripts should use these functions to locate facility and donor files.
 Canonical per-facility layout (preferred):
   deployments/pbj320-<CCN>/
     facility_<CCN>_complete_data.csv
+    facility_<CCN>_nonnurse_daily.csv
+    facility_<CCN>_citations.csv
     facility_<CCN>_provider_info_data.csv
     facility_<CCN>_flask_app.py
     facility_<CCN>_ein_{job_quarterly|category_quarterly|employee_detail|nursing_summaries}.parquet|.csv
@@ -84,6 +86,18 @@ def find_facility_file(provnum: str, filename: str) -> Optional[str]:
 def find_facility_complete_data(provnum: str) -> Optional[str]:
     """Find facility complete data CSV file."""
     return find_facility_file(provnum, f'facility_{provnum}_complete_data.csv')
+
+
+def find_facility_nonnurse_daily(provnum: str) -> Optional[str]:
+    """Find per-facility non-nurse daily PBJ CSV (``facility_<CCN>_nonnurse_daily.csv``)."""
+    provnum = str(provnum).strip().zfill(6)
+    return find_facility_file(provnum, f"facility_{provnum}_nonnurse_daily.csv")
+
+
+def find_facility_citations(provnum: str) -> Optional[str]:
+    """Find per-facility NH health citations slice (``facility_<CCN>_citations.csv``)."""
+    provnum = str(provnum).strip().zfill(6)
+    return find_facility_file(provnum, f"facility_{provnum}_citations.csv")
 
 
 def find_facility_provider_info(provnum: str) -> Optional[str]:

@@ -1174,7 +1174,8 @@ def generate_dashboard():
         local_run_cmd = None
         if create_local_app and create_facility_vercel_package is not None:
             try:
-                # This creates the facility_<provnum>_flask_app.py + templates/ in deployments/pbj320-<provnum>/
+                # Creates facility_<provnum>_flask_app.py + templates/ from canonical dynamic_facility_dashboard.*
+                # (same sources as scripts/sync_facility_dashboard_deployment.py — geo rollup series, etc.)
                 ok = create_facility_vercel_package(
                     provnum,
                     project_root=_root,
