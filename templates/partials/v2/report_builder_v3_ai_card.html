@@ -1,0 +1,42 @@
+{# PBJ320 AI — compact beta card for Case Builder (period follows review window) #}
+
+{% from 'partials/v2/brand_macros.html' import pbj320_mark %}
+
+
+
+<div class="card border shadow-sm rb-panel rb3-ai-card" id="rb3AiCard">
+
+    <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between gap-2">
+
+        <span class="small fw-semibold d-inline-flex align-items-center gap-2">
+
+            {{ pbj320_mark(' AI') }}
+
+            <span class="pbj-ai-beta-badge pbj-readable-badge">beta</span>
+
+        </span>
+
+        <button type="button" class="btn btn-sm btn-outline-primary py-0" id="rb3AiOpenToolkitBtn" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">Open toolkit</button>
+
+    </div>
+
+    <div class="card-body py-3">
+
+        <p class="small text-secondary mb-2">Export scoped PBJ data and a starter prompt for Claude, ChatGPT, or Gemini. Key dates you add are included in the pack.</p>
+
+        <p class="small mb-2"><span class="text-muted">Period:</span> <strong class="text-body" id="rb3AiScopeLine">—</strong></p>
+
+        <div class="d-flex flex-wrap gap-2">
+
+            <button type="button" class="btn btn-sm btn-primary" id="rb3AiCopyPromptBtn">Copy starter prompt</button>
+
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="rb3AiDownloadCsvBtn"><i class="fas fa-download me-1" aria-hidden="true"></i><span class="d-md-none">CSV</span><span class="d-none d-md-inline">Export CSV</span></button>
+
+        </div>
+
+        <p class="form-text small text-secondary mb-0 mt-2">Verify AI output against CMS sources. The memo preview remains the primary deliverable.</p>
+
+    </div>
+
+</div>
+
