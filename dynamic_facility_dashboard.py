@@ -8385,6 +8385,281 @@ def api_geo_distribution_context():
         return jsonify({"error": str(exc)}), 500
 
 
+def _report_builder_parse_iso_date(raw: Any, field_name: str) -> datetime:
+    text = str(raw or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        raise ValueError(f"{field_name} must be YYYY-MM-DD")
+    try:
+        return datetime.strptime(text, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be YYYY-MM-DD") from exc
+
+
+def _report_builder_default_date_bounds(df: pd.DataFrame) -> tuple[datetime, datetime]:
+    if df is None or df.empty or "WorkDate" not in df.columns:
+        raise ValueError("Facility PBJ daily rows are not loaded.")
+    wd = pd.to_datetime(df["WorkDate"], errors="coerce").dropna()
+    if wd.empty:
+        raise ValueError("Facility PBJ work dates are unavailable.")
+    lo_raw = cast(Any, wd.min())
+    hi_raw = cast(Any, wd.max())
+    if pd.isna(lo_raw) or pd.isna(hi_raw):
+        raise ValueError("Facility PBJ work dates are unavailable.")
+    lo = pd.Timestamp(lo_raw).to_pydatetime()
+    hi = pd.Timestamp(hi_raw).to_pydatetime()
+    return cast(datetime, lo), cast(datetime, hi)
+
+
+def _report_builder_parse_ranges(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        s = str(item.get("start_date") or item.get("start") or "").strip()
+        e = str(item.get("end_date") or item.get("end") or "").strip()
+        role = str(item.get("role") or "primary").strip().lower()
+        if role not in ("primary", "secondary"):
+            role = "primary"
+        if not s or not e:
+            continue
+        try:
+            sd = _report_builder_parse_iso_date(s, "date_range.start")
+            ed = _report_builder_parse_iso_date(e, "date_range.end")
+        except ValueError:
+            continue
+        if ed < sd:
+            sd, ed = ed, sd
+        out.append({"start": sd, "end": ed, "role": role})
+    return out
+
+
+def _generate_attorney_report_compat(report_kwargs: Dict[str, Any]) -> str:
+    """Call generate_attorney_report with only kwargs the loaded library accepts."""
+    import facility_report_lib
+
+    safe = getattr(facility_report_lib, "generate_attorney_report_safe", None)
+    if callable(safe):
+        return safe(report_kwargs)
+
+    import inspect
+
+    kwargs = dict(report_kwargs or {})
+    attempts = 0
+    while attempts < 16:
+        attempts += 1
+        try:
+            sig = inspect.signature(facility_report_lib.generate_attorney_report)
+            allowed = set(sig.parameters.keys())
+            filtered = {k: v for k, v in kwargs.items() if k in allowed}
+            return facility_report_lib.generate_attorney_report(**filtered)
+        except TypeError as exc:
+            msg = str(exc)
+            if "unexpected keyword argument" not in msg:
+                raise
+            match = re.search(r"argument '([^']+)'", msg)
+            if not match:
+                raise
+            bad_key = match.group(1)
+            if bad_key not in kwargs:
+                raise
+            kwargs.pop(bad_key, None)
+    raise TypeError("generate_attorney_report_compat: too many incompatible keyword arguments")
+
+
+def _report_builder_v3_generate_html(payload: dict[str, Any]) -> dict[str, Any]:
+    import facility_report_lib
+    import report_builder_v3 as rb3
+
+    global global_df
+    if global_df is None or len(global_df) == 0:
+        raise ValueError("Facility daily data is not loaded yet.")
+    df = cast(pd.DataFrame, global_df.copy())
+    bounds_lo, bounds_hi = _report_builder_default_date_bounds(df)
+
+    start_dt = _report_builder_parse_iso_date(payload.get("start_date") or bounds_lo.strftime("%Y-%m-%d"), "start_date")
+    end_dt = _report_builder_parse_iso_date(payload.get("end_date") or bounds_hi.strftime("%Y-%m-%d"), "end_date")
+    if end_dt < start_dt:
+        start_dt, end_dt = end_dt, start_dt
+    if end_dt < bounds_lo or start_dt > bounds_hi:
+        raise ValueError("Selected period is outside loaded PBJ date bounds.")
+    start_dt = max(start_dt, bounds_lo)
+    end_dt = min(end_dt, bounds_hi)
+
+    key_dates, key_date_notes, key_date_types = rb3.parse_key_date_events(payload.get("key_dates"))
+    date_ranges_of_interest = _report_builder_parse_ranges(payload.get("date_ranges_of_interest"))
+    staffing_emphasis = str(payload.get("staffing_emphasis") or "total_first").strip() or "total_first"
+    include_total_staffing = staffing_emphasis != "direct_only"
+    direct_first = staffing_emphasis == "direct_first"
+
+    facility_info = facility_report_lib.get_facility_info(df, start_dt, end_dt)
+    provnum = str(facility_info.get("provnum") or "").strip().zfill(6)
+
+    all_quarters = sorted(df["CY_Qtr"].astype(str).dropna().unique().tolist()) if "CY_Qtr" in df.columns else []
+    start_q = f"{start_dt.year}Q{((start_dt.month - 1) // 3) + 1}"
+    end_q = f"{end_dt.year}Q{((end_dt.month - 1) // 3) + 1}"
+    quarters_in_range = [q for q in all_quarters if start_q <= q <= end_q]
+
+    quarterly_data: dict[str, Any] = {}
+    for quarter in quarters_in_range:
+        q_metrics = facility_report_lib.calculate_quarterly_metrics(df, quarter)
+        if q_metrics:
+            quarterly_data[quarter] = q_metrics
+
+    state_code = str(facility_info.get("state") or "").strip()
+    state_comparisons = facility_report_lib.get_state_averages_batch(state_code, quarters_in_range)
+    period_metrics = facility_report_lib.calculate_period_metrics(df, start_dt, end_dt) or {}
+    macpac_standards = facility_report_lib.get_macpac_state_standards(state_code) or {}
+    min_staffing = float(macpac_standards.get("min_staffing", 0.0) or 0.0)
+    if min_staffing > 0:
+        days_under = facility_report_lib.calculate_days_under_state_minimum(
+            df,
+            start_dt,
+            end_dt,
+            min_staffing,
+        )
+        if isinstance(days_under, dict):
+            period_metrics.update(days_under)
+
+    daily_staffing: list[dict[str, Any]] = []
+    for d in key_dates:
+        day_data = facility_report_lib.get_daily_staffing(df, d)
+        if day_data:
+            daily_staffing.append(day_data)
+
+    red_flags_history: list[dict[str, Any]] = []
+    case_mix_data: list[dict[str, Any]] = []
+    previous_names: list[dict[str, str]] | list[str] = facility_info.get("previous_names") or []
+    try:
+        provider_info_df = facility_report_lib.load_provider_info_data(provnum)
+        if provider_info_df is not None and not provider_info_df.empty:
+            red_flags_history = facility_report_lib.extract_red_flags_history(provider_info_df, start_dt, end_dt)
+            case_mix_data = facility_report_lib.extract_case_mix_data(
+                provider_info_df,
+                start_dt,
+                end_dt,
+                quarters_in_range=None,
+            )
+            previous_names_with_years = facility_report_lib.get_previous_names_with_years(
+                provnum,
+                provider_info_df,
+                str(facility_info.get("name") or ""),
+            )
+            if previous_names_with_years:
+                previous_names = previous_names_with_years
+    except Exception:
+        provider_info_df = None
+
+    ein_detail = globals().get("ein_employee_detail_df")
+    v3_extras = rb3.build_v3_report_extras(
+        payload=payload,
+        df=df,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        bounds_lo=bounds_lo,
+        bounds_hi=bounds_hi,
+        key_dates=key_dates,
+        key_date_notes=key_date_notes,
+        key_date_types=key_date_types,
+        include_total_staffing=include_total_staffing,
+        min_staffing=min_staffing,
+        facility_info=facility_info,
+        facility_report_lib=facility_report_lib,
+        ein_detail_df=ein_detail,
+        state_code=state_code,
+        macpac_standards=macpac_standards,
+        case_mix_data=case_mix_data,
+        quarters_in_range=quarters_in_range,
+    )
+
+    report_kwargs: Dict[str, Any] = {
+        "provnum": provnum,
+        "facility_name": str(facility_info.get("name") or ""),
+        "city": str(facility_info.get("city") or ""),
+        "state": state_code,
+        "start_date": start_dt,
+        "end_date": end_dt,
+        "key_dates": key_dates,
+        "key_date_notes": key_date_notes,
+        "quarterly_data": quarterly_data,
+        "state_comparisons": state_comparisons,
+        "date_ranges_of_interest": date_ranges_of_interest,
+        "period_metrics": period_metrics,
+        "daily_staffing": daily_staffing,
+        "macpac_standards": macpac_standards,
+        "red_flags_history": red_flags_history,
+        "case_mix_data": case_mix_data,
+        "pbj_df": df,
+        "include_total_staffing": include_total_staffing,
+        "direct_first": direct_first,
+        "watermark": False,
+        "include_sections": cast(dict[str, bool], v3_extras["include_sections"]),
+        "previous_names": cast(Sequence, previous_names),
+        "section_order": v3_extras["section_order"],
+        "v3_report_summary_html": v3_extras["v3_report_summary_html"],
+        "event_windows_section_html": v3_extras["event_windows_section_html"],
+        "supporting_context_section_html": v3_extras.get("supporting_context_section_html") or "",
+        "key_staffing_findings_section_html": v3_extras.get("key_staffing_findings_section_html") or "",
+    }
+    html_report = _generate_attorney_report_compat(report_kwargs)
+
+    safe_name = re.sub(r"[^a-z0-9_]+", "_", str(facility_info.get("name") or provnum).lower()).strip("_")
+    file_name = f"staffing_analysis_memo_{provnum}_{safe_name}_{datetime.now().strftime('%Y%m%d')}.html"
+
+    return {
+        "html": html_report,
+        "file_name": file_name,
+        "resolved_start_date": start_dt.strftime("%Y-%m-%d"),
+        "resolved_end_date": end_dt.strftime("%Y-%m-%d"),
+        "warnings": v3_extras.get("warnings") or [],
+        "staffing_findings": v3_extras.get("staffing_findings") or [],
+        "findings_count": len(v3_extras.get("staffing_findings") or []),
+    }
+
+
+@app.route("/api/report_builder_v3/preview", methods=["POST"])
+def api_report_builder_v3_preview():
+    try:
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return jsonify({"error": "Invalid JSON payload"}), 400
+        built = _report_builder_v3_generate_html(cast(dict[str, Any], payload))
+        return jsonify(
+            {
+                "success": True,
+                "html": built["html"],
+                "file_name": built["file_name"],
+                "resolved_start_date": built["resolved_start_date"],
+                "resolved_end_date": built["resolved_end_date"],
+                "warnings": built["warnings"],
+                "staffing_findings": built.get("staffing_findings") or [],
+            }
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except ImportError as exc:
+        return jsonify({"error": f"Report builder v3 module missing: {exc}"}), 500
+    except Exception as exc:
+        return jsonify({"error": f"Report preview failed: {exc}"}), 500
+
+
+@app.route("/api/report_builder_v3/download_html", methods=["POST"])
+def api_report_builder_v3_download_html():
+    try:
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return jsonify({"error": "Invalid JSON payload"}), 400
+        built = _report_builder_v3_generate_html(cast(dict[str, Any], payload))
+        response = Response(str(built["html"]), mimetype="text/html")
+        response.headers["Content-Disposition"] = f"attachment; filename={built['file_name']}"
+        return response
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": f"Report download failed: {exc}"}), 500
+
+
 @app.route('/api/quarters')
 def get_quarters():
     """Get available quarters"""
