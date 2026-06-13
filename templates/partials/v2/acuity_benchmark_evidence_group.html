@@ -1,0 +1,7 @@
+{# v2 — Case-mix + Harrington rollups as grouped evidence list #}
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_evidence_group %}
+
+{% call pbj_chart_evidence_group('Benchmark detail tables', 'pbjAcuityEvidenceGroup') %}
+{% include 'partials/v2/case_mix_acuity_rollup_accordion.html' %}
+{% include 'partials/v2/harrington_expected_rollup_accordion.html' %}
+{% endcall %}

@@ -1,0 +1,68 @@
+{# CMS CHOW + ownership context (loaded via API) #}
+    <div class="modal fade" id="pbjChowOwnershipModal" tabindex="-1" aria-labelledby="pbjChowOwnershipModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2 px-3">
+                    <h5 class="modal-title fs-6" id="pbjChowOwnershipModalLabel">Ownership &amp; CHOW</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body py-2 px-3 small" id="pbjChowOwnershipModalBody">
+                    <p class="text-muted mb-0">Loading…</p>
+                </div>
+                <style>
+                    #pbjChowOwnershipModal .pbj-chow-tx-row {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 0.3rem;
+                        padding: 0.5rem 0;
+                        border-bottom: 1px solid #f1f5f9;
+                    }
+                    #pbjChowOwnershipModal .pbj-chow-tx-row:last-child {
+                        border-bottom: none;
+                    }
+                    #pbjChowOwnershipModal .pbj-chow-tx-head {
+                        display: flex;
+                        flex-wrap: nowrap;
+                        align-items: center;
+                        gap: 0.35rem;
+                    }
+                    #pbjChowOwnershipModal .pbj-chow-tx-date {
+                        font-weight: 700;
+                        color: #0f172a;
+                        white-space: nowrap;
+                    }
+                    #pbjChowOwnershipModal .pbj-chow-change-tag {
+                        font-size: 0.65rem;
+                        font-weight: 600;
+                        padding: 0.1rem 0.4rem;
+                        border-radius: 0.25rem;
+                        background: #ede9fe;
+                        color: #5b21b6 !important;
+                        border: 1px solid #c4b5fd;
+                        white-space: nowrap;
+                        flex-shrink: 0;
+                    }
+                    #pbjChowOwnershipModal .pbj-chow-tx-entities {
+                        display: flex;
+                        flex-wrap: wrap;
+                        align-items: baseline;
+                        gap: 0.2rem 0.35rem;
+                        line-height: 1.35;
+                    }
+                    #pbjChowOwnershipModal .pbj-chow-buyer {
+                        font-weight: 600;
+                        color: #0f172a;
+                    }
+                    #pbjChowOwnershipModal .pbj-chow-seller {
+                        color: #64748b;
+                        white-space: nowrap;
+                    }
+                </style>
+                <div class="modal-footer py-2 px-3 d-flex flex-wrap gap-2 justify-content-between">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary d-none" id="pbjChowModalAnchorBtn" onclick="if(typeof pbjV2ApplyChowCompareFromModal==='function'){pbjV2ApplyChowCompareFromModal();}">Use CHOW date in compare windows</button>
+                </div>
+            </div>
+        </div>
+    </div>

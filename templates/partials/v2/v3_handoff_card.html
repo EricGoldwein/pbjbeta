@@ -1,0 +1,23 @@
+{# V3 — bottom-of-pane "Continue analysis" handoff (summary line updated client-side) #}
+{% macro pbj_v3_handoff_card(pane_key, summary_fallback, actions, checks, footnote='') %}
+{% if superdynamic_v3_panes|default(false) %}
+<div class="pbj-v3-handoff-card" id="pbjV3Handoff{{ pane_key | capitalize }}" data-pbj-v3-handoff="{{ pane_key }}" aria-live="polite">
+    <div class="pbj-v3-handoff-eyebrow">Continue analysis</div>
+    <h3 class="pbj-v3-handoff-title h6 mb-2">Suggested next steps</h3>
+    <p class="pbj-v3-handoff-summary small text-body mb-2" id="pbjV3Handoff{{ pane_key | capitalize }}Summary">{{ summary_fallback }}</p>
+    {% if footnote %}
+    <p class="pbj-v3-handoff-footnote small text-muted mb-2">{{ footnote }}</p>
+    {% endif %}
+    <div class="pbj-v3-handoff-actions d-flex flex-wrap gap-2 mb-2">
+        {% for action in actions %}
+        <button type="button" class="btn btn-sm {% if loop.first %}btn-outline-primary{% else %}btn-outline-secondary{% endif %} pbj-v3-handoff-btn" data-pbj-v3-handoff-action="{{ action.action }}">{{ action.label }}</button>
+        {% endfor %}
+    </div>
+    <ul class="pbj-v3-handoff-checks small text-muted mb-0 ps-3">
+        {% for check in checks %}
+        <li>{{ check }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endmacro %}

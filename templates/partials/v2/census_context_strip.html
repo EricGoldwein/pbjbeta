@@ -1,0 +1,34 @@
+{# v2 — Census summary strip (chart footer or profile header) #}
+{% if census_strip_variant == 'profile' %}
+        <div id="pbjProfileCensusContextStrip" class="pbj-census-context-strip pbj-census-context-strip--profile" aria-label="Census summary for selected period">
+            <dl class="pbj-census-context-stats mb-0">
+                <div class="pbj-census-context-stat pbj-census-context-stat--avg">
+                    <dt id="pbjProfileCensusCtxAvgLabel">Avg census</dt>
+                    <dd class="pbj-census-context-avg-cell">
+                        <span id="pbjProfileCensusCtxAvg">—</span>
+                        <div id="pbjProfileCensusContextSparkline" class="pbj-census-context-sparkline" role="img" aria-label="Census trend sparkline"></div>
+                    </dd>
+                </div>
+                <div class="pbj-census-context-stat">
+                    <dt>Occupancy</dt>
+                    <dd id="pbjProfileCensusCtxOccupancy">—</dd>
+                </div>
+            </dl>
+        </div>
+{% else %}
+        <div id="pbjCensusContextStrip" class="pbj-census-context-strip" aria-label="Census summary for selected period">
+            <dl class="pbj-census-context-stats mb-0">
+                <div class="pbj-census-context-stat pbj-census-context-stat--avg">
+                    <dt id="pbjCensusCtxAvgLabel">Avg census</dt>
+                    <dd class="pbj-census-context-avg-cell">
+                        <span id="pbjCensusCtxAvg">—</span>
+                        <div id="pbjCensusContextSparkline" class="pbj-census-context-sparkline" role="img" aria-label="Census trend sparkline"></div>
+                    </dd>
+                </div>
+                <div class="pbj-census-context-stat">
+                    <dt>Occupancy</dt>
+                    <dd id="pbjCensusCtxOccupancy">—</dd>
+                </div>
+            </dl>
+        </div>
+{% endif %}

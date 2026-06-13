@@ -1,0 +1,190 @@
+{# v2 — Quarterly PBJ rollup (always quarterly; independent of chart grain) #}
+
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_utility_disclosure %}
+
+
+
+        {% call pbj_chart_utility_disclosure('quarterlyStaffingRollupSection', 'quarterlyStaffingRollupCollapse', 'quarterlyStaffingRollupBtn', 'fa-table', 'Quarterly PBJ rollup table', 'Role-level quarterly detail · HPRD with raw hours · CMS source links', export_onclick='exportQuarterlyDataToCSV()') %}
+
+
+
+                <div id="quarterlyBenchmarksSection" class="guided-scroll-anchor">
+
+
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pbj-qtr-rollup-toolbar">
+
+
+
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+
+
+
+                            <button type="button" class="btn btn-link btn-sm p-0 pbj-summary-info-btn text-muted" data-bs-toggle="modal" data-bs-target="#quarterlyRollupsLegendModal" title="How to read HPRD cells and bold QoQ changes" aria-label="Quarterly rollups legend"><i class="fas fa-circle-info" style="font-size:0.8rem;" aria-hidden="true"></i><span class="visually-hidden">Quarterly rollups legend</span></button>
+
+
+
+                            <span class="small text-muted" id="quarterlyFocusHint">Showing focused quarter window.</span>
+                            <span class="small text-muted d-none" id="quarterlyStatsUpdatingStatus" aria-live="polite"></span>
+
+
+
+                        </div>
+
+
+
+                        <div class="d-flex flex-row align-items-center gap-2 pbj-qtr-toolbar flex-wrap flex-shrink-0 ms-md-auto">
+
+
+
+                            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1">
+
+
+
+                                <input class="form-check-input" type="checkbox" role="switch" id="quarterlyShowRoleDetail" autocomplete="off">
+
+
+
+                                <label class="form-check-label small text-nowrap" for="quarterlyShowRoleDetail">Show role detail</label>
+
+
+
+                            </div>
+
+
+
+                            <button class="btn btn-sm btn-outline-primary" id="quarterlyShowAllBtn" type="button" onclick="toggleQuarterlyAcuityShowAll()" title="Show every loaded PBJ quarter in this table, or return to the filter-focused window.">
+
+
+
+                                <span class="qb-expand-label-wrap"><span class="qb-expand-label">Show all PBJ quarters</span></span>
+
+
+
+                            </button>
+
+
+
+                        </div>
+
+
+
+                    </div>
+
+
+
+                    <div class="table-responsive dashboard-table-scroll pbj-chart-rollup-table-scroll">
+
+
+
+                        <table class="table table-sm table-bordered table-striped table-hover mb-0 table-anchored pbj-quarterly-table--core" id="quarterlyDataTable">
+
+
+
+                            <thead class="table-dark">
+
+
+
+                                <tr>
+
+
+
+                                    <th class="text-center sortable quarter-col-core" data-sort="quarter">Quarter<span class="quarter-th-sub text-white-50">PBJ</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-core" data-sort="census">Census<span class="quarter-th-sub text-white-50">avg / day</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-metric-emphasis quarter-col-core" data-sort="total_hprd">Total<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-metric-emphasis quarter-col-core" data-sort="direct_hprd">Direct<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-metric-emphasis quarter-col-core" data-sort="rn_hprd">RN direct<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-metric-emphasis quarter-col-core" data-sort="lpn_hprd">LPN direct<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-metric-emphasis quarter-col-core" data-sort="total_nurse_aide_hprd">Nurse aide<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-core" data-sort="contract_pct_direct">Contract %<span class="quarter-th-sub text-white-50">direct care</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-core" data-sort="contract_pct_total">Contract %<span class="quarter-th-sub text-white-50">total nurse</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-metric-emphasis quarter-col-detail" data-sort="total_rn_hprd">RN total<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-detail" data-sort="rn_admin_hprd">RN Admin<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-detail" data-sort="rn_don_hprd">RN DON<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-metric-emphasis quarter-col-detail" data-sort="total_lpn_hprd">LPN total<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-detail" data-sort="lpn_admin_hprd">LPN Admin<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-detail" data-sort="cna_hprd">CNA<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-detail" data-sort="na_train_hprd">NA train<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                    <th class="text-center sortable quarter-col-detail" data-sort="med_aide_hprd">Med aide<span class="quarter-th-sub text-white-50">HPRD · hrs in ()</span></th>
+
+
+
+                                </tr>
+
+
+
+                            </thead>
+
+
+
+                            <tbody id="quarterlyDataBody">
+
+
+
+                            </tbody>
+
+
+
+                        </table>
+
+
+
+                    </div>
+
+
+
+                </div>
+
+
+
+        {% endcall %}
+
+

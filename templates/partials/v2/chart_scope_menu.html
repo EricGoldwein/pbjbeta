@@ -1,0 +1,247 @@
+{# v2 — Singleton chart range + events panels (shared anchor, separate dialogs) #}
+
+<div id="pbjChartRangeMenu" class="pbj-chart-scope-menu pbj-chart-range-menu d-none" role="dialog" aria-label="Date range" aria-modal="false">
+
+    <div class="pbj-chart-scope-menu-inner shadow-sm border rounded-3 bg-white p-2">
+
+        <div class="pbj-chart-scope-menu-head d-flex align-items-start justify-content-between gap-2 mb-2">
+
+            <div class="pbj-chart-scope-menu-title-wrap pbj-chart-scope-drag-handle min-w-0" title="Drag to reposition">
+
+                <div class="pbj-chart-scope-menu-title d-flex align-items-center gap-2">
+
+                    <i class="fas fa-calendar-week pbj-chart-scope-title-icon" aria-hidden="true"></i>
+
+                    <span>Date range</span>
+
+                </div>
+
+                <p class="pbj-chart-scope-menu-subtitle mb-0" id="pbjChartRangeMenuSubtitle">Chart</p>
+
+            </div>
+
+            <button type="button" class="btn-close btn-close-sm pbj-chart-scope-close-btn" id="pbjChartRangeCloseBtn" aria-label="Close date range panel"></button>
+
+        </div>
+
+
+
+        <div class="pbj-grain-segment-wrap mb-2">
+
+            <div class="btn-group pbj-grain-segment btn-group-sm w-100" role="group" aria-label="Chart range grain">
+
+                <input type="radio" class="btn-check" name="pbjChartScopeGrain" id="pbjChartScopeGrainYears" value="years">
+
+                <label class="btn btn-sm" for="pbjChartScopeGrainYears">Years</label>
+
+                <input type="radio" class="btn-check" name="pbjChartScopeGrain" id="pbjChartScopeGrainQuarters" value="quarters" checked>
+
+                <label class="btn btn-sm" for="pbjChartScopeGrainQuarters">Quarters</label>
+
+                <input type="radio" class="btn-check" name="pbjChartScopeGrain" id="pbjChartScopeGrainMonths" value="months">
+
+                <label class="btn btn-sm d-none d-md-inline-flex" for="pbjChartScopeGrainMonths">Months</label>
+
+                <input type="radio" class="btn-check" name="pbjChartScopeGrain" id="pbjChartScopeGrainRange" value="daterange">
+
+                <label class="btn btn-sm" for="pbjChartScopeGrainRange">Custom</label>
+
+                <input type="radio" class="btn-check" name="pbjChartScopeGrain" id="pbjChartScopeGrainDay" value="day">
+
+                <label class="btn btn-sm pbj-chart-scope-grain-day-label" for="pbjChartScopeGrainDay">Day</label>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--quarters">
+
+            <label class="form-label text-muted small mb-0" for="pbjChartScopeQuarterSelect">Quarters</label>
+
+            <select class="form-select form-select-sm pbj-chart-scope-multi" id="pbjChartScopeQuarterSelect" multiple size="4" aria-label="Chart quarter filter"></select>
+
+        </div>
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--years d-none">
+
+            <label class="form-label text-muted small mb-0" for="pbjChartScopeYearSelect">Years</label>
+
+            <select class="form-select form-select-sm pbj-chart-scope-multi" id="pbjChartScopeYearSelect" multiple size="4" aria-label="Chart year filter"></select>
+
+        </div>
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--months d-none">
+
+            <div class="row g-1">
+
+                <div class="col-6">
+
+                    <label class="form-label text-muted small mb-0" for="pbjChartScopeStartMonth">Start</label>
+
+                    <input type="month" class="form-control form-control-sm" id="pbjChartScopeStartMonth">
+
+                </div>
+
+                <div class="col-6">
+
+                    <label class="form-label text-muted small mb-0" for="pbjChartScopeEndMonth">End</label>
+
+                    <input type="month" class="form-control form-control-sm" id="pbjChartScopeEndMonth">
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--daterange d-none">
+
+            <div class="row g-1">
+
+                <div class="col-6">
+
+                    <label class="form-label text-muted small mb-0" for="pbjChartScopeStartDate">Start</label>
+
+                    <input type="date" class="form-control form-control-sm" id="pbjChartScopeStartDate">
+
+                </div>
+
+                <div class="col-6">
+
+                    <label class="form-label text-muted small mb-0" for="pbjChartScopeEndDate">End</label>
+
+                    <input type="date" class="form-control form-control-sm" id="pbjChartScopeEndDate">
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--day d-none">
+
+            <label class="form-label text-muted small mb-0" for="pbjChartScopeDayDate">Work date</label>
+
+            <input type="date" class="form-control form-control-sm" id="pbjChartScopeDayDate" aria-label="Chart single work date">
+
+        </div>
+
+
+
+        <div class="pbj-chart-scope-actions d-flex align-items-center gap-2 mt-2">
+
+            <button type="button" class="btn btn-sm px-2 pbj-btn-apply-navy flex-grow-1" id="pbjChartRangeApplyBtn">Apply range</button>
+
+            <button type="button" class="btn btn-sm pbj-btn-reset-ghost" id="pbjChartRangeResetBtn" title="Reset to Control Center range" aria-label="Reset range">
+
+                <span class="d-none d-sm-inline">Reset range</span>
+
+                <i class="fas fa-rotate-left d-sm-none" aria-hidden="true"></i>
+
+            </button>
+
+        </div>
+
+        <div class="pbj-chart-scope-resize-handle" aria-hidden="true" title="Resize panel"></div>
+
+    </div>
+
+</div>
+
+
+
+<div id="pbjChartEventsMenu" class="pbj-chart-scope-menu pbj-chart-events-menu d-none" role="dialog" aria-label="Events" aria-modal="false">
+
+    <div class="pbj-chart-scope-menu-inner shadow-sm border rounded-3 bg-white p-2">
+
+        <div class="pbj-chart-scope-menu-head pbj-chart-events-menu-head mb-2">
+
+            <div class="d-flex align-items-start justify-content-between gap-2 min-w-0">
+
+                <div class="pbj-chart-scope-menu-title-wrap pbj-chart-scope-drag-handle min-w-0 flex-grow-1" title="Drag to reposition">
+
+                    <div class="pbj-chart-scope-menu-title d-flex align-items-center gap-2">
+
+                        <i class="fas fa-circle-dot pbj-chart-scope-title-icon pbj-chart-events-title-icon" aria-hidden="true"></i>
+
+                        <span>Events</span>
+
+                    </div>
+
+                    <p class="pbj-chart-scope-menu-subtitle mb-0" id="pbjChartEventsMenuSubtitle">Chart</p>
+
+                </div>
+
+                <button type="button" class="btn-close btn-close-sm pbj-chart-scope-close-btn flex-shrink-0" id="pbjChartEventsCloseBtn" aria-label="Close events panel"></button>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="pbj-chart-events-visibility mb-2">
+
+            <div class="form-check form-switch mb-1 pbj-chart-events-master-switch d-flex align-items-center justify-content-start gap-2 ps-0">
+
+                <input class="form-check-input pbj-trend-events-switch flex-shrink-0 ms-0" type="checkbox" role="switch" id="pbjChartEventsMenuMasterSwitch" checked aria-label="Show markers on chart">
+
+                <label class="form-check-label mb-0" for="pbjChartEventsMenuMasterSwitch">Show markers on chart</label>
+
+            </div>
+
+            <p class="pbj-chart-scope-hint text-muted mb-0">Adds vertical markers for selected events.</p>
+
+        </div>
+
+
+
+        <div class="pbj-chart-scope-events-section">
+
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+
+                <span class="pbj-chart-scope-events-title mb-0">Events in selected range</span>
+
+                <button type="button" class="btn btn-link btn-sm p-0 pbj-chart-scope-possible-events-btn" id="pbjChartScopeEventsManageBtn" title="Manage event types" aria-label="Manage event types">
+
+                    Event types <i class="fas fa-chevron-right fa-2xs ms-1" aria-hidden="true"></i>
+
+                </button>
+
+            </div>
+
+            <div id="pbjChartScopeEventsList" class="pbj-chart-scope-events-list pbj-events-compact-timeline" aria-live="polite"></div>
+
+            <label class="pbj-chart-scope-add-event-label d-block mb-1" for="pbjChartScopeEventDate">Add event</label>
+
+            <div class="pbj-chart-scope-add-event-row d-flex gap-1 align-items-center">
+
+                <input type="date" class="form-control form-control-sm pbj-chart-scope-event-date-input" id="pbjChartScopeEventDate" aria-label="Date" title="Date">
+
+                <input type="text" class="form-control form-control-sm flex-grow-1 min-w-0" id="pbjChartScopeEventNote" placeholder="Event label" maxlength="120" aria-label="Event label">
+
+                <button type="button" class="btn btn-sm btn-outline-secondary pbj-chart-scope-event-add-btn flex-shrink-0" id="pbjChartScopeEventAddBtn" title="Add event marker" aria-label="Add event marker">
+
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+
+                </button>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="pbj-chart-scope-actions d-flex align-items-center gap-2 mt-2">
+
+            <button type="button" class="btn btn-sm px-2 pbj-btn-apply-navy flex-grow-1" id="pbjChartEventsApplyBtn" aria-label="Apply event markers">Apply event markers</button>
+
+        </div>
+
+        <div class="pbj-chart-scope-resize-handle" aria-hidden="true" title="Resize panel"></div>
+
+    </div>
+
+</div>

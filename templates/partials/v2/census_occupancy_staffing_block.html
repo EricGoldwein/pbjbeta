@@ -1,0 +1,235 @@
+{# v2 — Census & occupancy detail (collapsed; inherits staffing period/grain) #}
+
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_utility_disclosure %}
+
+
+
+        <div id="pbjCensusOccupancyStaffingBlock" class="pbj-census-occupancy-detail">
+
+
+
+            {% call pbj_chart_utility_disclosure('censusOccupancyRollupSection', 'censusOccupancyDetailCollapse', 'censusOccupancyDetailBtn', 'fa-chart-line', 'Census & occupancy detail', 'Resident census and occupancy trend · table detail', export_table_id='censusOccupancyTable', export_slug='census_occupancy_rollup') %}
+
+
+
+                <div class="pbj-census-detail-panel" id="pbjCensusDetailPanel">
+
+
+
+                    <div class="pbj-chart-toolbar census-occupancy-chart-head w-100 mb-2 pbj-census-detail-toolbar">
+
+
+
+                        <div class="pbj-chart-toolbar-title-cluster">
+
+
+
+                            <ul class="nav nav-pills border-0 pbj-segment-tabs pbj-ui-tabs mb-0" id="censusOccupancyTabs" role="tablist">
+
+
+
+                                <li class="nav-item" role="presentation"><button class="nav-link active" id="censusOccupancyTabCensus" data-bs-toggle="tab" data-bs-target="#censusOccupancyPaneCensus" type="button" role="tab" aria-controls="censusOccupancyPaneCensus" aria-selected="true">Census</button></li>
+
+
+
+                                <li class="nav-item" role="presentation"><button class="nav-link" id="censusOccupancyTabOccupancy" data-bs-toggle="tab" data-bs-target="#censusOccupancyPaneOccupancy" type="button" role="tab" aria-controls="censusOccupancyPaneOccupancy" aria-selected="false">Occupancy</button></li>
+
+
+
+                            </ul>
+
+
+
+                        </div>
+
+
+
+                        <div class="pbj-chart-toolbar-controls census-card-head-actions">
+
+
+
+                            <div class="pbj-chart-tool-cluster">
+
+
+
+                                <div class="btn-group btn-group-sm pbj-chart-grain-toggle census-view-toggle" role="group" aria-label="Census time grain (detail)">
+
+
+
+                                    <input type="radio" class="btn-check" name="censusView" id="censusDaily" value="daily">
+
+
+
+                                    <label class="btn census-grain-daily-month" for="censusDaily"><span class="desktop-text">Daily</span><span class="mobile-text">Day</span></label>
+
+
+
+                                    <input type="radio" class="btn-check" name="censusView" id="censusMonthly" value="month" checked>
+
+
+
+                                    <label class="btn census-grain-daily-month" for="censusMonthly"><span class="desktop-text">Monthly</span><span class="mobile-text">Mo</span></label>
+
+
+
+                                    <input type="radio" class="btn-check" name="censusView" id="censusQuarterly" value="quarter">
+
+
+
+                                    <label class="btn" for="censusQuarterly"><span class="desktop-text">Quarterly</span><span class="mobile-text">Qtr</span></label>
+
+
+
+                                    <input type="radio" class="btn-check" name="censusView" id="censusYearly" value="year">
+
+
+
+                                    <label class="btn" for="censusYearly"><span class="desktop-text">Annually</span><span class="mobile-text">Yr</span></label>
+
+
+
+                                </div>
+
+
+
+                            </div>
+
+
+
+                            <span class="pbj-chart-tool-divider" aria-hidden="true"></span>
+
+
+
+                            <div class="pbj-chart-tool-cluster pbj-census-detail-events">
+
+
+
+                                {% include 'partials/v2/chart_events_toolbar.html' %}
+
+
+
+                            </div>
+
+
+
+                        </div>
+
+
+
+                    </div>
+
+
+
+                    <div class="pbj-census-chart-table-row">
+
+                        <div class="pbj-census-chart-table-row__chart">
+
+                            <div id="censusOccupancyChartWrap">
+
+
+
+                                <div class="tab-content">
+
+
+
+                                    <div class="tab-pane fade show active" id="censusOccupancyPaneCensus" role="tabpanel" aria-labelledby="censusOccupancyTabCensus">
+
+
+
+                                        <div id="censusTrendChart" class="w-100 census-occupancy-chart-host pbj-census-detail-chart"></div>
+
+
+
+                                    </div>
+
+
+
+                                    <div class="tab-pane fade" id="censusOccupancyPaneOccupancy" role="tabpanel" aria-labelledby="censusOccupancyTabOccupancy">
+
+
+
+                                        <div id="providerInfoOccupancyChart" class="w-100 census-occupancy-chart-host pbj-census-detail-chart"></div>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                            </div>
+
+                        </div>
+
+                        <div class="pbj-census-chart-table-row__table">
+
+                            <p class="small text-muted mb-1 fw-semibold" id="pbjCensusTableCaption">Daily PBJ table</p>
+
+                            <div class="pbj-census-table-scroll-wrap dashboard-table-scroll">
+
+                                <table class="table table-sm table-striped table-hover mb-0 pbj-census-unified-table" id="censusOccupancyTable">
+
+
+
+                                    <thead class="table-dark">
+
+
+
+                                        <tr>
+
+
+
+                                            <th scope="col" class="pbj-census-col-period sortable pbj-rollup-sort-th" data-pbj-rollup-col="0">Period</th>
+
+
+
+                                            <th scope="col" class="pbj-census-col-num sortable pbj-rollup-sort-th" data-pbj-rollup-col="1">Census</th>
+
+
+
+                                            <th scope="col" class="pbj-census-col-num sortable pbj-rollup-sort-th" data-pbj-rollup-col="2">Beds</th>
+
+
+
+                                            <th scope="col" class="pbj-census-col-num sortable pbj-rollup-sort-th" data-pbj-rollup-col="3">Occ.</th>
+
+
+
+                                        </tr>
+
+
+
+                                    </thead>
+
+
+
+                                    <tbody id="censusOccupancyTableBody"></tbody>
+
+
+
+                                </table>
+
+
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                </div>
+
+
+
+            {% endcall %}
+
+
+
+        </div>
+
+

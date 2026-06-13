@@ -1,0 +1,197 @@
+{# v2 — Nursing staff HPRD trend module (chart + census context + drilldowns) #}
+
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_evidence_group %}
+
+
+
+            <div id="hprdTrendSection" class="guided-scroll-anchor">
+
+
+
+            <div class="row">
+
+
+
+                <div class="col-md-12 mb-4">
+
+
+
+                    <div class="card border shadow-sm pbj-trend-chart-card pbj-staffing-trend-module h-100">
+
+
+
+                    <div class="card-header py-2 px-3 bg-light border-bottom">
+
+
+
+                    <div class="pbj-chart-toolbar hprd-trends-chart-head">
+
+
+
+                        <div class="pbj-chart-toolbar-title-cluster text-center text-md-start">
+
+
+
+                            <div class="btn-group btn-group-sm pbj-segment-toggle" role="group" aria-label="Nursing staff metric">
+
+
+
+                                <input type="radio" class="btn-check" name="trendMetric" id="trendMetricHprd" value="hprd" checked>
+
+
+
+                                <label class="btn" for="trendMetricHprd">HPRD</label>
+
+
+
+                                <input type="radio" class="btn-check" name="trendMetric" id="trendMetricHours" value="hours">
+
+
+
+                                <label class="btn" for="trendMetricHours"><span class="desktop-text">Hours/day</span><span class="mobile-text">Hrs/d</span></label>
+
+
+
+                            </div>
+
+
+
+                            <h5 class="pbj-chart-toolbar-title" id="pbjHprdChartHeading">Staffing trends</h5>
+
+
+
+                        </div>
+
+
+
+                        <div class="pbj-chart-toolbar-controls justify-content-center justify-content-md-end">
+
+
+
+                            <div class="pbj-chart-tool-cluster">
+
+
+
+                            <div class="btn-group btn-group-sm pbj-chart-grain-toggle" role="group" aria-label="HPRD view toggle">
+
+
+
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdDaily" value="daily" checked>
+
+
+
+                                <label class="btn" for="hprdDaily"><span class="desktop-text">Daily</span><span class="mobile-text">Day</span></label>
+
+
+
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdMonthly" value="month">
+
+
+
+                                <label class="btn" for="hprdMonthly"><span class="desktop-text">Monthly</span><span class="mobile-text">Mo</span></label>
+
+
+
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdQuarterly" value="quarter">
+
+
+
+                                <label class="btn" for="hprdQuarterly"><span class="desktop-text">Quarterly</span><span class="mobile-text">Qtr</span></label>
+
+
+
+                                <input type="radio" class="btn-check" name="hprdView" id="hprdYearly" value="year">
+
+
+
+                                <label class="btn d-none d-md-inline-block" for="hprdYearly"><span class="desktop-text">Annually</span><span class="mobile-text">Yr</span></label>
+
+
+
+                            </div>
+
+
+
+                                </div>
+
+
+
+                            <span class="pbj-chart-tool-divider" aria-hidden="true"></span>
+
+
+
+                            <div class="pbj-chart-tool-cluster pbj-hprd-chart-tail-tools">
+
+
+
+                            {% set chart_scope_show_benchmark_mobile = true %}
+                            {% include 'partials/v2/chart_events_toolbar.html' %}
+                            {% set chart_scope_show_benchmark_mobile = false %}
+
+
+
+                            <span class="pbj-chart-tool-divider pbj-chart-tool-divider--inline d-none d-md-inline-block" aria-hidden="true"></span>
+
+
+
+                                <div class="pbj-chart-state-min-inline" title="State minimum HPRD reference line on this chart">
+                                    <i class="fas fa-ruler-horizontal fa-xs text-secondary" aria-hidden="true"></i>
+                                    <input type="number" class="pbj-chart-state-min-input" id="pbjChartStateMinOverride" step="0.01" min="0" max="20" inputmode="decimal" aria-label="State minimum HPRD" />
+                                    <button type="button" class="btn btn-link btn-sm p-0 pbj-summary-info-btn text-muted align-self-center" data-bs-toggle="modal" data-bs-target="#summaryStateMinExplainModal" title="How state minimum HPRD is estimated" aria-label="State minimum staffing methodology"><i class="fas fa-circle-info" style="font-size:0.72rem;" aria-hidden="true"></i></button>
+                                </div>
+
+
+
+                                </div>
+
+
+
+                        </div>
+
+
+
+                    </div>
+
+
+
+                    </div>
+
+
+
+                    <div class="card-body pt-2 pb-3 pbj-staffing-trend-module-body">
+
+                        <div class="pbj-hprd-trend-chart-shell">
+                            <div id="hprdTrendChart" class="census-occupancy-chart-host"></div>
+                        </div>
+
+                        <div id="complianceReviewSection" class="pbj-staffing-compliance-block guided-scroll-anchor">
+                        {% include 'partials/v2/compliance_analysis_toolbar.html' %}
+                        </div>
+
+                        {% call pbj_chart_evidence_group('Supporting facility data', 'pbjStaffingEvidenceGroup') %}
+                        {% include 'partials/v2/quarterly_staffing_rollup_accordion.html' %}
+                        {% include 'partials/v2/census_occupancy_staffing_block.html' %}
+                        {% include 'partials/v2/ratings_over_time_block.html' %}
+                        {% endcall %}
+
+
+
+                    </div>
+
+
+
+                    </div>
+
+
+
+                </div>
+
+
+
+            </div>
+
+
+
+            </div>
+
+
