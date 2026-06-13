@@ -1,0 +1,460 @@
+        <div class="main-container pbj-report-builder pbj-report-builder-v3 pb-4" id="pbjReportBuilderV3Pane">
+
+            <section class="dashboard-section mb-0" aria-labelledby="pbjReportBuilderV3Heading">
+
+                <div class="card rb3-context-card shadow-sm mb-3">
+
+                    <div class="card-body py-3 px-3 px-md-4">
+
+                        <h2 id="pbjReportBuilderV3Heading" class="visually-hidden">Case Builder for {{ facility_name_display }}</h2>
+
+                        <div class="rb3-hero-slim-row">
+
+                            <div class="rb3-hero-slim-main min-w-0">
+
+                                <nav class="rb-hero-bc mb-1 rb3-hero-standalone-hide" aria-label="Breadcrumb">
+
+                                    <ol class="breadcrumb flex-wrap align-items-center mb-0 py-0">
+
+                                        <li class="breadcrumb-item">
+
+                                            <a href="{{ pbj_dashboard_href|default('/', true) }}" class="rb-hero-bc-nav">Dashboard</a>
+
+                                        </li>
+
+                                        <li class="breadcrumb-item active" aria-current="page"><span class="rb-hero-bc-current">Case Builder</span></li>
+
+                                    </ol>
+
+                                </nav>
+
+                                <p class="facility-header-product-line mb-1 text-start">PBJ320 Nursing Home Staffing Intelligence</p>
+
+                                <div class="d-flex flex-wrap align-items-center gap-2 rb3-hero-standalone-hide">
+
+                                    <h1 class="rb-case-title mb-0 d-inline-flex align-items-center gap-2">
+
+                                        PBJ320 Case Builder
+
+                                        <span class="pbj-ai-beta-badge pbj-readable-badge">Beta</span>
+
+                                    </h1>
+
+                                </div>
+
+                                <p class="rb3-facility-name mb-0">{{ facility_name_display }} <span class="text-secondary font-monospace">({{ provnum }})</span></p>
+
+                                <p class="rb-hero-lead mb-0 mt-1">Build a staffing memo from CMS PBJ data for this facility and selected period.</p>
+
+                            </div>
+
+                            <span class="rb-freshness-badge is-loading flex-shrink-0" id="rb3DataFreshnessBadge"
+
+                                data-min-workdate="{{ pbj_min_work_date|default('', true) }}"
+
+                                data-max-workdate="{{ pbj_max_work_date|default('', true) }}">Coverage…</span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="row g-3 align-items-lg-start">
+
+                    <div class="col-12 col-lg-5 col-xl-4">
+
+                        <div class="d-flex flex-column gap-2 rb3-simple-flow">
+
+
+
+                            <div class="card rb3-sidebar-card shadow-sm rb3-setup-card">
+
+                                <div class="card-body py-3 px-3 d-flex flex-column gap-0">
+
+
+
+                                    <div class="rb3-setup-block">
+
+                                        <span class="rb3-setup-step d-block mb-2">Period</span>
+
+                                        <div class="btn-group btn-group-sm w-100 rb3-period-quick" role="group" aria-label="Quick period">
+
+                                            <button type="button" class="btn btn-outline-secondary active" data-rb3-period-quick="latest_quarter">Latest quarter</button>
+
+                                            <button type="button" class="btn btn-outline-secondary" data-rb3-period-quick="latest_year">Latest year</button>
+
+                                            <button type="button" class="btn btn-outline-secondary" data-rb3-period-quick="custom">Custom</button>
+
+                                        </div>
+
+                                        <details class="rb3-period-editor mt-2" id="rb3PeriodEditor">
+
+                                            <summary class="rb3-period-card-summary" aria-live="polite">
+
+                                                <span class="rb3-period-summary-label">Selected period</span>
+
+                                                <span class="rb3-period-summary-value" id="rb3SelectedPeriodLabel">—</span>
+
+                                            </summary>
+
+                                            <div class="rb3-period-editor-body pt-2">
+
+                                                <input type="hidden" id="rb3PeriodMode" value="quarter">
+
+                                                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Report period mode">
+
+                                                    <button type="button" class="btn btn-outline-secondary rb3-period-tab" data-rb3-period-mode="year">Years</button>
+
+                                                    <button type="button" class="btn btn-outline-secondary rb3-period-tab active" data-rb3-period-mode="quarter">Quarters</button>
+
+                                                    <button type="button" class="btn btn-outline-secondary rb3-period-tab" data-rb3-period-mode="custom">Date range</button>
+
+                                                </div>
+
+                                                <div class="row g-2 align-items-end mb-2">
+
+                                                    <div class="col-12 d-none" id="rb3PeriodYearWrap">
+
+                                                        <select id="rb3PeriodYear" class="form-select form-select-sm rb3-period-select" multiple size="3" aria-label="Select years"></select>
+
+                                                    </div>
+
+                                                    <div class="col-12" id="rb3PeriodQuarterWrap">
+
+                                                        <select id="rb3PeriodQuarter" class="form-select form-select-sm rb3-period-select" multiple size="3" aria-label="Select quarters"></select>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="row g-2" id="rb3PeriodDatesWrap">
+
+                                                    <div class="col-6">
+
+                                                        <label for="rb3StartDate" class="form-label fw-semibold small mb-1">Start</label>
+
+                                                        <input type="date" id="rb3StartDate" class="form-control form-control-sm" autocomplete="off">
+
+                                                    </div>
+
+                                                    <div class="col-6">
+
+                                                        <label for="rb3EndDate" class="form-label fw-semibold small mb-1">End</label>
+
+                                                        <input type="date" id="rb3EndDate" class="form-control form-control-sm" autocomplete="off">
+
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+
+                                        </details>
+
+                                    </div>
+
+
+
+                                    <div class="rb3-setup-block rb3-keydates-block" id="rb3KeyDatesBlock">
+
+                                        <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-2">
+
+                                            <span class="rb3-setup-step">Key dates</span>
+
+                                            <span id="rb3CaseDatesSummary" class="rb3-inline-hint rb3-keydates-summary-hint text-secondary">e.g. Apr 12 — incident</span>
+
+                                        </div>
+
+                                        <p class="rb3-helper-text mb-2">Case dates appear in the memo header and staffing-around-event sections.</p>
+
+                                        <div id="rb3KeyDatesList" class="d-flex flex-column gap-2" role="group" aria-label="Key dates"></div>
+
+                                        <button type="button" class="btn btn-sm w-100 rb-keydates-add d-inline-flex align-items-center justify-content-center gap-2 mt-2" id="rb3KeyDatesAddBtn">
+
+                                            <span class="rb-keydates-add-icon" aria-hidden="true">+</span><span>Add another date</span>
+
+                                        </button>
+
+                                    </div>
+
+
+
+                                    <details class="rb3-setup-block rb3-memo-design-details" id="rb3MemoDesignDetails">
+
+                                        <summary class="rb3-memo-design-summary">Design memo</summary>
+
+                                        <div class="pt-2">
+
+                                            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+
+                                                <span class="rb3-setup-step">Memo sections</span>
+
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none rb3-text-action" id="rb3SectionsResetBtn">Reset sections</button>
+
+                                            </div>
+
+                                            <p class="rb3-helper-text mb-2">Drag to reorder. Toggle off to exclude from the memo.</p>
+
+                                            <div id="rb3SectionsList" class="rb3-sections-list rb3-sections-list--compact" role="list" aria-label="Report sections order"></div>
+
+                                        </div>
+
+                                    </details>
+
+
+
+                                    <div class="rb3-setup-block rb3-findings-compact">
+
+                                        <span class="rb3-setup-step d-block mb-2">Detection / staffing flags</span>
+
+                                        <div class="form-check mb-0">
+
+                                            <input class="form-check-input" type="checkbox" id="rb3AutoDetectFindings" checked>
+
+                                            <label class="form-check-label small" for="rb3AutoDetectFindings">Auto-detect staffing flags</label>
+
+                                        </div>
+
+                                        <p class="rb3-helper-text mb-0 mt-1">Flags staffing patterns inside selected memo sections.</p>
+
+                                        <div class="rb3-findings-focus-wrap mt-2">
+
+                                            <span class="rb3-findings-focus-label">Flag focus</span>
+
+                                            <p class="rb3-helper-text mb-1 mt-0">All types start selected (full scan). Click a chip to narrow which staffing issues are detected for the memo.</p>
+
+                                            <div id="rb3FocusChips" class="d-flex flex-wrap gap-1" role="group" aria-label="Finding focus">
+
+                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="compliance_rn" aria-pressed="true">Compliance &amp; RN</button>
+
+                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="acuity" aria-pressed="true">Acuity</button>
+
+                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="patterns" aria-pressed="true">Patterns</button>
+
+                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="case_dates" aria-pressed="true">Key dates</button>
+
+                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="data_quality" aria-pressed="true">Data quality</button>
+
+                                            </div>
+
+                                        </div>
+
+                                        <p id="rb3FocusHint" class="rb3-helper-text mb-0 mt-1" aria-live="polite"></p>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <div class="card rb3-sidebar-card shadow-sm rb-actions-sticky rb3-actions-compact">
+
+                                <div class="card-body py-3 px-3">
+
+                                    <button type="button" class="btn btn-primary w-100 mb-2" id="rb3PreviewBtn">Generate memo</button>
+
+                                    <button type="button" class="btn btn-sm btn-outline-primary w-100 rb3-preview-gated d-none" id="rb3DownloadBtn" disabled title="Generate a memo preview first.">Download HTML</button>
+
+                                    <p id="rb3DownloadHint" class="rb3-helper-text mb-0 mt-2">Generate a memo to unlock download and print.</p>
+
+                                    <div id="rb3Status" class="small text-muted mt-2 mb-0" role="status" aria-live="polite"></div>
+
+                                    <div id="rb3Warnings" class="alert alert-warning py-2 px-2 small mb-0 mt-2 d-none" role="alert"></div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <details class="rb3-disclosure rb3-advanced-panel rb3-advanced-card rb3-ai-panel mb-0" id="rb3AiPanel">
+
+                                <summary class="rb3-advanced-disclosure-summary">
+
+                                    <span class="rb3-advanced-summary-main">
+
+                                        <span class="rb3-advanced-title d-inline-flex align-items-center gap-2 flex-wrap">
+
+                                            {{ pbj320_mark(' AI') }}
+
+                                            <span class="pbj-ai-beta-badge pbj-readable-badge">beta</span>
+
+                                        </span>
+
+                                        <span id="rb3AiPanelSummary" class="rb3-advanced-summary-hint">Send scoped PBJ data and a starter prompt to Claude, ChatGPT, or Gemini</span>
+
+                                    </span>
+
+                                    <span class="rb3-advanced-chevron" aria-hidden="true"></span>
+
+                                </summary>
+
+                                <div class="rb3-disclosure-body rb3-advanced-body d-flex flex-column gap-3">
+
+                                    <p class="small text-secondary mb-0">Download the data pack below, copy the starter prompt from the toolkit, and attach both in your AI chat. Key dates and incidents you add above are included in the export.</p>
+
+                                    <p class="small mb-0"><span class="text-muted">Period:</span> <strong class="text-body" id="rb3AiScopeLine">—</strong></p>
+
+                                    <div class="d-flex flex-wrap gap-2">
+
+                                        <button type="button" class="btn btn-sm btn-primary" id="rb3AiOpenToolkitBtn" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">Open AI toolkit</button>
+
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="rb3AiCopyPromptBtn">Copy starter prompt</button>
+
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="rb3AiDownloadCsvBtn"><i class="fas fa-download me-1" aria-hidden="true"></i><span class="d-md-none">CSV</span><span class="d-none d-md-inline">Export CSV</span></button>
+
+                                    </div>
+
+                                    <div id="rb3FindingCategoriesWrap" class="d-none">
+
+                                        <span class="small fw-semibold text-secondary d-block mb-2">Finding categories</span>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="compliance" checked> Compliance</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="rn_coverage" checked> RN</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="headcount" checked> Headcount</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="acuity_gap" checked> Acuity</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="staffing_volatility" checked> Fluctuations</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="employee_anomaly" checked> Employees</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="weekend_pattern" checked> Weekends</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="event_window" checked> Event windows</label>
+
+                                        <label class="form-check form-check-inline small mb-0"><input class="form-check-input rb3-finding-cat" type="checkbox" value="data_quality" checked> Data quality</label>
+
+                                    </div>
+
+                                    <select id="rb3StaffingEmphasis" class="d-none" aria-hidden="true" tabindex="-1">
+
+                                        <option value="total_first" selected>Total hours, then direct care</option>
+
+                                    </select>
+
+                                    <textarea id="rb3DateRangesText" class="d-none" aria-hidden="true" tabindex="-1"></textarea>
+
+                                    <div id="rb3EventWindowsBlock" class="d-none">
+
+                                        <span class="small fw-semibold text-secondary d-block mb-2">Staffing around key dates</span>
+
+                                        <div id="rb3EventWindowsList" class="d-flex flex-column gap-1 mb-2"></div>
+
+                                        <div class="d-none border rounded p-2 mb-0" id="rb3CustomWindowWrap">
+
+                                            <div class="row g-2">
+
+                                                <div class="col-6"><input type="date" id="rb3CustomWindowStart" class="form-control form-control-sm" aria-label="Custom window start"></div>
+
+                                                <div class="col-6"><input type="date" id="rb3CustomWindowEnd" class="form-control form-control-sm" aria-label="Custom window end"></div>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </details>
+
+
+
+                            <div class="card rb3-sidebar-card shadow-sm d-none" id="rb3UserItemsPanel">
+
+                                <div class="card-header py-2 px-3">Added report items</div>
+
+                                <div class="card-body py-3">
+
+                                    <ul id="rb3UserItemsList" class="mb-0 ps-3"></ul>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="col-12 col-lg-7 col-xl-8">
+
+                        <div class="card rb3-sidebar-card shadow-sm rb-preview-card h-100">
+
+                            <div class="card-header py-2 px-3 pbj-ui-header-actions">
+
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 w-100">
+
+                                    <h3 class="h6 mb-0 fw-semibold text-body">Preview</h3>
+
+                                    <div class="rb-preview-toolbar d-inline-flex align-items-center gap-2">
+
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rb3-preview-gated d-none" id="rb3FullscreenBtn" disabled title="Generate a memo preview first.">Full screen</button>
+
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rb3-preview-gated d-none" id="rb3PrintBtn" disabled title="Generate a memo preview first.">Print</button>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            <div class="card-body p-2 p-md-3">
+
+                                <script type="application/json" id="pbj-report-builder-v3-meta">{{ {'ccn': provnum|string, 'facility': facility_name_display, 'v3_enabled': true, 'standalone': true, 'quarters': pbj_available_quarters|default([]), 'min_workdate': pbj_min_work_date|default('', true), 'max_workdate': pbj_max_work_date|default('', true) } | tojson }}</script>
+
+                                <div class="rb-paper-shell rb3-paper-empty" id="rb3PaperShell">
+
+                                    <div class="rb-preview-overlay" id="rb3PreviewOverlay" aria-live="polite" aria-hidden="true">
+
+                                        <div class="rb-preview-overlay-card">
+
+                                            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status" aria-hidden="true"></div>
+
+                                            <div class="small fw-semibold">Building memo…</div>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="rb-paper-frame">
+
+                                        <div class="rb3-preview-empty-state" id="rb3PreviewEmptyState" role="status" aria-live="polite">
+
+                                            <div class="rb3-preview-empty-inner text-center">
+
+                                                <p class="rb3-preview-empty-title fw-semibold text-body mb-1">No memo generated</p>
+
+                                                <p class="rb3-preview-empty-hint rb3-helper-text mb-0">Select a period and choose <strong>Generate memo</strong>.</p>
+
+                                            </div>
+
+                                        </div>
+
+                                        <iframe id="rb3PreviewFrame" class="rounded-0 border-0 bg-white shadow-none d-none" title="Memo preview" style="width: 100%; height: 0; min-height: 0; border: 0;"></iframe>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
