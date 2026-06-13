@@ -20,6 +20,7 @@ Usage:
   python run_facility_dashboard.py 015009 --ein-mode none
   python run_facility_dashboard.py 015009 --ein-mode selected --ein-quarters CY2024Q1,CY2024Q2
   python run_facility_dashboard.py 335581 --deployment-bundle
+  python run_facility_dashboard.py 315461 --v2
 """
 
 import argparse
@@ -50,6 +51,11 @@ def main() -> None:
         "--deployment-bundle",
         action="store_true",
         help="Run deployments/pbj320-<CCN>/facility_*_flask_app.py with that folder as cwd (Vercel-style bundle).",
+    )
+    parser.add_argument(
+        "--v2",
+        action="store_true",
+        help="Render superdynamic_dashboard_v2.html (local V2 UI smoke; V1 APIs only).",
     )
     args = parser.parse_args()
 
@@ -111,6 +117,9 @@ def main() -> None:
     
     # Create and run the dashboard
     print(f"\n🚀 Starting dashboard for facility {provnum}...")
+
+    if args.v2:
+        os.environ["PBJ_SUPERDYNAMIC_TEMPLATE"] = "v2"
 
     ein_quarters = [q.strip() for q in args.ein_quarters.split(",") if q.strip()]
     run_dashboard(

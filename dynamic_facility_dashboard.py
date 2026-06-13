@@ -38,7 +38,11 @@ import glob
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 from urllib.parse import quote
 
-from pbj_identifiers.urls import PBJ_RANKINGS_REPORT_URL, generate_state_dashboard_url
+from pbj_identifiers.urls import (
+    PBJ_RANKINGS_REPORT_URL,
+    cms_nh_health_citations_dataset_explorer_url,
+    generate_state_dashboard_url,
+)
 from pbj_identifiers.validators import validate_state_code
 
 from facility_report_lib import calculate_harrington_adjusted_hprd
@@ -208,6 +212,27 @@ def _ein_employee_detail_workdate_bounds_iso() -> dict[str, Any]:
     return out
 
 
+def _local_dashboard_template_name() -> str:
+    """Local dashboard Jinja template; default V1. Set PBJ_SUPERDYNAMIC_TEMPLATE=v2 for V2 smoke."""
+    raw = (os.environ.get("PBJ_SUPERDYNAMIC_TEMPLATE") or "").strip()
+    if not raw:
+        return "dynamic_facility_dashboard.html"
+    low = raw.lower().removesuffix(".html")
+    if low in ("v2", "superdynamic_v2", "superdynamic_dashboard_v2"):
+        return "superdynamic_dashboard_v2.html"
+    if low.endswith("_v2") or low.endswith("dashboard_v2"):
+        return "superdynamic_dashboard_v2.html"
+    if raw.endswith(".html"):
+        return raw
+    return "dynamic_facility_dashboard.html"
+
+
+def _superdynamic_v3_panes_enabled() -> bool:
+    """Multi-pane V3 shell. Opt-in via PBJ_SUPERDYNAMIC_V3_PANES."""
+    raw = (os.environ.get("PBJ_SUPERDYNAMIC_V3_PANES") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
 def _pbj_template_client_config() -> dict[str, str]:
     """Jinja context for `pbjApiUrl` / `pbj_api_href` (see templates/dynamic_facility_dashboard.html).
 
@@ -219,9 +244,11 @@ def _pbj_template_client_config() -> dict[str, str]:
     mid = _pbj_resolved_ga_measurement_id()
     explicit_api = _pbj_normalize_public_api_origin(_pbj_env_str("PUBLIC_API_ORIGIN"))
     inferred_api = _pbj_inferred_public_api_origin()
+    marketing_origin = _pbj_env_str("PBJ320_MARKETING_ORIGIN").strip().rstrip("/") or "https://www.pbj320.com"
     return {
         "pbj_public_api_origin": explicit_api or inferred_api,
         "pbj_public_site_base_path": _pbj_normalize_public_site_base(_pbj_env_str("PUBLIC_SITE_BASE_PATH")),
+        "pbj320_marketing_origin": marketing_origin,
         "pbj_analytics_ga_id": mid,
         "pbj_analytics_plausible_domain": _pbj_env_str("PUBLIC_PLAUSIBLE_DOMAIN")
         or _pbj_env_str("VITE_PLAUSIBLE_DOMAIN"),
@@ -3534,8 +3561,25 @@ def index():
     og_page_url = request.base_url.rstrip("/")
     og_image_url = "https://www.pbj320.com/pbj.seo.png"
     pbj_entity_base_url = "https://www.pbj320.com/entity"
+    _dash_tpl = _local_dashboard_template_name()
+    _v2_shell = _dash_tpl == "superdynamic_dashboard_v2.html"
+    nh_health_citations_cms_explorer_url = (
+        cms_nh_health_citations_dataset_explorer_url(str(facility_provnum))
+        or "https://data.cms.gov/provider-data/dataset/r5ix-sfxw"
+    )
+    pbj_premium_facility_base_url = ""
+    if _v2_shell and facility_provnum and facility_provnum != "Unknown":
+        _mkt = _pbj_env_str("PBJ320_MARKETING_ORIGIN").strip().rstrip("/") or "https://www.pbj320.com"
+        pbj_premium_facility_base_url = f"{_mkt}/premium/{str(facility_provnum).strip().zfill(6)}"
     return render_template(
-        "dynamic_facility_dashboard.html",
+        _dash_tpl,
+        superdynamic_v2=_v2_shell,
+        superdynamic_v3_panes=_superdynamic_v3_panes_enabled(),
+        pbj_include_nonnurse=True,
+        nh_health_citations_cms_explorer_url=nh_health_citations_cms_explorer_url,
+        pbj_premium_facility_base_url=pbj_premium_facility_base_url,
+        ein_cms_job_codes_reference=[],
+        ein_headcount_csv_comment_lines=[],
         facility_name=facility_name,
         facility_name_display=facility_name_display,
         page_title=page_title,
