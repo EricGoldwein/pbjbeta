@@ -1,0 +1,181 @@
+{# v2 — Reusable chart + supporting-table module primitives.
+
+   pbj_chart_utility_disclosure — supporting data row (title left, Expand/Collapse then Export CSV on right).
+
+   pbj_chart_rollup_disclosure — alias for chart-paired modules (same layout as utility disclosure).
+
+   pbj_chart_evidence_group — stacked supporting rows under a chart (Supporting facility data).
+
+#}
+
+{% from 'partials/v2/export_macros.html' import pbj_export_btn %}
+
+
+{% macro pbj_chart_supporting_export(export_table_id='', export_slug='', export_onclick='', title='Download table as CSV') %}
+{% if export_onclick %}
+{{ pbj_export_btn('csv', onclick=export_onclick, extra_class='pbj-chart-rollup-foot-export', title=title, aria_label=title) }}
+{% elif export_table_id %}
+<button type="button" class="btn btn-sm btn-outline-secondary pbj-export-btn pbj-export-btn--csv pbj-chart-rollup-foot-export"
+        data-pbj-rollup-export="{{ export_table_id }}"
+        {% if export_slug %}data-pbj-rollup-slug="{{ export_slug }}"{% endif %}
+        title="{{ title }}" aria-label="{{ title }}">
+    <i class="fas fa-download" aria-hidden="true"></i>
+    <span class="pbj-export-btn-label"><span class="d-md-none">CSV</span><span class="d-none d-md-inline">Export CSV</span></span>
+</button>
+{% endif %}
+{% endmacro %}
+
+
+{% macro pbj_chart_evidence_group(label, group_id='') %}
+
+        <div class="pbj-chart-evidence-group"{% if group_id %} id="{{ group_id }}"{% endif %} role="group" aria-label="{{ label }}">
+
+            <p class="pbj-chart-evidence-group-label mb-0">{{ label }}</p>
+
+            <div class="pbj-chart-evidence-list">
+
+                {{ caller() }}
+
+            </div>
+
+        </div>
+
+{% endmacro %}
+
+
+{% macro pbj_chart_utility_disclosure_shell(section_id, collapse_id, btn_id, icon, title, helper_text='', export_table_id='', export_slug='', export_onclick='', inline=false, body='') %}
+
+        <div id="{{ section_id }}" class="pbj-chart-module pbj-chart-utility-disclosure pbj-chart-evidence-list__item{% if inline %} pbj-chart-module--chart-paired{% endif %}">
+
+            <div class="pbj-chart-module__supporting-row pbj-chart-utility-disclosure-row">
+
+                <div class="pbj-chart-module__supporting-title pbj-chart-utility-disclosure-main">
+
+                    <i class="fas {{ icon }} pbj-chart-utility-disclosure-icon" aria-hidden="true"></i>
+
+                    <div class="pbj-chart-module__supporting-copy pbj-chart-utility-disclosure-copy">
+
+                        <span class="pbj-chart-module__supporting-title-text pbj-chart-utility-disclosure-title">{{ title }}</span>
+
+                        {% if helper_text %}
+
+                        <span class="pbj-chart-module__supporting-description pbj-chart-utility-disclosure-helper">{{ helper_text }}</span>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+                <div class="pbj-chart-module__table-controls pbj-chart-utility-disclosure-controls" role="group" aria-label="{{ title }} controls">
+
+                    <button class="btn btn-sm pbj-chart-module__toggle-btn pbj-chart-utility-disclosure-btn pbj-chart-disclosure-toggle-btn collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#{{ collapse_id }}"
+                            aria-expanded="false"
+                            aria-controls="{{ collapse_id }}"
+                            id="{{ btn_id }}"
+                            aria-label="Expand {{ title }}">
+
+                        <i class="fas fa-chevron-down pbj-disclosure-chevron" aria-hidden="true"></i>
+
+                        <span class="visually-hidden pbj-chart-utility-disclosure-sr-toggle">
+
+                            <span class="pbj-chart-utility-action-expand">Expand</span>
+
+                            <span class="pbj-chart-utility-action-collapse">Collapse</span>
+
+                        </span>
+
+                    </button>
+
+                    {% if export_table_id or export_onclick %}
+
+                    {{ pbj_chart_supporting_export(export_table_id, export_slug, export_onclick, 'Download ' ~ title ~ ' as CSV') }}
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+            <div id="{{ collapse_id }}" class="collapse" aria-labelledby="{{ btn_id }}">
+
+                <div class="pbj-chart-module__table pbj-chart-utility-disclosure-body">
+
+                    {{ body }}
+
+                </div>
+
+            </div>
+
+        </div>
+
+{% endmacro %}
+
+
+{% macro pbj_chart_utility_disclosure(section_id, collapse_id, btn_id, icon, title, helper_text='', export_table_id='', export_slug='', export_onclick='', inline=false) %}
+
+        {{ pbj_chart_utility_disclosure_shell(section_id, collapse_id, btn_id, icon, title, helper_text, export_table_id, export_slug, export_onclick, inline, caller()) }}
+
+{% endmacro %}
+
+
+{% macro pbj_chart_rollup_disclosure(section_id, collapse_id, btn_id, title, helper_text='', icon='fa-table', export_table_id='', export_slug='', export_onclick='') %}
+
+        {{ pbj_chart_utility_disclosure_shell(section_id, collapse_id, btn_id, icon, title, helper_text, export_table_id, export_slug, export_onclick, true, caller()) }}
+
+{% endmacro %}
+
+
+{% macro pbj_chart_rollup_data_table(table_id, tbody_id, export_slug='', include_export=true) %}
+
+                <div class="table-responsive dashboard-table-scroll pbj-chart-rollup-table-scroll">
+
+                    <table class="table table-sm table-striped table-hover mb-0 pbj-chart-rollup-data-table" id="{{ table_id }}">
+
+                        <thead class="table-dark" id="{{ table_id }}Head">
+
+                            <tr><th scope="col" class="sortable pbj-rollup-sort-th" data-pbj-rollup-col="0">Period</th></tr>
+
+                        </thead>
+
+                        <tbody id="{{ tbody_id }}"></tbody>
+
+                        {% if include_export %}
+
+                        <tfoot class="pbj-chart-rollup-table-foot">
+
+                            <tr>
+
+                                <td colspan="99" class="border-0 pt-2 pb-0">
+
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pbj-export-btn pbj-export-btn--csv pbj-chart-rollup-foot-export"
+
+                                            data-pbj-rollup-export="{{ table_id }}"
+
+                                            {% if export_slug %}data-pbj-rollup-slug="{{ export_slug }}"{% endif %}
+
+                                            title="Download table as CSV" aria-label="Download table as CSV">
+
+                                        <i class="fas fa-download" aria-hidden="true"></i>
+
+                                        <span class="pbj-export-btn-label"><span class="d-md-none">CSV</span><span class="d-none d-md-inline">Export CSV</span></span>
+
+                                    </button>
+
+                                </td>
+
+                            </tr>
+
+                        </tfoot>
+
+                        {% endif %}
+
+                    </table>
+
+                </div>
+
+{% endmacro %}
+

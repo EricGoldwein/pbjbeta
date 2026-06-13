@@ -1,0 +1,58 @@
+{# v2 — Chart toolbar: Range + Events triggers (panels are singleton partial) #}
+
+
+
+<div class="pbj-trend-events-toolbar" data-pbj-chart-scope-profile="{{ chart_scope_profile|default('default') }}" role="group" aria-label="Chart range and timeline events">
+
+
+
+    <div class="pbj-chart-scope-header-btns d-none d-md-inline-flex align-items-center gap-1 flex-shrink-0">
+
+
+
+        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 pbj-trend-range-menu-btn" title="Date range for this chart" aria-label="Date range" aria-haspopup="dialog" aria-controls="pbjChartRangeMenu">
+
+            <i class="fas fa-calendar-week pbj-trend-scope-calendar-icon me-1" aria-hidden="true"></i>
+
+            <span class="pbj-trend-range-btn-label">Range</span>
+
+        </button>
+
+
+
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 pbj-trend-events-panel-btn" title="Timeline events on this chart" aria-label="Events" aria-haspopup="dialog" aria-controls="pbjChartEventsMenu" aria-pressed="false">
+
+            <span class="pbj-trend-events-btn-label">Events</span>
+
+        </button>
+
+
+
+    </div>
+
+
+
+    <div class="dropdown d-md-none pbj-chart-scope-mobile-options flex-shrink-0">
+
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" aria-label="Chart options">Options</button>
+
+        <ul class="dropdown-menu dropdown-menu-end">
+
+            <li><button type="button" class="dropdown-item pbj-trend-range-menu-btn">Range</button></li>
+
+            <li><button type="button" class="dropdown-item pbj-trend-events-panel-btn">Events</button></li>
+
+            {% if chart_scope_show_benchmark_mobile %}
+
+            <li><button type="button" class="dropdown-item pbj-chart-scope-mobile-benchmark-btn" data-pbj-benchmark-trigger="pbjChartStateMinOverride">Benchmark</button></li>
+
+            {% endif %}
+
+        </ul>
+
+    </div>
+
+
+
+</div>
+

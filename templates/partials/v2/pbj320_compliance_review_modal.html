@@ -1,0 +1,37 @@
+{# v2 — PBJ320 staffing compliance review (results from compliance_analysis_toolbar) #}
+{% from 'partials/v2/brand_macros.html' import pbj320_mark %}
+{% if has_state_standard %}
+
+<div class="modal fade" id="pbj320ComplianceReviewModal" tabindex="-1" aria-labelledby="pbj320ComplianceReviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-md-down pbj320-compliance-review-modal-dialog">
+        <div class="modal-content position-relative" id="pbj320ComplianceReviewPrintRoot">
+            <div class="pbj320-snapshot-scorecard-inner">
+                <div class="modal-header border-bottom py-2 px-3 align-items-start">
+                    <div class="flex-grow-1 min-w-0 pe-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            {% if favicon_href %}<img src="{{ favicon_href }}" width="18" height="18" alt="" class="pbj-pbj320-summary-favicon" aria-hidden="true">{% endif %}
+                            <span class="pbj320-snapshot-modal-kicker pbj-brand-kicker">{{ pbj320_mark(' Compliance Review') }}</span>
+                        </div>
+                        <h5 class="modal-title fs-6 mb-0 text-dark" id="pbj320ComplianceReviewModalLabel"><span class="d-md-none">{{ facility_name_display }}</span><span class="d-none d-md-inline">{{ facility_name_display }} ({{ provnum }})</span></h5>
+                        <p class="small text-muted mb-0 pbj320-compliance-review-header-meta">
+                            <span class="pbj320-compliance-review-period-wrap"><span class="pbj320-snapshot-audit-period-label">Review period:</span> <span id="pbj320ComplianceReviewPeriodLine">—</span></span>
+                            <span class="pbj320-compliance-review-meta-sep" id="pbj320ComplianceReviewMetaSep" aria-hidden="true">·</span>
+                            <span class="pbj320-compliance-review-criteria-wrap" id="pbj320ComplianceReviewCriteriaLine" aria-live="polite">—</span>
+                        </p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body py-2 px-2 px-sm-3" id="pbj320ComplianceReviewModalBody">
+                    {% include 'partials/v2/compliance_state_card.html' %}
+                </div>
+                <div class="modal-footer pbj320-compliance-review-modal-footer border-top py-2 px-3">
+                    <div class="d-flex flex-wrap gap-2 justify-content-end w-100">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}

@@ -1,0 +1,21 @@
+{# v2 — staffing standards settings modal (federal proxies + state benchmark) #}
+{% if has_state_standard %}
+
+<div class="modal fade" id="complianceSettingsModal" tabindex="-1" aria-labelledby="complianceSettingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable pbj-compliance-settings-modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header border-bottom py-2 px-3">
+                <h5 class="modal-title fs-6 mb-0" id="complianceSettingsModalLabel">Staffing standards settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pbj-compliance-settings-body py-2 px-3">
+                {% include 'partials/v2/compliance_settings_panel.html' %}
+            </div>
+            <div class="modal-footer border-top py-2 px-3">
+                <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}

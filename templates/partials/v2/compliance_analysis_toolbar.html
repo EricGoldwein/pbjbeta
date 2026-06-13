@@ -1,0 +1,44 @@
+{# v2 — PBJ staffing standards review (federal proxies + state benchmark) #}
+{% if has_state_standard %}
+{% set compliance_state_long = facility_state_long_name or (state_standard_info.state_name if state_standard_info else state) %}
+{% set compliance_default_hprd = state_standard_info.max_staffing if state_standard_info and state_standard_info.value_type == 'range' and state_standard_info.max_staffing is not none else (state_standard_info.min_staffing if state_standard_info and state_standard_info.min_staffing is not none else 2.56) %}
+
+<div id="complianceAnalysisToolbar" class="pbj-compliance-toolbar-strip mt-2" aria-label="PBJ staffing standards review">
+    <div class="pbj-compliance-toolbar-body">
+        <div class="pbj-compliance-toolbar-leading">
+            <span class="pbj-compliance-toolbar-label">PBJ Staffing Standards</span>
+
+            <div class="pbj-compliance-toolbar-dates" role="group" aria-label="Analysis period">
+                <label for="complianceStartDate" class="visually-hidden">Start date</label>
+                <input type="date" class="form-control form-control-sm pbj-compliance-date-input" id="complianceStartDate" value="2021-01-01" title="Start date (follows Control Center when you Apply)">
+                <span class="pbj-compliance-date-sep" aria-hidden="true">–</span>
+                <label for="complianceEndDate" class="visually-hidden">End date</label>
+                <input type="date" class="form-control form-control-sm pbj-compliance-date-input" id="complianceEndDate" title="End date (follows Control Center when you Apply)">
+            </div>
+
+            <button type="button" class="btn btn-sm btn-outline-secondary pbj-compliance-settings-btn" id="complianceSettingsOpenBtn" data-bs-toggle="modal" data-bs-target="#complianceSettingsModal" title="Federal staffing proxies and {{ compliance_state_long }} state standard / benchmark" aria-haspopup="dialog" aria-controls="complianceSettingsModal">
+                <i class="fas fa-sliders-h" aria-hidden="true"></i><span class="visually-hidden">Staffing standards settings</span>
+            </button>
+
+            <div class="pbj-compliance-toolbar-actions">
+                <button type="button" class="btn btn-sm pbj-compliance-analyze-btn pbj-btn-pbj320-compliance-review" id="pbjComplianceReviewBtn" onclick="openPbj320ComplianceReviewModal()" title="Run staffing standards review for the selected period (federal proxies and {{ compliance_state_long }} benchmark)" aria-label="Review PBJ compliance for the selected period">
+                    {% if favicon_href %}<img src="{{ favicon_href }}" width="14" height="14" alt="" class="pbj-pbj320-summary-favicon" aria-hidden="true">{% endif %}
+                    <span class="pbj-compliance-analyze-btn-label">Review PBJ Compliance</span>
+                </button>
+                <button type="button" class="btn btn-sm pbj-btn-reset-ghost pbj-compliance-reset-btn" onclick="clearComplianceAnalysis()" title="Reset results and settings" aria-label="Reset staffing standards review">
+                    <i class="fas fa-rotate-left" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="pbj-compliance-toolbar-trail">
+            <button type="button" class="btn btn-sm pbj-help-btn pbj-compliance-methodology-btn" data-bs-toggle="modal" data-bs-target="#complianceToolsExplainModal"><span class="d-md-none">Methods</span><span class="d-none d-md-inline">Methodology</span></button>
+            <span id="complianceCriteriaSummary" class="pbj-compliance-criteria-summary" aria-live="polite"></span>
+        </div>
+    </div>
+
+    <label for="complianceStateHprdThreshold" class="visually-hidden">Editable {{ compliance_state_long }} HPRD benchmark</label>
+    <input type="number" class="visually-hidden" id="complianceStateHprdThreshold" step="0.01" min="0" max="20" inputmode="decimal" value="{{ compliance_default_hprd }}" tabindex="-1" aria-hidden="true">
+</div>
+
+{% endif %}

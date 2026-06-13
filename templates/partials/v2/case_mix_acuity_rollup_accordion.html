@@ -1,0 +1,353 @@
+{# v2 — CMS Case-Mix acuity table rollup under case-mix adjusted staffing charts #}
+
+
+
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_utility_disclosure %}
+
+
+
+
+
+
+
+        {% call pbj_chart_utility_disclosure('caseMixAcuityRollupSection', 'caseMixAcuityRollupCollapse', 'caseMixAcuityRollupBtn', 'fa-table', 'Benchmark source table', 'Quarterly % of CMS case-mix · CMI · CMS case-mix HPRD', export_onclick='exportCaseMixDataToCSV()') %}
+
+
+
+
+
+
+
+                <div id="caseMixSection" class="guided-scroll-anchor pbj-case-mix-rollup-panel">
+
+
+
+
+
+
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pbj-case-mix-rollup-head">
+
+
+
+
+
+
+
+                        <div class="d-flex flex-wrap align-items-center gap-2 min-w-0">
+
+
+
+
+
+
+
+                            <button type="button" class="btn btn-link btn-sm p-0 pbj-summary-info-btn text-muted flex-shrink-0" data-bs-toggle="modal" data-bs-target="#caseMixTableNotesModal" title="Total vs direct case-mix %; amber/orange summary bars; red/yellow table tints" aria-label="Case-mix table methodology"><i class="fas fa-circle-info" style="font-size:0.8rem;" aria-hidden="true"></i><span class="visually-hidden">Case-mix table notes</span></button>
+
+
+
+
+
+
+
+                            <span class="small text-muted pbj-quarter-focus-hint mb-0" id="caseMixFocusHint">Showing focused quarter window.</span>
+
+
+
+
+
+
+
+                        </div>
+
+
+
+
+
+
+
+                        <div class="d-flex flex-row align-items-center gap-2 pbj-qtr-toolbar flex-wrap flex-shrink-0 ms-md-auto">
+
+
+
+
+
+
+
+                            <button class="btn btn-sm btn-outline-primary d-none" id="caseMixShowAllBtn" type="button" onclick="toggleCaseMixAcuityShowAll()" title="Show every loaded quarter in this table, or return to the filter-focused window.">
+
+
+
+
+
+
+
+                                <span class="qb-expand-label-wrap"><span class="qb-expand-label">Show all PBJ quarters</span></span>
+
+
+
+
+
+
+
+                            </button>
+
+
+
+
+
+
+
+                            <button type="button" class="btn btn-sm pbj-help-btn d-md-none" data-bs-toggle="modal" data-bs-target="#caseMixTableNotesModal" title="Total vs direct case-mix %; amber/orange bars; red/yellow table tints">About</button>
+
+
+
+
+
+
+
+                        </div>
+
+
+
+
+
+
+
+                    </div>
+
+
+
+
+
+
+
+                    <div class="table-responsive case-mix-wrapper dashboard-table-scroll pbj-chart-rollup-table-scroll">
+
+
+
+
+
+
+
+                        <table class="table table-sm table-bordered table-striped table-hover mb-0 table-anchored" id="caseMixDataTable">
+
+
+
+
+
+
+
+                            <thead class="table-dark">
+
+
+
+
+
+
+
+                                <tr>
+
+
+
+
+
+
+
+                                    <th rowspan="2" class="text-center align-middle sortable" style="min-width: 80px;" data-sort="quarter">Quarter</th>
+
+
+
+
+
+
+
+                                    <th colspan="7" class="text-center" style="background-color: #28a745;">% CMS Case-Mix</th>
+
+
+
+
+
+
+
+                                    <th rowspan="2" class="text-center align-middle sortable" style="min-width: 80px; background-color: #ffc107;" data-sort="cmi">CMI</th>
+
+
+
+
+
+
+
+                                    <th colspan="4" class="text-center" style="background-color: #dc3545;">CMS Case-Mix HPRD</th>
+
+
+
+
+
+
+
+                                </tr>
+
+
+
+
+
+
+
+                                <tr>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 70px;" data-sort="pct_cmi_total">Total</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 70px;" data-sort="pct_cmi_direct">Direct</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 80px;" data-sort="pct_cmi_total_rn">Total RN</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 80px;" data-sort="pct_cmi_direct_rn">Direct RN</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 80px;" data-sort="pct_cmi_total_lpn">Total LPN</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 80px;" data-sort="pct_cmi_direct_lpn">Direct LPN</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 80px;" data-sort="pct_cmi_na">NA</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 60px;" data-sort="case_mix_total">Total</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 60px;" data-sort="case_mix_rn">RN</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 60px;" data-sort="case_mix_lpn">LPN</th>
+
+
+
+
+
+
+
+                                    <th class="text-center align-middle sortable" style="min-width: 60px;" data-sort="case_mix_na">NA</th>
+
+
+
+
+
+
+
+                                </tr>
+
+
+
+
+
+
+
+                            </thead>
+
+
+
+
+
+
+
+                            <tbody id="caseMixDataBody">
+
+
+
+
+
+
+
+                            </tbody>
+
+
+
+
+
+
+
+                        </table>
+
+
+
+
+
+
+
+                    </div>
+
+
+
+
+
+
+
+                </div>
+
+
+
+
+
+
+
+        {% endcall %}
+
+
+
+

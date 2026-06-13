@@ -1,0 +1,14 @@
+{# V3 multi-pane section header — anchor id preserved for guided nav / pane controller #}
+{% macro pbj_v3_pane_anchor(anchor_id) %}
+<div id="{{ anchor_id }}" class="pbj-v3-pane-anchor guided-scroll-anchor" tabindex="-1" aria-hidden="true"></div>
+{% endmacro %}
+
+{% macro pbj_v3_pane_header(anchor_id, title, description, eyebrow='') %}
+<header id="{{ anchor_id }}" class="pbj-v3-pane-header guided-scroll-anchor mb-3" tabindex="-1" aria-labelledby="{{ anchor_id }}Title">
+    {% if eyebrow %}
+    <p class="pbj-v3-pane-eyebrow small text-uppercase text-muted mb-1">{{ eyebrow }}</p>
+    {% endif %}
+    <h2 id="{{ anchor_id }}Title" class="pbj-v3-pane-title h4 text-body mb-1">{{ title }}</h2>
+    <p class="pbj-v3-pane-desc small text-muted mb-0">{{ description }}</p>
+</header>
+{% endmacro %}

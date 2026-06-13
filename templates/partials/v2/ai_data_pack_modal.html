@@ -1,0 +1,606 @@
+{# PBJ320 AI Toolkit — brand, intro, one-line AI disclaimer + limits modal #}
+{% from 'partials/superdynamic_url_macros.html' import pbj_facility_download_href %}
+{% from 'partials/v2/brand_macros.html' import pbj320_mark %}
+{% from 'partials/v2/export_macros.html' import pbj_export_btn %}
+
+<script type="application/json" id="pbjAiToolkitConfig">{{ {
+    'skillZipEnabled': pbj_claude_skill_zip_enabled|default(false),
+    'skillZipUrl': pbj_facility_download_href(pbj_claude_skill_zip_url|default('/downloads/pbj320-staffing-review.zip'), pbj_public_api_origin|default(''))
+}|tojson }}</script>
+
+<div class="modal fade" id="pbjAiToolkitModal" tabindex="-1" aria-labelledby="pbjAiToolkitModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow pbj-ai-modal-content">
+            <div class="pbj-ai-modal-brandbar" aria-hidden="true"></div>
+            <div class="modal-header py-2 px-3 border-bottom align-items-start bg-white">
+                <div class="min-w-0 flex-grow-1 pe-2">
+                    <h5 class="modal-title mb-0 fs-6 d-flex align-items-center gap-2" id="pbjAiToolkitModalLabel">
+                        {% if favicon_href %}
+                        <img src="{{ favicon_href }}" width="20" height="20" alt="" class="pbj-ai-modal-favicon flex-shrink-0" aria-hidden="true">
+                        {% endif %}
+                        <span class="d-inline-flex align-items-center gap-2 flex-wrap pe-1">
+                            <span class="text-nowrap">{{ pbj320_mark(' AI') }}</span>
+                            <span class="pbj-ai-beta-badge pbj-ai-beta-badge--title">beta</span>
+                        </span>
+                    </h5>
+                </div>
+                <button type="button" class="btn-close flex-shrink-0 ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body px-3 py-2">
+                <div class="pbj-ai-intro mb-2">
+                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                        <p class="mb-0 small text-body-secondary flex-grow-1 min-w-0">Verify key points against the CSV and CMS sources.</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary pbj-ai-tips-btn flex-shrink-0"
+                                data-bs-toggle="modal" data-bs-target="#pbjAiDisclaimerModal">AI Tips</button>
+                    </div>
+                    <p class="mb-0 small text-body">
+                        PBJ320 AI pairs this facility’s CMS payroll export with review rules built from PBJ reporting standards, case-mix and staffing benchmarks, and public-interest analytic practice — so the model works from your dashboard scope, not invented metrics.
+                        Answers are organized around what the data <em>shows</em>, what it <em>may suggest</em>, what it <em>cannot prove</em>, and sensible next questions, tuned for counsel, reporters, researchers, or general analysis.
+                    </p>
+                </div>
+
+                <div class="pbj-ai-scope pbj-ai-scope--compact mb-2" aria-labelledby="pbjAiScopeHeading">
+                    <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3">
+                        <span class="small fw-semibold text-nowrap" id="pbjAiScopeHeading">Period</span>
+                        <span class="small text-body-secondary mb-0 text-truncate" id="pbjAiToolkitScopeLine" style="max-width: 14rem;">—</span>
+                        <div class="btn-group btn-group-sm pbj-ai-scope-grain flex-shrink-0" role="group" aria-label="Period type">
+                            <button type="button" class="btn btn-outline-secondary" data-pbj-ai-grain="quarters" aria-pressed="false">Quarters</button>
+                            <button type="button" class="btn btn-outline-secondary" data-pbj-ai-grain="years" aria-pressed="false">Years</button>
+                            <button type="button" class="btn btn-outline-secondary active" data-pbj-ai-grain="daterange" aria-pressed="true">Range</button>
+                            <button type="button" class="btn btn-outline-secondary" data-pbj-ai-grain="day" aria-pressed="false">Day</button>
+                        </div>
+                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiScopeApplyBtn">Apply</button>
+                    </div>
+                    <div id="pbjAiScopeBody">
+                    <div id="pbjAiScopeQuarters" class="pbj-ai-scope-panel d-none mt-1 mb-0">
+                        <select class="form-select form-select-sm pbj-ai-scope-select" id="pbjAiQuarterSelect" multiple size="5" aria-label="Quarters (Ctrl+click for multiple)">
+                            <option value="" disabled selected>Select quarters…</option>
+                        </select>
+                    </div>
+                    <div id="pbjAiScopeYears" class="pbj-ai-scope-panel d-none mt-1 mb-0">
+                        <select class="form-select form-select-sm pbj-ai-scope-select" id="pbjAiYearSelect" multiple size="5" aria-label="Years (Ctrl+click for multiple)">
+                            <option value="" disabled selected>Select years…</option>
+                        </select>
+                    </div>
+                    <div id="pbjAiScopeRange" class="pbj-ai-scope-panel mt-1 mb-0">
+                        <div class="d-flex flex-wrap align-items-end gap-2">
+                            <div class="pbj-ai-date-field">
+                                <label class="form-label mb-0 small text-muted" for="pbjAiStartDate">From</label>
+                                <input type="date" class="form-control form-control-sm pbj-ai-date-input" id="pbjAiStartDate" aria-label="Range start">
+                            </div>
+                            <div class="pbj-ai-date-field">
+                                <label class="form-label mb-0 small text-muted" for="pbjAiEndDate">To</label>
+                                <input type="date" class="form-control form-control-sm pbj-ai-date-input" id="pbjAiEndDate" aria-label="Range end">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="pbjAiScopeDay" class="pbj-ai-scope-panel d-none mt-1 mb-0">
+                        <div class="d-flex flex-wrap align-items-end gap-2">
+                            <div class="pbj-ai-date-field">
+                                <label class="form-label mb-0 small text-muted" for="pbjAiFilterDay">Work date</label>
+                                <input type="date" class="form-control form-control-sm pbj-ai-date-input" id="pbjAiFilterDay" aria-label="Single work day">
+                            </div>
+                            <div class="pbj-ai-focus-note-field flex-grow-1">
+                                <label class="form-label mb-0 small text-muted" for="pbjAiDayNote">Note <span class="fw-normal">(optional)</span></label>
+                                <input type="text" class="form-control form-control-sm" id="pbjAiDayNote" maxlength="120" placeholder="Context for this day" autocomplete="off" aria-label="Optional note for the selected work day">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="pbjAiFocusDatesBlock" class="pbj-ai-focus-dates mt-2 pt-2 border-top border-light">
+                        <label class="form-label small text-body-secondary mb-1" for="pbjAiFocusDatePicker">Focus dates <span class="fw-normal">(optional)</span></label>
+                        <div class="d-flex flex-wrap align-items-end gap-2">
+                            <div class="pbj-ai-date-field">
+                                <input type="date" class="form-control form-control-sm pbj-ai-date-input" id="pbjAiFocusDatePicker" aria-label="Pick a focus date">
+                            </div>
+                            <div class="pbj-ai-focus-note-field flex-grow-1">
+                                <input type="text" class="form-control form-control-sm" id="pbjAiFocusDateNote" maxlength="120" placeholder="Note (optional)" autocomplete="off" aria-label="Focus date note">
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" id="pbjAiFocusDateAddBtn">Add date</button>
+                        </div>
+                        <div id="pbjAiFocusDatesList" class="pbj-ai-focus-dates-list mt-1" role="list" aria-live="polite"></div>
+                        <input type="hidden" id="pbjAiPromptFocusDates" value="">
+                        <div id="pbjAiFocusDatesHelp" class="form-text small mb-0 mt-1">Added dates appear in the prompt and export (MM-DD-YYYY). Case Builder key dates sync here when available.</div>
+                    </div>
+                    </div>
+                </div>
+
+                <section class="pbj-ai-step" aria-labelledby="pbjAiStep1Heading">
+                    <div class="pbj-ai-step__head">
+                        <span class="pbj-ai-step__num" aria-hidden="true">1</span>
+                        <div>
+                            <h6 class="pbj-ai-step__title mb-0" id="pbjAiStep1Heading">Starter prompt</h6>
+                            <p class="pbj-ai-step__lede mb-0">Choose who the write-up is for. Copy this prompt into your AI chat with the export.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-0">
+                        <span class="small text-body-secondary text-nowrap">Written for</span>
+                        <div class="pbj-ai-audience-pick flex-grow-1" role="radiogroup" aria-label="Written for">
+                            <label class="pbj-ai-audience-pill" title="Counsel-style review with limitations and records to request">
+                                <input type="radio" name="pbjAiToolkitAudience" value="attorney" checked><span>Attorney</span>
+                            </label>
+                            <label class="pbj-ai-audience-pill" title="General staffing summary">
+                                <input type="radio" name="pbjAiToolkitAudience" value="analyst"><span>Analyst</span>
+                            </label>
+                            <label class="pbj-ai-audience-pill" title="News reporting — what is supportable and what to verify">
+                                <input type="radio" name="pbjAiToolkitAudience" value="journalist"><span>Journalist</span>
+                            </label>
+                            <label class="pbj-ai-audience-pill" title="Research-style — methods and caveats">
+                                <input type="radio" name="pbjAiToolkitAudience" value="researcher"><span>Researcher</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                            <span class="small fw-semibold text-body">Prompt</span>
+                            <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiPackCopyPromptBtn" onclick="pbjV2CopyAiStarterPrompt()">
+                                <i class="fas fa-copy me-1" aria-hidden="true"></i>Copy
+                            </button>
+                        </div>
+                        <pre id="pbjAiToolkitPromptLive" class="pbj-ai-pack-preview pbj-ai-starter-prompt-live mb-0" aria-readonly="true"></pre>
+                        <span id="pbjAiPackPromptStatus" class="small text-success d-none" role="status" aria-live="polite"></span>
+                    </div>
+                </section>
+
+                <section class="pbj-ai-step" aria-labelledby="pbjAiStep2Heading">
+                    <div class="pbj-ai-step__head">
+                        <span class="pbj-ai-step__num" aria-hidden="true">2</span>
+                        <div>
+                            <h6 class="pbj-ai-step__title mb-0" id="pbjAiStep2Heading">Download the data</h6>
+                            <p class="pbj-ai-step__lede mb-0">Daily PBJ rows for your period, plus quarterly benchmarks, citations, and peers when they apply.</p>
+                        </div>
+                    </div>
+                    <p id="pbjAiToolkitSummary" class="small fw-semibold text-body mb-1 mt-2">Scanning…</p>
+                    <ul id="pbjAiToolkitAdvisories" class="pbj-ai-toolkit-advisories list-unstyled small mb-2 d-none" aria-live="polite"></ul>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        {{ pbj_export_btn('csv', id='pbjAiPackCsvBtn', onclick='pbjV2DownloadAiContextPackCsv()', title='Download context pack CSV', primary=true, extra_class='') }}
+                        {{ pbj_export_btn('json', id='pbjAiPackJsonBtn', onclick='pbjV2DownloadAiContextPackJson()', title='Download as JSON', extra_class='') }}
+                        <button type="button" class="btn btn-sm btn-outline-secondary pbj-export-btn" id="pbjAiPackCopyCsvBtn" onclick="pbjV2CopyAiContextPackCsv()" title="Copy CSV to clipboard">
+                            <i class="fas fa-copy" aria-hidden="true"></i>
+                            <span class="pbj-export-btn-label">Copy</span>
+                        </button>
+                    </div>
+                    <div id="pbjAiToolkitClaudeSkill" class="mt-2{% if not pbj_claude_skill_zip_enabled|default(false) %} d-none{% endif %}">
+                        {% if pbj_claude_skill_zip_enabled|default(false) %}
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary pbj-ai-btn-brand-outline"
+                                onclick="pbjV2DownloadClaudeSkillZip(event)"
+                                title="Download without leaving this page">
+                            <i class="fas fa-download me-1" aria-hidden="true"></i>PBJ320 Claude add-on (.zip)
+                        </button>
+                        <span id="pbjAiSkillZipStatus" class="small text-success ms-1 d-none" role="status" aria-live="polite"></span>
+                        <span class="small text-body-secondary ms-1">In Claude: Customize → Skills</span>
+                        {% else %}
+                        <span class="small text-warning">Claude add-on ZIP not bundled on this server yet.</span>
+                        {% endif %}
+                    </div>
+                    <p class="small text-body-secondary mb-0 mt-1">Attach this file in your AI chat together with the prompt from step 1.</p>
+                    <p id="pbjAiPackCopyStatus" class="small text-success mb-0 mt-1 d-none" role="status" aria-live="polite"></p>
+                </section>
+
+                <section class="pbj-ai-step mb-2" aria-labelledby="pbjAiStep3Heading">
+                    <div class="pbj-ai-step__head">
+                        <span class="pbj-ai-step__num" aria-hidden="true">3</span>
+                        <div>
+                            <h6 class="pbj-ai-step__title mb-0" id="pbjAiStep3Heading">Ask your AI</h6>
+                            <p class="pbj-ai-step__lede mb-0">Open your chat tool, attach the export from step 2, and paste the prompt from step 1.</p>
+                        </div>
+                    </div>
+                    <div class="pbj-ai-tool-pick mt-2" aria-label="Open AI chat">
+                        <a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" class="pbj-ai-tool-pill pbj-ai-tool-pill--link" title="Open Claude">
+                            <span class="pbj-ai-tool-pill__inner">
+                                <span class="pbj-ai-brand-icon" aria-hidden="true"><svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path fill="currentColor" d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg></span>
+                                <span class="pbj-ai-tool-pill__text">Claude</span>
+                            </span>
+                        </a>
+                        <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" class="pbj-ai-tool-pill pbj-ai-tool-pill--link" title="Open ChatGPT">
+                            <span class="pbj-ai-tool-pill__inner">
+                                <span class="pbj-ai-brand-icon" aria-hidden="true"><svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path fill="currentColor" d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg></span>
+                                <span class="pbj-ai-tool-pill__text">ChatGPT</span>
+                            </span>
+                        </a>
+                        <a href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer" class="pbj-ai-tool-pill pbj-ai-tool-pill--link" title="Open Gemini">
+                            <span class="pbj-ai-tool-pill__inner">
+                                <span class="pbj-ai-brand-icon" aria-hidden="true"><svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path fill="currentColor" d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></svg></span>
+                                <span class="pbj-ai-tool-pill__text">Gemini</span>
+                            </span>
+                        </a>
+                    </div>
+                </section>
+
+                <div class="border-top pt-2 mt-1">
+                    <button type="button"
+                            class="btn btn-link btn-sm pbj-ai-ref-toggle px-0 text-decoration-none"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#pbjAiToolkitReference"
+                            aria-expanded="false"
+                            aria-controls="pbjAiToolkitReference"
+                            id="pbjAiToolkitReferenceBtn">
+                        <span class="pbj-ai-ref-toggle__label">Export file preview</span>
+                    </button>
+                    <div class="collapse small" id="pbjAiToolkitReference" aria-labelledby="pbjAiToolkitReferenceBtn">
+                        <div class="pt-1">
+                            <p class="fw-semibold text-body mb-1">Beginning of the export file</p>
+                            <p class="text-body-secondary mb-1">Scope and field definitions first, then daily staffing and quarterly benchmarks.</p>
+                            <pre id="pbjAiPackPreview" class="pbj-ai-pack-preview mb-0" aria-readonly="true">Loading…</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer py-2 px-3 border-top bg-white">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="pbjAiDisclaimerModal" tabindex="-1" aria-labelledby="pbjAiDisclaimerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header py-2 px-3 border-bottom">
+                <h6 class="modal-title mb-0 d-flex align-items-center gap-2" id="pbjAiDisclaimerModalLabel">
+                    <span>{{ pbj320_mark(' AI Tips') }}</span>
+                    <span class="pbj-ai-beta-badge">beta</span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-3 py-3 small text-body-secondary pbj-ai-tips-body">
+                <div class="pbj-ai-tips-callout mb-3">
+                    <p class="mb-0 text-body">PBJ320 AI sends your export and structured instructions to a <strong>third-party model</strong> (Claude, ChatGPT, or Gemini). The starter prompt and Claude add-on are built to work from this facility’s data — but the model can still <strong>misread the file</strong> or sound more certain than the sources support.</p>
+                </div>
+                <p class="fw-semibold text-body mb-2">Before you rely on the output</p>
+                <ul class="pbj-ai-tips-list mb-3 ps-3">
+                    <li class="mb-2">Spot-check key numbers on this dashboard and in the CSV against <strong>CMS payroll</strong> and related public files.</li>
+                    <li class="mb-2">Use the <strong>starter prompt</strong> (and Claude add-on when available) so the model follows PBJ320’s review structure.</li>
+                    <li class="mb-2">Do not paste <strong>resident-identifiable or privileged</strong> material you are not allowed to share with that service.</li>
+                    <li class="mb-0">Treat AI output as a <strong>draft for your review</strong> — not a substitute for counsel, clinical judgment, or CMS filings.</li>
+                </ul>
+                <p class="mb-0 pbj-ai-tips-footnote">PBJ payroll data describe reported staffing only. Careful prompts improve reliability; they do not guarantee the model will never err or hallucinate.</p>
+            </div>
+            <div class="modal-footer py-2 px-3 border-top">
+                <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white" data-bs-dismiss="modal">Understood</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    #pbjAiToolkitModal {
+        --pbj-ai-navy: #0f172a;
+        --pbj-ai-indigo: #4f46e5;
+        --pbj-ai-indigo-soft: #eef2ff;
+        --pbj-ai-indigo-mid: #c7d2fe;
+        --pbj-ai-brand-grad: linear-gradient(135deg, #312e81 0%, #1e40af 55%, #3b82f6 100%);
+    }
+    .pbj-ai-modal-brandbar {
+        height: 4px;
+        background: var(--pbj-ai-brand-grad);
+    }
+    #pbjAiToolkitModal .pbj-brand-pbj {
+        color: var(--pbj-ai-navy);
+    }
+    #pbjAiToolkitModal .pbj-brand-320 {
+        color: var(--pbj-ai-indigo);
+    }
+    #pbjAiToolkitModal .pbj-brand-suffix {
+        font-weight: 600;
+        color: #475569;
+    }
+    .pbj-ai-beta-badge {
+        display: inline-block;
+        padding: 0.12em 0.5em;
+        margin-inline-start: 0.15rem;
+        font-size: 0.62rem;
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: 0.04em;
+        text-transform: lowercase;
+        color: #5b21b6;
+        background: #ede9fe;
+        border: 1px solid #c4b5fd;
+        border-radius: 999px;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+    .pbj-ai-beta-badge--title {
+        margin-inline-start: 0.35rem;
+        margin-inline-end: 0.15rem;
+    }
+    .pbj-ai-modal-favicon {
+        border-radius: 4px;
+        box-shadow: none;
+        object-fit: contain;
+        background: transparent;
+        display: block;
+    }
+    .pbj-ai-scope {
+        padding: 0.45rem 0.65rem;
+        border-radius: 0.45rem;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .pbj-ai-scope--compact {
+        padding: 0.35rem 0.55rem;
+        background: #fff;
+    }
+    .pbj-ai-scope--compact .pbj-ai-scope-grain .btn {
+        font-size: 0.72rem;
+        padding: 0.2rem 0.45rem;
+    }
+    #pbjAiScopeBody .pbj-ai-scope-panel select[multiple] {
+        max-height: 9.5rem;
+    }
+    #pbjAiScopeBody .pbj-ai-scope-select {
+        max-width: 100%;
+    }
+    #pbjAiScopeBody .pbj-ai-date-field {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+    #pbjAiScopeBody .pbj-ai-date-input {
+        width: 11.25rem;
+        max-width: 100%;
+    }
+    #pbjAiFocusDatesBlock .pbj-ai-focus-note-field {
+        flex: 1 1 8rem;
+        min-width: 0;
+        max-width: 14rem;
+    }
+    .pbj-ai-focus-dates-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        min-height: 0;
+    }
+    .pbj-ai-focus-dates-list:empty {
+        display: none;
+    }
+    .pbj-ai-focus-date-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.45rem 0.2rem 0.55rem;
+        font-size: 0.78rem;
+        line-height: 1.25;
+        color: #334155;
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: 999px;
+    }
+    .pbj-ai-focus-date-chip__date {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: #312e81;
+    }
+    .pbj-ai-focus-date-chip__note {
+        color: #475569;
+        max-width: 12rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .pbj-ai-focus-date-chip__remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.15rem;
+        height: 1.15rem;
+        padding: 0;
+        margin: 0;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: #64748b;
+        font-size: 0.85rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .pbj-ai-focus-date-chip__remove:hover,
+    .pbj-ai-focus-date-chip__remove:focus-visible {
+        background: #c7d2fe;
+        color: #312e81;
+    }
+    .pbj-ai-scope-grain .btn.active {
+        background: var(--pbj-ai-indigo);
+        border-color: var(--pbj-ai-indigo);
+        color: #fff;
+    }
+    .pbj-ai-intro {
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.45rem;
+        border: 1px solid var(--pbj-ai-indigo-mid);
+        border-left: 4px solid var(--pbj-ai-indigo);
+        background: linear-gradient(135deg, var(--pbj-ai-indigo-soft) 0%, #fff 85%);
+    }
+    .pbj-ai-tips-btn {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.2rem 0.55rem;
+        border-color: var(--pbj-ai-indigo);
+        color: var(--pbj-ai-indigo);
+    }
+    .pbj-ai-tips-btn:hover,
+    .pbj-ai-tips-btn:focus-visible {
+        background: var(--pbj-ai-indigo-soft);
+        color: #312e81;
+        border-color: #4338ca;
+    }
+    .pbj-ai-tips-callout {
+        padding: 0.65rem 0.75rem;
+        border-radius: 0.45rem;
+        border: 1px solid #e2e8f0;
+        border-left: 3px solid var(--pbj-ai-indigo);
+        background: #f8fafc;
+        line-height: 1.45;
+    }
+    .pbj-ai-tips-list {
+        margin: 0;
+        line-height: 1.45;
+    }
+    .pbj-ai-tips-footnote {
+        padding-top: 0.65rem;
+        border-top: 1px solid #e2e8f0;
+        line-height: 1.4;
+        color: #64748b;
+    }
+    .pbj-ai-step {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.45rem;
+        padding: 0.6rem 0.75rem;
+        margin-bottom: 0.55rem;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .pbj-ai-step__head {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    .pbj-ai-step__num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        margin-top: 0.1rem;
+        border-radius: 50%;
+        background: var(--pbj-ai-brand-grad);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .pbj-ai-step__title { font-size: 0.9rem; font-weight: 600; color: var(--pbj-ai-navy); }
+    .pbj-ai-step__lede { font-size: 0.75rem; color: #64748b; line-height: 1.3; }
+    .pbj-ai-tool-pick, .pbj-ai-audience-pick {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .pbj-ai-tool-pill, .pbj-ai-audience-pill { margin: 0; cursor: pointer; }
+    a.pbj-ai-tool-pill--link {
+        text-decoration: none;
+        color: inherit;
+    }
+    a.pbj-ai-tool-pill--link:hover .pbj-ai-tool-pill__inner,
+    a.pbj-ai-tool-pill--link:focus-visible .pbj-ai-tool-pill__inner {
+        border-color: var(--pbj-ai-indigo);
+        background: var(--pbj-ai-indigo-soft);
+        color: #312e81;
+        box-shadow: 0 0 0 1px var(--pbj-ai-indigo);
+    }
+    .pbj-ai-tool-pill input, .pbj-ai-audience-pill input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .pbj-ai-brand-icon {
+        display: block;
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
+    }
+    .pbj-ai-tool-pill__inner {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0.65rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.45rem;
+        background: #fff;
+        font-size: 0.8rem;
+        line-height: 1.2;
+        color: #334155;
+    }
+    .pbj-ai-tool-pill__text { white-space: nowrap; font-weight: 500; }
+    .pbj-ai-tool-pill input:checked + .pbj-ai-tool-pill__inner,
+    .pbj-ai-audience-pill input:checked + span {
+        border-color: var(--pbj-ai-indigo);
+        background: var(--pbj-ai-indigo-soft);
+        color: #312e81;
+        box-shadow: 0 0 0 1px var(--pbj-ai-indigo);
+    }
+    .pbj-ai-audience-pill span {
+        display: inline-block;
+        padding: 0.25rem 0.55rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #fff;
+        font-size: 0.78rem;
+        font-weight: 500;
+    }
+    .pbj-ai-tool-pill__tag {
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--pbj-ai-indigo);
+        margin-left: 0.15rem;
+    }
+    #pbjAiToolkitModal .pbj-ai-btn-brand-outline {
+        border-color: var(--pbj-ai-indigo);
+        color: var(--pbj-ai-indigo);
+    }
+    #pbjAiToolkitModal .pbj-ai-btn-brand-outline:hover {
+        background: var(--pbj-ai-indigo-soft);
+        color: #312e81;
+    }
+    .pbj-ai-toolkit-advisories { margin: 0; padding: 0; }
+    .pbj-ai-toolkit-advisory {
+        padding: 0.3rem 0.45rem;
+        margin-bottom: 0.25rem;
+        border-radius: 0.3rem;
+        background: #fffbeb;
+        color: #92400e;
+        border-left: 3px solid #d97706;
+        font-size: 0.78rem;
+    }
+    #pbjAiToolkitModal .pbj-ai-ref-toggle {
+        font-weight: 600;
+        color: var(--pbj-ai-indigo);
+        font-size: 0.8rem;
+    }
+    #pbjAiToolkitModal .pbj-ai-ref-toggle:hover,
+    #pbjAiToolkitModal .pbj-ai-ref-toggle:focus { color: #312e81; }
+    #pbjAiToolkitModal .pbj-ai-ref-toggle::after {
+        content: '';
+        display: inline-block;
+        width: 0.45rem;
+        height: 0.45rem;
+        margin-left: 0.35rem;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+        transition: transform 0.15s ease;
+        vertical-align: 0.1em;
+    }
+    #pbjAiToolkitModal .pbj-ai-ref-toggle[aria-expanded="true"]::after {
+        transform: rotate(-135deg);
+        vertical-align: -0.05em;
+    }
+    .pbj-ai-starter-prompt-live {
+        max-height: 11rem;
+        min-height: 6.5rem;
+    }
+    .pbj-ai-pack-preview {
+        display: block;
+        width: 100%;
+        max-height: 7.5rem;
+        overflow: auto;
+        padding: 0.45rem 0.55rem;
+        font-size: 0.68rem;
+        line-height: 1.3;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        background: #f8fafc;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.35rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    /* Stack disclaimer above toolkit when both open */
+    #pbjAiDisclaimerModal { z-index: 1065; }
+    #pbjAiToolkitModal { z-index: 1055; }
+</style>

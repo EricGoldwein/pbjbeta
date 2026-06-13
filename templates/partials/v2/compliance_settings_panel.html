@@ -1,0 +1,87 @@
+{# v2 — staffing standards settings panel (settings modal body) #}
+<section class="pbj-compliance-settings-section" aria-labelledby="complianceSettingsFederalHeading">
+    <h6 class="pbj-compliance-settings-section-title" id="complianceSettingsFederalHeading">Federal staffing proxies</h6>
+    <p class="pbj-compliance-settings-helper">PBJ daily-hour proxies under <a href="https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-483/subpart-B/section-483.35" target="_blank" rel="noopener" class="link-secondary">42&nbsp;CFR&nbsp;§&nbsp;483.35</a>. Not definitive compliance; waivers and shift timing are not reflected.</p>
+
+    <div class="pbj-compliance-setting-block">
+        <div class="pbj-compliance-setting-row">
+            <div class="pbj-compliance-setting-copy">
+                <div class="pbj-compliance-setting-label">RN presence proxy</div>
+                <div class="pbj-compliance-setting-sublabel">8+ total RN hours/day</div>
+            </div>
+            <div class="form-check form-switch mb-0 pbj-compliance-setting-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="complianceRnProxySwitch" checked aria-describedby="complianceRnBasisSub">
+                <label class="form-check-label visually-hidden" for="complianceRnProxySwitch">RN presence proxy</label>
+            </div>
+        </div>
+        <div class="pbj-compliance-setting-sub" id="complianceRnBasisSub" role="radiogroup" aria-label="RN presence basis">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="radio" name="complianceRn8hBasis" id="complianceRn8hBasisTotal" value="rn_total_8h" checked>
+                <label class="form-check-label" for="complianceRn8hBasisTotal" title="Total RN hours (incl. admin/DON) — default federal proxy."><span id="complianceRn8hBasisTotalLabel">Total RN</span> <span class="text-muted">(default)</span></label>
+            </div>
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="radio" name="complianceRn8hBasis" id="complianceRn8hBasisDirect" value="rn_direct_8h">
+                <label class="form-check-label" for="complianceRn8hBasisDirect" title="Direct RN only — contextual warning when total RN passes but direct RN is very low."><span id="complianceRn8hBasisDirectLabel">Direct RN</span> <span class="text-muted">(context only)</span></label>
+            </div>
+            <input class="visually-hidden" type="radio" name="complianceRn8hBasis" id="complianceRn8hBasisNeither" value="none" tabindex="-1" aria-hidden="true">
+        </div>
+    </div>
+
+    <div class="pbj-compliance-setting-block">
+        <div class="pbj-compliance-setting-row">
+            <div class="pbj-compliance-setting-copy">
+                <div class="pbj-compliance-setting-label">Licensed-nurse hours proxy</div>
+                <div class="pbj-compliance-setting-sublabel">24+ total RN + LPN/LVN hours/day</div>
+            </div>
+            <div class="form-check form-switch mb-0 pbj-compliance-setting-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="complianceLicensedProxySwitch" checked aria-describedby="complianceLicensed24hBasisOn">
+                <label class="form-check-label visually-hidden" for="complianceLicensedProxySwitch">Licensed-nurse hours proxy</label>
+            </div>
+        </div>
+        <div class="visually-hidden" aria-hidden="true">
+            <input class="form-check-input" type="radio" name="complianceLicensed24hBasis" id="complianceLicensed24hBasisOn" value="licensed_nurse_24h" checked>
+            <input class="form-check-input" type="radio" name="complianceLicensed24hBasis" id="complianceLicensed24hBasisOff" value="none">
+        </div>
+    </div>
+</section>
+
+<hr class="my-2 text-muted opacity-25">
+
+<section class="pbj-compliance-settings-section" aria-labelledby="complianceSettingsStateHeading">
+    <h6 class="pbj-compliance-settings-section-title" id="complianceSettingsStateHeading">State standard / benchmark · {{ compliance_state_long }}</h6>
+    <p class="pbj-compliance-settings-helper">Facility-state reference{% if state_standard_info and state_standard_info.state_code_citation %} · <a href="{{ state_standard_info.state_code_citation }}" target="_blank" rel="noopener" class="link-secondary">{{ compliance_state_long }} rule</a>{% endif %}. Separate from federal proxies.</p>
+
+    <div class="pbj-compliance-setting-block">
+        <label for="complianceStateHprdThresholdVisible" class="pbj-compliance-setting-label d-block mb-1">{{ compliance_state_long }} HPRD benchmark</label>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <input type="number" class="form-control form-control-sm compliance-threshold-input" id="complianceStateHprdThresholdVisible" step="0.01" min="0" max="20" inputmode="decimal" value="{{ compliance_default_hprd }}" title="Editable {{ compliance_state_long }} MACPAC-style benchmark; upper band when the state publishes a range.">
+            <div class="{% if state_standard_info and state_standard_info.value_type == 'range' %}d-inline-block{% else %}d-none{% endif %}" id="complianceRangeChoiceContainer">
+                <label for="complianceRangeChoice" class="visually-hidden">State band</label>
+                <select class="form-select form-select-sm compliance-band-select" id="complianceRangeChoice" data-default-range-choice="{% if state_standard_info and state_standard_info.value_type == 'range' %}max{% else %}min{% endif %}">
+                    <option value="min" data-hprd="{{ state_standard_info.min_staffing if state_standard_info and state_standard_info.min_staffing is not none else 1.56 }}" {% if not state_standard_info or state_standard_info.value_type != 'range' %}selected{% endif %}>{% if state_standard_info %}~{{ state_standard_info.min_staffing }}{% else %}~1.56{% endif %} HPRD</option>
+                    {% if state_standard_info and state_standard_info.value_type == 'range' and state_standard_info.max_staffing is not none %}
+                    <option value="max" data-hprd="{{ state_standard_info.max_staffing }}" selected>~{{ state_standard_info.max_staffing }} HPRD</option>
+                    {% endif %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="pbj-compliance-setting-block mb-0">
+        <div class="pbj-compliance-setting-label mb-1">State HPRD comparison</div>
+        <div class="compliance-radio-row" role="radiogroup" aria-label="{{ compliance_state_long }} HPRD basis">
+            <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="radio" name="complianceHprdBasis" id="complianceHprdBasisTotal" value="total" {% if state|upper != 'CA' %}checked{% endif %}>
+                <label class="form-check-label" for="complianceHprdBasisTotal"><span id="complianceHprdBasisTotalLabel">Total HPRD</span></label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="radio" name="complianceHprdBasis" id="complianceHprdBasisDirect" value="direct_care" {% if state|upper == 'CA' %}checked{% endif %}>
+                <label class="form-check-label" for="complianceHprdBasisDirect"><span id="complianceHprdBasisDirectLabel">Direct HPRD</span></label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="radio" name="complianceHprdBasis" id="complianceHprdBasisNeither" value="none">
+                <label class="form-check-label" for="complianceHprdBasisNeither">Off</label>
+            </div>
+        </div>
+    </div>
+</section>

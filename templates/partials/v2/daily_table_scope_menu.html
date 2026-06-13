@@ -1,0 +1,123 @@
+{# v2 — Daily PBJ table range panel (shared grain pattern with chart scope menu) #}
+
+<div id="pbjDailyTableRangeMenu" class="pbj-chart-scope-menu pbj-chart-range-menu d-none" role="dialog" aria-label="Daily table date range" aria-modal="false">
+
+    <div class="pbj-chart-scope-menu-inner shadow-sm border rounded-3 bg-white p-2">
+
+        <div class="pbj-chart-scope-menu-head d-flex align-items-start justify-content-between gap-2 mb-2">
+
+            <div class="pbj-chart-scope-menu-title-wrap pbj-chart-scope-drag-handle min-w-0" title="Drag to reposition">
+
+                <div class="pbj-chart-scope-menu-title d-flex align-items-center gap-2">
+
+                    <i class="fas fa-calendar-week pbj-chart-scope-title-icon" aria-hidden="true"></i>
+
+                    <span>Range</span>
+
+                </div>
+
+                <p class="pbj-chart-scope-menu-subtitle mb-0" id="pbjDailyTableRangeMenuSubtitle">Daily PBJ table</p>
+
+            </div>
+
+            <button type="button" class="btn-close btn-close-sm pbj-chart-scope-close-btn" id="pbjDailyTableRangeCloseBtn" aria-label="Close range panel"></button>
+
+        </div>
+
+
+
+        <div class="pbj-grain-segment-wrap mb-2">
+
+            <div class="btn-group pbj-grain-segment btn-group-sm w-100" role="group" aria-label="Daily table range grain">
+
+                <input type="radio" class="btn-check" name="pbjDailyTableScopeGrain" id="pbjDailyTableScopeGrainYears" value="years">
+
+                <label class="btn btn-sm" for="pbjDailyTableScopeGrainYears">Years</label>
+
+                <input type="radio" class="btn-check" name="pbjDailyTableScopeGrain" id="pbjDailyTableScopeGrainQuarters" value="quarters" checked>
+
+                <label class="btn btn-sm" for="pbjDailyTableScopeGrainQuarters">Quarters</label>
+
+                <input type="radio" class="btn-check" name="pbjDailyTableScopeGrain" id="pbjDailyTableScopeGrainRange" value="daterange">
+
+                <label class="btn btn-sm" for="pbjDailyTableScopeGrainRange">Custom</label>
+
+                <input type="radio" class="btn-check" name="pbjDailyTableScopeGrain" id="pbjDailyTableScopeGrainDay" value="day">
+
+                <label class="btn btn-sm" for="pbjDailyTableScopeGrainDay">Day</label>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--quarters">
+
+            <label class="form-label text-muted small mb-0" for="pbjDailyTableScopeQuarterSelect">Quarters</label>
+
+            <select class="form-select form-select-sm pbj-chart-scope-multi" id="pbjDailyTableScopeQuarterSelect" aria-label="Daily table quarter filter"></select>
+
+        </div>
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--years d-none">
+
+            <label class="form-label text-muted small mb-0" for="pbjDailyTableScopeYearSelect">Years</label>
+
+            <select class="form-select form-select-sm pbj-chart-scope-multi" id="pbjDailyTableScopeYearSelect" aria-label="Daily table year filter"></select>
+
+        </div>
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--daterange d-none">
+
+            <div class="row g-1">
+
+                <div class="col-6">
+
+                    <label class="form-label text-muted small mb-0" for="pbjDailyTableScopeStartDate">Start</label>
+
+                    <input type="date" class="form-control form-control-sm" id="pbjDailyTableScopeStartDate">
+
+                </div>
+
+                <div class="col-6">
+
+                    <label class="form-label text-muted small mb-0" for="pbjDailyTableScopeEndDate">End</label>
+
+                    <input type="date" class="form-control form-control-sm" id="pbjDailyTableScopeEndDate">
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="pbj-chart-scope-picker pbj-chart-scope-picker--day d-none">
+
+            <label class="form-label text-muted small mb-0" for="pbjDailyTableScopeDayDate">Work date</label>
+
+            <input type="date" class="form-control form-control-sm" id="pbjDailyTableScopeDayDate" aria-label="Daily table single work date">
+
+        </div>
+
+
+
+        <div class="pbj-chart-scope-actions d-flex align-items-center gap-2 mt-2">
+
+            <button type="button" class="btn btn-sm px-2 pbj-btn-apply-navy flex-grow-1" id="pbjDailyTableRangeApplyBtn">Apply range</button>
+
+            <button type="button" class="btn btn-sm pbj-btn-reset-ghost" id="pbjDailyTableRangeResetBtn" title="Show all loaded days" aria-label="Reset range">
+
+                <span class="d-none d-sm-inline">Reset</span>
+
+                <i class="fas fa-rotate-left d-sm-none" aria-hidden="true"></i>
+
+            </button>
+
+        </div>
+
+        <div class="pbj-chart-scope-resize-handle" aria-hidden="true" title="Resize panel"></div>
+
+    </div>
+
+</div>

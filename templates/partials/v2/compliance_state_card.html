@@ -1,0 +1,131 @@
+{# v2 — staffing compliance results (toolbar in compliance_analysis_toolbar.html) #}
+
+{% if has_state_standard %}
+
+{% set compliance_state_long = facility_state_long_name or (state_standard_info.state_name if state_standard_info else state) %}
+
+<div class="pbj-compliance-results-wrap" id="stateStandardCompliance">
+
+    <div id="complianceReviewLoading" class="pbj-compliance-review-loading text-center py-4 d-none" role="status" aria-live="polite" aria-busy="true">
+        <div class="spinner-border spinner-border-sm text-secondary" aria-hidden="true"></div>
+        <p class="small text-muted mb-0 mt-2">Running staffing standards review…</p>
+    </div>
+
+    <p id="complianceRnOnlyHint" class="small text-muted mb-2 d-none">Turn on <strong>Total</strong> or <strong>Direct</strong> state HPRD in settings to compare HPRD to the reference line.</p>
+    <p id="complianceFederalProxyNote" class="small text-muted mb-2 d-none" aria-live="polite"></p>
+
+    <div id="complianceResults" class="compliance-results-slot" style="display: none;">
+
+        <div class="pbj320-compliance-review-finding mb-2 d-none" id="pbj320ComplianceFindingCard" role="status" aria-live="polite">
+            <p class="mb-0 compliance-summary-compact small text-body" id="complianceSummarySentence"></p>
+        </div>
+
+        <div class="row g-2 mb-2 compliance-summary-stats-row">
+            <div class="col-sm-6">
+                <div class="compliance-summary-stat compliance-summary-stat--met h-100">
+                    <div>
+                        <div class="compliance-summary-stat-val" id="complianceDaysMet">-</div>
+                        <div class="compliance-summary-stat-label" id="complianceDaysMetLabel">Days at/above all selected thresholds</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6" id="complianceDaysNotMetStat">
+                <div class="compliance-summary-stat compliance-summary-stat--not h-100">
+                    <div>
+                        <div class="compliance-summary-stat-val" id="complianceDaysNotMet">-</div>
+                        <div class="compliance-summary-stat-label" id="complianceDaysNotMetLabel">Days reported below threshold</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="mb-2 text-muted small d-none" id="complianceExclusionNote" aria-hidden="true"></p>
+
+        <div id="complianceNotMetDaysWrap" class="mt-3 d-none">
+            <div class="border rounded bg-white compliance-not-met-scroll">
+                <table class="table table-sm table-hover mb-0 align-middle table-compliance-not-met" style="font-size: 0.8125rem;">
+                    <thead class="table-light sticky-top"><tr>
+                        <th scope="col">Date</th>
+                        <th scope="col" class="col-day">Day</th>
+                        <th scope="col" class="text-end text-nowrap"><span id="complianceNotMetColValueLabel">Value</span></th>
+                        <th scope="col" class="text-end text-nowrap d-none col-rn-metric" id="complianceNotMetColRnTh">RN h/day</th>
+                        <th scope="col" class="col-noncompliance-head">Below threshold</th>
+                        <th scope="col" class="text-nowrap">Links</th>
+                    </tr></thead>
+                    <tbody id="complianceNotMetDaysBody"></tbody>
+                </table>
+            </div>
+            <div id="complianceNotMetDaysToolbar" class="d-none mt-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 compliance-not-met-pager" role="navigation" aria-label="Below-threshold days pages">
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" id="complianceNotMetPrevBtn" aria-label="Previous page" disabled>‹</button>
+                    <span class="small text-muted text-nowrap" id="complianceNotMetPageStatus" aria-live="polite">—</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" id="complianceNotMetNextBtn" aria-label="Next page" disabled>›</button>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="complianceNotMetExportCsvBtn" onclick="exportComplianceNotMetDaysCsv()" title="Download all below-threshold days as CSV">Download CSV</button>
+            </div>
+        </div>
+
+        <div id="complianceChartsSection" class="compliance-results-charts-section">
+            <div class="row g-2 compliance-charts-split-row mb-2">
+                <div class="col-lg-4" id="complianceChartHprdCol">
+                    <h6 class="small fw-semibold mb-1 text-body-secondary" id="complianceChartHprdHeading">State standard / benchmark · HPRD</h6>
+                    <div id="complianceChartHprd" class="w-100 rounded border bg-white compliance-chart-plot-host" aria-label="State HPRD benchmark chart"></div>
+                </div>
+                <div class="col-lg-4" id="complianceChartRnCol">
+                    <h6 class="small fw-semibold mb-1 text-body-secondary" id="complianceChartRnHeading">Federal proxy · RN presence (8+ total RN h/day)</h6>
+                    <div id="complianceChartRn" class="w-100 rounded border bg-white compliance-chart-plot-host" aria-label="Federal RN presence proxy chart"></div>
+                </div>
+                <div class="col-lg-4" id="complianceChartLicensedCol">
+                    <h6 class="small fw-semibold mb-1 text-body-secondary" id="complianceChartLicensedHeading">Federal proxy · licensed-nurse hours (24+ h/day)</h6>
+                    <div id="complianceChartLicensed" class="w-100 rounded border bg-white compliance-chart-plot-host" aria-label="Federal licensed-nurse hours proxy chart"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="complianceBreakdownToggleWrap" class="mt-2 mb-0 d-none">
+            <button type="button" class="btn btn-link btn-sm p-0 pbj-compliance-breakdown-toggle" id="complianceBreakdownToggle" data-bs-toggle="collapse" data-bs-target="#complianceSecondaryMetrics" aria-expanded="false" aria-controls="complianceSecondaryMetrics">
+                Day &amp; month breakdown <i class="fas fa-chevron-down fa-xs ms-1 pbj-compliance-breakdown-chev" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <div id="complianceSecondaryMetricsWrap" class="mt-1" style="display: none;">
+            <div id="complianceSecondaryMetrics" class="collapse pt-1">
+                <div class="row g-2">
+                    <div class="col-md-6 mb-2">
+                        <div id="complianceDayOfWeekBreakdown"></div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <div id="complianceTimePeriodBreakdown"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if state|upper == 'CA' %}
+        <div class="mt-3 pt-3" style="border-top: 1px solid #dee2e6;">
+            <div class="small text-muted">
+                <strong>California staffing law excerpt (HPRD):</strong>
+                <div class="mt-1">
+                    <div>• <strong>3.50 HPRD</strong> (direct care service hours): Each facility shall employ sufficient nursing staff to provide a minimum of <strong>3.50 direct care service hours per patient day</strong> (except as set forth in HSC 1276.9). Skilled nursing facilities shall provide a minimum of <strong>2.4 CNA hours per patient day</strong> to meet the requirements.</div>
+                    <div>• <strong>0.06 HPRD</strong>: Nursing service personnel shall be employed and on duty in at least the number and with the qualifications determined by the Department; staffing requirements are minimum standards only. SNFs shall employ and schedule additional staff as needed for quality resident care and compliance with relevant state and federal staffing requirements.</div>
+                    <div style="margin-left: 1rem;">- <strong>(b)</strong> Facilities licensed for <strong>59 or fewer beds</strong>: at least <strong>one RN or LVN</strong>, awake and on duty, in the facility at all times (day and night).</div>
+                    <div style="margin-left: 1rem;">- <strong>(c)</strong> Facilities licensed for <strong>60 to 99 beds</strong>: at least <strong>one RN or LVN</strong>, awake and on duty, in addition to the <strong>DNS</strong> (DNS shall not have charge nurse responsibilities).</div>
+                    <div>• <strong>0.24 HPRD (of total)</strong> / <strong>2.40 HPRD (of total)</strong>:
+                        <span>Facilities licensed for <strong>100 or more beds</strong>: at least <strong>one RN</strong>, awake and on duty, in addition to the DNS (DNS shall not have charge nurse responsibilities).</span>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        Source: <a href="https://www.macpac.gov/publication/state-policies-related-to-nursing-facility-staffing/" target="_blank" rel="noopener">MACPAC for state policies related to nursing home staffing</a>.
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <div id="complianceError" class="alert alert-warning mt-2 mb-0" style="display: none;"></div>
+
+</div>
+
+{% endif %}

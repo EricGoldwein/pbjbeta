@@ -1,0 +1,121 @@
+{# V3 Risk Timeline — unified shell (legacy blocks remain for V2 / detail collapse) #}
+<div id="pbjV3RiskTimelineShell" class="pbj-v3-risk-timeline-shell" aria-labelledby="pbjV3RiskTimelineHeading">
+    <h3 id="pbjV3RiskTimelineHeading" class="visually-hidden">Risk Timeline</h3>
+
+    <header class="pbj-v3-risk-control-header">
+        <p class="pbj-v3-risk-context-copy mb-0">Facility-history events for context. Staffing summaries follow selected dashboard period.</p>
+        <div class="pbj-v3-risk-scope-row">
+            <span class="pbj-v3-risk-scope-line" id="pbjV3RiskPeriodLine" aria-live="polite">Scope: —</span>
+            <div class="d-flex flex-wrap gap-1 pbj-v3-risk-counts" id="pbjV3RiskCountChips" aria-label="Event counts"></div>
+        </div>
+        <div class="pbj-v3-risk-filter-row">
+            <span class="pbj-v3-risk-filter-label" id="pbjV3RiskFilterLabel">Show:</span>
+            <div class="pbj-v3-risk-filters" role="group" aria-labelledby="pbjV3RiskFilterLabel" id="pbjV3RiskFilterGroup">
+                <button type="button" class="btn btn-sm active" data-pbj-v3-risk-filter="all">All</button>
+                <button type="button" class="btn btn-sm" data-pbj-v3-risk-filter="staffing_flag">Staffing flags</button>
+                <button type="button" class="btn btn-sm" data-pbj-v3-risk-filter="inspection">Inspections</button>
+                <button type="button" class="btn btn-sm" data-pbj-v3-risk-filter="enforcement">Enforcement/SFF</button>
+                <button type="button" class="btn btn-sm" data-pbj-v3-risk-filter="ownership">Ownership/CHOW</button>
+                <button type="button" class="btn btn-sm" data-pbj-v3-risk-filter="other">Other</button>
+            </div>
+        </div>
+    </header>
+
+    <section class="pbj-v3-risk-signal-timeline" aria-label="Signal timeline">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1 pbj-v3-risk-section-head">
+            <span class="small fw-semibold text-body">Signal timeline</span>
+        </div>
+        <div id="pbjV3RiskTimelineTrack" class="pbj-v3-risk-timeline-track" aria-live="polite"></div>
+    </section>
+
+    <div class="pbj-v3-risk-inspection-rollup" id="pbjV3RiskInspectionRollup" hidden>
+        <div class="pbj-v3-risk-inspection-inline" id="pbjV3RiskInspectionStats"></div>
+        <span id="pbjV3RiskInspectionCmsLink" class="pbj-v3-risk-cms-link"></span>
+    </div>
+
+    <div class="card border mb-3 pbj-v3-risk-events-card">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex flex-wrap align-items-start gap-2 mb-2">
+                <div class="min-w-0">
+                    <h4 class="fs-6 mb-0 fw-semibold">Signal log</h4>
+                    <p class="small text-muted mb-0 pbj-v3-risk-signal-log-lead">Facility-history events and inspection signals, newest first.</p>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary pbj-export-btn pbj-export-btn--csv ms-auto" id="pbjV3RiskExportCsvBtn" title="Download timeline as CSV" aria-label="Download timeline as CSV">
+                    <i class="fas fa-file-csv" aria-hidden="true"></i><span class="pbj-export-btn-label">CSV</span>
+                </button>
+            </div>
+            <div class="table-responsive dashboard-table-scroll pbj-v3-risk-table-scroll">
+                <table class="table table-sm table-hover mb-0 pbj-v3-risk-events-table" id="pbjV3RiskEventsTable" aria-label="Signal log">
+                    <thead class="pbj-v3-risk-table-head">
+                        <tr>
+                            <th scope="col" class="pbj-v3-risk-col-date">Date</th>
+                            <th scope="col" class="pbj-v3-risk-col-type">Type</th>
+                            <th scope="col" class="pbj-v3-risk-col-signal">Signal</th>
+                            <th scope="col" class="pbj-v3-risk-col-severity d-none d-md-table-cell">Severity</th>
+                            <th scope="col" class="pbj-v3-risk-col-source d-none d-lg-table-cell">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pbjV3RiskEventsTbody"></tbody>
+                </table>
+            </div>
+            <p class="small text-muted mb-0 mt-2 d-none" id="pbjV3RiskEventsEmpty">No risk signals for the selected period.</p>
+        </div>
+    </div>
+
+    <div class="pbj-chart-evidence-group pbj-v3-risk-evidence-group" role="group" aria-label="Inspection detail tables">
+        <p class="pbj-chart-evidence-group-label mb-0">Inspection detail tables</p>
+        <div class="pbj-chart-evidence-list">
+            <div id="pbjV3RiskCitationsDisclosure" class="pbj-chart-module pbj-chart-utility-disclosure pbj-chart-evidence-list__item pbj-v3-risk-legacy-disclosure">
+                <div class="pbj-chart-module__supporting-row pbj-chart-utility-disclosure-row">
+                    <div class="pbj-chart-module__supporting-title pbj-chart-utility-disclosure-main">
+                        <i class="fas fa-clipboard-list pbj-chart-utility-disclosure-icon" aria-hidden="true"></i>
+                        <div class="pbj-chart-module__supporting-copy pbj-chart-utility-disclosure-copy">
+                            <span class="pbj-chart-module__supporting-title-text pbj-chart-utility-disclosure-title">Citation detail table</span>
+                            <span class="pbj-chart-module__supporting-description pbj-chart-utility-disclosure-helper">Full deficiency rows · scope/severity · CMS source links</span>
+                        </div>
+                    </div>
+                    <div class="pbj-chart-module__table-controls pbj-chart-utility-disclosure-controls" role="group" aria-label="Citation detail table controls">
+                        <button class="btn btn-sm pbj-chart-module__toggle-btn pbj-chart-utility-disclosure-btn pbj-chart-disclosure-toggle-btn collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pbjV3RiskCitationsCollapse" aria-expanded="false" aria-controls="pbjV3RiskCitationsCollapse" id="pbjV3RiskCitationsBtn" aria-label="Expand citation detail table">
+                            <i class="fas fa-chevron-down pbj-disclosure-chevron" aria-hidden="true"></i>
+                            <span class="visually-hidden pbj-chart-utility-disclosure-sr-toggle">
+                                <span class="pbj-chart-utility-action-expand">Expand</span>
+                                <span class="pbj-chart-utility-action-collapse">Collapse</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                <div id="pbjV3RiskCitationsCollapse" class="collapse" aria-labelledby="pbjV3RiskCitationsBtn">
+                    <div class="pbj-chart-module__table pbj-chart-utility-disclosure-body">
+                        <div class="pbj-v3-risk-legacy-slot" data-pbj-v3-legacy-slot="citations"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pbjV3RiskFlagsDisclosure" class="pbj-chart-module pbj-chart-utility-disclosure pbj-chart-evidence-list__item pbj-v3-risk-legacy-disclosure">
+                <div class="pbj-chart-module__supporting-row pbj-chart-utility-disclosure-row">
+                    <div class="pbj-chart-module__supporting-title pbj-chart-utility-disclosure-main">
+                        <i class="fas fa-flag pbj-chart-utility-disclosure-icon" aria-hidden="true"></i>
+                        <div class="pbj-chart-module__supporting-copy pbj-chart-utility-disclosure-copy">
+                            <span class="pbj-chart-module__supporting-title-text pbj-chart-utility-disclosure-title">Full flag history table</span>
+                            <span class="pbj-chart-module__supporting-description pbj-chart-utility-disclosure-helper">SFF status · CMS red-flag rules · quarterly timeline</span>
+                        </div>
+                    </div>
+                    <div class="pbj-chart-module__table-controls pbj-chart-utility-disclosure-controls" role="group" aria-label="Full flag history table controls">
+                        <button class="btn btn-sm pbj-chart-module__toggle-btn pbj-chart-utility-disclosure-btn pbj-chart-disclosure-toggle-btn collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pbjV3RiskFlagsCollapse" aria-expanded="false" aria-controls="pbjV3RiskFlagsCollapse" id="pbjV3RiskFlagsBtn" aria-label="Expand full flag history table">
+                            <i class="fas fa-chevron-down pbj-disclosure-chevron" aria-hidden="true"></i>
+                            <span class="visually-hidden pbj-chart-utility-disclosure-sr-toggle">
+                                <span class="pbj-chart-utility-action-expand">Expand</span>
+                                <span class="pbj-chart-utility-action-collapse">Collapse</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                <div id="pbjV3RiskFlagsCollapse" class="collapse" aria-labelledby="pbjV3RiskFlagsBtn">
+                    <div class="pbj-chart-module__table pbj-chart-utility-disclosure-body">
+                        <div class="pbj-v3-risk-legacy-slot" data-pbj-v3-legacy-slot="flags"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

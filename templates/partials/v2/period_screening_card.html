@@ -1,0 +1,76 @@
+{# v2 — Outlier screening (nested below Daily PBJ table) #}
+{% from 'partials/v2/export_macros.html' import pbj_export_btn %}
+            <div id="outlierScreeningSection" class="guided-scroll-anchor pbj-outlier-daily-nested">
+            <div id="statisticalScreeningSection" class="guided-scroll-anchor">
+            <div class="card border-0 border-top rounded-0 shadow-none outlier-detection-nested-card mb-0">
+                <div class="card-header py-2 px-3 bg-white border-bottom-0">
+                    <div class="d-flex flex-wrap align-items-center gap-2 w-100 pbj-outlier-card-head">
+                        <button type="button" class="btn btn-sm p-0 border-0 bg-transparent pbj-outlier-toggle collapsed d-inline-flex align-items-center gap-2 fw-semibold text-body text-start" data-bs-toggle="collapse" data-bs-target="#statisticalScreeningControls" aria-expanded="false" aria-controls="statisticalScreeningControls" id="statisticalScreeningToggle">
+                            <i class="fas fa-chevron-right small pbj-period-screen-chevron text-muted flex-shrink-0" aria-hidden="true"></i>
+                            <span class="d-flex flex-column align-items-start lh-sm">
+                                <span>Outliers</span>
+                                <span class="fw-normal text-muted small pbj-outlier-toggle-hint">Off-pattern days · |Z|&nbsp;≥&nbsp;2</span>
+                            </span>
+                        </button>
+                        <span id="pbjPeriodScreeningBadge" class="badge rounded-pill pbj-outlier-status-badge d-none" aria-live="polite"></span>
+                        <div class="d-flex align-items-center gap-1 ms-md-auto flex-wrap pbj-outlier-card-actions">
+                            <button type="button" class="btn btn-sm pbj-help-btn" data-bs-toggle="modal" data-bs-target="#outlierScreeningExplainModal" title="Off-pattern day detection and thresholds"><span class="d-md-none">Methods</span><span class="d-none d-md-inline">Methodology</span></button>
+                            {{ pbj_export_btn('csv', id='outlierExportCsvBtn', onclick='exportOutliersToCsv()', title='Download outlier results as CSV', extra_class='d-none') }}
+                            <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="outlierClearBtn" onclick="clearOutlierDetection()" title="Clear results" aria-label="Clear results">
+                                <i class="fas fa-times" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Clear</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="collapse" id="statisticalScreeningControls">
+                <div class="card-body py-2 pt-0 px-3 border-top">
+                   <div class="d-flex flex-wrap align-items-end gap-2 mb-2 pbj-outlier-controls-row">
+                       <div class="d-flex flex-wrap gap-2 flex-grow-1 ein-outlier-cat-dir-row" style="min-width: 12rem;">
+                           <div style="min-width: 7.5rem; flex: 1 1 9rem;">
+                           <label for="outlierCategory" class="form-label small mb-0">Category</label>
+                           <select id="outlierCategory" class="form-select form-select-sm">
+                               <option value="all">All</option>
+                               <option value="census">Census</option>
+                               <option value="total_staff_hprd">Total Staff HPRD</option>
+                               <option value="total_hours">Total Staff Hours</option>
+                               <option value="nurse_staff_hprd_excl_admin">Direct Staff HPRD</option>
+                               <option value="total_rn_hprd">Total RN HPRD</option>
+                               <option value="total_rn_hours">Total RN Hours</option>
+                               <option value="rn_hprd">RN HPRD (Direct Care Only)</option>
+                               <option value="rn_hours">RN Hours (Direct Care Only)</option>
+                               <option value="total_lpn_hprd">Total LPN HPRD</option>
+                               <option value="total_lpn_hours">Total LPN Hours</option>
+                               <option value="lpn_hprd">LPN HPRD (Direct Care Only)</option>
+                               <option value="lpn_hours">LPN Hours (Direct Care Only)</option>
+                               <option value="total_nurse_aide_hours">Total Nurse Aide Hours</option>
+                               <option value="total_nurse_aide_hprd">Total Nurse Aide HPRD</option>
+                               <option value="cna_hours">CNA Hours</option>
+                           </select>
+                           </div>
+                           <div style="min-width: 6rem; flex: 0 1 7rem;">
+                           <label for="outlierFilter" class="form-label small mb-0">Direction</label>
+                           <select id="outlierFilter" class="form-select form-select-sm">
+                               <option value="all">All</option>
+                               <option value="low">Low</option>
+                               <option value="high">High</option>
+                           </select>
+                           </div>
+                       </div>
+                       <div class="d-flex flex-wrap gap-2 ms-md-auto">
+                               <button type="button" class="btn btn-warning btn-sm" onclick="pbjScreenCurrentPeriod({expand:false})" title="Within current filtered range">
+                                   <i class="fas fa-search me-1"></i><span class="d-md-none">This range</span><span class="d-none d-md-inline">This period</span>
+                               </button>
+                               <button type="button" class="btn btn-outline-danger btn-sm" onclick="detectOutliers('all')" title="All history (2017–2025)">
+                                   <i class="fas fa-globe me-1"></i><span class="d-md-none">All years</span><span class="d-none d-md-inline">All history</span>
+                               </button>
+                       </div>
+                   </div>
+                    <p class="small text-muted mb-0"><span id="currentFilterDescription"></span></p>
+                </div>
+                </div>
+                <div id="outlierResults" class="card-body py-2 px-3 border-top" style="display: none;">
+                    <div id="outlierContent"></div>
+                </div>
+            </div>
+            </div>
+            </div>

@@ -1,0 +1,460 @@
+{# v2 — Staffing patterns & workforce (composition, headcount, DOW, contract) #}
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_rollup_disclosure, pbj_chart_rollup_data_table %}
+{% from 'partials/v2/export_macros.html' import pbj_export_btn %}
+
+        <section id="staffingPatternsWorkforceSection" class="dashboard-section guided-scroll-anchor mb-4{% if superdynamic_v3_panes|default(false) %} d-none pbj-v3-pane-hidden{% endif %}" aria-labelledby="staffingPatternsWorkforceHeading"{% if superdynamic_v3_panes|default(false) %} aria-hidden="true"{% endif %}>
+
+            {% if superdynamic_v3_panes|default(false) %}
+            {% from 'partials/v2/v3_pane_header.html' import pbj_v3_pane_header %}
+            {{ pbj_v3_pane_header('pbjV3PaneWorkforce', 'Workforce & Daily', 'Workforce mix and patterns, daily PBJ table, and employee roster.') }}
+            {% endif %}
+
+            <h2 id="staffingPatternsWorkforceHeading" class="dashboard-section-title h4 text-body mb-1">{{ sec_patterns }}. Patterns</h2>
+
+            <p class="dashboard-section-lead small text-muted mb-3">Workforce mix and depth, weekday patterns, and contract reliance — each chart pairs with a collapsible rollup table.</p>
+
+            <div class="pbj-staffing-patterns-stack" id="pbjStaffingPatternsStack">
+
+            {% if ein_employee_detail_available|default(false) %}
+
+            <div class="row" id="pbjWorkforceDepthBlock">
+
+                <div class="col-12 mb-4">
+
+                    <div class="card h-100 border shadow-sm pbj-trend-chart-card pbj-chart-module">
+
+                        <div class="card-header py-2 px-3 bg-light border-bottom ein-headcount-card-header pbj-chart-module__header">
+
+                            <div class="pbj-chart-toolbar ein-headcount-chart-head ein-headcount-chart-head--single w-100">
+
+                                <div class="ein-headcount-toolbar-row ein-headcount-toolbar-row--primary">
+
+                                    <div class="pbj-chart-toolbar-title-cluster min-w-0">
+
+                                        <ul class="nav nav-pills pbj-segment-tabs pbj-ui-tabs pbj-composition-segment-tabs mb-0" id="einHeadcountJobSliceTabs" role="tablist">
+
+                                            <li class="nav-item" role="presentation">
+
+                                                <button type="button" class="nav-link active" id="einHeadcountSliceNurse" data-ein-hc-slice="nurse" aria-selected="true">Nurse</button>
+
+                                            </li>
+
+                                            <li class="nav-item" role="presentation">
+
+                                                <button type="button" class="nav-link" id="einHeadcountSliceNonnurse" data-ein-hc-slice="nonnurse" aria-selected="false">Non-nurse</button>
+
+                                            </li>
+
+                                            <li class="nav-item" role="presentation">
+
+                                                <button type="button" class="nav-link" id="einHeadcountSliceAll" data-ein-hc-slice="all" aria-selected="false">All</button>
+
+                                            </li>
+
+                                        </ul>
+
+                                        <h5 class="pbj-chart-toolbar-title mb-0">Workforce depth &amp; stability</h5>
+
+                                    </div>
+
+                                    <div class="pbj-chart-toolbar-controls ein-headcount-chart-head-controls">
+
+                                        <div class="form-check form-switch mb-0 d-flex align-items-center gap-1 flex-nowrap pbj-chart-tool-cluster ein-headcount-contract-switch" title="Orange line: distinct contract staff in the period (deduplicated across roles).">
+
+                                            <label class="form-check-label small mb-0 text-nowrap" for="einHeadcountContractOverlay"><span class="desktop-text">Contract staff</span><span class="mobile-text">Contract</span></label>
+
+                                            <input class="form-check-input ms-0 flex-shrink-0" type="checkbox" id="einHeadcountContractOverlay" checked>
+
+                                        </div>
+
+                                        <div class="pbj-chart-tool-cluster">
+
+                                            <div class="btn-group btn-group-sm pbj-chart-grain-toggle" role="group" aria-label="Headcount by job time grain">
+
+                                                <input type="radio" class="btn-check" name="einHeadcountJobGrain" id="einHeadcountGrainDay" value="day">
+
+                                                <label class="btn btn-outline-secondary" for="einHeadcountGrainDay"><span class="desktop-text">Daily</span><span class="mobile-text">Day</span></label>
+
+                                                <input type="radio" class="btn-check" name="einHeadcountJobGrain" id="einHeadcountGrainMonth" value="month" checked>
+
+                                                <label class="btn btn-outline-secondary" for="einHeadcountGrainMonth"><span class="desktop-text">Monthly</span><span class="mobile-text">Mo</span></label>
+
+                                                <input type="radio" class="btn-check" name="einHeadcountJobGrain" id="einHeadcountGrainQuarter" value="quarter">
+
+                                                <label class="btn btn-outline-secondary" for="einHeadcountGrainQuarter"><span class="desktop-text">Quarterly</span><span class="mobile-text">Qtr</span></label>
+
+                                                <input type="radio" class="btn-check" name="einHeadcountJobGrain" id="einHeadcountGrainYear" value="year">
+
+                                                <label class="btn btn-outline-secondary" for="einHeadcountGrainYear"><span class="desktop-text">Annually</span><span class="mobile-text">Yr</span></label>
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="pbj-chart-tool-cluster ein-headcount-events-cluster">
+
+                                            {% set chart_scope_profile = 'headcount' %}
+                                            {% include 'partials/v2/chart_events_toolbar.html' %}
+                                            {% set chart_scope_profile = 'default' %}
+
+                                        </div>
+
+                                        <div class="pbj-chart-tool-cluster ein-headcount-methodology-cluster">
+
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 pbj-help-btn pbj-chart-toolbar-compact-btn" data-bs-toggle="modal" data-bs-target="#einHeadcountByJobHowModal" title="Distinct headcount, job codes, and contract overlay"><span class="d-md-none">Methods</span><span class="d-none d-md-inline">Methodology</span></button>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="card-body pt-2 pb-3 pbj-chart-module__body">
+
+                            <div id="einHeadcountByJobChart" class="w-100 census-occupancy-chart-host" style="min-height:480px;"></div>
+
+                            <div id="einHeadcountContinuityFlag" class="d-none pbj-ein-continuity-host"></div>
+
+                            <div id="einHeadcountSustainedWorkFlag" class="d-none pbj-ein-continuity-host"></div>
+
+                            {% call pbj_chart_rollup_disclosure('einHeadcountRollupSection', 'einHeadcountRollupCollapse', 'einHeadcountRollupBtn', 'Supporting data', 'Distinct reported employee IDs by CMS job code · tap a count to view roster', 'fa-users', 'einHeadcountRollupTable', 'ein_headcount_rollup') %}
+
+                                {{ pbj_chart_rollup_data_table('einHeadcountRollupTable', 'einHeadcountRollupTableBody', 'ein_headcount_rollup', false) }}
+
+                            {% endcall %}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% endif %}
+
+            <div class="row" id="pbjWorkforceMixBlock">
+
+                <div class="col-12 mb-4">
+
+                    <div class="card border shadow-sm pbj-trend-chart-card pbj-chart-module h-100">
+
+                        <div class="card-header py-2 px-3 bg-light border-bottom pbj-chart-module__header">
+
+                            <div class="pbj-chart-toolbar composition-chart-head w-100">
+
+                                <div class="pbj-chart-toolbar-title-cluster">
+
+                                    <ul class="nav nav-pills pbj-segment-tabs pbj-ui-tabs pbj-composition-segment-tabs mb-0" id="compositionTrendTabs" role="tablist">
+
+                                        <li class="nav-item" role="presentation"><button class="nav-link active" id="compositionTrendTabTotal" data-bs-toggle="tab" data-bs-target="#compositionTrendPaneTotal" type="button" role="tab" aria-controls="compositionTrendPaneTotal" aria-selected="true">Total nurse</button></li>
+
+                                        <li class="nav-item" role="presentation"><button class="nav-link" id="compositionTrendTabDirect" data-bs-toggle="tab" data-bs-target="#compositionTrendPaneDirect" type="button" role="tab" aria-controls="compositionTrendPaneDirect" aria-selected="false">Direct care</button></li>
+
+                                    </ul>
+
+                                    <h5 class="pbj-chart-toolbar-title mb-0">Workforce mix</h5>
+
+                                </div>
+
+                                <div class="pbj-chart-toolbar-controls">
+
+                                    <div class="pbj-chart-tool-cluster">
+
+                                        <div class="btn-group btn-group-sm pbj-chart-grain-toggle" role="group" aria-label="Composition metric">
+
+                                            <input type="radio" class="btn-check" name="compositionMetric" id="compositionMetricHprd" value="hprd">
+
+                                            <label class="btn" for="compositionMetricHprd">HPRD</label>
+
+                                            <input type="radio" class="btn-check" name="compositionMetric" id="compositionMetricHours" value="hours" checked>
+
+                                            <label class="btn" for="compositionMetricHours"><span class="desktop-text">Total hours</span><span class="mobile-text">Hours</span></label>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="pbj-chart-tool-cluster">
+
+                                        <div class="btn-group btn-group-sm pbj-chart-grain-toggle" role="group" aria-label="Composition period">
+
+                                            <input type="radio" class="btn-check" name="compositionView" id="compositionDaily" value="daily">
+
+                                            <label class="btn" for="compositionDaily"><span class="desktop-text">Daily</span><span class="mobile-text">Day</span></label>
+
+                                            <input type="radio" class="btn-check" name="compositionView" id="compositionMonthly" value="month" checked>
+
+                                            <label class="btn" for="compositionMonthly"><span class="desktop-text">Monthly</span><span class="mobile-text">Mo</span></label>
+
+                                            <input type="radio" class="btn-check" name="compositionView" id="compositionQuarterly" value="quarter">
+
+                                            <label class="btn" for="compositionQuarterly"><span class="desktop-text">Quarterly</span><span class="mobile-text">Qtr</span></label>
+
+                                        </div>
+
+                                    </div>
+
+                                    <span class="pbj-chart-tool-divider" aria-hidden="true"></span>
+
+                                    <div class="pbj-chart-tool-cluster">
+
+                                        {% include 'partials/v2/chart_events_toolbar.html' %}
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="card-body pt-2 pb-3 pbj-chart-module__body">
+
+                            <div class="tab-content">
+
+                                <div class="tab-pane fade show active" id="compositionTrendPaneTotal" role="tabpanel" aria-labelledby="compositionTrendTabTotal">
+
+                                    <div id="compositionTotalTrendChart" class="w-100 census-occupancy-chart-host"></div>
+
+                                </div>
+
+                                <div class="tab-pane fade" id="compositionTrendPaneDirect" role="tabpanel" aria-labelledby="compositionTrendTabDirect">
+
+                                    <div id="compositionDirectTrendChart" class="w-100 census-occupancy-chart-host"></div>
+
+                                </div>
+
+                            </div>
+
+                            {% call pbj_chart_rollup_disclosure('compositionRollupSection', 'compositionRollupCollapse', 'compositionRollupBtn', 'Supporting data', 'Stacked role staffing by period for the active metric, view, and grain.', 'fa-chart-pie', 'compositionRollupTable', 'composition_rollup') %}
+
+                                {{ pbj_chart_rollup_data_table('compositionRollupTable', 'compositionRollupTableBody', 'composition_rollup', false) }}
+
+                            {% endcall %}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-lg-6" id="pbjStaffingPatternDowBlock">
+
+                    <div class="card border shadow-sm h-100 pbj-trend-chart-card pbj-chart-module">
+
+                        <div class="card-header py-2 px-3 bg-light border-bottom pbj-chart-module__header">
+
+                            <div class="pbj-chart-toolbar dow-chart-head pbj-chart-toolbar--compact w-100">
+
+                                <h5 class="pbj-chart-toolbar-title mb-0">Day of week</h5>
+
+                                <div class="pbj-chart-toolbar-meta-row">
+
+                                    <p class="pbj-chart-subtitle mb-0">Avg HPRD by weekday</p>
+
+                                    <div class="pbj-chart-toolbar-controls">
+
+                                        <div class="pbj-chart-tool-cluster">
+
+                                            <div class="btn-group btn-group-sm pbj-chart-grain-toggle" role="group" id="dowYearRangeToggle" aria-label="Day-of-week chart year range">
+
+                                                <input type="radio" class="btn-check" name="dowCalendarYear" id="dowYearAll" value="" checked autocomplete="off">
+
+                                                <label class="btn" for="dowYearAll">All</label>
+
+                                            </div>
+
+                                        </div>
+
+                                        <span class="pbj-chart-tool-divider" aria-hidden="true"></span>
+
+                                        <div class="pbj-chart-tool-cluster">
+
+                                            {% include 'partials/v2/chart_events_toolbar.html' %}
+
+                                        </div>
+
+                                        <input type="radio" class="btn-check visually-hidden" name="dowViewMode" id="dowViewDaily" value="daily" checked autocomplete="off" aria-hidden="true" tabindex="-1">
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="card-body pt-2 pb-3 pbj-chart-module__body">
+
+                            <div id="dowComparisonChart" class="w-100 census-occupancy-chart-host"></div>
+
+                            <p id="dowWeekpartCallout" class="pbj-dow-weekpart-callout mb-0" aria-live="polite"></p>
+
+                            {% call pbj_chart_rollup_disclosure('dowRollupSection', 'dowRollupCollapse', 'dowRollupBtn', 'Supporting data', 'Average HPRD by day of week for the selected year filter.', 'fa-calendar-week', 'dowRollupTable', 'dow_rollup') %}
+
+                                {{ pbj_chart_rollup_data_table('dowRollupTable', 'dowRollupTableBody', 'dow_rollup', false) }}
+
+                            {% endcall %}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="col-lg-6" id="pbjWorkforceModelContractBlock">
+
+                    <div class="card border shadow-sm h-100 pbj-trend-chart-card pbj-chart-module">
+
+                        <div class="card-header py-2 px-3 bg-light border-bottom pbj-chart-module__header">
+
+                            <div class="pbj-chart-toolbar contract-chart-head pbj-chart-toolbar--compact w-100">
+
+                                <h5 class="pbj-chart-toolbar-title mb-0">Agency Staff</h5>
+
+                                <div class="pbj-chart-toolbar-meta-row">
+
+                                    <p class="pbj-chart-subtitle mb-0">Contract share by role</p>
+
+                                    <div class="pbj-chart-toolbar-controls">
+
+                                        <div class="pbj-chart-tool-cluster">
+
+                                            <div class="btn-group btn-group-sm pbj-chart-grain-toggle" role="group" aria-label="Contract view toggle">
+
+                                                <input type="radio" class="btn-check" name="contractView" id="contractDaily" value="daily">
+
+                                                <label class="btn" for="contractDaily"><span class="desktop-text">Daily</span><span class="mobile-text">Day</span></label>
+
+                                                <input type="radio" class="btn-check" name="contractView" id="contractMonthly" value="month" checked>
+
+                                                <label class="btn" for="contractMonthly"><span class="desktop-text">Monthly</span><span class="mobile-text">Mo</span></label>
+
+                                                <input type="radio" class="btn-check" name="contractView" id="contractQuarterly" value="quarter">
+
+                                                <label class="btn" for="contractQuarterly"><span class="desktop-text">Quarterly</span><span class="mobile-text">Qtr</span></label>
+
+                                                <input type="radio" class="btn-check" name="contractView" id="contractYearly" value="year">
+
+                                                <label class="btn" for="contractYearly"><span class="desktop-text">Annually</span><span class="mobile-text">Yr</span></label>
+
+                                            </div>
+
+                                        </div>
+
+                                        <span class="pbj-chart-tool-divider" aria-hidden="true"></span>
+
+                                        <div class="pbj-chart-tool-cluster">
+
+                                            {% include 'partials/v2/chart_events_toolbar.html' %}
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="card-body pt-2 pb-3 pbj-chart-module__body">
+
+                            <div id="contractTrendChart" class="w-100 census-occupancy-chart-host"></div>
+
+                            {% call pbj_chart_rollup_disclosure('contractRollupSection', 'contractRollupCollapse', 'contractRollupBtn', 'Supporting data', 'Contract share of hours by role for the active grain.', 'fa-table', 'contractRollupTable', 'contract_rollup') %}
+
+                                {{ pbj_chart_rollup_data_table('contractRollupTable', 'contractRollupTableBody', 'contract_rollup', false) }}
+
+                            {% endcall %}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            </div>
+
+        </section>
+
+            {% if ein_employee_detail_available|default(false) %}
+
+            <div class="modal fade" id="einHeadcountJobEmployeesModal" tabindex="-1" aria-labelledby="einHeadcountJobEmployeesModalLabel" aria-hidden="true">
+
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+
+                    <div class="modal-content">
+
+                        <div class="modal-header py-2 px-3 border-bottom">
+
+                            <h5 class="modal-title fs-6" id="einHeadcountJobEmployeesModalLabel">Position headcount</h5>
+
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                        </div>
+
+                        <div class="modal-body small py-3 text-body" id="einHeadcountJobEmployeesModalBody">
+
+                            <p class="text-muted mb-0">Select a headcount cell to load employees.</p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="modal fade" id="einHeadcountByJobHowModal" tabindex="-1" aria-labelledby="einHeadcountByJobHowModalLabel" aria-hidden="true">
+
+                <div class="modal-dialog modal-dialog-scrollable">
+
+                    <div class="modal-content">
+
+                        <div class="modal-header py-2 px-3">
+
+                            <h5 class="modal-title fs-6" id="einHeadcountByJobHowModalLabel">Headcount Methodology</h5>
+
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                        </div>
+
+                        <div class="modal-body small text-body">
+
+                            <p class="mb-2">Bars are <strong>distinct <code>SYS_EMPLEE_ID</code></strong> with positive hours in each time bucket and <strong>CMS job code</strong> (role). That matches how CMS stores Employee Detail; it is the right view for <em>role mix</em>.</p>
+
+                            <p class="mb-2">Because someone can work two roles in the same period, the <strong>same person can appear in more than one stack segment</strong>. Summing bar heights can overstate unique people. A <strong>single unique-person</strong> series would need a rule (e.g. primary role = most hours in the period)—that is a different metric; this chart keeps CMS job codes explicit.</p>
+
+                            <p class="mb-2"><strong>Nurse</strong> tab = licensed and direct-care nursing codes <strong>5–12</strong> (RN DON 5, RN admin 6, RN 7, LPN admin 8, LPN 9, CNA 10, aide in training 11, med aide 12). <strong>Non-nurse</strong> = all other codes in the extract; <strong>All</strong> = every code.</p>
+
+                            <p class="mb-0"><strong>Contract</strong> in a role = <code>EMP_CTR</code> = 2 with hours in that bucket. The optional <strong>contract trend</strong> line is <strong>deduped</strong> contract staff in the period (any role). Tooltips on bars show both staff and contract for that role.</p>
+
+                            {% if cms_ein_landing_url|default('') %}
+                            <p class="mb-0 mt-2">
+                                <a href="{{ cms_ein_landing_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center">
+                                    CMS Employee Detail
+                                </a>
+                            </p>
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% endif %}

@@ -1,0 +1,181 @@
+{# v2 — Harrington expected staffing table (expand below case-mix acuity rollup) #}
+
+
+
+
+
+
+
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_utility_disclosure %}
+
+
+
+
+
+
+
+        {% call pbj_chart_utility_disclosure('harringtonExpectedRollupSection', 'harringtonExpectedRollupCollapse', 'harringtonExpectedRollupBtn', 'fa-book-medical', 'Harrington Expected Staffing', 'Expected vs reported HPRD · CMI', export_onclick='exportHarringtonCmiTableCsv()') %}
+
+
+
+
+
+
+
+                <div id="v2BenchHarringtonTablePanel" class="pbj-bench-slot">
+
+
+
+                    <div class="card mb-0 harrington-cmi-card shadow-sm border-0" id="v2BenchHarringtonTableHost" style="border: 1px solid #e9ecef !important;">
+
+
+
+                        <div class="card-header py-2 px-3 bg-transparent border-0 pb-0">
+
+
+
+                            <div class="harrington-cmi-toolbar d-flex flex-wrap align-items-center gap-2 gap-md-3">
+
+
+
+                                <div class="btn-group btn-group-sm harrington-cmi-basis-toggle flex-grow-1 flex-md-grow-0" role="group" aria-label="Harrington HPRD basis">
+
+
+
+                                    <input type="radio" class="btn-check" name="harringtonUseTotalMode" id="harringtonUseTotalTrue" value="true" checked onchange="updateHarringtonCMI()">
+
+
+
+                                    <label class="btn btn-outline-secondary" for="harringtonUseTotalTrue"><span class="d-md-none">Total</span><span class="d-none d-md-inline">Total HPRD</span></label>
+
+
+
+                                    <input type="radio" class="btn-check" name="harringtonUseTotalMode" id="harringtonUseTotalFalse" value="false" onchange="updateHarringtonCMI()">
+
+
+
+                                    <label class="btn btn-outline-secondary" for="harringtonUseTotalFalse"><span class="d-md-none">Direct</span><span class="d-none d-md-inline">Direct care HPRD</span></label>
+
+
+
+                                </div>
+
+
+
+                                <div class="d-flex align-items-center gap-2 ms-md-auto flex-wrap">
+
+
+
+                                    <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="harringtonShowAllBtn" onclick="toggleHarringtonShowAll()">Show all quarters</button>
+
+
+
+                                    <button type="button" class="btn btn-sm pbj-help-btn flex-shrink-0" data-bs-toggle="modal" data-bs-target="#harringtonMethodologyModal" aria-label="Open Harrington methodology and formulas">
+
+
+
+                                        <i class="fas fa-book-medical me-1 d-none d-md-inline" aria-hidden="true"></i><span class="d-md-none">Methods</span><span class="d-none d-md-inline">Methodology</span>
+
+
+
+                                    </button>
+
+
+
+                                </div>
+
+
+
+                            </div>
+
+
+
+                            <p id="harringtonQuarterContextLinks" class="small text-muted mb-0 mt-2 harrington-cmi-ref-links d-none" style="line-height: 1.4;"></p>
+
+
+
+                        </div>
+
+
+
+                        <div class="card-body pt-2 pb-0">
+
+
+
+                            <p id="harringtonFocusHint" class="small text-muted mb-2">Showing focused Harrington quarters.</p>
+
+
+
+                            <div id="harringtonCMIResults">
+
+
+
+                                <p id="harringtonCmiTableSummary" class="small text-secondary mb-2" style="line-height: 1.45;" aria-live="polite"></p>
+
+
+
+                                <div class="harrington-cmi-table-wrap mb-2">
+
+
+
+                                    <div class="table-responsive mb-0 harrington-cmi-table-scroll">
+
+
+
+                                        <table id="harringtonCMITable" class="table table-sm table-bordered table-striped table-hover align-middle mb-0 table-anchored">
+
+
+
+                                            <thead id="harringtonCMITableHead" class="table-dark"></thead>
+
+
+
+                                            <tbody id="harringtonCMITableBody">
+
+
+
+                                                <tr><td colspan="5" class="text-center text-muted py-3">Loading Harrington quarters…</td></tr>
+
+
+
+                                            </tbody>
+
+
+
+                                        </table>
+
+
+
+                                    </div>
+
+
+
+                                </div>
+
+
+
+                            </div>
+
+
+
+                        </div>
+
+
+
+                    </div>
+
+
+
+                </div>
+
+
+
+
+
+
+
+        {% endcall %}
+
+
+
+
