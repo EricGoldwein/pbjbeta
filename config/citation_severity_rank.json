@@ -1,0 +1,19 @@
+{
+  "_comment": "harm_rank is for sort/filter only; validate against NH_Data_Dictionary.pdf. high_severity_min_rank: rows with harm_rank >= this are is_high_severity (UI red / H+ subset). dashboard_citation_flag_min_rank: rows with harm_rank >= this feed PBJ320 red-flag merge, g_plus_only citation filter, and snapshot strings (default 60 = letter G and above, CMS 'G or higher').",
+  "harm_rank_by_scope_severity_code": {
+    "B": 10,
+    "C": 20,
+    "D": 30,
+    "E": 40,
+    "F": 50,
+    "G": 60,
+    "H": 70,
+    "I": 80,
+    "J": 90,
+    "K": 95,
+    "L": 100
+  },
+  "high_severity_min_rank": 70,
+  "dashboard_citation_flag_min_rank": 60,
+  "default_rank_for_unknown_code": null
+}
