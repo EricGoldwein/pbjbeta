@@ -11,11 +11,16 @@ Canonical per-facility layout (preferred):
     facility_<CCN>_flask_app.py
     facility_<CCN>_ein_{job_quarterly|category_quarterly|employee_detail|nursing_summaries}.parquet|.csv
 
-CMS **Employee Detail** source zips (national PUF or quarterly drops) are **not** stored under
-``deployments/``. Put the monolithic PUF under ``EIN/*.zip`` (or set ``PBJ_EIN_DETAIL_ZIP``) and
-put **supplemental** quarter releases under ``EIN/supplemental/*.zip``. Extraction scripts scan
-both; extracted per-facility Parquet/CSV artifacts are written to ``deployments/pbj320-<CCN>/``,
-which is also where the Vercel bundle loads them from (same directory as ``facility_*_flask_app.py``).
+CMS national sources are **not** stored under ``deployments/``. See ``cms_data_paths.py``:
+
+- Nurse: ``standardized_PBJ/`` (from ``PBJcsv/``)
+- Non-nurse: ``standardized_NonNurse/`` (from ``NonNursecsv/``)
+- EIN: ``EIN/monolithic/`` (multi-quarter PUF) + ``EIN/quarters/`` (newer single-quarter zips)
+
+Per-facility Parquet/CSV slices are written to ``deployments/pbj320-<CCN>/`` — where the
+superdynamic v2 Vercel bundle loads them (same directory as ``facility_*_flask_app.py``).
+``create_vercel_deployment.py`` uses ``packaging_refresh_gates`` to refresh slices when national
+quarters move ahead of deploy artifacts.
 
 The repo root still works as a legacy fallback for older workflows.
 
