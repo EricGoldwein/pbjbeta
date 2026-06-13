@@ -1,0 +1,80 @@
+{
+  "_comment": "2567 PDF narrative phrases → PBJ Employee Detail job-code families. Conservative: prefer broader families and confidence labels; never map #N IDs to named employees.",
+  "version": 1,
+  "mappings": [
+    {
+      "pattern": "registered\\s+nurse\\s+supervisor",
+      "flags": "i",
+      "position_label": "RN supervisor/admin",
+      "ein_job_codes": [6, 7],
+      "confidence": "medium",
+      "notes": "Supervisor often RN with administrative duties (6); include 7 for floor RN. Exclude 5 unless DON explicitly stated."
+    },
+    {
+      "pattern": "director\\s+of\\s+nursing|\\bDON\\b",
+      "flags": "i",
+      "position_label": "RN DON",
+      "ein_job_codes": [5],
+      "confidence": "high"
+    },
+    {
+      "pattern": "director\\s+of\\s+social\\s+work",
+      "flags": "i",
+      "position_label": "Social work (DONSW)",
+      "ein_job_codes": [30, 31],
+      "confidence": "high"
+    },
+    {
+      "pattern": "licensed\\s+practical\\s+nurse(?:\\s+with\\s+administrative\\s+duties)?|\\bLPN\\b",
+      "flags": "i",
+      "position_label": "LPN",
+      "ein_job_codes": [8, 9],
+      "confidence": "high",
+      "notes": "Use [8, 9] only; if narrative says administrative, prefer highlighting 8 in UI later."
+    },
+    {
+      "pattern": "certified\\s+nursing\\s+assistant|\\bCNA\\b",
+      "flags": "i",
+      "position_label": "CNA",
+      "ein_job_codes": [10, 11],
+      "confidence": "high"
+    },
+    {
+      "pattern": "registered\\s+nurse|\\bRN\\b",
+      "flags": "i",
+      "position_label": "RN",
+      "ein_job_codes": [7],
+      "confidence": "high",
+      "notes": "Evaluated after supervisor/DON patterns."
+    },
+    {
+      "pattern": "nurse\\s+aide|medication\\s+aide|medication\\s+technician",
+      "flags": "i",
+      "position_label": "Nurse aide",
+      "ein_job_codes": [12],
+      "confidence": "medium"
+    },
+    {
+      "pattern": "social\\s+worker",
+      "flags": "i",
+      "position_label": "Social work",
+      "ein_job_codes": [30, 31],
+      "confidence": "medium"
+    },
+    {
+      "pattern": "administrator",
+      "flags": "i",
+      "position_label": "Administrator",
+      "ein_job_codes": [1],
+      "confidence": "medium",
+      "notes": "Not a nursing HPRD role; show for context only."
+    },
+    {
+      "pattern": "physician|\\bMD\\b",
+      "flags": "i",
+      "position_label": "Physician",
+      "ein_job_codes": [2, 3, 4],
+      "confidence": "low"
+    }
+  ]
+}

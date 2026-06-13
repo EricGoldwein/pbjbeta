@@ -1,0 +1,324 @@
+{
+  "_comment": "Topic packs for facility citation slices. status=active matches; status=todo reserved for future F-tag curation.",
+  "version": 2,
+  "default_limit": 10,
+  "default_sort": "severity_then_complaint_then_survey_desc",
+  "topics": [
+    {
+      "id": "abuse_neglect",
+      "label": "Abuse, neglect & exploitation",
+      "domain": "resident_safety",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "category_contains": "freedom from abuse, neglect, and exploitation" },
+        {
+          "tags_exact": [
+            "F-0600",
+            "F-0656",
+            "F-0658",
+            "F-0686",
+            "F-0690",
+            "F-0692",
+            "F-0695",
+            "F-0609",
+            "F-0610",
+            "F-0677",
+            "F-0641"
+          ]
+        },
+        { "description_regex": ["\\b(abuse|neglect|exploitation)\\b"] }
+      ],
+      "exclude_tags": ["F-0689"],
+      "tag_priority": ["F-0600", "F-0656"],
+      "pbj_bridge": {
+        "bridge_strength": "role_contextual",
+        "role_family": "nursing_all",
+        "default_windows": ["survey_minus_7_plus_7", "survey_minus_30_plus_30", "survey_quarter"]
+      },
+      "narrative_keywords": ["abuse", "neglect", "assault", "mistreatment", "resident-to-resident"]
+    },
+    {
+      "id": "staffing_sufficiency",
+      "label": "Nursing staff sufficiency & coverage",
+      "domain": "staffing",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0725", "F-0731"] },
+        {
+          "description_regex": [
+            "enough nursing staff",
+            "licensed nurse in charge",
+            "nursing staff every day",
+            "payroll based journal",
+            "\\bPBJ\\b",
+            "staffing data",
+            "weekend staffing",
+            "sufficient nursing"
+          ]
+        }
+      ],
+      "tag_priority": ["F-0725"],
+      "pbj_bridge": {
+        "bridge_strength": "direct_staffing_citation",
+        "role_family": "nursing_all"
+      },
+      "narrative_keywords": ["nursing staff", "PBJ", "staffing", "weekend", "licensed nurse in charge", "each shift"]
+    },
+    {
+      "id": "staffing_posting",
+      "label": "Daily nurse staffing information posted",
+      "domain": "staffing",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0732"] },
+        { "description_regex": ["post nurse staffing", "staffing information every day"] }
+      ],
+      "tag_priority": ["F-0732"],
+      "pbj_bridge": {
+        "bridge_strength": "direct_staffing_citation",
+        "role_family": "nursing_all"
+      }
+    },
+    {
+      "id": "staffing_competency",
+      "label": "Nurse & aide competence / training",
+      "domain": "staffing",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0726", "F-0728", "F-0729", "F-0730"] },
+        { "description_regex": ["competent", "nurse aide", "training", "job performance"] }
+      ],
+      "pbj_bridge": {
+        "bridge_strength": "direct_staffing_citation",
+        "role_family": "nurse_aides"
+      }
+    },
+    {
+      "id": "rn_coverage",
+      "label": "RN hours on duty",
+      "domain": "staffing",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0727"] },
+        { "description_regex": ["registered nurse on duty", "8 hours a day"] }
+      ],
+      "tag_priority": ["F-0727"],
+      "pbj_bridge": {
+        "bridge_strength": "direct_staffing_citation",
+        "role_family": "rn_leadership"
+      }
+    },
+    {
+      "id": "licensed_nurse_coverage",
+      "label": "Licensed nurse in charge / LPN-RN coverage",
+      "domain": "staffing",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0725"] },
+        { "description_regex": ["licensed nurse in charge", "licensed practical nurse", "registered nurse"] }
+      ],
+      "pbj_bridge": {
+        "bridge_strength": "direct_staffing_citation",
+        "role_family": "licensed_nurses"
+      }
+    },
+    {
+      "id": "nurse_aide_staffing",
+      "label": "Nurse aide staffing & training",
+      "domain": "staffing",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0728", "F-0729", "F-0730"] },
+        { "description_regex": ["nurse aide", "certified nursing assistant", "\\bCNA\\b"] }
+      ],
+      "pbj_bridge": {
+        "bridge_strength": "direct_staffing_citation",
+        "role_family": "nurse_aides"
+      }
+    },
+    {
+      "id": "rn_leadership",
+      "label": "Director of nursing / RN leadership",
+      "domain": "staffing",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": true,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0727"] },
+        { "description_regex": ["director of nurses", "director of nursing", "\\bDON\\b"] }
+      ],
+      "pbj_bridge": {
+        "bridge_strength": "direct_staffing_citation",
+        "role_family": "rn_leadership"
+      }
+    },
+    {
+      "id": "care_planning",
+      "label": "Assessment & care planning",
+      "domain": "care_planning",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": false,
+      "pdf_enrich": true,
+      "match_any": [
+        { "category_contains": "resident assessment and care planning" },
+        { "tags_exact": ["F-0655", "F-0657"] },
+        { "description_regex": ["care plan", "baseline care plan", "comprehensive assessment"] }
+      ],
+      "exclude_tags": ["F-0600"],
+      "pbj_bridge": {
+        "bridge_strength": "weak_context_only",
+        "role_family": "nursing_all"
+      }
+    },
+    {
+      "id": "infection_control",
+      "label": "Infection control",
+      "domain": "infection_control",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": false,
+      "pdf_enrich": true,
+      "match_any": [
+        { "is_infection_control": true },
+        { "category_contains": "infection control" },
+        { "tags_prefix": ["F-088"] }
+      ],
+      "pbj_bridge": {
+        "bridge_strength": "weak_context_only",
+        "role_family": "nursing_all"
+      }
+    },
+    {
+      "id": "complaint_inspection",
+      "label": "Complaint inspection deficiencies",
+      "domain": "survey",
+      "status": "active",
+      "default_limit": 10,
+      "match_any": [{ "is_complaint": true }]
+    },
+    {
+      "id": "severe_g_plus",
+      "label": "G or higher scope/severity",
+      "domain": "severity",
+      "status": "active",
+      "default_limit": 10,
+      "match_any": [{ "min_scope_severity": "G" }]
+    },
+    {
+      "id": "falls_accidents",
+      "label": "Falls & accident hazards",
+      "domain": "resident_safety",
+      "status": "active",
+      "default_limit": 10,
+      "pbj_relevant": false,
+      "pdf_enrich": true,
+      "match_any": [
+        { "tags_exact": ["F-0689"] },
+        {
+          "description_regex": [
+            "accident hazard",
+            "free from accident",
+            "\\bfell\\b",
+            "\\bfalls\\b",
+            "fall risk",
+            "prevent falls",
+            "falling"
+          ]
+        }
+      ],
+      "pbj_bridge": {
+        "bridge_strength": "weak_context_only",
+        "role_family": "nursing_all"
+      }
+    },
+    {
+      "id": "pressure_ulcers",
+      "label": "Pressure ulcers / skin integrity",
+      "domain": "outcomes",
+      "status": "todo",
+      "default_limit": 10,
+      "tags_todo": ["F-0684", "F-0693"],
+      "match_any": [],
+      "pbj_bridge": { "bridge_strength": "weak_context_only", "role_family": "nursing_all" }
+    },
+    {
+      "id": "medication_errors",
+      "label": "Medication errors",
+      "domain": "pharmacy",
+      "status": "todo",
+      "default_limit": 10,
+      "tags_todo": [],
+      "match_any": [],
+      "pbj_bridge": { "bridge_strength": "weak_context_only", "role_family": "nursing_all" }
+    },
+    {
+      "id": "elopement_wandering",
+      "label": "Elopement & wandering",
+      "domain": "resident_safety",
+      "status": "todo",
+      "default_limit": 10,
+      "match_any": [{ "description_regex": ["elope", "wander"] }],
+      "pbj_bridge": { "bridge_strength": "weak_context_only", "role_family": "nursing_all" }
+    },
+    {
+      "id": "nutrition_weight_loss",
+      "label": "Nutrition & weight loss",
+      "domain": "dietary",
+      "status": "todo",
+      "default_limit": 10,
+      "match_any": [{ "category_contains": "nutrition and dietary" }],
+      "pbj_bridge": { "bridge_strength": "weak_context_only", "role_family": "nursing_all" }
+    },
+    {
+      "id": "restraints",
+      "label": "Restraints",
+      "domain": "resident_rights",
+      "status": "todo",
+      "default_limit": 10,
+      "match_any": [{ "description_regex": ["restraint", "physical restraint"] }],
+      "pbj_bridge": { "bridge_strength": "weak_context_only", "role_family": "nursing_all" }
+    },
+    {
+      "id": "transfer_discharge",
+      "label": "Transfer & discharge",
+      "domain": "care_coordination",
+      "status": "todo",
+      "default_limit": 10,
+      "match_any": [{ "description_regex": ["discharge", "transfer"] }],
+      "pbj_bridge": { "bridge_strength": "weak_context_only", "role_family": "nursing_all" }
+    },
+    {
+      "id": "quality_of_care_general",
+      "label": "General quality of care",
+      "domain": "quality",
+      "status": "todo",
+      "default_limit": 10,
+      "tags_todo": ["F-0684"],
+      "match_any": [{ "category_contains": "quality of life and care" }],
+      "pbj_bridge": { "bridge_strength": "weak_context_only", "role_family": "nursing_all" }
+    }
+  ]
+}

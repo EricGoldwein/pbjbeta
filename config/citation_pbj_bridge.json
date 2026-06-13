@@ -1,0 +1,75 @@
+{
+  "_comment": "PBJ staffing context windows and bridge strength per topic domain. Not causation.",
+  "version": 1,
+  "disclaimer": "Staffing context only; not incident causation.",
+  "default_windows": [
+    "survey_minus_7_plus_7",
+    "survey_minus_30_plus_30",
+    "survey_quarter"
+  ],
+  "bridge_strengths": {
+    "direct_staffing_citation": "Citation directly concerns nursing staff levels, coverage, or PBJ staffing data.",
+    "role_contextual": "Citation mentions staff roles in narrative; use role families for PBJ context.",
+    "weak_context_only": "Topic is related to quality/resident safety; staffing context is indirect."
+  },
+  "role_families": {
+    "nursing_all": {
+      "labels": ["RN DON", "RN supervisor/admin", "RN", "LPN", "CNA", "Nurse aide"],
+      "ein_job_codes": [5, 6, 7, 8, 9, 10, 11, 12]
+    },
+    "rn_leadership": {
+      "labels": ["RN DON", "RN supervisor/admin", "RN"],
+      "ein_job_codes": [5, 6, 7]
+    },
+    "licensed_nurses": {
+      "labels": ["RN", "LPN", "RN DON", "RN supervisor/admin"],
+      "ein_job_codes": [5, 6, 7, 8, 9]
+    },
+    "nurse_aides": {
+      "labels": ["CNA", "Nurse aide"],
+      "ein_job_codes": [10, 11, 12]
+    }
+  },
+  "topic_defaults": {
+    "staffing_sufficiency": {
+      "bridge_strength": "direct_staffing_citation",
+      "role_family": "nursing_all"
+    },
+    "staffing_posting": {
+      "bridge_strength": "direct_staffing_citation",
+      "role_family": "nursing_all"
+    },
+    "staffing_competency": {
+      "bridge_strength": "direct_staffing_citation",
+      "role_family": "nurse_aides"
+    },
+    "rn_coverage": {
+      "bridge_strength": "direct_staffing_citation",
+      "role_family": "rn_leadership"
+    },
+    "licensed_nurse_coverage": {
+      "bridge_strength": "direct_staffing_citation",
+      "role_family": "licensed_nurses"
+    },
+    "nurse_aide_staffing": {
+      "bridge_strength": "direct_staffing_citation",
+      "role_family": "nurse_aides"
+    },
+    "rn_leadership": {
+      "bridge_strength": "direct_staffing_citation",
+      "role_family": "rn_leadership"
+    },
+    "abuse_neglect": {
+      "bridge_strength": "role_contextual",
+      "role_family": "nursing_all"
+    },
+    "care_planning": {
+      "bridge_strength": "weak_context_only",
+      "role_family": "nursing_all"
+    },
+    "infection_control": {
+      "bridge_strength": "weak_context_only",
+      "role_family": "nursing_all"
+    }
+  }
+}
