@@ -1,0 +1,25 @@
+{# v2 — consistent CSV / PDF / JPG / JSON download buttons (fa-download icon) #}
+{% macro pbj_export_btn(kind, label='', onclick='', id='', title='', aria_label='', hint='', extra_class='', primary=false, type='button', responsive=true) %}
+{% set k = kind|lower %}
+{% set icon = 'fa-download' %}
+{% set btn_title = title or ('Download ' + (label or k|upper)) %}
+{% set btn_aria = aria_label or btn_title %}
+<button type="{{ type }}"
+        class="btn btn-sm pbj-export-btn pbj-export-btn--{{ k }} {% if primary %}btn-primary pbj-export-btn--primary{% else %}btn-outline-secondary{% endif %} {{ extra_class }}"
+        {% if id %}id="{{ id }}"{% endif %}
+        {% if onclick %}onclick="{{ onclick }}"{% endif %}
+        title="{{ btn_title }}"
+        aria-label="{{ btn_aria }}">
+    <i class="fas {{ icon }}" aria-hidden="true"></i>
+    <span class="pbj-export-btn-label">{% if label %}{{ label }}{% elif k == 'csv' and responsive %}<span class="d-md-none">CSV</span><span class="d-none d-md-inline">Export CSV</span>{% elif k == 'pdf' and responsive %}<span class="d-md-none">PDF</span><span class="d-none d-md-inline">Download PDF</span>{% elif k == 'csv' %}Export CSV{% elif k == 'pdf' %}Download PDF{% elif k == 'jpg' %}JPG{% elif k == 'json' %}JSON{% else %}{{ k|upper }}{% endif %}</span>
+    {% if hint %}<span class="pbj-export-btn-hint">{{ hint }}</span>{% endif %}
+</button>
+{% endmacro %}
+
+{% macro pbj_export_toolbar(extra_class='') %}
+<div class="pbj-export-toolbar {{ extra_class }}" role="group" aria-label="Download">
+{% endmacro %}
+
+{% macro pbj_export_toolbar_end() %}
+</div>
+{% endmacro %}

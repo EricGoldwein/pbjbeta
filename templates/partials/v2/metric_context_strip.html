@@ -1,0 +1,36 @@
+{# v2 — Metric context strip (mirrors profile census strip) #}
+
+<div class="pbj-census-context-strip pbj-census-context-strip--metric-trend" aria-label="{{ strip_aria_label|default(label, true) }}">
+
+    <dl class="pbj-census-context-stats mb-0">
+
+        <div class="pbj-census-context-stat pbj-census-context-stat--avg">
+
+            <dt{% if label_id is defined %} id="{{ label_id }}"{% endif %}>{{ label }}</dt>
+
+            <dd class="pbj-census-context-avg-cell">
+
+                <span id="{{ value_id }}"{% if value_tabindex is defined %} tabindex="{{ value_tabindex }}"{% endif %} title="">—</span>
+
+                <div id="{{ spark_id }}" class="pbj-census-context-sparkline" role="img" aria-label="{{ spark_aria_label|default(label ~ ' trend', true) }}"></div>
+
+            </dd>
+
+        </div>
+
+        {% if secondary_label is defined and secondary_value_id is defined %}
+
+        <div class="pbj-census-context-stat">
+
+            <dt>{{ secondary_label }}</dt>
+
+            <dd id="{{ secondary_value_id }}">—</dd>
+
+        </div>
+
+        {% endif %}
+
+    </dl>
+
+</div>
+

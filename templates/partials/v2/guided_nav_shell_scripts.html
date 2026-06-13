@@ -1,0 +1,37 @@
+{# Premium banner dismiss + guided nav bootstrap — after banner markup. #}
+<script>
+    (function () {
+        function wirePremiumBannerDismiss() {
+            var btn = document.getElementById('pbjPremiumBannerDismiss');
+            if (!btn || btn.dataset.pbjWired === '1') return;
+            btn.dataset.pbjWired = '1';
+            btn.addEventListener('click', function () {
+                try {
+                    sessionStorage.setItem('pbj320_premium_banner_dismissed', '1');
+                } catch (e) { /* private mode */ }
+                document.documentElement.classList.remove('pbj-premium-banner-visible');
+                if (typeof window.__pbjUpdateGuidedScrollMargin === 'function') {
+                    window.__pbjUpdateGuidedScrollMargin();
+                }
+                if (typeof window.__pbjGuidedNavSync === 'function') {
+                    window.__pbjGuidedNavSync();
+                }
+            });
+        }
+        function clearGuidedNavBootstrap() {
+            var wrap = document.getElementById('guidedNavWrap');
+            if (wrap) {
+                wrap.classList.remove('is-bootstrapping');
+            }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () {
+                wirePremiumBannerDismiss();
+                clearGuidedNavBootstrap();
+            });
+        } else {
+            wirePremiumBannerDismiss();
+            clearGuidedNavBootstrap();
+        }
+    })();
+</script>

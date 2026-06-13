@@ -1,0 +1,10 @@
+{# Premium banner visibility — run at start of <body> before banner markup. #}
+<script>
+    (function () {
+        try {
+            if (sessionStorage.getItem('pbj320_premium_banner_dismissed') !== '1') {
+                document.documentElement.classList.add('pbj-premium-banner-visible');
+            }
+        } catch (e) { /* private mode / quota */ }
+    })();
+</script>

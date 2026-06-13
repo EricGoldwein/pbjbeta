@@ -1,0 +1,1478 @@
+{# v2 — PBJ320 Control Center (FAB when closed, panel when open) #}
+{% from 'partials/v2/brand_macros.html' import pbj_summary_btn_label, pbj320_mark %}
+
+{% from 'partials/superdynamic_url_macros.html' import pbj_marketing_href, pbj_premium_page_href %}
+
+    <div class="pbj-floating-controls pbj-floating-controls--dock" id="pbjFloatingControls" aria-label="PBJ320 Control Center">
+
+        <div class="pbj-floating-controls-fab-cluster" id="pbjFloatingControlsFabCluster">
+
+            <span class="pbj-floating-controls-drag-zone" data-pbj-dock-drag title="Drag to move" aria-label="Drag Control Center">
+                <span class="pbj-floating-controls-drag-handle" tabindex="-1" aria-hidden="true">⋮⋮</span>
+            </span>
+
+            <button type="button" class="pbj-floating-controls-fab" id="pbjFloatingControlsFab" aria-expanded="false" aria-controls="pbjFloatingControlsPanel" title="Open PBJ320 Control Center (drag ⋮⋮ to move; double-click ⋮⋮ to reset)">
+
+                <span class="pbj-floating-controls-fab-brand-block">
+                {% if favicon_href %}
+                <img src="{{ favicon_href }}" width="36" height="36" alt="" class="pbj-floating-controls-fab-favicon" aria-hidden="true">
+                {% else %}
+                <span class="pbj-floating-controls-favicon-fallback" aria-hidden="true">PBJ</span>
+                {% endif %}
+                <span class="pbj-floating-controls-fab-brand pbj-floating-controls-fab-brand--stacked">
+                    <span class="pbj-floating-controls-fab-line1">
+                    <span class="pbj-floating-controls-fab-pbj">PBJ</span><span class="pbj-floating-controls-fab-320">320</span>
+                    </span>
+                    <span class="pbj-floating-controls-fab-label">Control Center</span>
+                </span>
+                </span>
+
+                <span class="pbj-floating-controls-hint-dot d-none" id="pbjFloatingControlsHintDot" aria-hidden="true"></span>
+
+            </button>
+
+        </div>
+
+        <div class="pbj-floating-controls-panel shadow-lg" id="pbjFloatingControlsPanel" hidden>
+
+            <div class="pbj-floating-controls-panel-head">
+
+                <div class="pbj-floating-controls-panel-drag-head" data-pbj-dock-drag-panel title="Drag to move; double-click to reset position" aria-label="Drag Control Center">
+                    <span class="pbj-floating-controls-panel-drag-grip" aria-hidden="true">⋮⋮</span>
+                    <span class="pbj-floating-controls-fab-mark pbj-floating-controls-fab-mark--panel">
+                    {% if favicon_href %}
+                    <img src="{{ favicon_href }}" width="20" height="20" alt="" class="pbj-floating-controls-panel-favicon" aria-hidden="true">
+                    {% endif %}
+                    <span class="pbj-floating-controls-panel-title min-w-0 pbj-floating-controls-fab-brand--stacked">
+                        <span class="pbj-floating-controls-fab-line1">
+                        <span class="pbj-floating-controls-fab-pbj">PBJ</span><span class="pbj-floating-controls-fab-320">320</span>
+                        </span>
+                        <span class="pbj-floating-controls-fab-label d-block">Control Center</span>
+                    </span>
+                    </span>
+                </div>
+
+                <button type="button" class="btn-close btn-sm pbj-floating-controls-panel-close" id="pbjFloatingControlsClose" aria-label="Close PBJ320 Control Center"></button>
+
+            </div>
+
+            <div class="pbj-floating-controls-block pbj-floating-period-block">
+
+                <p class="pbj-floating-period-inline small mb-2">
+                    <span class="text-muted">Period:</span>
+                    <strong class="text-body" id="pbjFloatingScopeLine" title="Active scope after Apply">—</strong>
+                </p>
+
+                <div class="btn-group btn-group-sm w-100 pbj-floating-grain-group mb-2" role="group" aria-label="Period grain">
+
+                    <button type="button" class="btn btn-outline-secondary d-none d-md-inline-block" data-pbj-floating-grain="years" title="Years">Yrs</button>
+
+                    <button type="button" class="btn btn-outline-secondary active" data-pbj-floating-grain="quarters" title="Quarters" aria-pressed="true">Qtrs</button>
+
+                    <button type="button" class="btn btn-outline-secondary d-none d-sm-inline-block" data-pbj-floating-grain="months" title="Months">Mo</button>
+
+                    <button type="button" class="btn btn-outline-secondary" data-pbj-floating-grain="daterange" title="Custom date range"><span class="d-md-none">Range</span><span class="d-none d-md-inline">Custom</span></button>
+
+                    <button type="button" class="btn btn-outline-secondary" data-pbj-floating-grain="day" title="Single work day">Day</button>
+
+                </div>
+
+                <div id="pbjFloatingPeriodQuarters" class="pbj-floating-period-inputs mb-2">
+                    <select class="form-select form-select-sm pbj-floating-period-select" id="pbjFloatingQuarterSelect" multiple size="4" aria-label="Quarters (Ctrl+click for multiple)">
+                        <option value="" disabled selected>Loading quarters…</option>
+                    </select>
+                </div>
+                <div id="pbjFloatingPeriodYears" class="pbj-floating-period-inputs d-none mb-2">
+                    <select class="form-select form-select-sm pbj-floating-period-select" id="pbjFloatingYearSelect" multiple size="4" aria-label="Years (Ctrl+click for multiple)">
+                        <option value="" disabled selected>Loading years…</option>
+                    </select>
+                </div>
+                <div id="pbjFloatingPeriodMonths" class="pbj-floating-period-inputs d-none mb-2">
+                    <div class="row g-1">
+                        <div class="col-6">
+                            <label class="form-label mb-0 small text-muted" for="pbjFloatingStartMonth">From</label>
+                            <input type="month" class="form-control form-control-sm" id="pbjFloatingStartMonth" aria-label="Start month">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label mb-0 small text-muted" for="pbjFloatingEndMonth">To</label>
+                            <input type="month" class="form-control form-control-sm" id="pbjFloatingEndMonth" aria-label="End month">
+                        </div>
+                    </div>
+                </div>
+                <div id="pbjFloatingPeriodCustom" class="pbj-floating-period-inputs d-none mb-2">
+                    <div class="row g-1 align-items-center">
+                        <div class="col-6">
+                            <label class="form-label mb-0 small text-muted" for="pbjFloatingStartDate">From</label>
+                            <input type="date" class="form-control form-control-sm" id="pbjFloatingStartDate" aria-label="Period start date">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label mb-0 small text-muted" for="pbjFloatingEndDate">To</label>
+                            <input type="date" class="form-control form-control-sm" id="pbjFloatingEndDate" aria-label="Period end date">
+                        </div>
+                    </div>
+                </div>
+                <div id="pbjFloatingPeriodDay" class="pbj-floating-period-inputs d-none mb-2">
+                    <label class="form-label mb-0 small text-muted" for="pbjFloatingFilterDay">Work date</label>
+                    <input type="date" class="form-control form-control-sm" id="pbjFloatingFilterDay" aria-label="Single work day">
+                </div>
+                <div class="d-flex gap-2 mt-2 align-items-center pbj-floating-period-actions w-100">
+                    <button type="button" class="btn btn-sm pbj-btn-apply-navy pbj-floating-apply-btn fw-semibold" data-pbj-apply-btn onclick="pbjV2FloatingApplyPeriod()">Filter</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary pbj-floating-reset-btn px-2" data-pbj-reset-btn onclick="clearFilters()" title="Reset filters" aria-label="Reset filters"><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
+                    <button type="button" class="btn btn-sm pbj-btn-pbj320-summary pbj-floating-summary-btn" onclick="pbjV2OpenPbj320SummaryFromControlCenter()" title="View PBJ320 staffing summary for the active filter range" aria-label="View PBJ320 staffing summary for the active filter range">
+                        {{ pbj_summary_btn_label(favicon=true, favicon_size=13) }}
+                    </button>
+                </div>
+
+            </div>
+
+            <div class="pbj-floating-controls-block pbj-floating-views-block">
+
+                <div class="pbj-floating-views-row" role="group" aria-label="Section shortcuts">
+
+                    <button type="button" class="pbj-floating-investigate-btn" data-pbj-floating-pane="benchmarks" title="Open Benchmarks for the active period">
+
+                        <i class="fas fa-chart-line" aria-hidden="true"></i>
+
+                        <span>Benchmarks</span>
+
+                    </button>
+
+                    <button type="button" class="pbj-floating-investigate-btn" data-pbj-floating-pane="workforce" title="Open PBJ Records for the active period">
+
+                        <i class="fas fa-table" aria-hidden="true"></i>
+
+                        <span>Records</span>
+
+                    </button>
+
+                    <button type="button" class="pbj-floating-investigate-btn" data-pbj-floating-pane="risk" title="Open Risk Timeline for the active period">
+
+                        <i class="fas fa-stream" aria-hidden="true"></i>
+
+                        <span>Risk Timeline</span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="pbj-floating-controls-block pbj-floating-report-block mb-0" id="pbjFloatingReportBlock">
+                <div class="pbj-floating-tool-row" role="group" aria-label="Case Builder, Methods, and AI Kit">
+                    <button type="button" class="pbj-floating-tool-btn pbj-floating-tool-btn--case" id="pbjFloatingOpenReportBuilderBtn" title="Open Case Builder for the active period">
+                        <i class="fas fa-file-lines" aria-hidden="true"></i>
+                        <span>Case Builder</span>
+                    </button>
+                    <a class="pbj-floating-tool-btn pbj-floating-tool-btn--methods" id="pbjFloatingMethodsBtn" href="{{ pbj_premium_page_href('/methodology', pbj_premium_facility_base_url|default('')) }}" title="Methods and data sources">
+                        <i class="fas fa-book-open" aria-hidden="true"></i>
+                        <span>Methods</span>
+                    </a>
+                    <button type="button" class="pbj-floating-tool-btn pbj-floating-tool-btn--ai" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal" title="AI Kit tools">
+                        <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
+                        <span class="pbj-floating-tool-ai-label"><span>AI Kit</span><span class="pbj-ai-beta-badge pbj-readable-badge">beta</span></span>
+                    </button>
+                </div>
+            </div>
+
+            <p class="small text-muted mb-0 mt-2 pbj-floating-panel-footnote">Drag <strong>⋮⋮</strong> to reposition; double-click the handle to reset. Set period, jump to a section, screen outliers, or open Case Builder.</p>
+
+        </div>
+
+    </div>
+
+    <style>
+
+        .pbj-floating-controls-fab-favicon {
+
+            display: block;
+
+            flex-shrink: 0;
+
+            object-fit: contain;
+
+            border-radius: 5px;
+
+            background: transparent;
+
+            width: auto;
+
+            height: 2.5rem;
+
+            max-width: 2.5rem;
+
+        }
+
+        .pbj-floating-controls-panel-favicon,
+
+        .guided-nav-brand-favicon {
+
+            display: block;
+
+            flex-shrink: 0;
+
+            object-fit: contain;
+
+            border-radius: 4px;
+
+            background: transparent;
+
+        }
+
+        .pbj-controls-dock-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1060;
+            background: rgba(15, 23, 42, 0.38);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s ease;
+        }
+        .pbj-controls-dock-backdrop.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .pbj-controls-dock {
+            position: fixed;
+            top: auto;
+            bottom: max(clamp(0.55rem, 1.75vh, 1rem), env(safe-area-inset-bottom, 0px));
+            right: max(clamp(0.65rem, 2vw, 1.25rem), env(safe-area-inset-right, 0px));
+            left: auto;
+            z-index: 1062;
+            pointer-events: none;
+        }
+        #pbjControlsDock:not(.pbj-controls-dock--ready) {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #pbjControlsDock.pbj-controls-dock--ready {
+            opacity: 1;
+            pointer-events: auto;
+            transition: opacity 0.15s ease;
+        }
+        #pbjFloatingControls.pbj-floating-controls--dock:not([data-pbj-dock-mounted="1"]) {
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .pbj-controls-dock.is-dragging {
+            touch-action: none;
+        }
+        .pbj-controls-dock.pbj-controls-dock--custom {
+            right: auto !important;
+            bottom: auto !important;
+        }
+        .pbj-floating-controls-fab {
+            cursor: pointer;
+        }
+        .pbj-floating-controls-fab-cluster {
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            border: 1px solid #cfe0ff;
+            border-radius: 999px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(49, 46, 129, 0.16);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+        .pbj-floating-controls-fab-cluster:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(49, 46, 129, 0.16);
+            background: #eef4ff;
+        }
+        .pbj-floating-controls-fab-cluster:focus-within:not(:hover) {
+            outline: 2px solid #93c5fd;
+            outline-offset: 2px;
+        }
+        .pbj-floating-controls-fab-mark {
+            cursor: pointer;
+        }
+        .pbj-controls-dock.is-dragging .pbj-floating-controls-fab-mark {
+            cursor: grabbing;
+        }
+        .pbj-floating-controls-drag-zone {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            cursor: grab;
+            position: relative;
+            padding: 0.22rem 0.38rem;
+            margin: 0.12rem 0.12rem 0.12rem 0.18rem;
+            border-radius: 0.45rem;
+            min-width: 1.55rem;
+            touch-action: none;
+            box-sizing: border-box;
+        }
+        .pbj-floating-controls-drag-zone:hover {
+            background: rgba(148, 163, 184, 0.14);
+        }
+        .pbj-floating-controls-drag-handle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            min-height: 1.5rem;
+            font-size: 0.82rem;
+            letter-spacing: -0.18em;
+            color: #94a3b8;
+            user-select: none;
+            line-height: 1;
+            pointer-events: none;
+        }
+        .pbj-floating-controls-fab-brand-block {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.1rem;
+            flex-shrink: 1;
+            min-width: 0;
+            pointer-events: auto;
+        }
+        .pbj-controls-dock.is-dragging .pbj-floating-controls-drag-zone,
+        .pbj-controls-dock.is-dragging [data-pbj-dock-drag],
+        .pbj-controls-dock.is-dragging .pbj-floating-controls-fab-cluster {
+            cursor: grabbing;
+        }
+        .pbj-controls-dock .pbj-floating-controls {
+            pointer-events: auto;
+        }
+        .pbj-floating-controls.pbj-floating-controls--dock {
+            position: relative;
+            right: auto;
+            bottom: auto;
+            max-width: none;
+        }
+        .pbj-floating-controls--dock .pbj-floating-controls-fab-cluster .pbj-floating-controls-fab {
+            min-height: 2.55rem;
+            padding: 0.34rem 0.7rem 0.34rem 0.12rem;
+            gap: 0.15rem;
+            font-size: 0.82rem;
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            transform: none;
+        }
+        .pbj-floating-controls--dock .pbj-floating-controls-fab-cluster .pbj-floating-controls-fab:hover,
+        .pbj-floating-controls--dock .pbj-floating-controls-fab-cluster .pbj-floating-controls-fab:focus-visible {
+            background: transparent;
+            box-shadow: none;
+            transform: none;
+        }
+        .pbj-floating-controls--dock .pbj-floating-controls-fab-cluster {
+            min-height: 2.55rem;
+            padding: 0;
+            gap: 0;
+            font-size: 0.82rem;
+        }
+        .pbj-floating-controls--dock .pbj-floating-controls-fab-label {
+            display: inline;
+        }
+        .pbj-floating-controls--dock .pbj-floating-controls-panel {
+            position: absolute;
+            bottom: calc(100% + 0.35rem);
+            top: auto;
+            right: 0;
+            left: auto;
+            margin-top: 0;
+            width: min(21rem, calc(100vw - 1rem));
+            max-height: min(
+                70vh,
+                calc(
+                    100dvh - var(--pbj-premium-banner-h, 0px) - clamp(3.25rem, 8vh, 4.5rem) - 0.85rem
+                )
+            );
+            overflow-y: auto;
+            z-index: 1060;
+        }
+        .pbj-floating-controls--dock.is-open.pbj-floating-controls--panel-below .pbj-floating-controls-panel {
+            bottom: auto;
+            top: calc(100% + 0.35rem);
+        }
+        .pbj-floating-controls--dock.pbj-floating-controls--panel-align-left .pbj-floating-controls-panel {
+            right: auto;
+            left: 0;
+        }
+        .pbj-floating-controls--dock.pbj-floating-controls--panel-force-right .pbj-floating-controls-panel {
+            right: 0 !important;
+            left: auto !important;
+        }
+        .pbj-floating-controls--dock.is-open .pbj-floating-controls-fab-cluster {
+            display: none;
+        }
+        .pbj-floating-controls--dock.is-open {
+            min-width: min(21rem, calc(100vw - 1rem));
+            min-height: 2.55rem;
+        }
+        .pbj-floating-scope-line {
+            font-size: 0.72rem;
+            max-width: 11rem;
+        }
+        .pbj-floating-views-block {
+            padding-top: 0.15rem;
+        }
+        .pbj-floating-views-row,
+        .pbj-floating-investigate-row,
+        .pbj-floating-tool-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.4rem;
+        }
+        .pbj-floating-investigate-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.15rem;
+            min-height: 3rem;
+            padding: 0.35rem 0.25rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.45rem;
+            background: #f8fafc;
+            color: #1e293b;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-decoration: none !important;
+            line-height: 1.15;
+            position: relative;
+        }
+        .pbj-floating-investigate-btn i {
+            font-size: 0.85rem;
+            color: #4f46e5;
+        }
+        .pbj-floating-investigate-btn:hover,
+        .pbj-floating-investigate-btn:focus-visible {
+            background: #eef4ff;
+            border-color: #cbd5e1;
+            color: #0f172a;
+        }
+        .pbj-floating-investigate-badge {
+            position: absolute;
+            top: 0.2rem;
+            right: 0.25rem;
+            min-width: 1rem;
+            height: 1rem;
+            padding: 0 0.25rem;
+            border-radius: 999px;
+            background: #1e3a5f;
+            color: #fff;
+            font-size: 0.58rem;
+            font-weight: 700;
+            line-height: 1rem;
+            text-align: center;
+        }
+        .pbj-floating-report-block {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .pbj-floating-report-context {
+            font-size: 0.74rem;
+            line-height: 1.4;
+            margin-bottom: 0.5rem !important;
+        }
+        .pbj-floating-report-footnote {
+            font-size: 0.68rem;
+            line-height: 1.35;
+        }
+        .pbj-floating-panel-footnote {
+            font-size: 0.68rem;
+            line-height: 1.4;
+            padding-top: 0.15rem;
+        }
+        .pbj-floating-tool-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.2rem;
+            min-height: 3.1rem;
+            padding: 0.38rem 0.3rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.45rem;
+            background: #f8fafc;
+            color: #1e293b;
+            font-size: 0.66rem;
+            font-weight: 600;
+            line-height: 1.15;
+            text-align: center;
+            text-decoration: none !important;
+            width: 100%;
+        }
+        .pbj-floating-tool-btn > i {
+            font-size: 0.82rem;
+            line-height: 1;
+            color: #4f46e5;
+        }
+        .pbj-floating-tool-btn > span:not(.pbj-floating-tool-ai-label) {
+            display: block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pbj-floating-tool-btn--case {
+            border-color: #c7d2fe;
+            background: linear-gradient(180deg, #f5f3ff 0%, #eef2ff 100%);
+            color: #312e81;
+        }
+        .pbj-floating-tool-btn--case > i {
+            color: #4f46e5;
+        }
+        .pbj-floating-tool-btn--case:hover,
+        .pbj-floating-tool-btn--case:focus-visible {
+            background: linear-gradient(180deg, #ede9fe 0%, #e0e7ff 100%);
+            border-color: #a5b4fc;
+            color: #1e1b4b;
+        }
+        .pbj-floating-tool-btn--methods:hover,
+        .pbj-floating-tool-btn--methods:focus-visible {
+            background: #eef4ff;
+            border-color: #cbd5e1;
+            color: #0f172a;
+        }
+        .pbj-floating-tool-btn--ai {
+            border-color: #ddd6fe;
+            background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
+        }
+        .pbj-floating-tool-btn--ai > i {
+            color: #6d28d9;
+        }
+        .pbj-floating-tool-btn--ai:hover,
+        .pbj-floating-tool-btn--ai:focus-visible {
+            background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
+            border-color: #c4b5fd;
+        }
+        .pbj-floating-tool-ai-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.18rem;
+            max-width: 100%;
+            white-space: nowrap;
+        }
+        .pbj-floating-tool-ai-label .pbj-ai-beta-badge {
+            font-size: 0.52rem;
+            padding: 0.08em 0.32em;
+            line-height: 1.15;
+        }
+        .pbj-v2-staffing-scope-bar {
+            border-left: 3px solid #6366f1 !important;
+            background: #f8fafc;
+        }
+        .pbj-v2-staffing-scope-bar .form-select-sm,
+        .pbj-v2-staffing-scope-bar .pbj-v2-work-date-field {
+            max-width: 100%;
+        }
+        #v2BenchPbjCompositionChartBlock .pbj-composition-chart-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem 0.75rem;
+            width: 100%;
+        }
+        #v2BenchPbjCompositionChartBlock .pbj-composition-chart-head-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+        #v2BenchPbjCompositionChartBlock .pbj-composition-segment-tabs {
+            margin-bottom: 0 !important;
+        }
+        #pbjCensusOccupancyStaffingBlock .census-occupancy-chart-head {
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+        }
+        #pbjCensusOccupancyStaffingBlock .census-card-head-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+        .pbj-staffing-core-stack,
+        .pbj-v2-day-level-flow,
+        #dailyDataSection,
+        .pbj-bench-topic-body,
+        .pbj-bench-slot,
+        .dashboard-section {
+            min-width: 0;
+            max-width: 100%;
+        }
+        #dailyDataSection .daily-data-card-scroll {
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #pbjDashboardPane {
+            overflow-x: hidden;
+        }
+        .main-container {
+            max-width: 1320px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .pbj-floating-controls {
+
+            position: fixed;
+
+            right: clamp(0.85rem, 2.5vw, 1.5rem);
+
+            bottom: clamp(1.25rem, 4vh, 2rem);
+
+            z-index: 1050;
+
+            max-width: min(20rem, calc(100vw - 1.25rem));
+
+        }
+        .pbj-floating-controls.pbj-floating-controls--dock {
+            position: relative;
+            right: auto;
+            bottom: auto;
+            max-width: none;
+        }
+
+        .pbj-floating-controls.is-open:not(.pbj-floating-controls--dock) .pbj-floating-controls-fab {
+
+            display: none;
+
+        }
+
+        .pbj-floating-controls.is-open .pbj-floating-controls-panel {
+
+            margin-top: 0;
+
+        }
+
+        .pbj-floating-controls-fab-mark {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.12rem;
+            min-width: 0;
+        }
+        .pbj-floating-controls-fab-mark--panel {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.1rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pbj-floating-controls-fab {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 0.1rem;
+
+            flex-wrap: nowrap;
+
+            white-space: nowrap;
+
+            border: 1px solid #cfe0ff;
+
+            border-radius: 999px;
+
+            background: #fff;
+
+            color: #1e3a5f;
+
+            font-size: 0.88rem;
+
+            font-weight: 700;
+
+            padding: 0.38rem 0.75rem 0.38rem 0.22rem;
+
+            min-height: 3.1rem;
+
+            box-shadow: 0 4px 14px rgba(49, 46, 129, 0.12);
+
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+        }
+
+        .pbj-floating-controls-fab:hover {
+
+            transform: translateY(-1px);
+
+            box-shadow: 0 6px 18px rgba(49, 46, 129, 0.16);
+
+            background: #eef4ff;
+
+        }
+
+        .pbj-floating-controls-favicon-fallback {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            width: 2.5rem;
+
+            height: 2.5rem;
+
+            border-radius: 5px;
+
+            background: linear-gradient(135deg, #312e81 0%, #1e3a5f 100%);
+
+            color: #fff;
+
+            font-size: 0.58rem;
+
+            font-weight: 800;
+
+            flex-shrink: 0;
+
+        }
+
+        .pbj-floating-controls-fab-brand {
+
+            display: inline-flex;
+
+            align-items: baseline;
+
+            gap: 0;
+
+            white-space: nowrap;
+
+            line-height: 1.1;
+
+        }
+
+        .pbj-floating-controls-fab-brand--stacked {
+
+            flex-direction: column;
+
+            align-items: flex-start;
+
+            gap: 0.02rem;
+
+            white-space: normal;
+
+        }
+
+        .pbj-floating-controls-fab-line1 {
+
+            display: inline-flex;
+
+            align-items: baseline;
+
+            gap: 0;
+
+            white-space: nowrap;
+
+        }
+
+        .pbj-floating-controls-fab-pbj {
+
+            font-weight: 800;
+
+            color: #1e3a5f;
+
+        }
+
+        .pbj-floating-controls-fab-320 {
+
+            font-weight: 600;
+
+            color: #4f46e5;
+
+            letter-spacing: -0.03em;
+
+        }
+
+        .pbj-floating-controls-fab-label {
+
+            margin-left: 0;
+
+            font-weight: 600;
+
+            font-size: 0.72rem;
+
+            color: #475569;
+
+            line-height: 1.15;
+
+        }
+        .pbj-floating-shortcuts-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.92fr) minmax(0, 0.92fr);
+            gap: 0.35rem;
+        }
+
+        .pbj-floating-shortcuts-grid > .pbj-floating-action-btn {
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+            gap: 0.32rem !important;
+            padding: 0.42rem 0.48rem !important;
+            font-size: 0.76rem;
+        }
+
+        .pbj-floating-shortcuts-grid > .pbj-floating-action-btn i {
+            width: 0.92rem;
+            font-size: 0.82rem;
+        }
+
+        .pbj-floating-controls-hint-dot {
+
+            width: 9px;
+
+            height: 9px;
+
+            border-radius: 50%;
+
+            background: #4f46e5;
+
+            border: 2px solid #fff;
+
+            flex-shrink: 0;
+
+            margin-left: 0.1rem;
+
+            animation: pbj-controls-hint-pulse 1.4s ease-in-out infinite;
+
+        }
+
+        @keyframes pbj-controls-hint-pulse {
+
+            0%, 100% { opacity: 1; transform: scale(1); }
+
+            50% { opacity: 0.65; transform: scale(0.9); }
+
+        }
+
+        .pbj-floating-controls-panel {
+
+            margin-top: 0.35rem;
+
+            padding: 0.5rem 0.6rem 0.55rem;
+
+            border-radius: 0.65rem;
+
+            border: 1px solid #e2e8f0;
+
+            background: #ffffff;
+
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14) !important;
+
+        }
+        .pbj-floating-controls--dock.is-open .pbj-floating-controls-panel {
+            max-height: min(
+                78vh,
+                calc(100dvh - var(--pbj-premium-banner-h, 0px) - clamp(3.5rem, 9vh, 5rem))
+            );
+            overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .pbj-floating-period-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            width: 100%;
+            min-width: 0;
+        }
+        .pbj-floating-period-actions .pbj-floating-apply-btn {
+            flex: 1 1 auto;
+            min-width: 0;
+            font-size: 0.8125rem;
+            font-weight: 650;
+            line-height: 1.25;
+            padding: 0.32rem 0.55rem !important;
+            min-height: 36px;
+            height: 36px;
+            white-space: nowrap;
+        }
+        .pbj-floating-period-actions .pbj-floating-reset-btn {
+            flex: 0 0 auto;
+            min-height: 36px;
+            height: 36px;
+        }
+        .pbj-floating-period-actions .pbj-floating-summary-btn {
+            min-width: 0;
+            max-width: 9rem;
+            height: 36px;
+            min-height: 36px;
+            padding: 0 0.75rem !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 0 1 auto;
+            font-size: 0.75rem;
+            font-weight: 650;
+            line-height: 1.2;
+            border-radius: 0.375rem !important;
+            border: 1px solid #d8deea !important;
+            background: #fff !important;
+            color: #1f2937 !important;
+            box-shadow: none;
+        }
+        .pbj-floating-period-actions .pbj-floating-summary-btn:hover,
+        .pbj-floating-period-actions .pbj-floating-summary-btn:focus-visible {
+            background: #f8fafc !important;
+            border-color: #94a3b8 !important;
+            color: #0f172a !important;
+        }
+        .pbj-floating-period-actions .pbj-floating-summary-btn .pbj-summary-btn-text {
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 650;
+        }
+        .pbj-floating-period-actions .pbj-floating-summary-btn .pbj-pbj320-summary-favicon {
+            flex-shrink: 0;
+            width: 13px;
+            height: 13px;
+        }
+        @media (max-width: 420px) {
+            .pbj-floating-period-actions .pbj-floating-summary-btn {
+                max-width: 6.75rem;
+                padding-inline: 0.6rem !important;
+            }
+        }
+        .pbj-floating-period-block {
+            padding-bottom: 0.35rem;
+        }
+        .pbj-floating-period-inline {
+            margin-bottom: 0.35rem !important;
+        }
+
+        .pbj-floating-controls-panel[hidden] {
+
+            display: none !important;
+
+        }
+
+        .pbj-floating-controls-panel-head {
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 0.35rem;
+
+            margin-bottom: 0.55rem;
+
+            padding-bottom: 0.45rem;
+
+            border-bottom: 1px solid #e2e8f0;
+
+        }
+
+        .pbj-floating-controls-panel-drag-head {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            min-width: 0;
+            flex: 1;
+            cursor: grab;
+            touch-action: none;
+            border-radius: 0.45rem;
+            margin: -0.15rem 0 -0.15rem -0.2rem;
+            padding: 0.2rem 0.4rem 0.2rem 0.15rem;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .pbj-floating-controls-panel-drag-head,
+        .pbj-floating-controls-panel-drag-head * {
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .pbj-floating-controls-panel-drag-head:hover {
+            background: rgba(148, 163, 184, 0.14);
+        }
+        .pbj-floating-controls-panel-drag-grip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.82rem;
+            letter-spacing: -0.18em;
+            color: #94a3b8;
+            line-height: 1;
+            pointer-events: none;
+        }
+        .pbj-floating-controls-panel-close {
+            flex-shrink: 0;
+            margin: 0;
+        }
+        .pbj-controls-dock.is-dragging .pbj-floating-controls-panel-drag-head,
+        .pbj-controls-dock.is-dragging .pbj-floating-controls-panel-drag-head * {
+            cursor: grabbing;
+        }
+        .pbj-floating-controls-panel-head .btn-close {
+            cursor: pointer;
+        }
+
+        .pbj-floating-controls-panel-title {
+
+            font-size: 0.9rem;
+
+            font-weight: 700;
+
+            color: #0f172a;
+
+            line-height: 1.15;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+
+        }
+
+        .pbj-floating-controls-block {
+
+            margin-bottom: 0.4rem;
+
+            padding-bottom: 0.4rem;
+
+            border-bottom: 1px solid #f1f5f9;
+
+        }
+
+        .pbj-floating-controls-block-label {
+
+            font-size: 0.65rem;
+
+            font-weight: 700;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.07em;
+
+            color: #64748b;
+
+            margin-bottom: 0.4rem;
+
+        }
+
+        .pbj-floating-scope-line {
+
+            font-size: 0.78rem;
+
+            font-weight: 600;
+
+            color: #1e3a5f;
+
+            line-height: 1.35;
+
+            margin: 0;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+
+            white-space: nowrap;
+
+        }
+
+        .pbj-floating-period-more {
+
+            color: #4f46e5;
+
+            font-weight: 600;
+
+            text-decoration: none;
+
+        }
+
+        .pbj-floating-period-more:hover {
+
+            color: #4338ca;
+
+            text-decoration: underline;
+
+        }
+
+        .pbj-floating-grain-group .btn {
+
+            font-size: 0.68rem;
+
+            font-weight: 600;
+
+            padding: 0.2rem 0.35rem;
+
+        }
+
+        .pbj-floating-period-inputs .form-control-sm {
+            font-size: 0.78rem;
+        }
+
+        .pbj-floating-period-select {
+            font-size: 0.78rem;
+            max-height: 8.5rem;
+            padding-top: 0.2rem;
+            padding-bottom: 0.2rem;
+        }
+
+        .pbj-floating-period-select option:checked {
+            background: linear-gradient(135deg, #312e81 0%, #1e3a5f 100%);
+            color: #fff;
+        }
+
+        .pbj-floating-grain-group .btn.active {
+
+            background: linear-gradient(135deg, #312e81 0%, #1e3a5f 100%) !important;
+
+            border-color: #312e81 !important;
+
+            color: #fff !important;
+
+        }
+
+        .pbj-floating-action-btn {
+
+            display: flex !important;
+
+            align-items: center;
+
+            gap: 0.55rem;
+
+            width: 100%;
+
+            text-align: left;
+
+            text-decoration: none !important;
+
+            border: 1px solid #e2e8f0 !important;
+
+            background: #f8fafc !important;
+
+            color: #1e293b !important;
+
+            font-weight: 600;
+
+            font-size: 0.8rem;
+
+            padding: 0.45rem 0.65rem !important;
+
+            border-radius: 0.5rem !important;
+
+            box-shadow: none !important;
+
+            min-height: 2.25rem;
+
+        }
+
+        .pbj-floating-action-btn i {
+
+            width: 1rem;
+
+            text-align: center;
+
+            color: #4f46e5;
+
+            opacity: 0.92;
+
+            flex-shrink: 0;
+
+        }
+
+        .pbj-floating-action-btn--ai {
+
+            border-color: #ddd6fe !important;
+
+            background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%) !important;
+
+            gap: 0.32rem !important;
+
+            padding: 0.42rem 0.48rem !important;
+
+        }
+
+        .pbj-floating-action-btn--ai i {
+
+            color: #6d28d9;
+
+        }
+
+        .pbj-floating-action-btn--ai .pbj-floating-ai-label {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 0.2rem;
+
+            min-width: 0;
+
+            flex: 1 1 auto;
+
+            overflow: hidden;
+
+            white-space: nowrap;
+
+        }
+
+        .pbj-floating-action-btn--ai .pbj-floating-ai-text {
+
+            font-weight: 600;
+
+            letter-spacing: -0.01em;
+
+        }
+
+        .pbj-floating-action-btn--ai .pbj-ai-beta-badge {
+
+            display: inline-block;
+
+            padding: 0.1em 0.38em;
+
+            margin: 0;
+
+            font-size: 0.58rem;
+
+            font-weight: 700;
+
+            line-height: 1.2;
+
+            letter-spacing: 0.03em;
+
+            text-transform: lowercase;
+
+            color: #5b21b6 !important;
+
+            background: #ede9fe !important;
+
+            border: 1px solid #c4b5fd !important;
+
+            border-radius: 999px;
+
+            vertical-align: middle;
+
+            flex-shrink: 0;
+
+            -webkit-text-fill-color: currentColor !important;
+
+        }
+
+        .pbj-floating-action-btn:hover,
+
+        .pbj-floating-action-btn:focus-visible {
+
+            background: #eef4ff !important;
+
+            border-color: #cbd5e1 !important;
+
+            color: #0f172a !important;
+
+        }
+
+        .pbj-floating-investigate-links {
+
+            display: flex;
+
+            flex-wrap: wrap;
+
+            align-items: center;
+
+            gap: 0.35rem 0.5rem;
+
+            font-size: 0.8rem;
+
+            font-weight: 600;
+
+        }
+
+        .pbj-floating-investigate-link {
+
+            color: #1e3a5f;
+
+            text-decoration: none;
+
+        }
+
+        .pbj-floating-investigate-link:hover {
+
+            color: #4f46e5;
+
+            text-decoration: underline;
+
+        }
+
+        .pbj-floating-investigate-sep {
+
+            color: #cbd5e1;
+
+            user-select: none;
+
+        }
+
+        @media (max-width: 767.98px) {
+            .pbj-controls-dock:not(.pbj-controls-dock--custom) {
+                bottom: max(0.55rem, env(safe-area-inset-bottom, 0px)) !important;
+                right: max(0.45rem, env(safe-area-inset-right, 0px)) !important;
+            }
+            /* Closed FAB: icon-only pill — saves horizontal space over the chart */
+            .pbj-floating-controls--dock:not(.is-open) .pbj-floating-controls-fab-cluster .pbj-floating-controls-drag-zone,
+            .pbj-floating-controls--dock:not(.is-open) .pbj-floating-controls-fab-line1,
+            .pbj-floating-controls--dock:not(.is-open) .pbj-floating-controls-fab-label {
+                display: none !important;
+            }
+            .pbj-floating-controls--dock:not(.is-open) .pbj-floating-controls-fab-cluster {
+                padding: 0.32rem !important;
+                min-height: 2.45rem !important;
+                min-width: 2.45rem !important;
+                justify-content: center;
+                border-radius: 999px;
+            }
+            .pbj-floating-controls--dock:not(.is-open) .pbj-floating-controls-fab-cluster .pbj-floating-controls-fab {
+                padding: 0 !important;
+                min-height: 0 !important;
+                min-width: 0 !important;
+                justify-content: center;
+            }
+            .pbj-floating-controls--dock:not(.is-open) .pbj-floating-controls-fab-brand-block {
+                gap: 0;
+            }
+            .pbj-floating-controls--dock:not(.is-open) .pbj-floating-controls-fab-favicon {
+                width: 1.65rem !important;
+                height: 1.65rem !important;
+            }
+            .pbj-floating-controls--dock.is-open .pbj-floating-controls-panel {
+                position: fixed !important;
+                left: max(0.5rem, env(safe-area-inset-left, 0px)) !important;
+                right: max(0.5rem, env(safe-area-inset-right, 0px)) !important;
+                bottom: max(0.5rem, env(safe-area-inset-bottom, 0px)) !important;
+                top: auto !important;
+                width: auto !important;
+                max-width: none !important;
+                max-height: min(
+                    88vh,
+                    calc(
+                        100dvh - var(--pbj-premium-banner-h, 0px) - clamp(3.25rem, 8vh, 4.5rem) - 0.75rem
+                    )
+                ) !important;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                z-index: 1065;
+            }
+            .pbj-floating-controls--dock.is-open .pbj-floating-controls-fab-cluster {
+                display: none !important;
+            }
+            .pbj-floating-controls-panel-head {
+                padding: 0.45rem 0.55rem !important;
+            }
+            .pbj-floating-controls-panel-drag-grip {
+                display: none !important;
+            }
+            .pbj-floating-controls-block {
+                padding: 0.45rem 0.55rem !important;
+            }
+            .pbj-floating-controls-block-label {
+                font-size: 0.68rem !important;
+                margin-bottom: 0.25rem !important;
+            }
+            .pbj-floating-period-inline {
+                font-size: 0.78rem !important;
+                margin-bottom: 0.35rem !important;
+            }
+            .pbj-floating-period-inline > .text-muted:first-child {
+                display: none;
+            }
+            .pbj-floating-report-open-btn .fa-file-lines {
+                margin-right: 0 !important;
+            }
+            @media (min-width: 768px) {
+                .pbj-floating-report-open-btn .fa-file-lines {
+                    margin-right: 0.25rem !important;
+                }
+            }
+        }
+
+        @media (max-width: 575.98px) {
+
+            .pbj-floating-controls-fab-brand--stacked {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.02rem;
+            }
+
+            .pbj-floating-controls-fab-label {
+                display: block;
+                font-size: 0.62rem;
+                max-width: 5.5rem;
+                line-height: 1.1;
+                white-space: normal;
+            }
+
+            .pbj-floating-controls-fab {
+                padding: 0.32rem 0.55rem 0.32rem 0.18rem;
+                min-height: 2.65rem;
+            }
+
+            .pbj-floating-controls-drag-zone {
+                min-width: 1.55rem;
+                padding: 0.22rem 0.38rem;
+            }
+
+        }
+
+    </style>
+
+    <script>
+        (function pbjV2BootControlCenterDock() {
+            function closeOnMobileBeforePaint() {
+                try {
+                    if (!window.matchMedia('(max-width: 767.98px)').matches) {
+                        return;
+                    }
+                } catch (eMq) {
+                    return;
+                }
+                var wrap = document.getElementById('pbjFloatingControls');
+                var fab = document.getElementById('pbjFloatingControlsFab');
+                var panel = document.getElementById('pbjFloatingControlsPanel');
+                if (wrap) {
+                    wrap.classList.remove('is-open');
+                }
+                if (panel) {
+                    panel.hidden = true;
+                }
+                if (fab) {
+                    fab.setAttribute('aria-expanded', 'false');
+                }
+            }
+            closeOnMobileBeforePaint();
+            function showDock() {
+                var dock = document.getElementById('pbjControlsDock');
+                var wrap = document.getElementById('pbjFloatingControls');
+                if (!dock || !wrap) {
+                    return;
+                }
+                if (dock.parentElement !== document.body) {
+                    document.body.appendChild(dock);
+                }
+                if (wrap.parentElement !== dock) {
+                    dock.appendChild(wrap);
+                }
+                wrap.setAttribute('data-pbj-dock-mounted', '1');
+                dock.classList.add('pbj-controls-dock--ready');
+                dock.removeAttribute('aria-hidden');
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', showDock);
+            } else {
+                showDock();
+            }
+            setTimeout(showDock, 400);
+        })();
+    </script>
+
+

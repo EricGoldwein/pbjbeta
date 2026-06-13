@@ -1,0 +1,44 @@
+{# v2 — CMS star ratings (own collapsible; chart + table side-by-side) #}
+
+{% from 'partials/v2/chart_rollup_macros.html' import pbj_chart_utility_disclosure %}
+
+        <div id="providerInfoRatingsSection" class="pbj-chart-evidence-list__item pbj-ratings-over-time-block guided-scroll-anchor">
+
+            {% call pbj_chart_utility_disclosure('ratingsOverTimeSection', 'ratingsOverTimeDetailCollapse', 'ratingsOverTimeDetailBtn', 'fa-star', 'CMS star ratings', 'Overall and staffing stars · quarterly detail', export_table_id='ratingsOverTimeRollupTable', export_slug='ratings_rollup') %}
+
+                <div class="pbj-ratings-detail-panel" id="pbjRatingsDetailPanel">
+
+                    <div class="pbj-ratings-chart-table-row">
+                        <div class="pbj-ratings-chart-table-row__chart">
+                            <div class="pbj-ratings-chart-shell">
+                                <div id="providerInfoRatingsChart" class="w-100 census-occupancy-chart-host pbj-ratings-detail-chart"></div>
+                            </div>
+                        </div>
+                        <div class="pbj-ratings-chart-table-row__table">
+                            <button type="button" class="btn btn-link btn-sm p-0 pbj-summary-info-btn text-muted fw-semibold small mb-1 pbj-ratings-table-title-btn" data-bs-toggle="modal" data-bs-target="#pbjRatingsMeasuresModal" title="What each CMS star rating measures" aria-label="CMS ratings definitions">
+                                CMS Ratings <i class="fas fa-circle-info" style="font-size:0.8rem;" aria-hidden="true"></i>
+                            </button>
+                            <div class="pbj-ratings-table-scroll-wrap dashboard-table-scroll">
+                                <table class="table table-sm table-striped table-hover mb-0 pbj-chart-rollup-data-table" id="ratingsOverTimeRollupTable">
+                                    <thead class="table-dark" id="ratingsOverTimeRollupTableHead">
+                                        <tr>
+                                            <th scope="col" class="sortable pbj-rollup-sort-th" data-pbj-rollup-col="0">Quarter</th>
+                                            <th scope="col" class="text-end sortable pbj-rollup-sort-th" data-pbj-rollup-col="1">Overall</th>
+                                            <th scope="col" class="text-end sortable pbj-rollup-sort-th" data-pbj-rollup-col="2">Staffing</th>
+                                            <th scope="col" class="text-end sortable pbj-rollup-sort-th" data-pbj-rollup-col="3">Inspection</th>
+                                            <th scope="col" class="text-end sortable pbj-rollup-sort-th" data-pbj-rollup-col="4">Quality</th>
+                                            <th scope="col" class="text-end sortable pbj-rollup-sort-th" data-pbj-rollup-col="5">Long-stay QM</th>
+                                            <th scope="col" class="text-end sortable pbj-rollup-sort-th" data-pbj-rollup-col="6">Short-stay QM</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ratingsOverTimeRollupTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            {% endcall %}
+
+        </div>

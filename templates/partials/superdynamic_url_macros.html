@@ -1,0 +1,76 @@
+{% macro pbj_api_href(p, pbj_public_api_origin='', pbj_public_site_base_path='') -%}
+{%- set path = p if p.startswith('/') else '/' ~ p -%}
+{%- set _o = pbj_public_api_origin|default('', true) -%}
+{%- set _b = pbj_public_site_base_path|default('', true) -%}
+{%- if _o -%}
+{{ _o }}{{ path }}
+{%- elif _b -%}
+{{ _b }}{{ path }}
+{%- else -%}
+{{ path }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro pbj_site_href(p, pbj_public_api_origin='', pbj_public_site_base_path='') -%}
+{%- set path = p if p.startswith('/') else '/' ~ p -%}
+{%- set _o = pbj_public_api_origin|default('', true) -%}
+{%- set _b = pbj_public_site_base_path|default('', true) -%}
+{%- if _o -%}
+{{ _o }}{{ path }}
+{%- elif _b -%}
+{{ _b }}{{ path }}
+{%- else -%}
+{{ path }}
+{%- endif -%}
+{%- endmacro %}
+
+{# In-app facility pages served by this Flask/Vercel bundle (dashboard, methodology, data-matching, report-builder).
+   Respects ``PUBLIC_SITE_BASE_PATH`` when set (e.g. /premium/<CCN>); otherwise same-origin relative paths for local QA. #}
+{% macro pbj_facility_page_href(p, pbj_public_site_base_path='') -%}
+{%- set path = p if p.startswith('/') else '/' ~ p -%}
+{%- set base = (pbj_public_site_base_path or '')|trim -%}
+{%- if base -%}
+{{ base.rstrip('/') }}{{ path }}
+{%- else -%}
+{{ path }}
+{%- endif -%}
+{%- endmacro %}
+
+{# Facility-specific pages on the main PBJ320 marketing site (e.g. https://www.pbj320.com/premium/<CCN>/methodology).
+   Pass ``pbj_premium_facility_base_url`` from Flask (``_pbj_premium_facility_base_url(prov)``); CCN and marketing origin come from loaded facility + env (``PBJ320_PREMIUM_PAGE_BASE``, ``PBJ320_MARKETING_ORIGIN``). When base is empty, returns a same-origin relative path. #}
+{% macro pbj_premium_page_href(p, pbj_premium_facility_base_url='') -%}
+{%- set path = p if p.startswith('/') else '/' ~ p -%}
+{%- set base = (pbj_premium_facility_base_url or '')|trim -%}
+{%- if base -%}
+{{ base.rstrip('/') }}{{ path }}
+{%- else -%}
+{{ path }}
+{%- endif -%}
+{%- endmacro %}
+
+{# Same-app downloads (Claude Skill zip, etc.). Prefer same-origin relative paths on HTTP/dev;
+   only prefix with PUBLIC_API_ORIGIN when it is HTTPS (production / cross-host embed). #}
+{% macro pbj_facility_download_href(p, pbj_public_api_origin='') -%}
+{%- set path = p if p.startswith('/') else '/' ~ p -%}
+{%- set _o = ((pbj_public_api_origin|default('', true))|trim).rstrip('/') -%}
+{%- if _o and _o.lower().startswith('https://') -%}
+{{ _o }}{{ path }}
+{%- else -%}
+{{ path }}
+{%- endif -%}
+{%- endmacro %}
+
+{# Public marketing site (pbj-ai-support, attorneys). Claude Skill zip is pbj-root / Premium — not www.pbj320.com/downloads. #}
+{% macro pbj_marketing_href(p, pbj320_marketing_origin='https://www.pbj320.com') -%}
+{%- set path = p if p.startswith('/') else '/' ~ p -%}
+{%- set origin = (pbj320_marketing_origin or 'https://www.pbj320.com')|trim -%}
+{{ origin.rstrip('/') }}{{ path }}
+{%- endmacro %}
+
+{# Public owner portfolio on www.pbj320.com (CMS ASSOCIATE ID - OWNER digits only). #}
+{% macro pbj_owner_public_href(associate_id, pbj320_marketing_origin='https://www.pbj320.com') -%}
+{%- set oid = (associate_id|string)|trim -%}
+{%- if oid and oid.isdigit() -%}
+{{ (pbj320_marketing_origin or 'https://www.pbj320.com')|trim|rstrip('/') }}/owners/{{ oid }}
+{%- endif -%}
+{%- endmacro %}

@@ -1,0 +1,18 @@
+{# PBJ320 dictionary-style brand mark — PBJ (800) + 320 (indigo 600). Use on features, nav, product chrome.
+   Plain text in headings, body copy, and methodology sentences (e.g. "PBJ Nursing Home Staffing Intelligence") — not this macro. #}
+
+{% macro pbj320_mark(suffix='', variant='default', extra_class='', suffix_class='') -%}
+<span class="pbj-brand-mark{% if variant != 'default' %} pbj-brand-mark--{{ variant }}{% endif %}{% if extra_class %} {{ extra_class }}{% endif %}"><span class="pbj-brand-pbj">PBJ</span><span class="pbj-brand-320">320</span></span>{% if suffix %}<span class="pbj-brand-suffix{% if suffix_class %} {{ suffix_class }}{% endif %}">{{ suffix }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro pbj320_mark_link(href, suffix='', variant='default', link_class='', attrs='') -%}
+<a href="{{ href }}" class="pbj-brand-link{% if link_class %} {{ link_class }}{% endif %}"{% if attrs %} {{ attrs|safe }}{% endif %}>{{ pbj320_mark(suffix, variant) }}</a>
+{%- endmacro %}
+
+{% macro pbj320_brand_btn_label(suffix='', favicon=true, favicon_class='pbj-pbj320-summary-favicon align-text-bottom', favicon_size=14) -%}
+{% if favicon and favicon_href %}<img src="{{ favicon_href }}" width="{{ favicon_size }}" height="{{ favicon_size }}" alt="" class="{{ favicon_class }}" aria-hidden="true">{% endif %}{{ pbj320_mark(suffix) }}
+{%- endmacro %}
+
+{% macro pbj_summary_btn_label(favicon=true, favicon_class='pbj-pbj320-summary-favicon align-text-bottom', favicon_size=14, label='Summary') -%}
+{% if favicon %}<img src="{{ favicon_href or '/favicon.ico' }}" width="{{ favicon_size }}" height="{{ favicon_size }}" alt="" class="{{ favicon_class }}" aria-hidden="true">{% endif %}<span class="pbj-summary-btn-text">{{ label }}</span>
+{%- endmacro %}
