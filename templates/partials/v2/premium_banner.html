@@ -1,0 +1,13 @@
+{# Thin premium notice above fixed guided nav — same markup on dashboard and standalone pages. #}
+{% from 'partials/superdynamic_url_macros.html' import pbj_premium_page_href %}
+<div id="pbjPremiumBanner" class="pbj-premium-banner" role="region" aria-label="Premium PBJ320 dashboard notice">
+    <div class="pbj-premium-banner-inner">
+        <span class="pbj-premium-badge">Premium</span>
+        <p class="pbj-premium-banner-text mb-0">
+            {{ pbj_premium_banner_title | default('Sample Premium PBJ320 Dashboard') }} for <strong>{{ facility_name_display }}</strong>.
+            <a href="{{ pbj_premium_custom_dashboard_primary_href | default(pbj_premium_page_href('/', pbj_premium_facility_base_url|default(''))) }}"
+               {% if pbj_premium_custom_dashboard_primary_new_tab | default(false) %}target="_blank" rel="noopener noreferrer"{% endif %}>{{ pbj_premium_custom_dashboard_cta_label | default('Learn more') }}</a>
+        </p>
+        <button type="button" class="pbj-premium-banner-dismiss" id="pbjPremiumBannerDismiss" aria-label="Dismiss premium notice">×</button>
+    </div>
+</div>

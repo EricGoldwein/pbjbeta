@@ -1,0 +1,8 @@
+{# v2 — hidden hooks only (period UI lives in Summary + Control Center; chart range on Staffing trend toolbar) #}
+<div class="visually-hidden" aria-hidden="true" id="pbjV2ScopeHooks">
+    <span id="pbjStaffingScopePeriod">—</span>
+    <input type="date" id="pbjV2WorkDatePrimary" min="{% if pbj_min_work_date %}{{ pbj_min_work_date }}{% else %}2017-01-01{% endif %}" {% if pbj_max_work_date %}max="{{ pbj_max_work_date }}"{% endif %} tabindex="-1">
+    <button type="button" id="pbjV2WorkDateGoDaily" tabindex="-1"></button>
+    <button type="button" id="pbjV2WorkDateGoRoster" tabindex="-1"></button>
+    <button type="button" id="pbjV2WorkDateDayReport" tabindex="-1"></button>
+</div>

@@ -1,0 +1,330 @@
+{# v2 — PBJ320 facility dashboard quick start #}
+
+
+
+    <div class="modal fade" id="pbjDashboardHowToModal" tabindex="-1" aria-labelledby="pbjDashboardHowToModalLabel" aria-hidden="true">
+
+
+
+        <div class="modal-dialog modal-dialog-scrollable modal-md">
+
+
+
+            <div class="modal-content pbj-dashboard-howto-modal">
+
+
+
+                <div class="modal-header py-2 px-3 border-bottom align-items-start gap-2">
+
+
+
+                    <div class="flex-grow-1 min-w-0 pe-1">
+
+
+
+                        <div class="ein-modal-brand mb-0">{% if favicon_href %}<img src="{{ favicon_href }}" width="16" height="16" alt="" aria-hidden="true">{% endif %}<span class="pbj-howto-brand-mark"><span class="pbj-howto-brand-pbj">PBJ</span><span class="pbj-howto-brand-320">320</span></span></div>
+
+
+
+                        <h5 class="modal-title fs-6 mb-0 fw-semibold text-body" id="pbjDashboardHowToModalLabel">PBJ Guide</h5>
+
+
+
+                        <p class="small text-muted mb-0 mt-1">{{ facility_name_display }} · CCN {{ provnum }}</p>
+
+
+
+                    </div>
+
+
+
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+
+
+                </div>
+
+
+
+                <div class="modal-body small text-body">
+
+
+
+                    <p class="mb-3 pbj-howto-lead">Explore <strong>{{ facility_name_display }}</strong> ({{ provnum }}) with CMS PBJ, Employee Detail, Provider Information, and citations. Filter by period, compare benchmarks and peers, and drill to single work days.</p>
+
+
+
+
+
+
+
+                    <h6 class="pbj-howto-kicker mb-2">Start here</h6>
+
+
+
+                    <ol class="pbj-howto-steps mb-3 ps-3">
+
+
+
+                        <li class="mb-2"><strong>Pick a period.</strong> Use <strong>Summary</strong> filters or <strong>PBJ320 Control Center</strong>, then <strong>Apply</strong>.</li>
+
+
+
+                        <li class="mb-2"><strong>Track PBJ trends.</strong> Summary cards and quarterly tables show HPRD, case-mix context, and CMS Care Compare ratings for the period.</li>
+
+
+
+                        {% if superdynamic_v3_panes|default(false) %}
+                        <li class="mb-2"><strong>Go deeper.</strong> Use the top nav: <em>Staffing</em> → <em>Benchmarks</em> → <em>PBJ Records</em> → <em>Risk Timeline</em>. <em>Case Builder</em> and <em>Methodology</em> sit after the divider.</li>
+                        {% else %}
+                        <li class="mb-2"><strong>Go deeper.</strong> Use the top nav: <em>Staffing</em> → <em>Compliance</em> → <em>Benchmarks</em> → <em>Patterns</em> → <em>Events</em> → <em>Forensics</em>. <em>Case Builder</em> and <em>Methodology</em> sit after the divider.</li>
+                        {% endif %}
+
+
+
+                        <li class="mb-0"><strong>Case Builder.</strong> Build an evidence-based PBJ memo focusing on custom time periods and dates.</li>
+
+
+
+                    </ol>
+
+
+
+
+
+
+
+                    <h6 class="pbj-howto-kicker mb-2">What you can do</h6>
+
+
+
+                    <div class="row g-2 mb-3 pbj-howto-feature-grid">
+
+
+
+                        <div class="col-sm-6">
+
+
+
+                            <a href="#hprdTrendSection" class="pbj-howto-feature-card pbj-howto-jump h-100" data-guided-nav-target="hprdTrendSection" aria-label="Jump to Staffing section">
+
+
+
+                                <span class="pbj-howto-feature-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></span>
+
+
+
+                                <div>
+
+
+
+                                    <strong class="d-block">Staffing</strong>
+
+
+
+                                    <span class="text-muted">Staffing trends with per-chart <strong>Range</strong>, <strong>Events</strong>, and <strong>Benchmark line</strong> controls; census context, quarterly rollups, compliance tools, and CMS Care Compare ratings.</span>
+
+
+
+                                </div>
+
+
+
+                            </a>
+
+
+
+                        </div>
+
+
+
+                        <div class="col-sm-6">
+
+
+
+                            <a href="#staffingBenchmarkingSection" class="pbj-howto-feature-card pbj-howto-jump h-100" data-guided-nav-target="staffingBenchmarkingSection" aria-label="Jump to Benchmarks section">
+
+
+
+                                <span class="pbj-howto-feature-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
+
+
+
+                                <div>
+
+
+
+                                    <strong class="d-block">Benchmarks</strong>
+
+
+
+                                    <span class="text-muted">Case-mix benchmarks and regional peer comparison (county, state, CMS region, national).</span>
+
+
+
+                                </div>
+
+
+
+                            </a>
+
+
+
+                        </div>
+
+
+
+                        <div class="col-sm-6">
+
+
+
+                            <a href="#dayLevelEvidenceSection" class="pbj-howto-feature-card pbj-howto-jump h-100" data-guided-nav-target="dayLevelEvidenceSection" aria-label="Jump to Forensics section">
+
+
+
+                                <span class="pbj-howto-feature-icon" aria-hidden="true"><i class="fas fa-microscope"></i></span>
+
+
+
+                                <div>
+
+
+
+                                    <strong class="d-block">Forensics</strong>
+
+
+
+                                    <span class="text-muted">Daily grid, roster, off-pattern screening, and single-day drill-down reports.</span>
+
+
+
+                                </div>
+
+
+
+                            </a>
+
+
+
+                        </div>
+
+
+
+                        <div class="col-sm-6">
+
+
+
+                            <a href="#" class="pbj-howto-feature-card pbj-howto-jump pbj-howto-feature-card--featured h-100" data-howto-action="reportBuilder" aria-label="Open Case Builder">
+
+
+
+                                <span class="pbj-howto-feature-icon pbj-howto-feature-icon--featured" aria-hidden="true"><i class="fas fa-file-lines"></i></span>
+
+
+
+                                <div>
+
+
+
+                                    <strong class="d-block">Case Builder</strong>
+
+
+
+                                    <span class="text-muted">Attorney-ready memo with period summary, compliance, charts, red flags, and methods appendix.</span>
+
+
+
+                                </div>
+
+
+
+                            </a>
+
+
+
+                        </div>
+
+
+
+                    </div>
+
+
+
+
+
+
+
+                    <button type="button" class="pbj-howto-cc-callout rounded px-2 py-2 mb-0 pbj-howto-jump" data-howto-action="openControlCenter" aria-label="Open PBJ320 Control Center">
+
+
+
+                        <div class="pbj-howto-cc-brand mb-1">
+
+
+
+                            {% if favicon_href %}<img src="{{ favicon_href }}" width="22" height="22" alt="" class="pbj-howto-cc-favicon" aria-hidden="true">{% endif %}
+
+
+
+                            <span class="pbj-howto-brand-mark"><span class="pbj-howto-brand-pbj">PBJ</span><span class="pbj-howto-brand-320">320</span></span>
+
+
+
+                            <span class="pbj-howto-cc-label">Control Center</span>
+
+
+
+                        </div>
+
+
+
+                        <p class="mb-0 text-muted">Drag <strong>⋮⋮</strong> to reposition; double-click the handle to reset. Set period, jump to outliers and flags, run pre/post compare, or open Case Builder.</p>
+
+
+
+                    </button>
+
+
+
+                </div>
+
+
+
+                <div class="modal-footer py-2 px-3 d-flex flex-wrap gap-2 justify-content-between border-top">
+
+
+
+                    <div class="d-flex flex-wrap gap-2">
+
+
+
+                        <button type="button" class="btn btn-sm btn-primary pbj-howto-jump" data-howto-action="reportBuilder">Case Builder</button>
+
+
+
+                        <a class="btn btn-sm btn-outline-primary" href="{{ pbj_premium_page_href('/methodology', pbj_premium_facility_base_url|default('')) }}" target="_blank" rel="noopener">Methods <i class="fas fa-arrow-up-right-from-square fa-xs ms-1" aria-hidden="true"></i></a>
+
+
+
+                    </div>
+
+
+
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Got it</button>
+
+
+
+                </div>
+
+
+
+            </div>
+
+
+
+        </div>
+
+
+
+    </div>
+
