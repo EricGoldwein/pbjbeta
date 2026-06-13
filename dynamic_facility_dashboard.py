@@ -8324,6 +8324,67 @@ def api_citations_summary():
         return jsonify({"error": str(e)})
 
 
+@app.route("/api/geo-distribution")
+def api_geo_distribution():
+    """PBJ-derived facility-quarter distribution for a metric within a geography."""
+    try:
+        from geo_distribution_lib import build_geo_distribution_payload
+        import facility_report_lib
+
+        provnum = request.args.get("provnum") or request.args.get("ccn") or ""
+        if not provnum and global_df is not None and len(global_df) and "PROVNUM" in global_df.columns:
+            provnum = str(global_df["PROVNUM"].iloc[0])
+        quarter = request.args.get("quarter") or request.args.get("cy_qtr") or ""
+        metric = request.args.get("metric") or "total_nurse_hprd"
+        geography_type = request.args.get("geography_type") or "state"
+        geography_value = request.args.get("geography_value") or ""
+        facility_name = request.args.get("facility_name") or ""
+        threshold_override = request.args.get("threshold_override")
+        thr_ov: Optional[float] = None
+        if threshold_override is not None and str(threshold_override).strip() != "":
+            try:
+                thr_ov = float(threshold_override)
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid threshold_override."}), 400
+        peer_sort = request.args.get("peer_sort") or ""
+        payload = build_geo_distribution_payload(
+            provnum=str(provnum),
+            quarter=str(quarter),
+            metric=str(metric),
+            geography_type=str(geography_type),
+            geography_value=str(geography_value),
+            facility_name=str(facility_name),
+            threshold_override=thr_ov,
+            peer_sort=str(peer_sort),
+            macpac_getter=facility_report_lib.get_macpac_state_standards,
+        )
+        if payload.get("error"):
+            return jsonify(payload), 400
+        return jsonify(payload)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/geo-distribution/context")
+def api_geo_distribution_context():
+    """Geography facility counts and default comparison scope for a quarter."""
+    try:
+        from geo_distribution_lib import build_geo_distribution_context
+
+        provnum = request.args.get("provnum") or request.args.get("ccn") or ""
+        if not provnum and global_df is not None and len(global_df) and "PROVNUM" in global_df.columns:
+            provnum = str(global_df["PROVNUM"].iloc[0])
+        quarter = request.args.get("quarter") or request.args.get("cy_qtr") or ""
+        payload = build_geo_distribution_context(str(provnum), str(quarter))
+        if payload.get("error"):
+            return jsonify(payload), 400
+        return jsonify(payload)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route('/api/quarters')
 def get_quarters():
     """Get available quarters"""
