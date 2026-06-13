@@ -1,28 +1,160 @@
-# Ignore Python cache files
-__pycache__
+# =============================================================================
+# PBJapp .gitignore — phase 1 guardrails (2026-06-13)
+# See docs/repo_cleanup_plan.md for migration plan.
+# =============================================================================
+
+# --- Python ---
+__pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.whl
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
 
-# Ignore virtual environments
-venv
-ENV
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+.python-version
 
-# Exclude unnecessary logs and other files
+# --- Node / JS build ---
+node_modules/
+.npm/
+.yarn/
+*.min.js.map
+
+# --- Logs and temp ---
 *.log
-
-# Ignore image files
-*.png
-
-# Ignore temporary files
 *.tmp
 *.bak
+*.swp
+*~
 
-# Ignore large data files
-provider_info_combined.csv
-provider_info_extracted/
-.vercel
-.env*.local
-
-# Ignore API keys and secrets
+# --- Secrets and credentials ---
 .env
-donor/.env
+.env*.local
 *.env
+donor/.env
+drive-key.json
+drive-oauth-client.json
+drive-oauth-token.json
+*credentials*.json
+*service-account*.json
+
+# --- Local machine config ---
+data_paths.local.json
+.vercel
+
+# --- QA / verify output ---
+.verify_output/
+.verify_output_sff.json
+playwright-report/
+test-results/
+
+# --- Cache directories ---
+.ein_quarter_cache/
+.safety-backups/
+logs/
+downloads/
+column_mapping_reports/
+reference_docx_extract/
+metrics_backups/
+indexed/
+
+# --- Generated outputs and exports ---
+outputs/
+Facility Reports/
+facility_red_flag_report/reports/
+reports/generated/
+
+# --- Backups and archives (local only) ---
+backups/
+Archive/
+archives/
+
+# --- National CMS data trees (keep local via junction or data_paths.local.json) ---
+PBJcsv/
+NonNursecsv/
+standardized_PBJ/
+standardized_NonNurse/
+EIN/
+provider_info/
+provider_info_normalized/
+provider_info_extracted/
+provider_info_combined.csv
+provider_info_combined_with_quarters.csv
+
+# --- Large generated metric / export CSVs (regenerable) ---
+facility_quarterly_metrics.csv
+facility_quarterly_metrics.pre_unify_*.csv
+facility_census_volatility.csv
+non_nurse_facility_metrics.csv
+non_nurse_state_metrics.csv
+non_nurse_national_metrics.csv
+quality_check_staffing_comparison.csv
+state_quarterly_metrics.csv
+state_lite_metrics.csv
+state_lite_metrics_with_rankings.csv
+national_lite_metrics.csv
+national_pbj_metrics.csv
+national_quarterly_metrics.csv
+donor_*.csv
+donors_classified.csv
+donor_entity_links.csv
+donor_entity_rolled_up.csv
+donor_facility_links.csv
+donor_pbj_summary.csv
+data_dropout_analysis_updated.csv
+simplified_pbj_report.csv
+
+# NOTE: pbj_lite/*.csv is intentionally TRACKED (deployment slices).
+# NOTE: data/gis/, data/players/, data/sec/ are intentionally TRACKED (small registries).
+# NOTE: Small reference CSVs at root (e.g. cms_region_state_mapping.csv, state_legislation_standards.csv) are NOT ignored.
+
+# --- Large binary / archive formats ---
+*.parquet
+*.zip
+*.xlsx
+*.xls
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb
+
+# --- Media (use pbj_images/ or CDN; png rule below) ---
+*.mp4
+*.mov
+*.avi
+nursing_homes_including_rehab_services_*.zip
+
+# --- Images (historical rule; pbj_images may exist locally) ---
+*.png
+
+# --- Playground generated artifacts ---
+playground_data.json
+playground_distributions.json
+real_mobile_data.js
+
+# --- Accidental / debug root files ---
+debug_*.py
+tmp_*.txt
+tmp_*.py
+_step*.txt
+_shell_test.txt
+tatus*
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
