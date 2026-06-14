@@ -1,5 +1,0 @@
-[33m5162159[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Add favicon and back to dashboard buttons to About and Premium pages
-[33md436b5e[m Reduce contact section padding on Premium page and add footer navigation to About and Premium pages
-[33mbfea1cf[m Update Premium page
-[33m18b33c9[m Remove horizontal divider between header text and Back to Search button
-[33mfcf8fcd[m Improve mobile layout and About link styling - Reduce vertical spacing on mobile for tighter layout - Add italic styling to mobile About link - Fix performance issues with function caching - Hide About link on destination pages

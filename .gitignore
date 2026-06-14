@@ -152,6 +152,8 @@ tmp_*.py
 _step*.txt
 _shell_test.txt
 tatus*
+*_pre_rebase_diff_report.txt
+.cursorignore.*.local
 
 # --- IDE / OS ---
 .vscode/
