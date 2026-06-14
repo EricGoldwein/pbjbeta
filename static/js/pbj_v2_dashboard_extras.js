@@ -1819,6 +1819,20 @@
             });
     }
 
+    function pbjV2FormatQuarterOptionLabel(value, fallback) {
+        var v = String(value || '').trim();
+        if (!v || v === 'all' || v === '__auto__') {
+            return String(fallback || v);
+        }
+        if (typeof global.formatQuarter === 'function') {
+            var formatted = global.formatQuarter(v);
+            if (formatted && formatted !== v) {
+                return formatted;
+            }
+        }
+        return pbjV2FormatCyQuarter(v) || String(fallback || v);
+    }
+
     function pbjV2CopySelectOptions(srcId, dstId) {
         var dst = document.getElementById(dstId);
         if (!dst) {
@@ -1830,7 +1844,7 @@
             Array.prototype.forEach.call(src.options, function (opt) {
                 var o = document.createElement('option');
                 o.value = opt.value;
-                o.textContent = opt.textContent;
+                o.textContent = pbjV2FormatQuarterOptionLabel(opt.value, opt.textContent);
                 o.selected = opt.selected;
                 dst.appendChild(o);
             });
@@ -3390,6 +3404,24 @@
         global.__pbjAiPackScopeStale = false;
     }
 
+    function pbjV2UpdateAiToolkitSummaryIdle() {
+        var summaryEl = document.getElementById('pbjAiToolkitSummary');
+        if (!summaryEl) {
+            return;
+        }
+        if (global.__pbjLastAiPackMeta && global.__pbjLastAiPackMeta.dailyRowCount && !global.__pbjAiPackScopeStale) {
+            pbjV2RenderAiPackAdvisories(global.__pbjLastAiPackMeta || {});
+            return;
+        }
+        summaryEl.textContent = 'Use the buttons below when you are ready to export.';
+        summaryEl.className = 'small text-body-secondary mb-2';
+        var ul = document.getElementById('pbjAiToolkitAdvisories');
+        if (ul) {
+            ul.classList.add('d-none');
+            ul.innerHTML = '';
+        }
+    }
+
     function pbjV2RefreshAiPackPreview() {
         var pre = document.getElementById('pbjAiPackPreview');
         if (!pre || typeof global.exportPbj320AiContextPack !== 'function') {
@@ -3397,30 +3429,31 @@
         }
         pbjV2EnsureAiPackDataThen(function () {
             global.__pbjAiPackPreviewOnly = true;
-            global.exportPbj320AiContextPack();
-            global.__pbjAiPackPreviewOnly = false;
+            try {
+                global.exportPbj320AiContextPack();
+            } finally {
+                global.__pbjAiPackPreviewOnly = false;
+            }
         });
     }
 
     function pbjV2CopyAiStarterPrompt() {
-        pbjV2EnsureAiPackDataThen(function () {
-            var text = pbjV2BuildAiStarterPrompt(
-                pbjV2GetAiToolkitAudience(),
-                global.__pbjLastAiPackMeta || {}
-            );
-            var btn = document.getElementById('pbjAiPackCopyPromptBtn');
-            pbjV2CopyTextToClipboard(text, 'pbjAiPackPromptStatus').then(function (ok) {
-                if (!ok || !btn) {
-                    return;
-                }
-                var prev = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check me-1" aria-hidden="true"></i>Copied';
-                btn.setAttribute('aria-label', 'Copied');
-                setTimeout(function () {
-                    btn.innerHTML = prev;
-                    btn.setAttribute('aria-label', 'Copy prompt');
-                }, 2200);
-            });
+        var text = pbjV2BuildAiStarterPrompt(
+            pbjV2GetAiToolkitAudience(),
+            global.__pbjLastAiPackMeta || pbjV2AiPackMetaFromPage() || {}
+        );
+        var btn = document.getElementById('pbjAiPackCopyPromptBtn');
+        pbjV2CopyTextToClipboard(text, 'pbjAiPackPromptStatus').then(function (ok) {
+            if (!ok || !btn) {
+                return;
+            }
+            var prev = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check me-1" aria-hidden="true"></i>Copied';
+            btn.setAttribute('aria-label', 'Copied');
+            setTimeout(function () {
+                btn.innerHTML = prev;
+                btn.setAttribute('aria-label', 'Copy prompt');
+            }, 2200);
         });
     }
 
@@ -6657,6 +6690,12 @@
                 }
                 pbjV2RefreshAiToolkitScopeLine();
                 pbjV2RefreshAiStarterPromptPreview(global.__pbjLastAiPackMeta || {});
+                pbjV2UpdateAiToolkitSummaryIdle();
+            });
+        }
+        var aiRefPanel = document.getElementById('pbjAiToolkitReference');
+        if (aiRefPanel) {
+            aiRefPanel.addEventListener('shown.bs.collapse', function () {
                 pbjV2RefreshAiPackPreview();
             });
         }

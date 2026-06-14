@@ -575,6 +575,11 @@
         .pbj-report-builder-v3 .rb3-ai-modal-panel .rb3-ai-panel-trigger {
             width: 100%;
             text-align: left;
+            cursor: pointer;
+        }
+        .pbj-report-builder-v3 .rb3-ai-modal-panel .rb3-ai-panel-trigger:hover {
+            border-color: #93c5fd;
+            box-shadow: 0 2px 8px rgba(30, 64, 175, 0.08);
         }
         .pbj-report-builder-v3 .rb3-ai-modal-panel .rb3-ai-panel-trigger:focus-visible {
             outline: 2px solid #2563eb;
@@ -584,8 +589,8 @@
             font-size: 0.75rem;
             font-weight: 500;
         }
-        .pbj-report-builder-v3 .rb3-ai-modal-panel .rb3-ai-panel-actions .btn {
-            pointer-events: auto;
+        .pbj-report-builder-v3 .rb3-ai-modal-panel .rb3-advanced-chevron {
+            display: none;
         }
         .pbj-report-builder-v3 .rb3-period-editor {
             border: none;
@@ -721,6 +726,23 @@
             background: #1e40af;
             border-color: #1e40af;
             color: #fff;
+        }
+        .pbj-report-builder-v3 .rb3-focus-chip-all.active {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            border-color: #1e40af;
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(30, 64, 175, 0.22);
+        }
+        .pbj-report-builder-v3 #rb3FocusChips.rb3-focus-all-mode .rb3-focus-chip:not(.rb3-focus-chip-all) {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            color: #64748b;
+            opacity: 0.92;
+        }
+        .pbj-report-builder-v3 #rb3FocusChips.rb3-focus-all-mode .rb3-focus-chip:not(.rb3-focus-chip-all).active {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            color: #64748b;
         }
         .pbj-report-builder-v3 .rb3-focus-chip:not(.active):hover {
             border-color: #94a3b8;

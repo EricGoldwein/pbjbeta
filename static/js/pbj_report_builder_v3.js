@@ -610,13 +610,51 @@
 
     function applyFocusChipsToCategoryCheckboxes() {
         var enabled = new Set();
-        document.querySelectorAll('.rb3-focus-chip.active').forEach(function (btn) {
-            var key = btn.getAttribute('data-rb3-focus') || '';
-            (FOCUS_CHIP_CATEGORIES[key] || []).forEach(function (c) { enabled.add(c); });
-        });
+        var chipsRoot = $('rb3FocusChips');
+        var allMode = chipsRoot && chipsRoot.classList.contains('rb3-focus-all-mode');
+        if (allMode) {
+            Object.keys(FOCUS_CHIP_CATEGORIES).forEach(function (key) {
+                (FOCUS_CHIP_CATEGORIES[key] || []).forEach(function (c) { enabled.add(c); });
+            });
+        } else {
+            document.querySelectorAll('.rb3-focus-chip.active:not(.rb3-focus-chip-all)').forEach(function (btn) {
+                var key = btn.getAttribute('data-rb3-focus') || '';
+                (FOCUS_CHIP_CATEGORIES[key] || []).forEach(function (c) { enabled.add(c); });
+            });
+        }
         document.querySelectorAll('.rb3-finding-cat').forEach(function (el) {
             el.checked = enabled.has(el.value);
         });
+    }
+
+    function rb3EnterFocusAllMode() {
+        var chipsRoot = $('rb3FocusChips');
+        var allBtn = document.querySelector('.rb3-focus-chip-all');
+        if (chipsRoot) {
+            chipsRoot.classList.add('rb3-focus-all-mode');
+        }
+        if (allBtn) {
+            allBtn.classList.add('active');
+            allBtn.setAttribute('aria-pressed', 'true');
+        }
+        document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)').forEach(function (chip) {
+            chip.classList.remove('active');
+            chip.setAttribute('aria-pressed', 'false');
+        });
+        applyFocusChipsToCategoryCheckboxes();
+        updateFocusChipSummary();
+    }
+
+    function rb3ExitFocusAllMode() {
+        var chipsRoot = $('rb3FocusChips');
+        if (chipsRoot) {
+            chipsRoot.classList.remove('rb3-focus-all-mode');
+        }
+        var allBtn = document.querySelector('.rb3-focus-chip-all');
+        if (allBtn) {
+            allBtn.classList.remove('active');
+            allBtn.setAttribute('aria-pressed', 'false');
+        }
     }
 
     function syncFocusChipsFromCategoryCheckboxes() {
@@ -645,6 +683,14 @@
             return;
         }
         var chips = document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)');
+        var chipsRoot = $('rb3FocusChips');
+        var allMode = chipsRoot && chipsRoot.classList.contains('rb3-focus-all-mode');
+        if (allMode) {
+            hint.textContent = 'All issue types — full scan for the memo period.';
+            hint.classList.remove('d-none');
+            hint.setAttribute('aria-hidden', 'false');
+            return;
+        }
         var active = Array.prototype.filter.call(chips, function (btn) {
             return btn.classList.contains('active');
         });
@@ -655,7 +701,7 @@
             return;
         }
         if (active.length === chips.length) {
-            hint.textContent = 'All issue types selected — full scan for the memo period.';
+            hint.textContent = 'All issue types — full scan for the memo period.';
         } else {
             var labels = active.map(function (btn) {
                 return String(btn.textContent || '').trim();
@@ -786,34 +832,22 @@
                 if (allBtn.disabled) {
                     return;
                 }
-                document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)').forEach(function (chip) {
-                    chip.classList.add('active');
-                    chip.setAttribute('aria-pressed', 'true');
-                });
-                allBtn.classList.add('active');
-                allBtn.setAttribute('aria-pressed', 'true');
-                applyFocusChipsToCategoryCheckboxes();
-                updateFocusChipSummary();
+                rb3EnterFocusAllMode();
             });
         }
         document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 if (btn.disabled) return;
+                rb3ExitFocusAllMode();
                 var on = !btn.classList.contains('active');
                 if (!on) {
                     var activeCount = document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all).active').length;
-                    if (activeCount <= 1) {
+                    if (activeCount <= 1 && btn.classList.contains('active')) {
                         return;
                     }
                 }
                 btn.classList.toggle('active', on);
                 btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-                if (allBtn) {
-                    var allOn = document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all).active').length ===
-                        document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)').length;
-                    allBtn.classList.toggle('active', allOn);
-                    allBtn.setAttribute('aria-pressed', allOn ? 'true' : 'false');
-                }
                 applyFocusChipsToCategoryCheckboxes();
                 updateFocusChipSummary();
             });
@@ -821,6 +855,7 @@
         document.querySelectorAll('.rb3-finding-cat').forEach(function (el) {
             el.addEventListener('change', syncFocusChipsFromCategoryCheckboxes);
         });
+        rb3EnterFocusAllMode();
     }
 
     function collectPayload() {
@@ -1200,30 +1235,16 @@
     }
 
     function bindRb3AiCard() {
-        var openBtn = $('rb3AiOpenToolkitBtn');
-        if (openBtn) {
-            openBtn.addEventListener('click', function (ev) {
-                ev.stopPropagation();
-                syncRb3AiScope();
-            });
-        }
         var trigger = $('rb3AiPanelTrigger');
         if (trigger) {
-            trigger.addEventListener('click', function (ev) {
-                if (ev.target.closest('#rb3AiOpenToolkitBtn')) {
-                    return;
-                }
-                openRb3AiToolkitModal();
+            trigger.addEventListener('click', function () {
+                syncRb3AiScope();
             });
             trigger.addEventListener('keydown', function (ev) {
                 if (ev.key !== 'Enter' && ev.key !== ' ') {
                     return;
                 }
-                if (ev.target.closest('#rb3AiOpenToolkitBtn')) {
-                    return;
-                }
-                ev.preventDefault();
-                openRb3AiToolkitModal();
+                syncRb3AiScope();
             });
         }
         var copyBtn = $('rb3AiCopyPromptBtn');

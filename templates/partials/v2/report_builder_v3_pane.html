@@ -7,7 +7,7 @@
 
                     <div class="card-body py-3 px-3 px-md-4">
 
-                        <h2 id="pbjReportBuilderV3Heading" class="visually-hidden">Case Builder for {{ facility_name_compact|default(facility_name_display) }}</h2>
+                        <h2 id="pbjReportBuilderV3Heading" class="visually-hidden">Case Builder for {{ facility_name_display }}</h2>
 
                         <div class="rb3-hero-slim-row">
 
@@ -43,7 +43,7 @@
 
                                 </div>
 
-                                <p class="rb3-facility-name mb-0">{{ facility_name_compact|default(facility_name_display) }} <span class="text-secondary font-monospace">({{ provnum }})</span></p>
+                                <p class="rb3-facility-name mb-0">{{ facility_name_display }} <span class="text-secondary font-monospace">({{ provnum }})</span></p>
 
                                 <p class="rb-hero-lead mb-0 mt-1">Build a staffing memo from CMS PBJ data for this facility and selected period.</p>
 
@@ -225,21 +225,21 @@
 
                                             <span class="rb3-findings-focus-label">Issue focus</span>
 
-                                            <p class="rb3-helper-text mb-1 mt-0">What should Case Builder look for? Start with all issue types. Select one or more chips to focus the memo.</p>
+                                            <p class="rb3-helper-text mb-1 mt-0">What should Case Builder look for? <strong>All issues</strong> runs a full scan. Pick specific chips to narrow the memo.</p>
 
-                                            <div id="rb3FocusChips" class="d-flex flex-wrap gap-1" role="group" aria-label="Issue focus">
+                                            <div id="rb3FocusChips" class="d-flex flex-wrap gap-1 rb3-focus-all-mode" role="group" aria-label="Issue focus">
 
                                                 <button type="button" class="btn btn-sm rb3-focus-chip rb3-focus-chip-all active" data-rb3-focus-all="1" aria-pressed="true">All issues</button>
 
-                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="compliance_rn" aria-pressed="true">Compliance &amp; RN</button>
+                                                <button type="button" class="btn btn-sm rb3-focus-chip" data-rb3-focus="compliance_rn" aria-pressed="false">Compliance &amp; RN</button>
 
-                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="acuity" aria-pressed="true">Acuity</button>
+                                                <button type="button" class="btn btn-sm rb3-focus-chip" data-rb3-focus="acuity" aria-pressed="false">Acuity</button>
 
-                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="patterns" aria-pressed="true">Patterns</button>
+                                                <button type="button" class="btn btn-sm rb3-focus-chip" data-rb3-focus="patterns" aria-pressed="false">Patterns</button>
 
-                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="case_dates" aria-pressed="true">Key dates</button>
+                                                <button type="button" class="btn btn-sm rb3-focus-chip" data-rb3-focus="case_dates" aria-pressed="false">Key dates</button>
 
-                                                <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="data_quality" aria-pressed="true">Data quality</button>
+                                                <button type="button" class="btn btn-sm rb3-focus-chip" data-rb3-focus="data_quality" aria-pressed="false">Data quality</button>
 
                                             </div>
 
@@ -276,20 +276,14 @@
 
 
                             <div class="rb3-disclosure rb3-advanced-panel rb3-advanced-card rb3-ai-panel rb3-ai-modal-panel mb-0" id="rb3AiPanel">
-                                <div class="rb3-advanced-disclosure-summary rb3-ai-panel-trigger" id="rb3AiPanelTrigger" role="button" tabindex="0" aria-label="Open PBJ320 AI Toolkit" aria-haspopup="dialog">
+                                <div class="rb3-advanced-disclosure-summary rb3-ai-panel-trigger" id="rb3AiPanelTrigger" role="button" tabindex="0" aria-label="Open PBJ320 AI Toolkit" aria-haspopup="dialog" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">
                                     <span class="rb3-advanced-summary-main">
                                         <span class="rb3-advanced-title d-inline-flex align-items-center gap-2 flex-wrap">
                                             {{ pbj320_mark(' AI') }}
                                             <span class="pbj-ai-beta-badge pbj-readable-badge">beta</span>
                                         </span>
-                                        <span id="rb3AiPanelSummary" class="rb3-advanced-summary-hint">Send scoped PBJ data and a starter prompt to Claude, ChatGPT, or Gemini</span>
+                                        <span id="rb3AiPanelSummary" class="rb3-advanced-summary-hint">Click to open — send scoped PBJ data and a starter prompt to Claude, ChatGPT, or Gemini</span>
                                         <p class="small mb-0 mt-1 rb3-ai-scope-line"><span class="text-muted">Period:</span> <strong class="text-body" id="rb3AiScopeLine">—</strong></p>
-                                    </span>
-                                    <span class="rb3-ai-panel-actions d-flex align-items-center gap-2 flex-shrink-0">
-                                        <button type="button" class="btn btn-sm btn-primary px-3" id="rb3AiOpenToolkitBtn" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">
-                                            <i class="fas fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Open AI Toolkit
-                                        </button>
-                                        <span class="rb3-advanced-chevron" aria-hidden="true"></span>
                                     </span>
                                 </div>
 
@@ -397,7 +391,7 @@
 
                             <div class="card-body p-2 p-md-3">
 
-                                <script type="application/json" id="pbj-report-builder-v3-meta">{{ {'ccn': provnum|string, 'facility': facility_name_compact|default(facility_name_display), 'v3_enabled': true, 'standalone': true, 'quarters': pbj_available_quarters|default([]), 'min_workdate': pbj_min_work_date|default('', true), 'max_workdate': pbj_max_work_date|default('', true) } | tojson }}</script>
+                                <script type="application/json" id="pbj-report-builder-v3-meta">{{ {'ccn': provnum|string, 'facility': facility_name_display, 'v3_enabled': true, 'standalone': true, 'quarters': pbj_available_quarters|default([]), 'min_workdate': pbj_min_work_date|default('', true), 'max_workdate': pbj_max_work_date|default('', true) } | tojson }}</script>
 
                                 <div class="rb-paper-shell rb3-paper-empty" id="rb3PaperShell">
 

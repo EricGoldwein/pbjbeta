@@ -106,12 +106,17 @@
                 </div>
 
                 <section class="pbj-ai-step" aria-labelledby="pbjAiStep1Heading">
-                    <div class="pbj-ai-step__head">
-                        <span class="pbj-ai-step__num" aria-hidden="true">1</span>
-                        <div>
-                            <h6 class="pbj-ai-step__title mb-0" id="pbjAiStep1Heading">Starter prompt</h6>
-                            <p class="pbj-ai-step__lede mb-0">Choose who the write-up is for. Copy this prompt into your AI chat with the export.</p>
+                    <div class="pbj-ai-step__head d-flex flex-wrap align-items-start justify-content-between gap-2">
+                        <div class="d-flex align-items-start gap-2 min-w-0">
+                            <span class="pbj-ai-step__num" aria-hidden="true">1</span>
+                            <div>
+                                <h6 class="pbj-ai-step__title mb-0" id="pbjAiStep1Heading">Starter prompt</h6>
+                                <p class="pbj-ai-step__lede mb-0">Choose who the write-up is for, then copy this prompt into your AI chat with the export.</p>
+                            </div>
                         </div>
+                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiPackCopyPromptBtn" onclick="pbjV2CopyAiStarterPrompt()" title="Copy starter prompt to clipboard" aria-label="Copy prompt">
+                            <i class="fas fa-copy me-1" aria-hidden="true"></i>Copy prompt
+                        </button>
                     </div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-0">
                         <span class="small text-body-secondary text-nowrap">Written for</span>
@@ -132,13 +137,10 @@
                     </div>
                     <div class="mt-2">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                            <span class="small fw-semibold text-body">Prompt</span>
-                            <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiPackCopyPromptBtn" onclick="pbjV2CopyAiStarterPrompt()" title="Copy starter prompt to clipboard" aria-label="Copy prompt">
-                                <i class="fas fa-copy me-1" aria-hidden="true"></i>Copy prompt
-                            </button>
+                            <span class="small fw-semibold text-body">Prompt preview</span>
+                            <span id="pbjAiPackPromptStatus" class="small text-success" role="status" aria-live="polite"></span>
                         </div>
                         <pre id="pbjAiToolkitPromptLive" class="pbj-ai-pack-preview pbj-ai-starter-prompt-live mb-0" aria-readonly="true"></pre>
-                        <span id="pbjAiPackPromptStatus" class="small text-success d-none" role="status" aria-live="polite"></span>
                     </div>
                 </section>
 
@@ -150,7 +152,7 @@
                             <p class="pbj-ai-step__lede mb-0">Daily PBJ rows for your period, plus case-mix, Harrington, and regional peer rollups when available.</p>
                         </div>
                     </div>
-                    <p id="pbjAiToolkitSummary" class="small fw-semibold text-body mb-1 mt-2">Scanning…</p>
+                    <p id="pbjAiToolkitSummary" class="small text-body-secondary mb-1 mt-2">Use the buttons below when you are ready to export.</p>
                     <ul id="pbjAiToolkitAdvisories" class="pbj-ai-toolkit-advisories list-unstyled small mb-2 d-none" aria-live="polite"></ul>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         {{ pbj_export_btn('csv', id='pbjAiPackCsvBtn', onclick='pbjV2DownloadAiContextPackCsv()', title='Download context pack CSV', primary=true, extra_class='') }}

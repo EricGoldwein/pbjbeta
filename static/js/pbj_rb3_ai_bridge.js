@@ -231,37 +231,35 @@
 
 
     window.exportPbj320AiContextPack = function exportPbj320AiContextPackRb3() {
-
         var range = rb3IsoRange();
-
         if (!range.start || !range.end) return;
-
+        var previewOnly = !!window.__pbjAiPackPreviewOnly;
         fetchDailyRows(range).then(function (rows) {
-
             window.currentData = rows;
-
             var ccn = metaCcn() || 'facility';
-
             var csv = buildSimplePackCsv(rows, range);
-
             window.__pbjLastAiContextPackCsv = csv;
-
-            if (window.__pbjAiPackWantClipboard && navigator.clipboard) {
-
-                navigator.clipboard.writeText(csv).catch(function () {});
-
+            if (previewOnly) {
+                if (typeof window.pbjV2RenderAiPackPreview === 'function') {
+                    window.pbjV2RenderAiPackPreview({
+                        sectionCounts: { DAILY: rows.length, META: 1 },
+                        sampleLines: csv.split('\n').slice(1, 20),
+                        filterLabel: range.start + ' to ' + range.end,
+                        dailyRowCount: rows.length,
+                        dailyMetricRows: rows.length,
+                        quarters: [],
+                        facilityName: '',
+                        ccn: ccn,
+                    });
+                }
                 return;
-
             }
-
-            if (!window.__pbjAiPackPreviewOnly) {
-
-                triggerCsvDownload('pbj320_ai_context_' + ccn + '.csv', csv);
-
+            if (window.__pbjAiPackWantClipboard && navigator.clipboard) {
+                navigator.clipboard.writeText(csv).catch(function () {});
+                return;
             }
-
+            triggerCsvDownload('pbj320_ai_context_' + ccn + '.csv', csv);
         }).catch(function () { /* ignore */ });
-
     };
 
 

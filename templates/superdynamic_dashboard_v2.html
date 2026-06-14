@@ -2515,6 +2515,32 @@
             border-color: #6366f1;
             box-shadow: 0 0 0 0.15rem rgba(99, 102, 241, 0.2);
         }
+        .ein-roster-day-input-wrap {
+            position: relative;
+            min-width: 10.5rem;
+        }
+        .ein-roster-day-input-wrap .ein-roster-day-placeholder {
+            position: absolute;
+            left: 0.55rem;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            font-weight: 600;
+            color: #64748b;
+            z-index: 1;
+        }
+        .ein-roster-day-input-wrap.has-value .ein-roster-day-placeholder,
+        .ein-roster-day-input-wrap:focus-within .ein-roster-day-placeholder {
+            display: none;
+        }
+        .ein-roster-day-input-wrap #einNursingWorkDayFilter {
+            position: relative;
+            z-index: 2;
+            background: transparent;
+        }
+        .ein-roster-day-input-wrap:not(.has-value):not(:focus-within) #einNursingWorkDayFilter {
+            color: transparent;
+        }
         .ein-roster-context-strip {
             min-height: 1.55rem;
         }
@@ -15491,7 +15517,10 @@
                             <div class="ein-roster-picker ein-roster-picker-day" id="einRosterPickerDay" style="min-width: 8.5rem; max-width: 12rem;">
                                 <label class="form-label small text-muted mb-0 text-uppercase d-none d-md-block" for="einNursingWorkDayFilter">Work day</label>
                                 <div class="d-flex gap-1 align-items-center">
-                                    <input type="date" class="form-control form-control-sm" id="einNursingWorkDayFilter" min="2017-01-01" {% if pbj_max_work_date %}max="{{ pbj_max_work_date }}"{% endif %} aria-label="Filter roster to employees who worked this calendar day">
+                                    <div class="ein-roster-day-input-wrap flex-grow-1" id="einRosterDayInputWrap">
+                                        <span class="ein-roster-day-placeholder" id="einRosterDayPlaceholder" aria-hidden="true">Select date</span>
+                                        <input type="date" class="form-control form-control-sm" id="einNursingWorkDayFilter" min="2017-01-01" {% if pbj_max_work_date %}max="{{ pbj_max_work_date }}"{% endif %} aria-label="Select a work day to load roster">
+                                    </div>
                                     <button type="button" class="btn btn-sm btn-outline-secondary px-2 flex-shrink-0" id="einNursingWorkDayFilterClear" title="Clear work-day filter" aria-label="Clear work-day filter">×</button>
                                 </div>
                             </div>
@@ -29557,7 +29586,7 @@
         function einRosterPeriodPickHint(grain) {
             var g = grain || einRosterGetPeriodGrain();
             if (g === 'day') {
-                return 'Pick a day above to load roster.';
+                return 'Select a work day above to load the roster.';
             }
             if (g === 'month') {
                 return 'Pick a month above to load roster.';
@@ -29579,16 +29608,23 @@
         }
 
         function einRosterApplyDefaultDayPicker(force) {
+            /* Roster day view requires an explicit work-day pick — no auto-fill. */
             var dayWF = document.getElementById('einNursingWorkDayFilter');
-            if (!dayWF) {
+            if (dayWF && force) {
+                dayWF.value = '';
+                dayWF.dataset.einUserSetDay = '';
+            }
+            einRosterSyncDayPickerEmptyState();
+        }
+
+        function einRosterSyncDayPickerEmptyState() {
+            var dayWF = document.getElementById('einNursingWorkDayFilter');
+            var wrap = document.getElementById('einRosterDayInputWrap');
+            if (!dayWF || !wrap) {
                 return;
             }
-            if (!force && dayWF.dataset.einUserSetDay === '1' && String(dayWF.value || '').trim()) {
-                return;
-            }
-            if (typeof window.__pbjMaxWorkDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(window.__pbjMaxWorkDate)) {
-                dayWF.value = window.__pbjMaxWorkDate;
-            }
+            var has = !!String(dayWF.value || '').trim();
+            wrap.classList.toggle('has-value', has);
         }
 
         function einRosterPopulateMonthSelect() {
@@ -29648,8 +29684,9 @@
             if (g === 'day') {
                 var dayWF = document.getElementById('einNursingWorkDayFilter');
                 if (dayWF) {
+                    dayWF.value = '';
                     dayWF.dataset.einUserSetDay = '';
-                    einRosterApplyDefaultDayPicker(true);
+                    einRosterSyncDayPickerEmptyState();
                 }
             } else if (g === 'month') {
                 einRosterPopulateMonthSelect();
@@ -33512,19 +33549,8 @@
             getEinPositionSummaryOnce().finally(function () {
                     populateEinRosterQuarterSelect();
                     updateEinRosterCaptionQuarterLine();
-                    const dayWFInit = document.getElementById('einNursingWorkDayFilter');
-                    if (
-                        dayWFInit &&
-                        !dayWFInit.dataset.einDefaultDaySet &&
-                        typeof window.__pbjMaxWorkDate === 'string' &&
-                        /^\d{4}-\d{2}-\d{2}$/.test(window.__pbjMaxWorkDate)
-                    ) {
-                        dayWFInit.value = window.__pbjMaxWorkDate;
-                        dayWFInit.dataset.einDefaultDaySet = '1';
-                        refreshEinWorkDayRosterKeys();
-                    } else {
-                        loadEinNursingEmployeeRows();
-                    }
+                    einRosterSyncDayPickerEmptyState();
+                    loadEinNursingEmployeeRows();
                     updateEinCmsDetailSmartLink();
                 });
             const einDayScopeHost = document.getElementById('einNursingModalDayScopeChips');
@@ -33719,6 +33745,7 @@
             if (dayWF) {
                 dayWF.addEventListener('change', function () {
                     dayWF.dataset.einUserSetDay = dayWF.value ? '1' : '';
+                    einRosterSyncDayPickerEmptyState();
                     if (einRosterGetPeriodGrain() !== 'day') {
                         var dayRadio = document.getElementById('einRosterGrainDay');
                         if (dayRadio) {
@@ -33739,6 +33766,7 @@
                     if (dayWF) {
                         dayWF.value = '';
                     }
+                    einRosterSyncDayPickerEmptyState();
                     window._einRosterWorkDayKeys = undefined;
                     window.__einNonnursePbjDayMeta = null;
                     pbjRenderEinHeadcountSummary('', null);
