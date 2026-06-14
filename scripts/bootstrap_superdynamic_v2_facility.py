@@ -56,7 +56,6 @@ COPY_REL_PATHS: tuple[str, ...] = (
     "_pbj_canonical_facility_ein_employee_analytics.py",
     "facility_report_lib.py",
     ".vercelignore",
-    "requirements.txt",
     "ownership/chow_index.json",
     "ownership/entity_lookup.csv",
     "static/data/interval_quarter_mapping.json",
@@ -183,6 +182,26 @@ def _adapt_vercel_json(ref_json: Path, dst_json: Path, ccn: str, ref_ccn: str) -
     dst_json.write_text(json.dumps(json.loads(raw), indent=2) + "\n", encoding="utf-8")
 
 
+def _write_flask_requirements(target: Path) -> None:
+    """Flask bundle deps (not Streamlit); matches create_vercel_deployment.py."""
+    needs_pyarrow = any(target.glob("facility_*_ein_*.parquet")) or (
+        target / "facility_quarterly_metrics.parquet"
+    ).is_file()
+    lines = [
+        "Flask==3.0.0",
+        "pandas==2.2.3",
+        "numpy==1.26.4",
+        "scipy==1.14.1",
+        "python-dateutil==2.9.0",
+        "pytz==2023.3",
+    ]
+    if needs_pyarrow:
+        lines.append("pyarrow>=14.0.0")
+    req_path = target / "requirements.txt"
+    req_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("  [OK] requirements.txt (Flask bundle)")
+
+
 def _manifest_diff(root: Path, target: Path, ref: Path, ccn: str) -> list[str]:
     lines: list[str] = []
     for rel in REQUIRED_V2_RUNTIME:
@@ -297,6 +316,8 @@ def run_bootstrap(
         else:
             _adapt_vercel_json(ref_vercel, dst_vercel, ccn, ref_ccn)
             print("  [OK] vercel.json (v2)")
+
+    _write_flask_requirements(target)
 
     print("\n--- Manifest diff (required V2 runtime) ---")
     missing = []
