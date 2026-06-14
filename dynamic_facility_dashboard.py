@@ -3627,6 +3627,14 @@ def index():
         **_pbj_template_client_config(),
     )
 
+@app.route('/case-builder')
+def case_builder_shortcut():
+    """Canonical Case Builder URL alias for premium dashboards."""
+    qs = request.query_string.decode('utf-8', errors='replace')
+    dest = '/report-builder-v3' + ('?' + qs if qs else '')
+    return redirect(dest)
+
+
 @app.route('/data-matching')
 def data_matching_page():
     """Dedicated page explaining how provider-info quarters are matched to PBJ quarters."""

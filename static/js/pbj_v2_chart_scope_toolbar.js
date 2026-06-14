@@ -793,6 +793,49 @@
         return payload;
     }
 
+    function boundsFromScopeState(state) {
+        if (!state || state.mode === 'all') {
+            return null;
+        }
+        var payload = buildScopeApiPayload(state);
+        if (payload.start_date && payload.end_date) {
+            return { min: payload.start_date, max: payload.end_date };
+        }
+        if (payload.mode === 'custom' && payload.filterType === 'years' && payload.year && payload.year !== 'all') {
+            var yrs = String(payload.year)
+                .split(',')
+                .map(function (y) {
+                    return parseInt(String(y).trim(), 10);
+                })
+                .filter(function (n) {
+                    return isFinite(n);
+                });
+            if (yrs.length) {
+                var yMin = Math.min.apply(null, yrs);
+                var yMax = Math.max.apply(null, yrs);
+                return { min: yMin + '-01-01', max: yMax + '-12-31' };
+            }
+        }
+        return null;
+    }
+
+    function pbjEinHeadcountChartScopeIsActive() {
+        if (!global.__pbjChartScopeUserEdited || !global.__pbjChartScopeState) {
+            return false;
+        }
+        if (global.__pbjChartScopeActiveProfile !== 'headcount') {
+            return false;
+        }
+        return scopePreviewHasDefinedRange(global.__pbjChartScopeState);
+    }
+
+    function pbjBoundsFromEinHeadcountChartScope() {
+        if (!pbjEinHeadcountChartScopeIsActive()) {
+            return null;
+        }
+        return boundsFromScopeState(global.__pbjChartScopeState);
+    }
+
     function activeScopeProfile() {
         var anchor = global.__pbjChartScopeAnchor;
         if (!anchor) {
@@ -809,6 +852,17 @@
         opts = opts || {};
         var profile = opts.profile || activeScopeProfile();
         global.__pbjChartScopeState = state;
+
+        if (profile === 'headcount') {
+            global.__pbjChartScopeActiveProfile = 'headcount';
+            if (typeof global.pbjRefreshEinHeadcountAfterAnalysis === 'function') {
+                global.pbjRefreshEinHeadcountAfterAnalysis();
+            } else if (typeof global.pbjLoadEinHeadcountByJobChart === 'function') {
+                global.pbjLoadEinHeadcountByJobChart({ force: true });
+            }
+            renderScopeEventsList(state);
+            return;
+        }
 
         if (profile === 'casemix') {
             global.__pbjCaseMixChartScopeState = state;
@@ -1341,4 +1395,7 @@
     } else {
         init();
     }
+
+    global.pbjBoundsFromEinHeadcountChartScope = pbjBoundsFromEinHeadcountChartScope;
+    global.pbjEinHeadcountChartScopeIsActive = pbjEinHeadcountChartScopeIsActive;
 })(typeof window !== 'undefined' ? window : globalThis);
