@@ -50,8 +50,9 @@
                             <button type="button" class="btn btn-outline-secondary active" data-pbj-ai-grain="daterange" aria-pressed="true">Range</button>
                             <button type="button" class="btn btn-outline-secondary" data-pbj-ai-grain="day" aria-pressed="false">Day</button>
                         </div>
-                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiScopeApplyBtn">Apply</button>
+                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiScopeApplyBtn" title="Apply period to dashboard and refresh CSV export">Apply period</button>
                     </div>
+                    <p id="pbjAiScopeStaleHint" class="form-text small text-warning mb-0 mt-1 d-none">Period changed — click Apply period to refresh the CSV export.</p>
                     <div id="pbjAiScopeBody">
                     <div id="pbjAiScopeQuarters" class="pbj-ai-scope-panel d-none mt-1 mb-0">
                         <select class="form-select form-select-sm pbj-ai-scope-select" id="pbjAiQuarterSelect" multiple size="5" aria-label="Quarters (Ctrl+click for multiple)">
@@ -114,9 +115,6 @@
                                 <p class="pbj-ai-step__lede mb-0">Choose who the write-up is for, then copy this prompt into your AI chat with the export.</p>
                             </div>
                         </div>
-                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiPackCopyPromptBtn" onclick="pbjV2CopyAiStarterPrompt()" title="Copy starter prompt to clipboard" aria-label="Copy prompt">
-                            <i class="fas fa-copy me-1" aria-hidden="true"></i>Copy prompt
-                        </button>
                     </div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-0">
                         <span class="small text-body-secondary text-nowrap">Written for</span>
@@ -134,6 +132,9 @@
                                 <input type="radio" name="pbjAiToolkitAudience" value="researcher"><span>Researcher</span>
                             </label>
                         </div>
+                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0 pbj-ai-copy-prompt-btn" id="pbjAiPackCopyPromptBtn" onclick="pbjV2CopyAiStarterPrompt()" title="Copy starter prompt to clipboard" aria-label="Copy prompt">
+                            <i class="fas fa-copy me-1" aria-hidden="true"></i>Copy prompt
+                        </button>
                     </div>
                     <div class="mt-2">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">

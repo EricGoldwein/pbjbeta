@@ -37754,8 +37754,18 @@
                                 typeof fixFacilityNameCasing === 'function'
                                     ? fixFacilityNameCasing(canonicalNm)
                                     : canonicalNm;
-                            if (heroNm) heroNm.textContent = nmDisp;
-                            if (dailyNm) dailyNm.textContent = nmDisp;
+                            if (heroNm) {
+                                heroNm.setAttribute('data-cms-full-name', nmDisp);
+                                if (typeof pbjApplyFacilityDisplayNameEl === 'function') {
+                                    pbjApplyFacilityDisplayNameEl(heroNm, 'compact');
+                                }
+                            }
+                            if (dailyNm) {
+                                dailyNm.setAttribute('data-cms-full-name', nmDisp);
+                                if (typeof pbjApplyFacilityDisplayNameEl === 'function') {
+                                    pbjApplyFacilityDisplayNameEl(dailyNm, 'compact');
+                                }
+                            }
                             const snapLbl = document.getElementById('pbj320SnapshotModalLabel');
                             if (snapLbl) {
                                 const _ccnSnap = String(
@@ -37764,8 +37774,12 @@
                                         : ''
                                 ).trim();
                                 const _ccnParen = _ccnSnap ? ' (' + _ccnSnap + ')' : '';
-                                const _snapMobile = escPr(nmDisp);
-                                const _snapDesktop = escPr(nmDisp) + escPr(_ccnParen);
+                                const snapCompact =
+                                    typeof getFacilityNameForContext === 'function'
+                                        ? (getFacilityNameForContext(nmDisp, 'compact').label || nmDisp)
+                                        : nmDisp;
+                                const _snapMobile = escPr(snapCompact);
+                                const _snapDesktop = escPr(snapCompact) + escPr(_ccnParen);
                                 snapLbl.innerHTML =
                                     '<span class="d-md-none">' +
                                     _snapMobile +
@@ -45242,6 +45256,46 @@
             return html;
         }
 
+        function pbjProfileRatingTooltipText(kind, rating, nQuarters) {
+            const label = kind === 'staff' ? 'CMS staffing rating' : 'CMS overall rating';
+            const src = 'CMS Provider Info (Care Compare)';
+            if (rating == null || isNaN(rating)) {
+                return label + ' — not available for this period.';
+            }
+            const qNote =
+                nQuarters > 1
+                    ? ' Average across ' + nQuarters + ' quarters in your filter.'
+                    : ' For the matched provider quarter.';
+            return label + ': ' + rating + ' of 5 stars. Source: ' + src + '.' + qNote;
+        }
+
+        function pbjWireProfileRatingPopovers() {
+            if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) {
+                return;
+            }
+            ['pbjProfileOverallRating', 'pbjProfileStaffRating'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (!el) {
+                    return;
+                }
+                const prev = bootstrap.Tooltip.getInstance(el);
+                if (prev) {
+                    prev.dispose();
+                }
+                const tip = String(el.getAttribute('data-pbj-rating-tip') || el.getAttribute('title') || '').trim();
+                if (!tip || el.querySelector('.pbj-summary-pod-placeholder')) {
+                    el.removeAttribute('data-bs-toggle');
+                    el.removeAttribute('title');
+                    return;
+                }
+                el.setAttribute('title', tip);
+                el.setAttribute('data-bs-toggle', 'tooltip');
+                el.setAttribute('data-bs-placement', 'top');
+                new bootstrap.Tooltip(el, { trigger: 'hover focus', container: 'body' });
+            });
+        }
+        window.pbjWireProfileRatingPopovers = pbjWireProfileRatingPopovers;
+
         function pbjSyncProfilePodRatings() {
             const prStaff = document.getElementById('pbjProfileStaffRating');
             const prOverall = document.getElementById('pbjProfileOverallRating');
@@ -45282,9 +45336,14 @@
                             ? 'CMS overall ' + overallAvg + ' of 5 stars (average of ' + nQuarters + ' quarters in filter)'
                             : 'CMS overall ' + overallAvg + ' of 5 stars';
                     prOverall.setAttribute('aria-label', avgNote);
+                    prOverall.setAttribute(
+                        'data-pbj-rating-tip',
+                        pbjProfileRatingTooltipText('overall', overallAvg, nQuarters)
+                    );
                 } else {
                     prOverall.innerHTML = '<span class="pbj-summary-pod-placeholder">—</span>';
                     prOverall.setAttribute('aria-label', 'CMS overall rating unavailable');
+                    prOverall.removeAttribute('data-pbj-rating-tip');
                 }
             }
             if (prStaff) {
@@ -45295,11 +45354,17 @@
                             ? 'CMS staffing ' + staffAvg + ' of 5 stars (average of ' + nQuarters + ' quarters in filter)'
                             : 'CMS staffing ' + staffAvg + ' of 5 stars';
                     prStaff.setAttribute('aria-label', avgNote);
+                    prStaff.setAttribute(
+                        'data-pbj-rating-tip',
+                        pbjProfileRatingTooltipText('staff', staffAvg, nQuarters)
+                    );
                 } else {
                     prStaff.innerHTML = '<span class="pbj-summary-pod-placeholder">—</span>';
                     prStaff.setAttribute('aria-label', 'CMS staffing rating unavailable');
+                    prStaff.removeAttribute('data-pbj-rating-tip');
                 }
             }
+            pbjWireProfileRatingPopovers();
         }
 
         function pbjSyncTrendsPodStaffRating() {

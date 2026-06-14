@@ -2039,9 +2039,9 @@
             var hasMaster = localStorage.getItem(pbjEventsMasterKey()) !== null;
             global.__pbjFacilityEventsMaster = hasMaster
                 ? localStorage.getItem(pbjEventsMasterKey()) === '1'
-                : true;
+                : false;
         } catch (e7) {
-            global.__pbjFacilityEventsMaster = true;
+            global.__pbjFacilityEventsMaster = false;
         }
         global.__pbjFacilityEventsTypes = pbjFacilityEventsLoadTypeState();
         if (global.__pbjFacilityEventsMaster) {
