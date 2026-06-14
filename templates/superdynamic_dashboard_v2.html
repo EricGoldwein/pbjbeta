@@ -48,7 +48,7 @@
         {{ {'min': pbj_min_work_date or '', 'max': pbj_max_work_date or ''} | tojson }}
     </script>
     <script type="application/json" id="pbj-feature-flags">
-        {{ {'includeNonnurse': (pbj_include_nonnurse if pbj_include_nonnurse is defined else True), 'superdynamicV2': (superdynamic_v2 if superdynamic_v2 is defined else True), 'superdynamicV3Panes': (superdynamic_v3_panes if superdynamic_v3_panes is defined else False), 'reportBuilderV3Href': (pbj_facility_page_href('/case-builder', pbj_public_site_base_path|default('', true)) if superdynamic_v3_panes|default(false) else '')} | tojson }}
+        {{ {'includeNonnurse': (pbj_include_nonnurse if pbj_include_nonnurse is defined else True), 'superdynamicV2': (superdynamic_v2 if superdynamic_v2 is defined else True), 'superdynamicV3Panes': (superdynamic_v3_panes if superdynamic_v3_panes is defined else False), 'reportBuilderV3Href': (pbj_facility_page_href('/report-builder-v3', pbj_public_site_base_path|default('', true)) if superdynamic_v3_panes|default(false) else '')} | tojson }}
     </script>
     <script>
         (function () {
