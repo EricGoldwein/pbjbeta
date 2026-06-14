@@ -16910,6 +16910,8 @@
     </script>
     <script>
         let currentData = [];
+        // Must init before any chart refresh path (updateCharts reads this binding).
+        let originalChartsData = null;
         /** Copy of daily rows last written with /api/summary (NY min + acuity pod + snapshot); avoids mixing with in-flight currentData. */
         window.__pbjForensicPodDailyRows = [];
 
@@ -48490,8 +48492,6 @@
             quarterlyStatsHeader.textContent = `Quarterly Staffing, ${providerName}, ${quarterRange}`;
         }
 
-        // Store original charts data for toggle functionality
-        let originalChartsData = null;
         /** Chart-only scope: 'filtered' (page filter / Apply), 'full' (all loaded dates), or 'range' (preset window). */
         window.__pbjChartsScopeMode = 'filtered';
         /** Last filtered /api/charts payload + total_days so charts can snap back without re-fetching the table. */
