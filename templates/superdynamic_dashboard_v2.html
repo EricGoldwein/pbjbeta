@@ -48,7 +48,7 @@
         {{ {'min': pbj_min_work_date or '', 'max': pbj_max_work_date or ''} | tojson }}
     </script>
     <script type="application/json" id="pbj-feature-flags">
-        {{ {'includeNonnurse': (pbj_include_nonnurse if pbj_include_nonnurse is defined else True), 'superdynamicV2': (superdynamic_v2 if superdynamic_v2 is defined else True), 'superdynamicV3Panes': (superdynamic_v3_panes if superdynamic_v3_panes is defined else False), 'reportBuilderV3Href': (pbj_facility_page_href('/report-builder-v3', pbj_public_site_base_path|default('', true)) if superdynamic_v3_panes|default(false) else '')} | tojson }}
+        {{ {'includeNonnurse': (pbj_include_nonnurse if pbj_include_nonnurse is defined else True), 'superdynamicV2': (superdynamic_v2 if superdynamic_v2 is defined else True), 'superdynamicV3Panes': (superdynamic_v3_panes if superdynamic_v3_panes is defined else False), 'reportBuilderV3Href': (pbj_facility_page_href('/case-builder', pbj_public_site_base_path|default('', true)) if superdynamic_v3_panes|default(false) else '')} | tojson }}
     </script>
     <script>
         (function () {
@@ -315,7 +315,7 @@
             line-height: 1;
             color: #94a3b8;
             flex-shrink: 0;
-            opacity: 0;
+            opacity: 0.55;
             transition: opacity 0.12s ease, color 0.12s ease;
         }
         .geo-rollup-panel .geo-rollup-dist-val {
@@ -329,6 +329,7 @@
         .geo-rollup-panel td.geo-rollup-dist-cell:hover .geo-rollup-dist-icon,
         .geo-rollup-panel td.geo-rollup-dist-cell:focus-visible .geo-rollup-dist-icon {
             color: #2563eb;
+            opacity: 1;
         }
         #geoDistributionModal {
             z-index: 1065;
@@ -6755,8 +6756,7 @@
             font-weight: 600;
             letter-spacing: 0.01em;
         }
-        html.pbj-filter-bootstrapping #quartersYearsSection.pbj-filter-yq-pending .col-12:has(#years),
-        html.pbj-filter-bootstrapping #quartersYearsSection.pbj-filter-yq-pending .col-12:has(#quarterRange) ~ .col-12:has(#years) {
+        html.pbj-filter-bootstrapping #quartersYearsSection.pbj-filter-yq-pending .col-12:has(#quarterRange) {
             display: none !important;
         }
         html.pbj-filter-bootstrapping #monthsSection,
@@ -14362,10 +14362,10 @@
                     <div class="col-12">
                         <div class="pbj-grain-segment-wrap">
                         <div class="btn-group pbj-grain-segment" role="group" aria-label="Period type">
-                            <input type="radio" class="btn-check" name="filterType" id="filterTypeYears" value="years" onchange="onFilterTypeChange()">
+                            <input type="radio" class="btn-check" name="filterType" id="filterTypeYears" value="years" checked onchange="onFilterTypeChange()">
                             <label class="btn btn-sm" for="filterTypeYears">Annual</label>
                             
-                            <input type="radio" class="btn-check" name="filterType" id="filterTypeQuarters" value="quarters" checked onchange="onFilterTypeChange()">
+                            <input type="radio" class="btn-check" name="filterType" id="filterTypeQuarters" value="quarters" onchange="onFilterTypeChange()">
                             <label class="btn btn-sm" for="filterTypeQuarters">Quarters</label>
                             
                             <input type="radio" class="btn-check" name="filterType" id="filterTypeMonths" value="months" onchange="onFilterTypeChange()">
@@ -15996,7 +15996,11 @@
                                 {% endif %}
                             </ul>
                         </div>
+                        {% if superdynamic_v3_panes|default(false) %}
+                        <p class="pbj-meth-toc__footnote mb-2"><strong>Dashboard sections:</strong> <em>Staffing</em> (trends, compliance tools, census detail, ratings) → <em>Benchmarks</em> → <em>PBJ Records</em> → <em>Risk Timeline</em>. Compliance tools live under Staffing; Case Builder and Methodology are linked from the nav.</p>
+                        {% else %}
                         <p class="pbj-meth-toc__footnote mb-2"><strong>Dashboard sections:</strong> PBJ Nursing Home Staffing Intelligence (profile, trends, compliance tools, census detail, ratings) → Acuity &amp; Regional Benchmarks → Patterns → Events → Daily Staffing &amp; Roster Review. Top nav <strong>Compliance</strong> scrolls to the staffing compliance block; <strong>Forensics</strong> opens the day-level roster review. Case Builder and Methodology are linked from the nav.</p>
+                        {% endif %}
                         <p class="pbj-meth-toc__footnote mb-0">Primary source links appear under each heading below.</p>
                     </nav>
                 </aside>
@@ -16577,6 +16581,7 @@
                 <div class="modal-body small text-body">
                     <p class="mb-2">Facility columns use <strong>filtered PBJ</strong> for the selected scope. State / region / national columns are <strong>CMS-published rollups</strong> (different construction than many raw PBJ fields).</p>
                     <p class="mb-2"><strong>Direct nurse</strong> on the facility side is PBJ direct-care HPRD; the geography &ldquo;Nurse care&rdquo; series is the closest published peer metric and is <strong>not</strong> meant to match line-for-line.</p>
+                    <p class="mb-2 mb-md-1">Benchmark table columns show <strong>CMS-published geography means</strong> for the selected quarter (unweighted facility averages in the rollup series). Peer distribution charts can switch reference lines between <strong>median</strong> and <strong>mean</strong>.</p>
                     <p class="mb-0 small text-muted" id="geoRollupNotesCountsLine"></p>
                 </div>
                 <div class="modal-footer py-2 px-3">
@@ -28683,7 +28688,7 @@
             };
             var layout = {
                 barmode: 'stack',
-                bargap: 0.18,
+                bargap: 0.12,
                 title: {
                     text:
                         typeof pbjChartSubtitleTitleHtml === 'function'
@@ -28699,7 +28704,8 @@
                         categoryarray: x.slice(),
                         automargin: true,
                     },
-                    smartX
+                    smartX,
+                    n >= 1 ? { range: [x[0], x[n - 1]] } : {}
                 ),
                 yaxis: {
                     title:

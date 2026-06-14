@@ -274,43 +274,17 @@
 
 
 
-                            <details class="rb3-disclosure rb3-advanced-panel rb3-advanced-card rb3-ai-panel mb-0" id="rb3AiPanel">
+                            <div class="d-flex justify-content-end align-items-center gap-2 mb-2 rb3-ai-toolbar">
+                                <span id="rb3AiScopeLine" class="visually-hidden" aria-hidden="true">—</span>
+                                <button type="button" class="btn btn-sm btn-primary px-3" id="rb3AiOpenToolkitBtn" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">
+                                    <i class="fas fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Open AI Toolkit
+                                </button>
+                            </div>
 
-                                <summary class="rb3-advanced-disclosure-summary">
-
-                                    <span class="rb3-advanced-summary-main">
-
-                                        <span class="rb3-advanced-title d-inline-flex align-items-center gap-2 flex-wrap">
-
-                                            {{ pbj320_mark(' AI') }}
-
-                                            <span class="pbj-ai-beta-badge pbj-readable-badge">beta</span>
-
-                                        </span>
-
-                                        <span id="rb3AiPanelSummary" class="rb3-advanced-summary-hint">Send scoped PBJ data and a starter prompt to Claude, ChatGPT, or Gemini</span>
-
-                                    </span>
-
-                                    <span class="rb3-advanced-chevron" aria-hidden="true"></span>
-
-                                </summary>
-
-                                <div class="rb3-disclosure-body rb3-advanced-body d-flex flex-column gap-3">
-
-                                    <p class="small text-secondary mb-0">Download the data pack below, copy the starter prompt from the toolkit, and attach both in your AI chat. Key dates and incidents you add above are included in the export.</p>
-
-                                    <p class="small mb-0"><span class="text-muted">Period:</span> <strong class="text-body" id="rb3AiScopeLine">—</strong></p>
-
-                                    <div class="d-flex flex-wrap gap-2">
-
-                                        <button type="button" class="btn btn-sm btn-primary" id="rb3AiOpenToolkitBtn" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">Open AI toolkit</button>
-
-                                        <button type="button" class="btn btn-sm btn-outline-primary" id="rb3AiCopyPromptBtn">Copy starter prompt</button>
-
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="rb3AiDownloadCsvBtn"><i class="fas fa-download me-1" aria-hidden="true"></i><span class="d-md-none">CSV</span><span class="d-none d-md-inline">Export CSV</span></button>
-
-                                    </div>
+                            <div class="d-none" id="rb3AiPanel" aria-hidden="true">
+                                <span id="rb3AiPanelSummary" class="d-none"></span>
+                                <button type="button" class="d-none" id="rb3AiCopyPromptBtn" tabindex="-1" aria-hidden="true"></button>
+                                <button type="button" class="d-none" id="rb3AiDownloadCsvBtn" tabindex="-1" aria-hidden="true"></button>
 
                                     <div id="rb3FindingCategoriesWrap" class="d-none">
 
@@ -364,9 +338,7 @@
 
                                     </div>
 
-                                </div>
-
-                            </details>
+                            </div>
 
 
 

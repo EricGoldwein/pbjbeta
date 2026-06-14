@@ -3627,12 +3627,150 @@ def index():
         **_pbj_template_client_config(),
     )
 
-@app.route('/case-builder')
-def case_builder_shortcut():
-    """Canonical Case Builder URL alias for premium dashboards."""
-    qs = request.query_string.decode('utf-8', errors='replace')
-    dest = '/report-builder-v3' + ('?' + qs if qs else '')
-    return redirect(dest)
+def _pbj_quarter_keys_from_bounds(min_iso: str, max_iso: str) -> list[str]:
+    """Calendar quarters (``yyyyQn``) spanning PBJ workdate bounds, ascending."""
+    import re
+    from datetime import date
+
+    def _parse(iso: str) -> date | None:
+        s = str(iso or "").strip()[:10]
+        m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", s)
+        if not m:
+            return None
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
+
+    def _yq(d: date) -> tuple[int, int]:
+        return d.year, (d.month - 1) // 3 + 1
+
+    lo = _parse(min_iso)
+    hi = _parse(max_iso)
+    if not lo or not hi:
+        return []
+    if hi < lo:
+        lo, hi = hi, lo
+    y, q = _yq(lo)
+    end_y, end_q = _yq(hi)
+    out: list[str] = []
+    while (y, q) <= (end_y, end_q):
+        out.append(f"{y}Q{q}")
+        q += 1
+        if q > 4:
+            q = 1
+            y += 1
+    return out
+
+
+def _pbj_report_builder_v3_route_allowed(provnum: str, *, beta_query: bool = False) -> bool:
+    """Case Builder route gate (optional env CCN list + beta flag)."""
+    ccn = str(provnum or "").strip().zfill(6)
+    allow_env = _pbj_env_str("PBJ_REPORT_BUILDER_V3_CCNS").strip()
+    if allow_env:
+        allowed = frozenset(
+            str(x).strip().zfill(6) for x in allow_env.split(",") if str(x).strip()
+        )
+        if ccn not in allowed:
+            return False
+    beta_only = _pbj_env_str("PBJ_REPORT_BUILDER_V3_BETA_ONLY").strip().lower() in ("1", "true", "yes")
+    if beta_only:
+        env_ok = _pbj_env_str("PBJ_REPORT_BUILDER_V3_ENABLED").strip().lower() in ("1", "true", "yes")
+        return beta_query or env_ok
+    return True
+
+
+def _render_report_builder_v3_page():
+    """Standalone PBJ Case Builder (v3 UI)."""
+    global global_df, provider_info_df
+
+    facility_name = "Unknown Facility"
+    facility_provnum = "Unknown"
+    city = "Unknown"
+    state = "Unknown"
+    pbj_min_work_date = ""
+    pbj_max_work_date = ""
+
+    if global_df is not None and not global_df.empty:
+        df = global_df.sort_values("WorkDate", ascending=False) if "WorkDate" in global_df.columns else global_df
+        if not df.empty:
+            if "PROVNUM" in df.columns:
+                facility_provnum = str(df["PROVNUM"].iloc[0]).zfill(6)
+            if "CITY" in df.columns:
+                city = str(df["CITY"].iloc[0] or "").strip() or "Unknown"
+            if "STATE" in df.columns:
+                state = str(df["STATE"].iloc[0] or "").strip() or "Unknown"
+            if "PROVNAME" in df.columns:
+                facility_name = str(df["PROVNAME"].iloc[0] or "").strip() or facility_name
+        if "WorkDate" in global_df.columns:
+            _wd = pd.to_datetime(global_df["WorkDate"], errors="coerce").dropna()
+            if not _wd.empty:
+                pbj_min_work_date = _wd.min().strftime("%Y-%m-%d")
+                pbj_max_work_date = _wd.max().strftime("%Y-%m-%d")
+
+    if provider_info_df is not None and not provider_info_df.empty and "provider_name" in provider_info_df.columns:
+        p_df = (
+            provider_info_df.sort_values("processing_date", ascending=False)
+            if "processing_date" in provider_info_df.columns
+            else provider_info_df
+        )
+        if not p_df.empty:
+            latest_name = p_df["provider_name"].iloc[0]
+            if pd.notna(latest_name) and str(latest_name).strip():
+                facility_name = str(latest_name).strip()
+
+    if not _pbj_report_builder_v3_route_allowed(
+        facility_provnum,
+        beta_query=request.args.get("beta") == "1",
+    ):
+        abort(404)
+
+    facility_name_display = format_facility_display_name(facility_name)
+    facility_name_compact = get_facility_name_for_context(facility_name, "compact") or facility_name_display
+    favicon_href = url_for("pbj_favicon_png") if _pbj_favicon_path() else None
+    pbj_premium_facility_base_url = ""
+    _mkt = (_pbj_env_str("PBJ_PUBLIC_SITE_BASE_PATH") or "").strip().rstrip("/")
+    if _mkt and facility_provnum != "Unknown":
+        pbj_premium_facility_base_url = f"{_mkt}/premium/{str(facility_provnum).strip().zfill(6)}"
+    dashboard_href = (pbj_premium_facility_base_url + "/") if pbj_premium_facility_base_url else url_for("index")
+    pbj_available_quarters = _pbj_quarter_keys_from_bounds(pbj_min_work_date, pbj_max_work_date)
+
+    claude_ctx: dict[str, Any] = {}
+
+    return render_template(
+        "report_builder_v3_standalone.html",
+        facility_name=facility_name,
+        facility_name_display=facility_name_display,
+        facility_name_compact=facility_name_compact,
+        provnum=facility_provnum,
+        city=city,
+        state=state,
+        favicon_href=favicon_href,
+        page_title=f"PBJ Case Builder | {facility_name_display} | PBJ320",
+        pbj_min_work_date=pbj_min_work_date,
+        pbj_max_work_date=pbj_max_work_date,
+        pbj_available_quarters=pbj_available_quarters,
+        pbj_dashboard_href=dashboard_href,
+        superdynamic_v3_panes=True,
+        pbj_report_builder_standalone=True,
+        pbj_premium_facility_base_url=pbj_premium_facility_base_url,
+        **_pbj_template_client_config(),
+        **claude_ctx,
+    )
+
+
+@app.route("/case-builder")
+def case_builder_page():
+    """Canonical user-facing Case Builder URL."""
+    return _render_report_builder_v3_page()
+
+
+@app.route("/report-builder-v3")
+def report_builder_v3_legacy_redirect():
+    """Legacy alias → /case-builder."""
+    qs = request.query_string.decode("utf-8", errors="replace")
+    dest = "/case-builder" + ("?" + qs if qs else "")
+    return redirect(dest, code=302)
 
 
 @app.route('/data-matching')
@@ -11688,6 +11826,19 @@ def api_ein_nursing_employees():
             else None
         )
         position_group = (request.args.get("position_group") or "all").strip().lower()
+        job_code_raw = (request.args.get("job_code") or "").strip()
+
+        def _matches_job_code(row: dict[str, Any]) -> bool:
+            if not job_code_raw:
+                return True
+            try:
+                want = int(job_code_raw)
+            except ValueError:
+                return True
+            try:
+                return int(row.get("job_code") or -1) == want
+            except (TypeError, ValueError):
+                return False
 
         def _json_rows_from_df(df_in: pd.DataFrame) -> list[dict[str, Any]]:
             rows_out: list[dict[str, Any]] = []
@@ -11717,6 +11868,8 @@ def api_ein_nursing_employees():
                 filtered = [
                     r for r in filtered if ein_job_code_matches_position_group(r.get("job_code"), position_group)
                 ]
+            if job_code_raw:
+                filtered = [r for r in filtered if _matches_job_code(r)]
             apply_roster_tenure_quarter_span(filtered, rows_for_global_bounds=rows_all)
             total = int(len(filtered))
             filtered.sort(
@@ -11791,6 +11944,8 @@ def api_ein_nursing_employees():
             rows_filtered = [
                 r for r in rows_filtered if ein_job_code_matches_position_group(r.get("job_code"), position_group)
             ]
+        if job_code_raw:
+            rows_filtered = [r for r in rows_filtered if _matches_job_code(r)]
         apply_roster_tenure_quarter_span(rows_filtered, rows_for_global_bounds=rows_all)
         total = len(rows_filtered)
         rows_filtered.sort(

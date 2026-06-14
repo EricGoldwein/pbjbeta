@@ -1205,7 +1205,7 @@
                 siteBase = String((cfg && cfg.siteBasePath) || '').replace(/\/+$/, '');
             }
         } catch (cfgErr) { /* ignore */ }
-        var localPath = (siteBase || '') + '/report-builder-v3';
+        var localPath = (siteBase || '') + '/case-builder';
         if (window.__pbjReportBuilderV3Href) {
             var h = String(window.__pbjReportBuilderV3Href);
             global.location.href = h;
@@ -3180,7 +3180,19 @@
                 pbjV2GetAiToolkitAudience(),
                 global.__pbjLastAiPackMeta || {}
             );
-            pbjV2CopyTextToClipboard(text, 'pbjAiPackPromptStatus');
+            var btn = document.getElementById('pbjAiPackCopyPromptBtn');
+            pbjV2CopyTextToClipboard(text, 'pbjAiPackPromptStatus').then(function (ok) {
+                if (!ok || !btn) {
+                    return;
+                }
+                var prev = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1" aria-hidden="true"></i>Copied';
+                btn.setAttribute('aria-label', 'Copied');
+                setTimeout(function () {
+                    btn.innerHTML = prev;
+                    btn.setAttribute('aria-label', 'Copy prompt');
+                }, 2200);
+            });
         });
     }
 
