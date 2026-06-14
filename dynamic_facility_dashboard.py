@@ -36,7 +36,7 @@ from difflib import SequenceMatcher
 from decimal import Decimal, ROUND_HALF_UP
 import glob
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from pbj_identifiers.urls import (
     PBJ_RANKINGS_REPORT_URL,
@@ -7695,6 +7695,66 @@ def get_charts():
         
     except Exception as e:
         return jsonify({'error': str(e)})
+
+
+def _analysis_bundle_query_sets() -> tuple[dict[str, str], dict[str, str]]:
+    """Split request args into data/summary filters vs chart filters."""
+    flat = request.args.to_dict(flat=True)
+    data_qs = dict(flat)
+    chart_qs = dict(flat)
+    charts_start = flat.get("charts_start_date")
+    charts_end = flat.get("charts_end_date")
+    if charts_start:
+        chart_qs["start_date"] = charts_start
+    if charts_end:
+        chart_qs["end_date"] = charts_end
+    for key in ("charts_start_date", "charts_end_date"):
+        data_qs.pop(key, None)
+        chart_qs.pop(key, None)
+    return data_qs, chart_qs
+
+
+def _invoke_dashboard_route_json(view_func) -> dict[str, Any]:
+    """Call a Flask view on ``app`` and return its JSON body (no double-encoding)."""
+    rv = view_func()
+    if isinstance(rv, tuple):
+        resp = rv[0]
+    else:
+        resp = rv
+    payload = resp.get_json(silent=True)
+    return payload if isinstance(payload, dict) else {}
+
+
+@app.route("/api/analysis_bundle")
+def get_analysis_bundle():
+    """Combined data + charts + summary for V2 ``updateAnalysis()``."""
+    try:
+        data_qs, chart_qs = _analysis_bundle_query_sets()
+        data_query = urlencode(data_qs, doseq=True)
+        chart_query = urlencode(chart_qs, doseq=True)
+        with app.test_request_context(query_string=data_query):
+            data_payload = _invoke_dashboard_route_json(get_data)
+        with app.test_request_context(query_string=chart_query):
+            charts_payload = _invoke_dashboard_route_json(get_charts)
+        with app.test_request_context(query_string=data_query):
+            summary_payload = _invoke_dashboard_route_json(get_summary)
+        return jsonify(
+            {
+                "data": data_payload,
+                "charts": charts_payload,
+                "summary": summary_payload,
+            }
+        )
+    except Exception as e:
+        return jsonify(
+            {
+                "error": str(e),
+                "data": {},
+                "charts": {},
+                "summary": {},
+            }
+        )
+
 
 @app.route('/api/chart_aggregated')
 def get_chart_aggregated():
