@@ -6764,6 +6764,19 @@
         html.pbj-filter-bootstrapping #dayFilterSection {
             display: none !important;
         }
+        html.pbj-filter-bootstrapping .pbj-floating-controls .pbj-floating-period-inputs {
+            visibility: hidden;
+            max-height: 6.5rem;
+            overflow: hidden;
+        }
+        html.pbj-filter-bootstrapping .pbj-floating-controls .pbj-floating-period-inputs.d-none {
+            display: none !important;
+            visibility: hidden;
+            max-height: 0;
+            overflow: hidden;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
         [data-pbj-apply-btn].pbj-btn-filtering {
             position: relative;
             min-width: 4.75rem;
@@ -20000,14 +20013,32 @@
                         countyNRaw != null && countyNRaw !== '' && !isNaN(parseInt(countyNRaw, 10))
                             ? parseInt(countyNRaw, 10)
                             : null;
-                    const countyMedRaw =
-                        lite.county_median_total_nurse_hprd != null
-                            ? parseFloat(lite.county_median_total_nurse_hprd)
-                            : parseFloat(lite.county_total_nurse_hprd);
-                    const stateMedRaw =
-                        lite.state_median_total_nurse_hprd != null
-                            ? parseFloat(lite.state_median_total_nurse_hprd)
-                            : null;
+                    const countyMedRaw = (function () {
+                        var vals = [lite.county_median_total_nurse_hprd, lite.county_total_nurse_hprd];
+                        for (var ci = 0; ci < vals.length; ci++) {
+                            if (vals[ci] == null || vals[ci] === '') {
+                                continue;
+                            }
+                            var cn = parseFloat(vals[ci]);
+                            if (!isNaN(cn) && cn > 0) {
+                                return cn;
+                            }
+                        }
+                        return null;
+                    })();
+                    const stateMedRaw = (function () {
+                        var vals = [lite.state_median_total_nurse_hprd, lite.state_total_nurse_hprd];
+                        for (var si = 0; si < vals.length; si++) {
+                            if (vals[si] == null || vals[si] === '') {
+                                continue;
+                            }
+                            var sn = parseFloat(vals[si]);
+                            if (!isNaN(sn) && sn > 0) {
+                                return sn;
+                            }
+                        }
+                        return null;
+                    })();
                     const countyMed = countyMedRaw;
                     const stateMed = stateMedRaw;
                     const countyLabel =

@@ -1602,6 +1602,10 @@
         if (day) {
             day.classList.toggle('d-none', filterType !== 'day');
         }
+        var wrap = document.getElementById('pbjFloatingControls');
+        if (wrap) {
+            wrap.classList.add('pbj-floating-ready');
+        }
     }
 
     function pbjV2SelectHasRealOptions(srcId, selectEl) {
@@ -2021,6 +2025,9 @@
 
     function pbjV2FloatingApplyPeriod() {
         pbjV2PushFloatingPeriodToSummary();
+        if (typeof global.pbjV2RefreshScopeLabel === 'function') {
+            global.pbjV2RefreshScopeLabel();
+        }
         if (typeof global.applyFilters === 'function') {
             global.applyFilters();
         }
@@ -3289,6 +3296,23 @@
         return yearsSorted[0] + ' – ' + yearsSorted[yearsSorted.length - 1];
     }
 
+    function pbjV2SelectedQuarterKeysFromDom() {
+        var fq = document.getElementById('pbjFloatingQuarterSelect');
+        if (fq && fq.options && fq.options.length) {
+            var fromFloating = Array.from(fq.selectedOptions || [])
+                .map(function (o) { return String(o.value || '').trim(); })
+                .filter(function (v) { return v && v !== 'all'; });
+            if (fromFloating.length) {
+                return fromFloating;
+            }
+        }
+        var qv = pbjV2GetMultiSelectValue('quarterRange', 'all');
+        if (!qv || qv === 'all') {
+            return [];
+        }
+        return qv.split(',').map(function (q) { return q.trim(); }).filter(Boolean);
+    }
+
     function pbjV2ScopeLabelFromDom() {
         var ft = document.querySelector('input[name="filterType"]:checked');
         var filterType = ft ? ft.value : 'quarters';
@@ -3337,11 +3361,10 @@
             });
             return pbjV2FormatYearScopeLabel(parts);
         }
-        var qv = pbjV2GetMultiSelectValue('quarterRange', 'all');
-        if (!qv || qv === 'all') {
+        var qKeys = pbjV2SelectedQuarterKeysFromDom();
+        if (!qKeys.length) {
             return 'All quarters';
         }
-        var qKeys = qv.split(',').map(function (q) { return q.trim(); }).filter(Boolean);
         qKeys.sort(function (a, b) {
             return pbjCyQuarterSortKey(a) - pbjCyQuarterSortKey(b);
         });
@@ -4916,22 +4939,23 @@
             }
         }
         if (ft === 'quarters') {
-            var qSel = document.getElementById('quarterRange');
-            var qs = qSel
-                ? Array.from(qSel.selectedOptions || []).map(function (o) { return String(o.value || '').trim(); }).filter(function (v) { return v && v !== 'all'; })
+            var qKeys = typeof pbjV2SelectedQuarterKeysFromDom === 'function'
+                ? pbjV2SelectedQuarterKeysFromDom()
                 : [];
-            if (!qs.length && document.getElementById('quarterRangeMobileCompact')) {
-                var mq = String(document.getElementById('quarterRangeMobileCompact').value || '').trim();
-                if (mq && mq !== 'all') {
-                    qs = [mq];
-                }
+            if (!qKeys.length) {
+                var qSel = document.getElementById('quarterRange');
+                qKeys = qSel
+                    ? Array.from(qSel.selectedOptions || []).map(function (o) { return String(o.value || '').trim(); }).filter(function (v) { return v && v !== 'all'; })
+                    : [];
             }
-            if (qs.length === 1) {
-                return fmtQ(qs[0]);
+            if (qKeys.length === 1) {
+                return fmtQ(qKeys[0]);
             }
-            if (qs.length > 1) {
-                var sorted = qs.slice().sort();
-                return fmtQ(sorted[0]) + ' – ' + fmtQ(sorted[sorted.length - 1]);
+            if (qKeys.length > 1) {
+                var sortedQ = qKeys.slice().sort(function (a, b) {
+                    return pbjCyQuarterSortKey(a) - pbjCyQuarterSortKey(b);
+                });
+                return fmtQ(sortedQ[0]) + ' – ' + fmtQ(sortedQ[sortedQ.length - 1]);
             }
         }
         return 'All data';
@@ -6042,6 +6066,7 @@
     global.pbjScrollToCompareWindows = pbjScrollToCompareWindows;
     global.pbjBuildDayEvidenceActionCellHtml = pbjBuildDayEvidenceActionCellHtml;
 
+    global.pbjV2SelectedQuarterKeysFromDom = pbjV2SelectedQuarterKeysFromDom;
     global.pbjV2ScopeLabelFromFilterInfo = pbjV2ScopeLabelFromFilterInfo;
     global.pbjV2ScopeLabelFromDom = pbjV2ScopeLabelFromDom;
     global.pbjV2RefreshScopeLabel = pbjV2RefreshScopeLabel;

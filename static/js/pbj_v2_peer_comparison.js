@@ -1414,18 +1414,23 @@
         global.PbjV2GeoDistribution.openDistributionModal(m.distKey, geo);
     }
 
-    function renderTable(model, primaryScope, compact) {
+    function renderTable(model, primaryScope, compact, periodLabel) {
         var peerLabel = model.geoLabels[primaryScope] || primaryScope;
         var facHead = facilityTableHeaderMeta(model);
         var countyNote = countyUnavailableNote(model.counts.county, model.showCounty && !model.countyAvailable);
         var peerCountKey = primaryScope === 'urban' ? 'urban' : primaryScope;
         var peerN = model.counts[peerCountKey];
+        var periodNote =
+            periodLabel && String(periodLabel).trim()
+                ? ' · ' + esc(String(periodLabel).trim())
+                : '';
         var caption = compact
             ? '<caption class="small text-muted">Facility vs <strong>' +
               esc(peerLabel) +
               '</strong>' +
               (peerN != null ? ' (n=' + fmtCount(peerN) + ')' : '') +
-              '. Diff = facility − benchmark; percentile within peer group.</caption>'
+              periodNote +
+              '. Diff = facility − CMS geography mean; percentile within peer group.</caption>'
             : '';
         var head =
             '<thead class="geo-rollup-thead"><tr>' +
@@ -2047,7 +2052,7 @@
             );
             var tm = mount.querySelector('#geoPeerBenchmarkTableMount');
             if (tm) {
-                tm.innerHTML = renderTable(model, primaryScope, true);
+                tm.innerHTML = renderTable(model, primaryScope, true, periodLabel);
             }
             if (
                 global.PbjV2GeoDistribution &&
