@@ -345,7 +345,7 @@
             '<i class="fas fa-table pbj-chart-utility-disclosure-icon" aria-hidden="true"></i>' +
             '<span class="pbj-chart-utility-disclosure-copy">' +
             '<span class="pbj-chart-utility-disclosure-title">All geography comparisons</span>' +
-            '<span class="pbj-chart-utility-disclosure-helper">County, state, region, and national averages. Click 🌐 values to view distributions where available.</span>' +
+            '<span class="pbj-chart-utility-disclosure-helper">County, state, region, and national CMS means. Click values with a globe icon to open peer distributions where available.</span>' +
             '</span></span>' +
             '<span class="pbj-chart-utility-disclosure-action" aria-hidden="true">' +
             '<span class="pbj-chart-utility-action-expand">Expand <span class="pbj-disclosure-affordance">›</span></span>' +
@@ -1600,7 +1600,8 @@
             (model.showReg ? '<th scope="col" class="text-end pe-2 py-1">' + esc(model.geoLabels.region) + '</th>' : '') +
             '<th scope="col" class="text-end pe-2 py-1">National</th></tr></thead><tbody class="geo-rollup-tbody">' +
             rows +
-            '</tbody></table></div>'
+            '</tbody></table>' +
+            '<p class="small text-muted mb-0 mt-1 px-1">Geography columns are CMS-published quarter means. Click values with a globe icon for peer distributions (median/mean toggle in chart).</p></div>'
         );
     }
 
@@ -1731,6 +1732,7 @@
             '<p class="small mb-2 geo-peer-insight" aria-live="polite">' +
             insight +
             '</p>' +
+            '<p class="small text-muted mb-2 geo-peer-benchmark-measure-note">Benchmark columns use CMS-published geography <strong>means</strong> for the selected quarter (unweighted facility averages in the rollup series). Distribution charts offer median/mean reference lines.</p>' +
             '<div class="geo-peer-chart-table-row">' +
             '<div class="geo-peer-chart-table-row__chart">' +
             '<div id="geoPeerBenchmarkChart" class="geo-peer-benchmark-chart-host" role="img" aria-label="Benchmark comparison chart"></div>' +
