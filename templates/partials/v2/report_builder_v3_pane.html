@@ -1,3 +1,4 @@
+        {% from 'partials/v2/brand_macros.html' import pbj320_mark %}
         <div class="main-container pbj-report-builder pbj-report-builder-v3 pb-4" id="pbjReportBuilderV3Pane">
 
             <section class="dashboard-section mb-0" aria-labelledby="pbjReportBuilderV3Heading">
@@ -274,15 +275,25 @@
 
 
 
-                            <div class="d-flex justify-content-end align-items-center gap-2 mb-2 rb3-ai-toolbar">
-                                <span id="rb3AiScopeLine" class="visually-hidden" aria-hidden="true">—</span>
-                                <button type="button" class="btn btn-sm btn-primary px-3" id="rb3AiOpenToolkitBtn" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">
-                                    <i class="fas fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Open AI Toolkit
-                                </button>
-                            </div>
+                            <div class="rb3-disclosure rb3-advanced-panel rb3-advanced-card rb3-ai-panel rb3-ai-modal-panel mb-0" id="rb3AiPanel">
+                                <div class="rb3-advanced-disclosure-summary rb3-ai-panel-trigger" id="rb3AiPanelTrigger" role="button" tabindex="0" aria-label="Open PBJ320 AI Toolkit" aria-haspopup="dialog">
+                                    <span class="rb3-advanced-summary-main">
+                                        <span class="rb3-advanced-title d-inline-flex align-items-center gap-2 flex-wrap">
+                                            {{ pbj320_mark(' AI') }}
+                                            <span class="pbj-ai-beta-badge pbj-readable-badge">beta</span>
+                                        </span>
+                                        <span id="rb3AiPanelSummary" class="rb3-advanced-summary-hint">Send scoped PBJ data and a starter prompt to Claude, ChatGPT, or Gemini</span>
+                                        <p class="small mb-0 mt-1 rb3-ai-scope-line"><span class="text-muted">Period:</span> <strong class="text-body" id="rb3AiScopeLine">—</strong></p>
+                                    </span>
+                                    <span class="rb3-ai-panel-actions d-flex align-items-center gap-2 flex-shrink-0">
+                                        <button type="button" class="btn btn-sm btn-primary px-3" id="rb3AiOpenToolkitBtn" data-bs-toggle="modal" data-bs-target="#pbjAiToolkitModal">
+                                            <i class="fas fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Open AI Toolkit
+                                        </button>
+                                        <span class="rb3-advanced-chevron" aria-hidden="true"></span>
+                                    </span>
+                                </div>
 
-                            <div class="d-none" id="rb3AiPanel" aria-hidden="true">
-                                <span id="rb3AiPanelSummary" class="d-none"></span>
+                                <div class="d-none" aria-hidden="true">
                                 <button type="button" class="d-none" id="rb3AiCopyPromptBtn" tabindex="-1" aria-hidden="true"></button>
                                 <button type="button" class="d-none" id="rb3AiDownloadCsvBtn" tabindex="-1" aria-hidden="true"></button>
 
@@ -337,6 +348,8 @@
                                         </div>
 
                                     </div>
+
+                                </div>
 
                             </div>
 

@@ -1191,11 +1191,39 @@
         syncPeriodModeUI();
     }
 
+    function openRb3AiToolkitModal() {
+        syncRb3AiScope();
+        var modalEl = document.getElementById('pbjAiToolkitModal');
+        if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    }
+
     function bindRb3AiCard() {
         var openBtn = $('rb3AiOpenToolkitBtn');
         if (openBtn) {
-            openBtn.addEventListener('click', function () {
+            openBtn.addEventListener('click', function (ev) {
+                ev.stopPropagation();
                 syncRb3AiScope();
+            });
+        }
+        var trigger = $('rb3AiPanelTrigger');
+        if (trigger) {
+            trigger.addEventListener('click', function (ev) {
+                if (ev.target.closest('#rb3AiOpenToolkitBtn')) {
+                    return;
+                }
+                openRb3AiToolkitModal();
+            });
+            trigger.addEventListener('keydown', function (ev) {
+                if (ev.key !== 'Enter' && ev.key !== ' ') {
+                    return;
+                }
+                if (ev.target.closest('#rb3AiOpenToolkitBtn')) {
+                    return;
+                }
+                ev.preventDefault();
+                openRb3AiToolkitModal();
             });
         }
         var copyBtn = $('rb3AiCopyPromptBtn');
