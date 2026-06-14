@@ -140,6 +140,19 @@ def main() -> int:
         return 0
 
     # Deploy: do not read or print .env.local
+    import_check = root / "scripts" / "check_v2_deployment_import.py"
+    if import_check.is_file():
+        code = _run(
+            [sys.executable, str(import_check), prov, "--deploy-dir", str(deploy_dir)],
+            cwd=root,
+        )
+        if code != 0:
+            print(
+                "ERROR: deployment import check failed — fix the bundle before --confirm-deploy.",
+                file=sys.stderr,
+            )
+            return code
+
     vercel = _vercel_argv_prefix()
     code = _run(
         vercel + ["link", f"--project=pbj320-{prov}", "--yes"],

@@ -28694,7 +28694,7 @@
             };
             var layout = {
                 barmode: 'stack',
-                bargap: 0.12,
+                bargap: 0.18,
                 title: {
                     text:
                         typeof pbjChartSubtitleTitleHtml === 'function'
@@ -28710,8 +28710,7 @@
                         categoryarray: x.slice(),
                         automargin: true,
                     },
-                    smartX,
-                    n >= 1 ? { range: [x[0], x[n - 1]] } : {}
+                    smartX
                 ),
                 yaxis: {
                     title:
@@ -36518,7 +36517,7 @@
              const _pbjSnapXlsxBtn = document.getElementById('pbj320SnapshotExportXlsxBtn');
              if (_pbjSnapXlsxBtn) {
                  _pbjSnapXlsxBtn.addEventListener('click', function () {
-                     exportPbj320SnapshotModalXlsxUi();
+                     exportPbj320SnapshotModalXlsx();
                  });
              }
              const _pbjComplianceReviewModalEl = document.getElementById('pbj320ComplianceReviewModal');
