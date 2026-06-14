@@ -53788,7 +53788,12 @@
                     return pbjNormalizeQuarterToCy(qq) || qq;
                 })
             );
-            (window.__lastHarringtonRows || []).forEach(function (hr) {
+            (function () {
+                const harRows =
+                    (window.__lastHarringtonRows && window.__lastHarringtonRows.length
+                        ? window.__lastHarringtonRows
+                        : window.__lastHarringtonCmiExport && window.__lastHarringtonCmiExport.rows) || [];
+                harRows.forEach(function (hr) {
                 const q =
                     typeof harringtonNormalizedQuarter === 'function'
                         ? harringtonNormalizedQuarter(hr)
@@ -53816,7 +53821,8 @@
                         pushRow(out, 'HARRINGTON', 'quarter', q, k, hr[k], '', '', 'Harrington / PBJ');
                     }
                 });
-            });
+                });
+            })();
             const citeRows = window.__pbjCitationsRows || [];
             citeRows.forEach(function (c, idx) {
                 const sd = String(c.survey_date || c.surveyDate || '').slice(0, 10);
@@ -53911,6 +53917,9 @@
                     });
                 });
             });
+            if (typeof pbjV2AppendAiPackPeriodStaffingRows === 'function') {
+                pbjV2AppendAiPackPeriodStaffingRows(pushRow, out, rows, quarters);
+            }
             if (ft === 'day' && typeof pbjV2AppendAiPackSingleDayRows === 'function') {
                 pbjV2AppendAiPackSingleDayRows(pushRow, out, startIso);
             }
@@ -53937,7 +53946,7 @@
             const packBody = out.join('\n') + '\n';
             const packCsv =
                 pbj320CsvPreamble(
-                    'AI context pack: long-format CSV for the active filter. Sections: META, DEFINITION, DAILY, SINGLE_DAY, KEY_DATE, INCIDENT, CONTEXT, CASE_MIX, HARRINGTON, CITATION, RED_FLAG, REGULATORY, GEO_PEER, CHOW, OWNERSHIP, JOB_CODE, SUMMARY.'
+                    'AI context pack: long-format CSV for the active filter. Sections: META, DEFINITION, DAILY, PERIOD_STAFFING, SINGLE_DAY, KEY_DATE, INCIDENT, CONTEXT, CASE_MIX, HARRINGTON, CITATION, RED_FLAG, REGULATORY, GEO_PEER, CHOW, OWNERSHIP, JOB_CODE, SUMMARY.'
                 ) +
                 pbj320CaseMixCsvMethodsCommentBlock() +
                 pbj320HarringtonCsvFormulaCommentBlock() +

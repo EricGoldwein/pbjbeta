@@ -2403,16 +2403,12 @@
                 var pack = global.__singleDayReportPayload;
                 if (!pack || !pack.date || (iso && pack.date !== iso)) {
                     global.generateSingleDayReport().finally(function () {
-                        if (typeof fn === 'function') {
-                            fn();
-                        }
+                        pbjV2PrefetchAiPackBenchmarks(fn);
                     });
                     return;
                 }
             }
-            if (typeof fn === 'function') {
-                fn();
-            }
+            pbjV2PrefetchAiPackBenchmarks(fn);
         }
         function afterRows(rows) {
             if (rows && rows.length) {
@@ -2898,6 +2894,214 @@
         return qs.join(', ');
     }
 
+    function pbjV2DashDisplayText(id) {
+        var node = document.getElementById(id);
+        if (!node) {
+            return '';
+        }
+        var t = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+        return t && t !== '—' && t !== '-' ? t : '';
+    }
+
+    function pbjV2ParseBenchGapEl(gapEl) {
+        if (!gapEl) {
+            return null;
+        }
+        var raw = String(gapEl.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!raw || raw === '—' || raw === '-') {
+            return null;
+        }
+        var numEl = gapEl.querySelector('.pbj-bench-gap-num');
+        var dirEl = gapEl.querySelector('.pbj-bench-gap-dir');
+        var num = numEl ? String(numEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
+        var dir = dirEl ? String(dirEl.textContent || '').trim().toLowerCase() : '';
+        if (!num) {
+            return null;
+        }
+        if (!dir) {
+            var n = parseFloat(String(num).replace(/[^\d.+-]/g, ''));
+            if (isNaN(n)) {
+                return null;
+            }
+            dir = Math.abs(n) <= 0.02 ? 'at' : n > 0 ? 'above' : 'below';
+            num = String(Math.abs(n));
+        }
+        return { num: num, dir: dir };
+    }
+
+    function pbjV2BenchGapPhrase(gap, label) {
+        if (!gap) {
+            return '';
+        }
+        if (gap.dir === 'at') {
+            return 'at the ' + label;
+        }
+        return gap.num + ' HPRD ' + gap.dir + ' the ' + label;
+    }
+
+    function pbjV2ComputePeriodStaffingFromRows(rows) {
+        if (!rows || !rows.length) {
+            return null;
+        }
+        var totalHours = 0;
+        var directHours = 0;
+        var rnHours = 0;
+        var lpnHours = 0;
+        var naHours = 0;
+        var totalCensus = 0;
+        var contractSum = 0;
+        var contractN = 0;
+        rows.forEach(function (r) {
+            var census = parseFloat(r.MDScensus);
+            if (!isFinite(census) || census <= 0) {
+                return;
+            }
+            totalCensus += census;
+            var th = parseFloat(r.Total_Staff_Hours || r.Total_Nurse_Hours || 0);
+            if (isFinite(th)) {
+                totalHours += th;
+            }
+            var dh = parseFloat(r.Nurse_Staff_Hours_Excl_Admin || 0);
+            if (isFinite(dh)) {
+                directHours += dh;
+            }
+            var rh = parseFloat(r.Total_RN_Hours || 0);
+            if (isFinite(rh)) {
+                rnHours += rh;
+            }
+            var lh = parseFloat(r.Total_LPN_Hours || 0);
+            if (isFinite(lh)) {
+                lpnHours += lh;
+            }
+            var ah = parseFloat(r.Total_Nurse_Aide_Hours || 0);
+            if (isFinite(ah)) {
+                naHours += ah;
+            }
+            var cp = parseFloat(r.RN_Contract_Pct || r.Contract_Percentage || '');
+            if (isFinite(cp)) {
+                contractSum += cp;
+                contractN += 1;
+            }
+        });
+        if (totalCensus <= 0) {
+            return null;
+        }
+        function hprd(hours) {
+            return (hours / totalCensus).toFixed(2);
+        }
+        return {
+            workDays: rows.length,
+            avgTotalHprd: hprd(totalHours),
+            avgDirectHprd: directHours > 0 ? hprd(directHours) : '',
+            avgRnHprd: hprd(rnHours),
+            avgLpnHprd: hprd(lpnHours),
+            avgNaHprd: hprd(naHours),
+            avgContractPct: contractN ? (contractSum / contractN).toFixed(1) : ''
+        };
+    }
+
+    function pbjV2BuildAiPeriodStaffingSnippet(packMeta) {
+        packMeta = packMeta || {};
+        var bits = [];
+        var scope =
+            packMeta.filterLabel ||
+            pbjV2AiToolkitScopeLabel() ||
+            (typeof pbjV2ScopeLabelFromDom === 'function' ? pbjV2ScopeLabelFromDom() : '') ||
+            'selected period';
+        var rows =
+            typeof global.currentData !== 'undefined' && global.currentData && global.currentData.length
+                ? global.currentData
+                : [];
+        var computed = pbjV2ComputePeriodStaffingFromRows(rows);
+        var totalH = pbjV2DashDisplayText('pbjSummaryTotalHprdDisplay') || (computed && computed.avgTotalHprd) || '';
+        var rnH = pbjV2DashDisplayText('pbjSummaryRnHprdDisplay') || (computed && computed.avgRnHprd) || '';
+        var directH = '';
+        var totalDisp = document.getElementById('pbjSummaryTotalHprdDisplay');
+        if (totalDisp) {
+            var tip = totalDisp.getAttribute('title') || '';
+            var tm = tip.match(/Direct care HPRD:\s*([\d.]+)/i);
+            if (tm) {
+                directH = tm[1];
+            }
+        }
+        if (!directH && computed && computed.avgDirectHprd) {
+            directH = computed.avgDirectHprd;
+        }
+        var contract = pbjV2DashDisplayText('contractPct') || (computed && computed.avgContractPct) || '';
+        var workDays =
+            packMeta.dailyRowCount != null
+                ? packMeta.dailyRowCount
+                : computed
+                    ? computed.workDays
+                    : rows.length;
+        if (workDays != null && Number.isFinite(Number(workDays)) && Number(workDays) > 0) {
+            bits.push(
+                workDays +
+                    ' work day' +
+                    (Number(workDays) === 1 ? '' : 's') +
+                    ' in scope (' +
+                    scope +
+                    ')'
+            );
+        }
+        if (totalH) {
+            bits.push('weighted avg total nurse HPRD ' + totalH);
+        }
+        if (directH) {
+            bits.push('direct-care HPRD ' + directH);
+        }
+        if (rnH) {
+            bits.push('RN HPRD ' + rnH);
+        }
+        if (contract) {
+            bits.push('contract share ' + contract + (String(contract).indexOf('%') >= 0 ? '' : '%'));
+        }
+        var cmGap = pbjV2ParseBenchGapEl(document.getElementById('forensicCaseMixDelta'));
+        if (cmGap) {
+            bits.push('vs CMS case-mix expected: ' + pbjV2BenchGapPhrase(cmGap, 'case-mix benchmark'));
+        }
+        var harGap = pbjV2ParseBenchGapEl(document.getElementById('forensicHarringtonDelta'));
+        if (harGap) {
+            bits.push('vs Harrington expected: ' + pbjV2BenchGapPhrase(harGap, 'Harrington benchmark'));
+        }
+        var countyGap = pbjV2ParseBenchGapEl(document.getElementById('forensicGeoPeerCountyDelta'));
+        var stateGap = pbjV2ParseBenchGapEl(document.getElementById('forensicGeoPeerStateDelta'));
+        if (countyGap) {
+            bits.push('vs county peer median: ' + pbjV2BenchGapPhrase(countyGap, 'county median'));
+        }
+        if (stateGap) {
+            bits.push('vs state peer median: ' + pbjV2BenchGapPhrase(stateGap, 'state median'));
+        }
+        return bits;
+    }
+
+    function pbjV2PrefetchAiPackBenchmarks(fn) {
+        var waits = [];
+        if (typeof global.loadCaseMixData === 'function') {
+            var cm = global.__pbjCaseMixDataByQuarter || {};
+            if (!global.__pbjCaseMixLoadSuccess || !Object.keys(cm).length) {
+                waits.push(Promise.resolve(global.loadCaseMixData()).catch(function () {}));
+            }
+        }
+        if (typeof global.pbjPrefetchHarringtonCmiExport === 'function') {
+            var har = global.__lastHarringtonCmiExport;
+            if (!har || !har.rows || !har.rows.length) {
+                waits.push(Promise.resolve(global.pbjPrefetchHarringtonCmiExport()).catch(function () {}));
+            }
+        }
+        if (!waits.length) {
+            if (typeof fn === 'function') {
+                fn();
+            }
+            return;
+        }
+        Promise.all(waits).finally(function () {
+            if (typeof fn === 'function') {
+                fn();
+            }
+        });
+    }
+
     function pbjV2BuildAiStarterPrompt(audienceKey, packMeta) {
         packMeta = packMeta || {};
         var aud = String(audienceKey || 'attorney').trim() || 'attorney';
@@ -2916,6 +3120,7 @@
         var workDaysText = workDays != null && Number.isFinite(Number(workDays)) ? String(workDays) : 'pending export';
         var qtrs = Array.isArray(packMeta.quarters) ? packMeta.quarters.join(', ') : (packMeta.quarters || '');
         var focusDates = packMeta.focusDates || pbjV2AiPromptFocusDatesText();
+        var staffingBits = pbjV2BuildAiPeriodStaffingSnippet(packMeta);
         var audienceLine =
             aud === 'attorney'
                 ? 'Written for an attorney: include limitations, timing context, and records worth requesting. Do not state legal violations or causation.'
@@ -2928,8 +3133,12 @@
             'Review CMS Payroll-Based Journal staffing for ' + fn + (ccn ? ' (CCN ' + ccn + ').' : '.'),
             audienceLine,
             'Period: ' + scope + '.',
-            'Attached: PBJ320 export CSV (' + workDaysText + ' work day' + (workDaysText === '1' ? '' : 's') + (qtrs ? '; ' + qtrs : '') + ').'
+            'Attached: PBJ320 export CSV (' + workDaysText + ' work day' + (workDaysText === '1' ? '' : 's') + (qtrs ? '; quarters ' + qtrs : '') + ').',
+            'CSV sections include DAILY staffing for this filter plus CASE_MIX, HARRINGTON, and GEO_PEER regional rollups when loaded.'
         ];
+        if (staffingBits.length) {
+            lines.push('Selected-period staffing (active dashboard filter): ' + staffingBits.join('; ') + '.');
+        }
         if (focusDates) {
             lines.push('Dates of interest: ' + focusDates + '.');
         }
@@ -2940,12 +3149,14 @@
             '- PBJ is facility-reported payroll data only.',
             '- Say what the data shows, what it may suggest, and what it cannot establish.',
             '- Treat red flags as screening only until confirmed.',
+            '- Prefer charts or small multiples over tables for the main visual.',
             '',
             'Please:',
-            '1. Summarize total and RN staffing vs case-mix and Harrington benchmarks where available.',
-            '2. Note unusual days, census effects, contract staff share, and peer comparisons if present.',
-            '3. List what this dataset cannot establish.',
-            '4. End with up to five practical follow-up questions or records to request.'
+            '1. Summarize total and RN staffing for this period vs case-mix, Harrington, and regional peer rows in the CSV.',
+            '2. Note unusual days, census effects, contract staff share, and county/state/region comparisons when present.',
+            '3. Propose one primary data visualization (line chart, bar chart, timeline, or small multiples — not a table) that best communicates the main staffing story for this period. Choose the chart type from the data (e.g., daily HPRD trend, RN vs aide mix, case-mix or Harrington gap by quarter, facility vs regional peer). Describe axes, series, highlights, and why that visual fits.',
+            '4. List what this dataset cannot establish.',
+            '5. End with up to five practical follow-up questions or records to request.'
         );
         return lines.join('\n');
     }
@@ -3100,6 +3311,15 @@
         if (workDays > 0 && !(counts.META > 0)) {
             items.push('Export looks incomplete — try downloading again.');
         }
+        if (workDays > 0 && !(counts.CASE_MIX > 0)) {
+            items.push('Case-mix benchmarks are not in the file yet — wait a moment and export again.');
+        }
+        if (workDays > 0 && !(counts.HARRINGTON > 0)) {
+            items.push('Harrington expected staffing is not in the file yet — wait a moment and export again.');
+        }
+        if (workDays > 0 && !(counts.GEO_PEER > 0)) {
+            items.push('Regional peer rollups are not bundled for this facility — daily staffing still exports.');
+        }
 
         if (!items.length) {
             ul.classList.add('d-none');
@@ -3141,8 +3361,16 @@
                 }
                 if (filterType === 'day' && (counts.SINGLE_DAY || 0) > 0) {
                     parts.push('day benchmarks included');
-                } else if ((counts.CASE_MIX || 0) > 0) {
-                    parts.push('quarterly benchmarks included');
+                } else {
+                    if ((counts.CASE_MIX || 0) > 0) {
+                        parts.push('case-mix included');
+                    }
+                    if ((counts.HARRINGTON || 0) > 0) {
+                        parts.push('Harrington included');
+                    }
+                    if ((counts.GEO_PEER || 0) > 0) {
+                        parts.push('regional peers included');
+                    }
                 }
                 parts.push(totalRows.toLocaleString() + ' CSV lines');
                 summaryEl.textContent = parts.join(' · ');
@@ -5903,6 +6131,118 @@
         layout.shapes = ([]).concat(layout.shapes || [], chow);
     }
 
+    function pbjV2ResolveAiPackHarringtonRows() {
+        if (global.__lastHarringtonRows && global.__lastHarringtonRows.length) {
+            return global.__lastHarringtonRows;
+        }
+        var pack = global.__lastHarringtonCmiExport;
+        if (pack && Array.isArray(pack.rows) && pack.rows.length) {
+            return pack.rows;
+        }
+        return [];
+    }
+
+    function pbjV2AppendAiPackPeriodStaffingRows(pushRow, out, rows, quarters) {
+        rows = rows || [];
+        quarters = quarters || [];
+        var computed = pbjV2ComputePeriodStaffingFromRows(rows);
+        if (computed) {
+            [
+                ['work_days', computed.workDays, 'days'],
+                ['avg_total_nurse_hprd', computed.avgTotalHprd, 'HPRD'],
+                ['avg_direct_care_hprd', computed.avgDirectHprd, 'HPRD'],
+                ['avg_rn_hprd', computed.avgRnHprd, 'HPRD'],
+                ['avg_lpn_hprd', computed.avgLpnHprd, 'HPRD'],
+                ['avg_nurse_aide_hprd', computed.avgNaHprd, 'HPRD'],
+                ['avg_contract_pct', computed.avgContractPct, 'percent']
+            ].forEach(function (pair) {
+                if (pair[1] != null && pair[1] !== '') {
+                    pushRow(
+                        out,
+                        'PERIOD_STAFFING',
+                        'rollup',
+                        '',
+                        pair[0],
+                        pair[1],
+                        pair[2],
+                        'Weighted average for active dashboard filter',
+                        'PBJ320'
+                    );
+                }
+            });
+        }
+        var byQuarter = {};
+        rows.forEach(function (r) {
+            var q =
+                (typeof global.pbj320RowCyQuarter === 'function' ? global.pbj320RowCyQuarter(r) : '') ||
+                r.CY_Qtr ||
+                '';
+            var nq =
+                typeof global.pbjNormalizeQuarterToCy === 'function'
+                    ? global.pbjNormalizeQuarterToCy(q) || q
+                    : q;
+            if (!nq) {
+                return;
+            }
+            if (!byQuarter[nq]) {
+                byQuarter[nq] = { hours: 0, rn: 0, lpn: 0, na: 0, census: 0, days: 0 };
+            }
+            var bucket = byQuarter[nq];
+            bucket.days += 1;
+            var census = parseFloat(r.MDScensus);
+            if (!isFinite(census) || census <= 0) {
+                return;
+            }
+            bucket.census += census;
+            var th = parseFloat(r.Total_Staff_Hours || r.Total_Nurse_Hours || 0);
+            if (isFinite(th)) {
+                bucket.hours += th;
+            }
+            var rh = parseFloat(r.Total_RN_Hours || 0);
+            if (isFinite(rh)) {
+                bucket.rn += rh;
+            }
+            var lh = parseFloat(r.Total_LPN_Hours || 0);
+            if (isFinite(lh)) {
+                bucket.lpn += lh;
+            }
+            var ah = parseFloat(r.Total_Nurse_Aide_Hours || 0);
+            if (isFinite(ah)) {
+                bucket.na += ah;
+            }
+        });
+        quarters.forEach(function (q) {
+            var bucket = byQuarter[q];
+            if (!bucket || bucket.census <= 0) {
+                return;
+            }
+            [
+                ['facility_total_nurse_hprd', bucket.hours / bucket.census, 'HPRD'],
+                ['facility_rn_hprd', bucket.rn / bucket.census, 'HPRD'],
+                ['facility_lpn_hprd', bucket.lpn / bucket.census, 'HPRD'],
+                ['facility_nurse_aide_hprd', bucket.na / bucket.census, 'HPRD'],
+                ['facility_avg_census', bucket.census / bucket.days, 'residents'],
+                ['facility_work_days', bucket.days, 'days']
+            ].forEach(function (pair) {
+                var val = pair[1];
+                if (val == null || val === '' || isNaN(Number(val))) {
+                    return;
+                }
+                pushRow(
+                    out,
+                    'GEO_PEER',
+                    'quarter',
+                    q,
+                    pair[0],
+                    typeof val === 'number' ? Number(val).toFixed(3) : val,
+                    pair[2],
+                    'Facility weighted rollup for peer comparison',
+                    'PBJ320'
+                );
+            });
+        });
+    }
+
     function pbjV2AppendAiPackSingleDayRows(pushRow, out, iso) {
         var pack = global.__singleDayReportPayload;
         if (!pack || !pack.payload || !iso) {
@@ -6181,6 +6521,7 @@
     };
     global.pbjV2AppendChowShapes = pbjV2AppendChowShapes;
     global.pbjV2AppendAiPackSingleDayRows = pbjV2AppendAiPackSingleDayRows;
+    global.pbjV2AppendAiPackPeriodStaffingRows = pbjV2AppendAiPackPeriodStaffingRows;
     global.pbjV2AppendAiPackContextRows = pbjV2AppendAiPackContextRows;
     global.pbjV2AppendAiPackOwnershipRows = pbjV2AppendAiPackOwnershipRows;
     global.pbjV2AiToolkitApplyScope = pbjV2AiToolkitApplyScope;
@@ -6196,6 +6537,8 @@
     global.pbjV2CopyAiContextPackCsv = pbjV2CopyAiContextPackCsv;
     global.pbjV2CopyTextToClipboard = pbjV2CopyTextToClipboard;
     global.pbjV2BuildAiStarterPrompt = pbjV2BuildAiStarterPrompt;
+    global.pbjV2BuildAiPeriodStaffingSnippet = pbjV2BuildAiPeriodStaffingSnippet;
+    global.pbjV2PrefetchAiPackBenchmarks = pbjV2PrefetchAiPackBenchmarks;
     global.pbjV2OnDashboardScopeChanged = pbjV2OnDashboardScopeChanged;
     global.pbjV2UpdateAiToolkitToolHelp = pbjV2UpdateAiToolkitToolHelp;
 
