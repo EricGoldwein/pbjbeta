@@ -16815,8 +16815,22 @@
     <script src="{% if _pbj_utils_origin %}{{ _pbj_utils_origin }}/static/js/pbj_v2_chart_scope_toolbar.js{% else %}{{ url_for('static', filename='js/pbj_v2_chart_scope_toolbar.js') }}{% endif %}"></script>
     <script src="{% if _pbj_utils_origin %}{{ _pbj_utils_origin }}/static/js/pbj_v2_daily_table_scope.js{% else %}{{ url_for('static', filename='js/pbj_v2_daily_table_scope.js') }}{% endif %}"></script>
     <script src="{% if _pbj_utils_origin %}{{ _pbj_utils_origin }}/static/js/pbj320_snapshot_report.js{% else %}{{ url_for('static', filename='js/pbj320_snapshot_report.js') }}{% endif %}"{% if _pbj_utils_origin %} onerror="this.onerror=null;this.src='/static/js/pbj320_snapshot_report.js'"{% endif %}></script>
-    <script src="{% if _pbj_utils_origin %}{{ _pbj_utils_origin }}/static/js/pbj_v2_geo_distribution.js{% else %}{{ url_for('static', filename='js/pbj_v2_geo_distribution.js') }}{% endif %}"></script>
-    <script src="{% if _pbj_utils_origin %}{{ _pbj_utils_origin }}/static/js/pbj_v2_peer_comparison.js{% else %}{{ url_for('static', filename='js/pbj_v2_peer_comparison.js') }}{% endif %}"></script>
+    <script type="application/json" id="pbj-benchmark-lazy-scripts">
+        {{ {
+            'geo': (_pbj_utils_origin ~ '/static/js/pbj_v2_geo_distribution.js') if _pbj_utils_origin else url_for('static', filename='js/pbj_v2_geo_distribution.js'),
+            'peer': (_pbj_utils_origin ~ '/static/js/pbj_v2_peer_comparison.js') if _pbj_utils_origin else url_for('static', filename='js/pbj_v2_peer_comparison.js'),
+        } | tojson }}
+    </script>
+    <script>
+        (function () {
+            var el = document.getElementById('pbj-benchmark-lazy-scripts');
+            try {
+                window.__PBJ_BENCHMARK_LAZY_SCRIPTS = el ? JSON.parse(el.textContent || '{}') : {};
+            } catch (eBenchLazy) {
+                window.__PBJ_BENCHMARK_LAZY_SCRIPTS = {};
+            }
+        })();
+    </script>
     {% if superdynamic_v3_panes|default(false) %}
     <script src="{% if _pbj_utils_origin %}{{ _pbj_utils_origin }}/static/js/pbj_v3_panes.js{% else %}{{ url_for('static', filename='js/pbj_v3_panes.js') }}{% endif %}"{% if _pbj_utils_origin %} onerror="this.onerror=null;this.src='/static/js/pbj_v3_panes.js'"{% endif %}></script>
     <script src="{% if _pbj_utils_origin %}{{ _pbj_utils_origin }}/static/js/pbj_v3_risk_timeline.js{% else %}{{ url_for('static', filename='js/pbj_v3_risk_timeline.js') }}{% endif %}"{% if _pbj_utils_origin %} onerror="this.onerror=null;this.src='/static/js/pbj_v3_risk_timeline.js'"{% endif %}></script>
@@ -36192,9 +36206,21 @@
                 return;
             }
             var doRefresh = function () {
-                if (typeof pbjGeoRollupRefresh === 'function') {
-                    pbjGeoRollupRefresh(window.__pbjGeoRollupPendingRows || []);
-                    window.__pbjGeoRollupRenderedOnce = true;
+                var run = function () {
+                    if (typeof pbjGeoRollupRefresh === 'function') {
+                        pbjGeoRollupRefresh(window.__pbjGeoRollupPendingRows || []);
+                        window.__pbjGeoRollupRenderedOnce = true;
+                    }
+                };
+                if (typeof pbjEnsureBenchmarkGeoPeerScripts === 'function') {
+                    pbjEnsureBenchmarkGeoPeerScripts({ immediate: true })
+                        .then(run)
+                        .catch(function (errBenchLazy) {
+                            console.error('Benchmark geo/peer scripts failed to load:', errBenchLazy);
+                            run();
+                        });
+                } else {
+                    run();
                 }
             };
             if (window.__pbjGeoRollupRenderedOnce) {
@@ -36209,6 +36235,7 @@
                 loadFn: doRefresh,
             });
         }
+        window.pbjMaybeRefreshGeoRollupWhenVisible = pbjMaybeRefreshGeoRollupWhenVisible;
 
         function pbjV3WireWorkforceLazyLoads(force) {
             if (!window.__pbjV3PanesActive) {

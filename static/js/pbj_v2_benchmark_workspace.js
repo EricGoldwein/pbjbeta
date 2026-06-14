@@ -906,6 +906,161 @@
 
     global.pbjScheduleUpdateHarringtonCMI = pbjBenchRequestHarringtonRefresh;
 
+    var _benchmarkScriptsPromise = null;
+    var _benchmarkScriptsLoaded = false;
+    var _benchmarkPrefetchObs = null;
+
+    function benchmarkLazyScriptUrls() {
+        var cfg = global.__PBJ_BENCHMARK_LAZY_SCRIPTS || {};
+        return {
+            geo: cfg.geo || '/static/js/pbj_v2_geo_distribution.js',
+            peer: cfg.peer || '/static/js/pbj_v2_peer_comparison.js',
+        };
+    }
+
+    function loadBenchmarkScriptOnce(src) {
+        if (!src) {
+            return Promise.reject(new Error('Missing benchmark script URL'));
+        }
+        var attr = 'data-pbj-lazy-src';
+        var existing = null;
+        var nodes = document.querySelectorAll('script[' + attr + ']');
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].getAttribute(attr) === src) {
+                existing = nodes[i];
+                break;
+            }
+        }
+        if (existing) {
+            if (existing.getAttribute('data-pbj-lazy-state') === 'loaded') {
+                return Promise.resolve(true);
+            }
+            return new Promise(function (resolve, reject) {
+                existing.addEventListener('load', function () {
+                    resolve(true);
+                });
+                existing.addEventListener('error', function () {
+                    reject(new Error('Failed to load ' + src));
+                });
+            });
+        }
+        return new Promise(function (resolve, reject) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.async = false;
+            s.setAttribute(attr, src);
+            s.setAttribute('data-pbj-lazy-state', 'loading');
+            s.onload = function () {
+                s.setAttribute('data-pbj-lazy-state', 'loaded');
+                resolve(true);
+            };
+            s.onerror = function () {
+                s.remove();
+                reject(new Error('Failed to load ' + src));
+            };
+            document.head.appendChild(s);
+        });
+    }
+
+    function dispatchBenchmarkScriptsReady() {
+        _benchmarkScriptsLoaded = true;
+        try {
+            global.dispatchEvent(new CustomEvent('pbj:benchmarkScriptsReady'));
+        } catch (eReady) {
+            /* ignore */
+        }
+    }
+
+    function pbjEnsureBenchmarkGeoPeerScripts(opts) {
+        opts = opts || {};
+        if (
+            _benchmarkScriptsLoaded &&
+            global.PbjV2GeoDistribution &&
+            global.PbjV2PeerComparison
+        ) {
+            return Promise.resolve(true);
+        }
+        if (_benchmarkScriptsPromise && !opts.force) {
+            return _benchmarkScriptsPromise;
+        }
+        var urls = benchmarkLazyScriptUrls();
+        _benchmarkScriptsPromise = loadBenchmarkScriptOnce(urls.geo)
+            .then(function () {
+                return loadBenchmarkScriptOnce(urls.peer);
+            })
+            .then(function () {
+                dispatchBenchmarkScriptsReady();
+                return true;
+            })
+            .catch(function (err) {
+                _benchmarkScriptsPromise = null;
+                throw err;
+            });
+        return _benchmarkScriptsPromise;
+    }
+
+    function pbjPrefetchBenchmarkGeoPeerScripts() {
+        if (_benchmarkScriptsLoaded || _benchmarkScriptsPromise) {
+            return;
+        }
+        if (!document.getElementById('geoRollupDynamicMount')) {
+            return;
+        }
+        var runPrefetch = function () {
+            pbjEnsureBenchmarkGeoPeerScripts({ prefetch: true }).catch(function () {
+                /* ignore prefetch errors */
+            });
+        };
+        var section = document.getElementById('staffingBenchmarkingSection');
+        if (!section) {
+            global.setTimeout(runPrefetch, 2500);
+            return;
+        }
+        if (typeof IntersectionObserver === 'function') {
+            if (_benchmarkPrefetchObs) {
+                return;
+            }
+            _benchmarkPrefetchObs = new IntersectionObserver(
+                function (entries) {
+                    entries.forEach(function (entry) {
+                        if (entry.isIntersecting) {
+                            if (_benchmarkPrefetchObs) {
+                                _benchmarkPrefetchObs.disconnect();
+                                _benchmarkPrefetchObs = null;
+                            }
+                            runPrefetch();
+                        }
+                    });
+                },
+                { root: null, rootMargin: '320px 0px', threshold: 0 }
+            );
+            _benchmarkPrefetchObs.observe(section);
+            return;
+        }
+        var fallbackTriggered = false;
+        var onFallback = function () {
+            if (fallbackTriggered) {
+                return;
+            }
+            fallbackTriggered = true;
+            global.removeEventListener('scroll', onFallback, true);
+            global.removeEventListener('touchstart', onFallback, true);
+            runPrefetch();
+        };
+        global.setTimeout(onFallback, 2500);
+        global.addEventListener('scroll', onFallback, true);
+        global.addEventListener('touchstart', onFallback, true);
+    }
+
+    global.pbjEnsureBenchmarkGeoPeerScripts = pbjEnsureBenchmarkGeoPeerScripts;
+    global.pbjPrefetchBenchmarkGeoPeerScripts = pbjPrefetchBenchmarkGeoPeerScripts;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', pbjPrefetchBenchmarkGeoPeerScripts);
+    } else {
+        pbjPrefetchBenchmarkGeoPeerScripts();
+    }
+
 })(typeof window !== 'undefined' ? window : globalThis);
 
 
