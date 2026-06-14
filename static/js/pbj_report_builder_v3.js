@@ -644,7 +644,7 @@
             hint.setAttribute('aria-hidden', 'false');
             return;
         }
-        var chips = document.querySelectorAll('.rb3-focus-chip');
+        var chips = document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)');
         var active = Array.prototype.filter.call(chips, function (btn) {
             return btn.classList.contains('active');
         });
@@ -780,18 +780,40 @@
     }
 
     function bindFocusChips() {
-        document.querySelectorAll('.rb3-focus-chip').forEach(function (btn) {
+        var allBtn = document.querySelector('.rb3-focus-chip-all');
+        if (allBtn) {
+            allBtn.addEventListener('click', function () {
+                if (allBtn.disabled) {
+                    return;
+                }
+                document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)').forEach(function (chip) {
+                    chip.classList.add('active');
+                    chip.setAttribute('aria-pressed', 'true');
+                });
+                allBtn.classList.add('active');
+                allBtn.setAttribute('aria-pressed', 'true');
+                applyFocusChipsToCategoryCheckboxes();
+                updateFocusChipSummary();
+            });
+        }
+        document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 if (btn.disabled) return;
                 var on = !btn.classList.contains('active');
                 if (!on) {
-                    var activeCount = document.querySelectorAll('.rb3-focus-chip.active').length;
+                    var activeCount = document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all).active').length;
                     if (activeCount <= 1) {
                         return;
                     }
                 }
                 btn.classList.toggle('active', on);
                 btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                if (allBtn) {
+                    var allOn = document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all).active').length ===
+                        document.querySelectorAll('.rb3-focus-chip:not(.rb3-focus-chip-all)').length;
+                    allBtn.classList.toggle('active', allOn);
+                    allBtn.setAttribute('aria-pressed', allOn ? 'true' : 'false');
+                }
                 applyFocusChipsToCategoryCheckboxes();
                 updateFocusChipSummary();
             });

@@ -1205,7 +1205,7 @@
                 siteBase = String((cfg && cfg.siteBasePath) || '').replace(/\/+$/, '');
             }
         } catch (cfgErr) { /* ignore */ }
-        var localPath = (siteBase || '') + '/case-builder';
+        var localPath = (siteBase || '') + '/report-builder-v3';
         if (window.__pbjReportBuilderV3Href) {
             var h = String(window.__pbjReportBuilderV3Href);
             global.location.href = h;
@@ -2531,7 +2531,7 @@
             if (!st) {
                 return;
             }
-            st.textContent = 'Copied to clipboard.';
+            st.textContent = 'Copied';
             st.classList.remove('d-none');
             setTimeout(function () {
                 st.classList.add('d-none');

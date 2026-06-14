@@ -20,6 +20,8 @@
     /** Legacy guided-nav scroll targets → V3 pane id */
     var LEGACY_NAV_TO_PANE = {
         pbjStaffingCoreSection: 'overview',
+        complianceReviewSection: 'overview',
+        hprdTrendSection: 'overview',
         staffingBenchmarkingSection: 'benchmarks',
         staffingPatternsWorkforceSection: 'workforce',
         dayLevelEvidenceSection: 'workforce',
@@ -389,6 +391,29 @@
         return null;
     }
 
+    function dismissGuidedNavOffcanvas() {
+        if (global.matchMedia && global.matchMedia('(max-width: 767.98px)').matches) {
+            var oc = document.getElementById('guidedNavOffcanvas');
+            if (oc && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
+                var inst = bootstrap.Offcanvas.getInstance(oc);
+                if (inst) {
+                    inst.hide();
+                }
+            }
+        }
+    }
+
+    function scrollToGuidedSection(sectionId) {
+        if (typeof global.__pbjScrollToGuidedSection === 'function') {
+            global.__pbjScrollToGuidedSection(sectionId);
+            return;
+        }
+        var el = document.getElementById(sectionId);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
     function wireGuidedNavV3() {
         document.querySelectorAll('[data-guided-nav-target^="pbjV3Pane"]').forEach(function (a) {
             a.addEventListener('click', function (ev) {
@@ -402,13 +427,17 @@
                     else if (tid === 'pbjV3PaneRisk') pane = 'risk';
                 }
                 switchPane(pane);
-                if (global.matchMedia && global.matchMedia('(max-width: 767.98px)').matches) {
-                    var oc = document.getElementById('guidedNavOffcanvas');
-                    if (oc && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
-                        var inst = bootstrap.Offcanvas.getInstance(oc);
-                        if (inst) inst.hide();
-                    }
-                }
+                dismissGuidedNavOffcanvas();
+            });
+        });
+        document.querySelectorAll('[data-guided-nav-target="complianceReviewSection"]').forEach(function (a) {
+            a.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                switchPane('overview', { skipLazy: true });
+                requestAnimationFrame(function () {
+                    scrollToGuidedSection('complianceReviewSection');
+                });
+                dismissGuidedNavOffcanvas();
             });
         });
         var brand = document.getElementById('guidedNavBrand');

@@ -10642,15 +10642,8 @@
             display: none !important;
         }
         body.pbj-v3-panes-active #pbjDashboardPane > .dashboard-section:not(.pbj-v3-pane-hidden)::after {
-            content: '';
-            display: block;
-            height: 10px;
-            margin-top: 1.35rem;
-            margin-bottom: 0.1rem;
-            border: none;
-            border-radius: 0 0 4px 4px;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(226, 232, 240, 0.75) 52%, rgba(241, 245, 249, 0.95) 100%);
-            pointer-events: none;
+            content: none;
+            display: none;
         }
         body.pbj-v3-panes-active:not(.pbj-v3-pane--overview) .pbj-v3-pane-header {
             margin-bottom: 0.5rem !important;
@@ -27662,6 +27655,12 @@
         }
 
         function pbjEinHeadcountResolveDateBounds() {
+            if (typeof pbjBoundsFromEinHeadcountChartScope === 'function') {
+                var chartScopeBounds = pbjBoundsFromEinHeadcountChartScope();
+                if (chartScopeBounds && chartScopeBounds.min && chartScopeBounds.max) {
+                    return chartScopeBounds;
+                }
+            }
             if (
                 window.__pbjLastDataDateRange &&
                 window.__pbjLastDataDateRange.min &&
@@ -27686,6 +27685,20 @@
         }
 
         function pbjEinHeadcountScopeSubtitleLine(data) {
+            if (
+                typeof pbjEinHeadcountChartScopeIsActive === 'function' &&
+                pbjEinHeadcountChartScopeIsActive() &&
+                typeof pbjBoundsFromEinHeadcountChartScope === 'function'
+            ) {
+                var csBounds = pbjBoundsFromEinHeadcountChartScope();
+                if (csBounds && csBounds.min && csBounds.max) {
+                    var csY1 = parseInt(String(csBounds.min).slice(0, 4), 10);
+                    var csY2 = parseInt(String(csBounds.max).slice(0, 4), 10);
+                    if (isFinite(csY1) && isFinite(csY2)) {
+                        return csY1 === csY2 ? String(csY1) : csY1 + '–' + csY2;
+                    }
+                }
+            }
             var filterScope =
                 window.lastPbjFilterCleanSubtitle && String(window.lastPbjFilterCleanSubtitle).trim();
             if (filterScope) {
@@ -28928,6 +28941,9 @@
         }
 
         function pbjEinHeadcountAuditFilterIsActive() {
+            if (typeof pbjEinHeadcountChartScopeIsActive === 'function' && pbjEinHeadcountChartScopeIsActive()) {
+                return true;
+            }
             var ft = document.querySelector('input[name="filterType"]:checked')?.value || 'quarters';
             if (ft === 'daterange' || ft === 'day' || ft === 'months') {
                 return true;

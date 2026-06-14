@@ -222,11 +222,13 @@
 
                                         <div class="rb3-findings-focus-wrap mt-2">
 
-                                            <span class="rb3-findings-focus-label">Flag focus</span>
+                                            <span class="rb3-findings-focus-label">Issue focus</span>
 
-                                            <p class="rb3-helper-text mb-1 mt-0">All types start selected (full scan). Click a chip to narrow which staffing issues are detected for the memo.</p>
+                                            <p class="rb3-helper-text mb-1 mt-0">What should Case Builder look for? Start with all issue types. Select one or more chips to focus the memo.</p>
 
-                                            <div id="rb3FocusChips" class="d-flex flex-wrap gap-1" role="group" aria-label="Finding focus">
+                                            <div id="rb3FocusChips" class="d-flex flex-wrap gap-1" role="group" aria-label="Issue focus">
+
+                                                <button type="button" class="btn btn-sm rb3-focus-chip rb3-focus-chip-all active" data-rb3-focus-all="1" aria-pressed="true">All issues</button>
 
                                                 <button type="button" class="btn btn-sm rb3-focus-chip active" data-rb3-focus="compliance_rn" aria-pressed="true">Compliance &amp; RN</button>
 
