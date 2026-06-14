@@ -498,6 +498,10 @@ if __name__ == "__main__":
     facility_ein_analytics_src = os.path.normpath(os.path.join(root, "facility_ein_employee_analytics.py"))
     if os.path.isfile(facility_ein_analytics_src):
         deployment_files[facility_ein_analytics_src] = "facility_ein_employee_analytics.py"
+
+    pbj_facility_display_name_src = os.path.normpath(os.path.join(root, "pbj_facility_display_name.py"))
+    if os.path.isfile(pbj_facility_display_name_src):
+        deployment_files[pbj_facility_display_name_src] = "pbj_facility_display_name.py"
     
     # Add MACPAC standards file (try clean version first, fall back to original)
     macpac_clean = "pbj_lite/macpac_state_standards_clean.csv"

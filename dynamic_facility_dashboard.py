@@ -45,6 +45,7 @@ from pbj_identifiers.urls import (
 )
 from pbj_identifiers.validators import validate_state_code
 
+from pbj_facility_display_name import get_facility_name_for_context
 from facility_report_lib import calculate_harrington_adjusted_hprd
 from facility_ein_lib import (
     CMS_EIN_DETAIL_LANDING_URL,
@@ -3512,6 +3513,7 @@ def index():
             pbj_max_work_date = _wd.max().strftime("%Y-%m-%d")
             pbj_min_work_date = _wd.min().strftime("%Y-%m-%d")
     facility_name_display = format_facility_display_name(facility_name)
+    facility_name_compact = get_facility_name_for_context(facility_name, "compact") or facility_name_display
     pdf_export_state_ref: dict[str, Any] | None = None
     if state_standard_info:
         pdf_export_state_ref = {
@@ -3582,6 +3584,7 @@ def index():
         ein_headcount_csv_comment_lines=[],
         facility_name=facility_name,
         facility_name_display=facility_name_display,
+        facility_name_compact=facility_name_compact,
         page_title=page_title,
         provnum=facility_provnum,
         pbj_entity_base_url=pbj_entity_base_url,

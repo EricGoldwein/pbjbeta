@@ -14487,13 +14487,13 @@
                                 <div class="pbj-summary-pod pbj-summary-pod--profile">
                                     <div class="pbj-summary-pod-title-wrap">
                                         <div class="pbj-summary-pod-title-row d-flex align-items-center gap-1 min-w-0">
-                                            <div class="pbj-summary-pod-title text-truncate" id="pbjProfilePodTitle">Profile: {{ facility_name_display }}</div>
+                                            <div class="pbj-summary-pod-title text-truncate" id="pbjProfilePodTitle">Profile: {{ facility_name_compact|default(facility_name_display) }}</div>
                                             <button type="button" class="btn btn-link btn-sm p-0 pbj-summary-info-btn text-muted flex-shrink-0 d-none" id="pbjProfilePodNameInfo" aria-label="CMS facility name"><i class="fas fa-circle-info pbj-profile-pod-info-icon" aria-hidden="true"></i></button>
                                         </div>
                                     </div>
                                     <div class="pbj-summary-pod-body pbj-profile-pod-body pbj-summary-pod-body--stretch">
-                                        <span class="visually-hidden" id="pbjProfileFacilityName" data-cms-full-name="{{ facility_name|e }}" data-base-name="{{ facility_name_display }}">{{ facility_name_display }}</span>
-                                        <span class="visually-hidden" id="pbjProfileShortName">{{ facility_name_display }}</span>
+                                        <span class="visually-hidden" id="pbjProfileFacilityName" data-cms-full-name="{{ facility_name|e }}" data-base-name="{{ facility_name_compact|default(facility_name_display) }}">{{ facility_name_compact|default(facility_name_display) }}</span>
+                                        <span class="visually-hidden" id="pbjProfileShortName">{{ facility_name_compact|default(facility_name_display) }}</span>
                                         <span class="visually-hidden" id="pbjProfileCityState">{{ city | title }}, {{ state }}</span>
                                         <div class="pbj-summary-pod-rows">
                                             <div class="pbj-summary-pod-row pbj-summary-pod-row--profile-meta">
@@ -16780,6 +16780,7 @@
             'exportCcn': provnum,
             'exportFacilityFallback': facility_name,
             'exportFacilityDisplay': facility_name_display,
+            'exportFacilityCompact': facility_name_compact|default(facility_name_display),
             'entityBaseUrl': pbj_entity_base_url|default('https://www.pbj320.com/entity'),
             'stateStaffingRef': pdf_export_state_ref,
             'liteHprdBenchmarks': pdf_lite_hprd_benchmarks,
@@ -45980,7 +45981,10 @@
             }
             if (titleEl) {
                 if (shortLabel) {
-                    titleEl.textContent = 'Profile: ' + shortLabel;
+                    const nextTitle = 'Profile: ' + shortLabel;
+                    if (titleEl.textContent !== nextTitle) {
+                        titleEl.textContent = nextTitle;
+                    }
                 } else if (placeLabel) {
                     titleEl.textContent = 'Profile';
                 }
