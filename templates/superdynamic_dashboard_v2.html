@@ -29626,6 +29626,7 @@
             var has = !!String(dayWF.value || '').trim();
             wrap.classList.toggle('has-value', has);
         }
+        window.einRosterSyncDayPickerEmptyState = einRosterSyncDayPickerEmptyState;
 
         function einRosterPopulateMonthSelect() {
             var sel = document.getElementById('einRosterMonthPicker');
@@ -30898,6 +30899,12 @@
                 if (!nonnurseEmpBody) {
                     return;
                 }
+                var grainNn = einRosterGetPeriodGrain();
+                if (einRosterPeriodNeedsSelection(grainNn)) {
+                    einRosterSetLoadingState(false);
+                    renderEinNonnurseTable();
+                    return;
+                }
                 window._einNonnurseLoadSeq = (window._einNonnurseLoadSeq || 0) + 1;
                 const lid = window._einNonnurseLoadSeq;
                 const q = einRosterQuarterForFetch();
@@ -31790,6 +31797,12 @@
                 }
             }
             function loadEinNursingEmployeeRows() {
+                var grain = einRosterGetPeriodGrain();
+                if (einRosterPeriodNeedsSelection(grain)) {
+                    einRosterSetLoadingState(false);
+                    renderEinNursingTable();
+                    return;
+                }
                 window._einNursingLoadSeq = (window._einNursingLoadSeq || 0) + 1;
                 const lid = window._einNursingLoadSeq;
                 const q = einRosterQuarterForFetch();
@@ -33549,6 +33562,10 @@
             getEinPositionSummaryOnce().finally(function () {
                     populateEinRosterQuarterSelect();
                     updateEinRosterCaptionQuarterLine();
+                    var dayInit = document.getElementById('einNursingWorkDayFilter');
+                    if (dayInit && dayInit.dataset.einUserSetDay !== '1') {
+                        dayInit.value = '';
+                    }
                     einRosterSyncDayPickerEmptyState();
                     loadEinNursingEmployeeRows();
                     updateEinCmsDetailSmartLink();

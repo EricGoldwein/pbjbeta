@@ -59,8 +59,9 @@
             if (inp.filterDay) {
                 inp.filterDay.value = d;
             }
-            if (inp.einDay) {
+            if (inp.einDay && (options.loadRoster || options.syncRosterDay || options.scrollTo === 'roster')) {
                 inp.einDay.value = d;
+                inp.einDay.dataset.einUserSetDay = '1';
             }
             if (inp.dailySearch) {
                 inp.dailySearch.value = d;

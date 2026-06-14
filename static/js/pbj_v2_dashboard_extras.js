@@ -1303,11 +1303,11 @@
             global.__pbjSetActiveWorkDateSyncing = true;
         }
 
+        var syncRosterDay = !!(opts.syncRosterDay || opts.loadRoster || opts.scrollTo === 'roster');
         [
             'pbjV2WorkDatePrimary',
             'filterDayDate',
             'specificDaySearch',
-            'einNursingWorkDayFilter',
             'pbjFloatingFilterDay'
         ].forEach(function (id) {
             var el = document.getElementById(id);
@@ -1315,6 +1315,16 @@
                 el.value = iso;
             }
         });
+        if (syncRosterDay) {
+            var rosterDay = document.getElementById('einNursingWorkDayFilter');
+            if (rosterDay && rosterDay.value !== iso) {
+                rosterDay.value = iso;
+                rosterDay.dataset.einUserSetDay = '1';
+            }
+            if (typeof global.einRosterSyncDayPickerEmptyState === 'function') {
+                global.einRosterSyncDayPickerEmptyState();
+            }
+        }
 
         if (typeof global.pbjAssignSingleDayDate === 'function') {
             global.pbjAssignSingleDayDate(iso);
@@ -1450,7 +1460,25 @@
         }
 
         if (!primary.value && global.__pbjMaxWorkDate) {
-            pbjSetActiveWorkDate(global.__pbjMaxWorkDate, { syncOnly: true });
+            primary.value = global.__pbjMaxWorkDate;
+            global.__pbjActiveWorkDate = global.__pbjMaxWorkDate;
+            ['filterDayDate', 'specificDaySearch', 'pbjFloatingFilterDay'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el && !el.value) {
+                    el.value = global.__pbjMaxWorkDate;
+                }
+            });
+            if (typeof global.syncFilterDayGenerateReportLabel === 'function') {
+                global.syncFilterDayGenerateReportLabel();
+            }
+        }
+
+        var rosterDayEl = document.getElementById('einNursingWorkDayFilter');
+        if (rosterDayEl && rosterDayEl.dataset.einUserSetDay !== '1' && rosterDayEl.value) {
+            rosterDayEl.value = '';
+            if (typeof global.einRosterSyncDayPickerEmptyState === 'function') {
+                global.einRosterSyncDayPickerEmptyState();
+            }
         }
 
         ['einNursingWorkDayFilter', 'specificDaySearch'].forEach(function (id) {
@@ -1460,8 +1488,17 @@
             }
             el.dataset.pbjWorkDateSyncBound = '1';
             el.addEventListener('change', function () {
+                if (id === 'einNursingWorkDayFilter') {
+                    el.dataset.einUserSetDay = el.value ? '1' : '';
+                    if (typeof global.einRosterSyncDayPickerEmptyState === 'function') {
+                        global.einRosterSyncDayPickerEmptyState();
+                    }
+                }
                 if (el.value) {
-                    pbjSetActiveWorkDate(el.value, { syncOnly: true });
+                    pbjSetActiveWorkDate(el.value, {
+                        syncOnly: true,
+                        syncRosterDay: id === 'einNursingWorkDayFilter'
+                    });
                 }
             });
         });
