@@ -16912,6 +16912,12 @@
         let currentData = [];
         // Must init before any chart refresh path (updateCharts reads this binding).
         let originalChartsData = null;
+        const _pbj320Page = JSON.parse(document.getElementById('pbj320-export-page').textContent || '{}');
+        /** MACPAC-style state staffing reference for PDF copy (null if unavailable). */
+        const PBJ320_STATE_STAFFING_REF = _pbj320Page.stateStaffingRef || null;
+        /** Case-mix / Harrington CMI in this dashboard is treated as meaningful from this calendar year onward. */
+        const PBJ320_HARRINGTON_CMI_MIN_YEAR = 2024;
+        let _pbjCaseMixLoadPromise = null;
         /** Copy of daily rows last written with /api/summary (NY min + acuity pod + snapshot); avoids mixing with in-flight currentData. */
         window.__pbjForensicPodDailyRows = [];
 
@@ -17133,15 +17139,10 @@
                 'https://www.cms.gov/medicare/quality-initiatives-patient-assessment-instruments/nursinghomequalityinits',
             cmsProviderDataset: 'https://data.cms.gov/provider-data/dataset/4pq5-n9py',
         };
-        const _pbj320Page = JSON.parse(document.getElementById('pbj320-export-page').textContent || '{}');
         const PBJ320_EXPORT_CCN = _pbj320Page.exportCcn;
         window.__pbjNhHealthCitationsCmsUrl = {{ nh_health_citations_cms_explorer_url | tojson }};
         const PBJ320_EXPORT_FACILITY_FALLBACK = _pbj320Page.exportFacilityFallback;
         const PBJ320_EXPORT_FACILITY_DISPLAY = String(_pbj320Page.exportFacilityDisplay || '').trim();
-        /** MACPAC-style state staffing reference for PDF copy (null if unavailable). */
-        const PBJ320_STATE_STAFFING_REF = _pbj320Page.stateStaffingRef || null;
-        /** Case-mix / Harrington CMI in this dashboard is treated as meaningful from this calendar year onward. */
-        const PBJ320_HARRINGTON_CMI_MIN_YEAR = 2024;
         /** Latest lite-metrics state/national Total_Nurse_HPRD (for snapshot reference when MACPAC min is N/A or very low). */
         const PBJ320_LITE_HPRD_BENCHMARKS = _pbj320Page.liteHprdBenchmarks || null;
         const PBJ320_GEO_ROLLUP_PAGE = _pbj320Page.geoRollupSeries || null;
@@ -47599,8 +47600,6 @@
                 '" style="cursor: help;">*</span>'
             );
         }
-
-        let _pbjCaseMixLoadPromise = null;
 
         async function loadCaseMixData() {
             if (window.__pbjCaseMixLoadSuccess && Object.keys(window.__pbjCaseMixDataByQuarter || {}).length > 0) {
