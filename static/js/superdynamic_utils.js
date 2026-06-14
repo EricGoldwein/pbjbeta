@@ -346,3 +346,74 @@ function einMmYyyyFromIso(iso) {
     }
     return mo + '/' + y;
 }
+
+/** Lazy-load Plotly once before chart rendering (removed from synchronous head). */
+(function (global) {
+    'use strict';
+    var DEFAULT_PLOTLY_URL = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+    var plotlyLoadPromise = null;
+
+    function pbjPlotlyLazyUrl() {
+        try {
+            var el = document.getElementById('pbj-plotly-lazy-script');
+            if (el && el.textContent) {
+                var cfg = JSON.parse(el.textContent);
+                if (cfg && cfg.url) {
+                    return String(cfg.url);
+                }
+            }
+        } catch (ePlotlyCfg) {
+            /* ignore */
+        }
+        return DEFAULT_PLOTLY_URL;
+    }
+
+    global.pbjEnsurePlotly = function pbjEnsurePlotly() {
+        if (global.Plotly && typeof global.Plotly.newPlot === 'function') {
+            return Promise.resolve(global.Plotly);
+        }
+        if (plotlyLoadPromise) {
+            return plotlyLoadPromise;
+        }
+        plotlyLoadPromise = new Promise(function (resolve, reject) {
+            var existing = document.querySelector('script[data-pbj-plotly="1"]');
+            if (existing) {
+                if (global.Plotly && typeof global.Plotly.newPlot === 'function') {
+                    resolve(global.Plotly);
+                    return;
+                }
+                existing.addEventListener('load', function () {
+                    if (global.Plotly && typeof global.Plotly.newPlot === 'function') {
+                        resolve(global.Plotly);
+                    } else {
+                        plotlyLoadPromise = null;
+                        reject(new Error('Plotly unavailable after script load'));
+                    }
+                });
+                existing.addEventListener('error', function () {
+                    plotlyLoadPromise = null;
+                    reject(new Error('Plotly script failed to load'));
+                });
+                return;
+            }
+            var script = document.createElement('script');
+            script.src = pbjPlotlyLazyUrl();
+            script.async = true;
+            script.setAttribute('data-pbj-plotly', '1');
+            script.onload = function () {
+                if (global.Plotly && typeof global.Plotly.newPlot === 'function') {
+                    resolve(global.Plotly);
+                } else {
+                    plotlyLoadPromise = null;
+                    reject(new Error('Plotly unavailable after script load'));
+                }
+            };
+            script.onerror = function () {
+                plotlyLoadPromise = null;
+                reject(new Error('Plotly script failed to load'));
+            };
+            document.head.appendChild(script);
+        });
+        return plotlyLoadPromise;
+    };
+})(typeof window !== 'undefined' ? window : this);
