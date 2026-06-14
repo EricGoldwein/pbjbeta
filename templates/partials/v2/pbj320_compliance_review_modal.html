@@ -12,7 +12,7 @@
                             {% if favicon_href %}<img src="{{ favicon_href }}" width="18" height="18" alt="" class="pbj-pbj320-summary-favicon" aria-hidden="true">{% endif %}
                             <span class="pbj320-snapshot-modal-kicker pbj-brand-kicker">{{ pbj320_mark(' Compliance Review') }}</span>
                         </div>
-                        <h5 class="modal-title fs-6 mb-0 text-dark" id="pbj320ComplianceReviewModalLabel"><span class="d-md-none">{{ facility_name_display }}</span><span class="d-none d-md-inline">{{ facility_name_display }} ({{ provnum }})</span></h5>
+                        <h5 class="modal-title fs-6 mb-0 text-dark" id="pbj320ComplianceReviewModalLabel"><span class="d-md-none">{{ facility_name_compact|default(facility_name_display) }}</span><span class="d-none d-md-inline">{{ facility_name_compact|default(facility_name_display) }} ({{ provnum }})</span></h5>
                         <p class="small text-muted mb-0 pbj320-compliance-review-header-meta">
                             <span class="pbj320-compliance-review-period-wrap"><span class="pbj320-snapshot-audit-period-label">Review period:</span> <span id="pbj320ComplianceReviewPeriodLine">—</span></span>
                             <span class="pbj320-compliance-review-meta-sep" id="pbj320ComplianceReviewMetaSep" aria-hidden="true">·</span>

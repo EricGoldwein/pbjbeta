@@ -4,7 +4,7 @@
     <div class="pbj-premium-banner-inner">
         <span class="pbj-premium-badge">Premium</span>
         <p class="pbj-premium-banner-text mb-0">
-            {{ pbj_premium_banner_title | default('Sample Premium PBJ320 Dashboard') }} for <strong>{{ facility_name_display }}</strong>.
+            {{ pbj_premium_banner_title | default('Sample Premium PBJ320 Dashboard') }} for <strong>{{ facility_name_compact|default(facility_name_display) }}</strong>.
             <a href="{{ pbj_premium_custom_dashboard_primary_href | default(pbj_premium_page_href('/', pbj_premium_facility_base_url|default(''))) }}"
                {% if pbj_premium_custom_dashboard_primary_new_tab | default(false) %}target="_blank" rel="noopener noreferrer"{% endif %}>{{ pbj_premium_custom_dashboard_cta_label | default('Learn more') }}</a>
         </p>

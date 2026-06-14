@@ -993,7 +993,7 @@
         if (FULL_NAME_CONTEXTS[ctx]) {
             return 'display';
         }
-        if (ctx === 'compact' || ctx === 'display') {
+        if (ctx === 'display') {
             return 'display';
         }
         return 'short';

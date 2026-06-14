@@ -22,6 +22,7 @@
 <html lang="en">
 <head>
 {% from 'partials/superdynamic_url_macros.html' import pbj_api_href, pbj_site_href, pbj_premium_page_href, pbj_facility_page_href %}
+{% set pbj_ui_facility_name = facility_name_compact|default(facility_name_display) %}
 {% if has_state_standard|default(false) %}
 {% set compliance_state_long = facility_state_long_name or (state_standard_info.state_name if state_standard_info else state) %}
 {% endif %}
@@ -14308,7 +14309,7 @@
                 <p class="facility-header-product-line mb-0">PBJ320 Nursing Home Staffing Intelligence</p>
                 {% endif %}
                 <div class="facility-title-wrap">
-                    <h1 class="facility-title-row mb-0 flex-grow-1"><span id="facilityHeroName" data-cms-full-name="{{ facility_name|e }}">{{ facility_name_display }}</span><button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline pbj-hero-prev-name-btn d-none" id="pbjHeroPreviousNameInfo" data-bs-toggle="tooltip" data-bs-placement="bottom" title="" aria-label="Previous facility name"><i class="fas fa-circle-info text-muted" style="font-size:0.85rem;" aria-hidden="true"></i></button> <span class="facility-header-id">({{ provnum }})</span></h1>
+                    <h1 class="facility-title-row mb-0 flex-grow-1"><span id="facilityHeroName" data-cms-full-name="{{ facility_name|e }}">{{ pbj_ui_facility_name }}</span><button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline pbj-hero-prev-name-btn d-none" id="pbjHeroPreviousNameInfo" data-bs-toggle="tooltip" data-bs-placement="bottom" title="" aria-label="Previous facility name"><i class="fas fa-circle-info text-muted" style="font-size:0.85rem;" aria-hidden="true"></i></button> <span class="facility-header-id">({{ provnum }})</span></h1>
                 </div>
                 <div class="facility-locline-wrap mt-1 mb-0">
                     <span class="facility-locline-location">{{ city | title }},
@@ -15764,7 +15765,7 @@
                             <div class="min-w-0 flex-grow-1">
                                 <div class="daily-card-title-row">
                                     <div class="daily-card-title-main">
-                                        <h5 class="mb-0 text-truncate"><span class="daily-card-title-label">Daily PBJ Data</span><span class="daily-facility-sep text-muted" aria-hidden="true"> · </span><span class="text-muted daily-facility-subtitle" id="dailyFacilityName" data-cms-full-name="{{ facility_name|e }}">{{ facility_name_display }}</span></h5>
+                                        <h5 class="mb-0 text-truncate"><span class="daily-card-title-label">Daily PBJ Data</span><span class="daily-facility-sep text-muted" aria-hidden="true"> · </span><span class="text-muted daily-facility-subtitle" id="dailyFacilityName" data-cms-full-name="{{ facility_name|e }}">{{ pbj_ui_facility_name }}</span></h5>
                                     </div>
                                     {% if pbj_include_nonnurse|default(true) %}
                                     <ul class="nav nav-pills mb-0 flex-nowrap gap-1 pbj-daily-kind-tabs-inline ms-md-auto" id="dailyStaffingKindTabs" role="tablist" aria-label="Daily PBJ staffing type">
@@ -16303,7 +16304,7 @@
                             {% if favicon_href %}<img src="{{ favicon_href }}" width="18" height="18" alt="" aria-hidden="true">{% endif %}
                             <span class="pbj320-snapshot-modal-kicker">{{ pbj320_mark(' Summary') }}</span>
                         </div>
-                        <h5 class="modal-title fs-6 mb-0 text-dark" id="pbj320SnapshotModalLabel"><span class="d-md-none">{{ facility_name_display }}</span><span class="d-none d-md-inline">{{ facility_name_display }} ({{ provnum }})</span></h5>
+                        <h5 class="modal-title fs-6 mb-0 text-dark" id="pbj320SnapshotModalLabel"><span class="d-md-none">{{ pbj_ui_facility_name }}</span><span class="d-none d-md-inline">{{ pbj_ui_facility_name }} ({{ provnum }})</span></h5>
                         <p class="small text-muted mb-0" id="pbj320SnapshotSubhead"><span class="pbj320-snapshot-audit-period-label">Audit period:</span> <span id="pbj320SnapshotPeriodLine">—</span></p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -16718,7 +16719,7 @@
                         <div class="d-flex flex-wrap align-items-center gap-1">
                             <div class="ein-modal-brand mb-0 small">{% if favicon_href %}<img src="{{ favicon_href }}" width="16" height="16" alt="" aria-hidden="true">{% endif %}{{ pbj320_mark() }}</div>
                         </div>
-                        <p class="small text-secondary mb-0 mt-0 text-break" style="font-size:0.8rem;" id="einNursingModalFacilityName">Employee Tracker: {{ facility_name_display }}</p>
+                        <p class="small text-secondary mb-0 mt-0 text-break" style="font-size:0.8rem;" id="einNursingModalFacilityName">Employee Tracker: {{ pbj_ui_facility_name }}</p>
                         <h5 class="modal-title fs-6 fw-bold mb-0 mt-1 text-dark ein-nursing-modal-title-host" id="einNursingEmployeeModalLabel"><span class="ein-nursing-modal-title-text" id="einNursingEmployeeModalTitleText">Employee</span></h5>
                         <p class="small mb-0 mt-0 d-none" id="einNursingModalTopCmsLinks" aria-live="polite"></p>
                         <p class="small mb-0 mt-0 d-none" style="font-size:0.78rem;" id="einNursingModalQuickMeta" aria-live="polite"></p>
@@ -19271,8 +19272,8 @@
             }
             const fallback =
                 typeof capitalizeProviderName === 'function'
-                    ? capitalizeProviderName("{{ facility_name_display }}")
-                    : "{{ facility_name_display }}";
+                    ? capitalizeProviderName("{{ pbj_ui_facility_name }}")
+                    : "{{ pbj_ui_facility_name }}";
             return fallback;
         }
 
@@ -19324,12 +19325,17 @@
                 pbjSyncProfileEntityRow(null);
             }
             [
+                'facilityHeroName',
                 'dailyFacilityName',
                 'quarterlyFacilityName',
                 'caseMixFacilityName',
             ].forEach(function (id) {
                 pbjApplyFacilityDisplayNameEl(document.getElementById(id), 'compact');
             });
+            const snapDesktop = document.querySelector('#pbj320SnapshotModalLabel .d-none.d-md-inline');
+            if (snapDesktop) {
+                pbjApplyFacilityDisplayNameEl(snapDesktop, 'compact');
+            }
             const einEl = document.getElementById('einNursingModalFacilityName');
             if (einEl) {
                 const meta = pbjFacilityNameForContext('compact');
@@ -28666,7 +28672,7 @@
                           xVals: x,
                       })
                     : { tickangle: grain === 'day' && n > 60 ? -35 : -25, nticks: 12, automargin: true };
-            var prov = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : "{{ facility_name_display }}";
+            var prov = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : "{{ pbj_ui_facility_name }}";
             var gLabel =
                 grain === 'day'
                     ? 'Daily'
@@ -39773,7 +39779,7 @@
                 return 450;
             };
             const chartHeight = getChartHeight();
-            const formattedProviderNameProv = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : capitalizeProviderName("{{ facility_name_display }}");
+            const formattedProviderNameProv = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : capitalizeProviderName("{{ pbj_ui_facility_name }}");
             if (!chartData || !chartData.ratings || !Array.isArray(chartData.ratings.quarters) || chartData.ratings.quarters.length === 0) {
                 try { Plotly.purge('providerInfoRatingsChart'); } catch (e) { /* ignore */ }
                 ratingsHost.innerHTML = '<p class="small text-muted text-center py-4 mb-0">Star ratings time series is unavailable (no quarter labels in Provider Info for this facility, or rating columns missing in the CSV).</p>';
@@ -40116,7 +40122,7 @@
                 return 450;
             };
             const chartHeight = getChartHeight();
-            const formattedProviderNameProv = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : capitalizeProviderName("{{ facility_name_display }}");
+            const formattedProviderNameProv = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : capitalizeProviderName("{{ pbj_ui_facility_name }}");
 
             if (chartData.occupancy && chartData.occupancy.quarters && chartData.occupancy.occupancy_pct) {
                 const occQuarters = chartData.occupancy.quarters;
@@ -48544,7 +48550,7 @@
         // Ensure elements exist before setting properties
         const quarterlyStatsHeader = document.getElementById('quarterlyStatsHeader');
         if (quarterlyStatsHeader) {
-            const providerName = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : "{{ facility_name_display }}";
+            const providerName = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : "{{ pbj_ui_facility_name }}";
             quarterlyStatsHeader.textContent = `Quarterly Staffing, ${providerName}, ${quarterRange}`;
         }
 
@@ -49724,7 +49730,7 @@
             }
             window.lastPbjChartsTotalDays = totalDays;
             
-            const providerName = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : "{{ facility_name_display }}";
+            const providerName = typeof pbjChartFacilityName === 'function' ? pbjChartFacilityName() : "{{ pbj_ui_facility_name }}";
             const formattedProviderName = capitalizeProviderName(providerName);
             
             // Legacy admin-exclusion toggles were removed from the UI; keep behavior at default "off".

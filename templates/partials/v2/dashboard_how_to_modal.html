@@ -30,7 +30,7 @@
 
 
 
-                        <p class="small text-muted mb-0 mt-1">{{ facility_name_display }} · CCN {{ provnum }}</p>
+                        <p class="small text-muted mb-0 mt-1">{{ facility_name_compact|default(facility_name_display) }} · CCN {{ provnum }}</p>
 
 
 
@@ -50,7 +50,7 @@
 
 
 
-                    <p class="mb-3 pbj-howto-lead">Explore <strong>{{ facility_name_display }}</strong> ({{ provnum }}) with CMS PBJ, Employee Detail, Provider Information, and citations. Filter by period, compare benchmarks and peers, and drill to single work days.</p>
+                    <p class="mb-3 pbj-howto-lead">Explore <strong>{{ facility_name_compact|default(facility_name_display) }}</strong> ({{ provnum }}) with CMS PBJ, Employee Detail, Provider Information, and citations. Filter by period, compare benchmarks and peers, and drill to single work days.</p>
 
 
 

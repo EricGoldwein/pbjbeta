@@ -6,7 +6,7 @@
 
                     <div class="card-body py-3 px-3 px-md-4">
 
-                        <h2 id="pbjReportBuilderV3Heading" class="visually-hidden">Case Builder for {{ facility_name_display }}</h2>
+                        <h2 id="pbjReportBuilderV3Heading" class="visually-hidden">Case Builder for {{ facility_name_compact|default(facility_name_display) }}</h2>
 
                         <div class="rb3-hero-slim-row">
 
@@ -42,7 +42,7 @@
 
                                 </div>
 
-                                <p class="rb3-facility-name mb-0">{{ facility_name_display }} <span class="text-secondary font-monospace">({{ provnum }})</span></p>
+                                <p class="rb3-facility-name mb-0">{{ facility_name_compact|default(facility_name_display) }} <span class="text-secondary font-monospace">({{ provnum }})</span></p>
 
                                 <p class="rb-hero-lead mb-0 mt-1">Build a staffing memo from CMS PBJ data for this facility and selected period.</p>
 
@@ -384,7 +384,7 @@
 
                             <div class="card-body p-2 p-md-3">
 
-                                <script type="application/json" id="pbj-report-builder-v3-meta">{{ {'ccn': provnum|string, 'facility': facility_name_display, 'v3_enabled': true, 'standalone': true, 'quarters': pbj_available_quarters|default([]), 'min_workdate': pbj_min_work_date|default('', true), 'max_workdate': pbj_max_work_date|default('', true) } | tojson }}</script>
+                                <script type="application/json" id="pbj-report-builder-v3-meta">{{ {'ccn': provnum|string, 'facility': facility_name_compact|default(facility_name_display), 'v3_enabled': true, 'standalone': true, 'quarters': pbj_available_quarters|default([]), 'min_workdate': pbj_min_work_date|default('', true), 'max_workdate': pbj_max_work_date|default('', true) } | tojson }}</script>
 
                                 <div class="rb-paper-shell rb3-paper-empty" id="rb3PaperShell">
 
