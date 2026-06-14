@@ -1811,6 +1811,17 @@ def calculate_harrington_adjusted_hprd(cmi: float, hprd_type: str = 'total') -> 
         print(f"Error calculating Harrington-adjusted HPRD: {e}")
         return None
 
+
+def calculate_harrington_residual_lpn_hprd(cmi: float) -> Optional[float]:
+    """LPN Harrington expectation as residual: total − RN − nurse aide."""
+    total = calculate_harrington_adjusted_hprd(cmi, "total")
+    rn = calculate_harrington_adjusted_hprd(cmi, "rn")
+    na = calculate_harrington_adjusted_hprd(cmi, "cna")
+    if total is None or rn is None or na is None:
+        return None
+    residual = float(total) - float(rn) - float(na)
+    return residual if residual > 0 else None
+
 def generate_case_mix_section(case_mix_data: Optional[List[Dict]], quarterly_data: Optional[Dict] = None, pbj_df: Optional[pd.DataFrame] = None) -> str:
     """Generate HTML section for case-mix adjusted HPRD comparison with Harrington-adjusted calculations."""
     # Include all entries that have any case-mix data (total or RN); CMI is optional (needed for Harrington only)
