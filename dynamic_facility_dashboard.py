@@ -10290,6 +10290,8 @@ def get_state_standard_compliance():
 
         # Filter data by date range (same as attorney report)
         filtered_df = global_df.copy()
+        filtered_df["WorkDate"] = pd.to_datetime(filtered_df["WorkDate"], errors="coerce")
+        filtered_df = filtered_df[filtered_df["WorkDate"].notna()]
         if start_dt is not None:
             filtered_df = filtered_df[filtered_df["WorkDate"] >= start_dt]
         if end_dt is not None:
@@ -10317,7 +10319,7 @@ def get_state_standard_compliance():
                 met = bool(row['Met_Standard'])
                 hrs_disp = round_financial(row[hours_col], 2) if pd.notna(row[hours_col]) else 0.0
                 daily_data.append({
-                    'date': row['WorkDate'].strftime('%Y-%m-%d'),
+                    'date': work_date.strftime('%Y-%m-%d'),
                     'hprd': hrs_disp,
                     'threshold': round_financial(threshold, 2),
                     'met_standard': met,
@@ -10527,7 +10529,7 @@ def get_state_standard_compliance():
             hprd_display = round_financial(row[hprd_col_display], 2) if hprd_col_display in row.index else round_financial(row[hprd_col_raw], 2)
             met = bool(row['Met_Standard'])
             daily_data.append({
-                'date': row['WorkDate'].strftime('%Y-%m-%d'),
+                'date': work_date.strftime('%Y-%m-%d'),
                 'hprd': hprd_display,
                 'threshold': round_financial(threshold, 2),
                 'met_standard': met,
