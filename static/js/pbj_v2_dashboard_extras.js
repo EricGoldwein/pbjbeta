@@ -6208,14 +6208,23 @@
                 }
             }
         } catch (eRbExtrasInit) { /* ignore */ }
-        pbjV2InstallPlotlyMinimalChrome();
-        var plotlyPatchAttempts = 0;
-        var plotlyPatchTimer = setInterval(function () {
-            plotlyPatchAttempts += 1;
-            if (pbjV2InstallPlotlyMinimalChrome() || plotlyPatchAttempts > 40) {
-                clearInterval(plotlyPatchTimer);
-            }
-        }, 100);
+        function pbjV2SchedulePlotlyChromeInstall() {
+            pbjV2InstallPlotlyMinimalChrome();
+            var plotlyPatchAttempts = 0;
+            var plotlyPatchTimer = setInterval(function () {
+                plotlyPatchAttempts += 1;
+                if (pbjV2InstallPlotlyMinimalChrome() || plotlyPatchAttempts > 40) {
+                    clearInterval(plotlyPatchTimer);
+                }
+            }, 100);
+        }
+        if (typeof global.pbjEnsurePlotly === 'function') {
+            global.pbjEnsurePlotly().then(pbjV2SchedulePlotlyChromeInstall).catch(function () {
+                pbjV2SchedulePlotlyChromeInstall();
+            });
+        } else {
+            pbjV2SchedulePlotlyChromeInstall();
+        }
         pbjV2AssembleStaffingCoreHub();
         pbjV2InitFloatingControls();
         pbjV2CloseControlCenter();

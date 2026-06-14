@@ -216,7 +216,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script type="application/json" id="pbj-plotly-lazy-script">{{ {'url': 'https://cdn.plot.ly/plotly-2.27.0.min.js'} | tojson }}</script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         {% include 'partials/v2/brand_styles.html' %}
@@ -16911,6 +16911,14 @@
     </script>
     <script>
         let currentData = [];
+        // Must init before any chart refresh path (updateCharts reads this binding).
+        let originalChartsData = null;
+        const _pbj320Page = JSON.parse(document.getElementById('pbj320-export-page').textContent || '{}');
+        /** MACPAC-style state staffing reference for PDF copy (null if unavailable). */
+        const PBJ320_STATE_STAFFING_REF = _pbj320Page.stateStaffingRef || null;
+        /** Case-mix / Harrington CMI in this dashboard is treated as meaningful from this calendar year onward. */
+        const PBJ320_HARRINGTON_CMI_MIN_YEAR = 2024;
+        let _pbjCaseMixLoadPromise = null;
         /** Copy of daily rows last written with /api/summary (NY min + acuity pod + snapshot); avoids mixing with in-flight currentData. */
         window.__pbjForensicPodDailyRows = [];
 
@@ -17132,15 +17140,10 @@
                 'https://www.cms.gov/medicare/quality-initiatives-patient-assessment-instruments/nursinghomequalityinits',
             cmsProviderDataset: 'https://data.cms.gov/provider-data/dataset/4pq5-n9py',
         };
-        const _pbj320Page = JSON.parse(document.getElementById('pbj320-export-page').textContent || '{}');
         const PBJ320_EXPORT_CCN = _pbj320Page.exportCcn;
         window.__pbjNhHealthCitationsCmsUrl = {{ nh_health_citations_cms_explorer_url | tojson }};
         const PBJ320_EXPORT_FACILITY_FALLBACK = _pbj320Page.exportFacilityFallback;
         const PBJ320_EXPORT_FACILITY_DISPLAY = String(_pbj320Page.exportFacilityDisplay || '').trim();
-        /** MACPAC-style state staffing reference for PDF copy (null if unavailable). */
-        const PBJ320_STATE_STAFFING_REF = _pbj320Page.stateStaffingRef || null;
-        /** Case-mix / Harrington CMI in this dashboard is treated as meaningful from this calendar year onward. */
-        const PBJ320_HARRINGTON_CMI_MIN_YEAR = 2024;
         /** Latest lite-metrics state/national Total_Nurse_HPRD (for snapshot reference when MACPAC min is N/A or very low). */
         const PBJ320_LITE_HPRD_BENCHMARKS = _pbj320Page.liteHprdBenchmarks || null;
         const PBJ320_GEO_ROLLUP_PAGE = _pbj320Page.geoRollupSeries || null;
@@ -42915,9 +42918,27 @@
                 if (window.__pbjV3PanesActive) {
                     /* Geo peer table loads when Benchmarks pane opens */
                 } else if (typeof pbjMaybeRefreshGeoRollupWhenVisible === 'function') {
-                    pbjMaybeRefreshGeoRollupWhenVisible();
+                    var runGeoRollupRefresh = function () {
+                        pbjMaybeRefreshGeoRollupWhenVisible();
+                    };
+                    if (typeof pbjEnsurePlotly === 'function') {
+                        pbjEnsurePlotly().then(runGeoRollupRefresh).catch(function (eGeoPlotly) {
+                            console.warn('Plotly unavailable for geo rollup:', eGeoPlotly);
+                        });
+                    } else {
+                        runGeoRollupRefresh();
+                    }
                 } else if (typeof pbjGeoRollupRefresh === 'function') {
-                    pbjGeoRollupRefresh(rowsForStateMin);
+                    var runGeoRollupDirect = function () {
+                        pbjGeoRollupRefresh(rowsForStateMin);
+                    };
+                    if (typeof pbjEnsurePlotly === 'function') {
+                        pbjEnsurePlotly().then(runGeoRollupDirect).catch(function (eGeoPlotly) {
+                            console.warn('Plotly unavailable for geo rollup:', eGeoPlotly);
+                        });
+                    } else {
+                        runGeoRollupDirect();
+                    }
                 }
                 window.__pbjLastChartsParamsString = chartsParams.toString();
                 if (typeof pbjPopulateDowCalendarYearSelect === 'function') {
@@ -47584,8 +47605,6 @@
             );
         }
 
-        let _pbjCaseMixLoadPromise = null;
-
         async function loadCaseMixData() {
             if (window.__pbjCaseMixLoadSuccess && Object.keys(window.__pbjCaseMixDataByQuarter || {}).length > 0) {
                 return;
@@ -48476,8 +48495,6 @@
             quarterlyStatsHeader.textContent = `Quarterly Staffing, ${providerName}, ${quarterRange}`;
         }
 
-        // Store original charts data for toggle functionality
-        let originalChartsData = null;
         /** Chart-only scope: 'filtered' (page filter / Apply), 'full' (all loaded dates), or 'range' (preset window). */
         window.__pbjChartsScopeMode = 'filtered';
         /** Last filtered /api/charts payload + total_days so charts can snap back without re-fetching the table. */
@@ -49505,7 +49522,7 @@
         }
         
         // Update chart titles with correct capitalization and placement
-        function updateCharts(response, totalDays) {
+        async function updateCharts(response, totalDays) {
             if (typeof pbjPerfStart === 'function') {
                 pbjPerfStart('charts:total');
             }
@@ -49515,6 +49532,27 @@
             // Check if response has the expected structure
             if (!response || !response.charts) {
                 console.error('Invalid response structure:', response);
+                if (typeof pbjPerfEnd === 'function') {
+                    pbjPerfEnd('charts:total');
+                }
+                return;
+            }
+
+            try {
+                if (typeof pbjEnsurePlotly === 'function') {
+                    await pbjEnsurePlotly();
+                } else if (typeof Plotly === 'undefined') {
+                    console.error('Plotly unavailable');
+                    if (typeof pbjPerfEnd === 'function') {
+                        pbjPerfEnd('charts:total');
+                    }
+                    return;
+                }
+                if (typeof pbjV2InstallPlotlyMinimalChrome === 'function') {
+                    pbjV2InstallPlotlyMinimalChrome();
+                }
+            } catch (ePlotlyLoad) {
+                console.error('Plotly failed to load:', ePlotlyLoad);
                 if (typeof pbjPerfEnd === 'function') {
                     pbjPerfEnd('charts:total');
                 }
