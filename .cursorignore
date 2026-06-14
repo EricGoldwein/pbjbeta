@@ -1,0 +1,23 @@
+﻿# Generated deployment bundles (edit repo canonical; re-bootstrap)
+deployments/
+
+# Local backups and archives
+backups/
+
+# Provider pipeline outputs (raw snapshots tracked separately in git)
+provider_info_extracted/
+provider_info_normalized/
+
+# Generated exports and reports
+outputs/
+
+# SEC/cache and other local caches
+data/sec/cache/
+
+# Cursor/deploy audit archives (not app source)
+docs/cursor_memory_archive/
+docs/deploy_audits/
+tools/cursor_state_audit/
+
+# Design mockups
+pbj320_main_site_mockups/
