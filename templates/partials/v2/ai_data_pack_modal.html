@@ -41,7 +41,7 @@
                 </div>
 
                 <div class="pbj-ai-scope pbj-ai-scope--compact mb-2" aria-labelledby="pbjAiScopeHeading">
-                    <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3">
+                    <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3 pbj-ai-scope-head-row">
                         <span class="small fw-semibold text-nowrap" id="pbjAiScopeHeading">Period</span>
                         <span class="small text-body-secondary mb-0 text-truncate" id="pbjAiToolkitScopeLine" style="max-width: 14rem;">—</span>
                         <div class="btn-group btn-group-sm pbj-ai-scope-grain flex-shrink-0" role="group" aria-label="Period type">
@@ -50,7 +50,10 @@
                             <button type="button" class="btn btn-outline-secondary active" data-pbj-ai-grain="daterange" aria-pressed="true">Range</button>
                             <button type="button" class="btn btn-outline-secondary" data-pbj-ai-grain="day" aria-pressed="false">Day</button>
                         </div>
-                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0" id="pbjAiScopeApplyBtn" title="Apply period to dashboard and refresh CSV export">Apply period</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary pbj-ai-scope-apply-btn flex-shrink-0 d-none ms-md-auto" id="pbjAiScopeApplyBtn" title="Apply period and refresh CSV export" aria-label="Apply period">Apply period</button>
+                    </div>
+                    <div class="d-flex justify-content-end mt-1 d-none pbj-ai-scope-apply-fallback" id="pbjAiScopeApplyRow">
+                        <button type="button" class="btn btn-sm btn-outline-secondary pbj-ai-scope-apply-btn" id="pbjAiScopeApplyBtnInline" title="Apply period and refresh CSV export" aria-label="Apply period">Apply period</button>
                     </div>
                     <p id="pbjAiScopeStaleHint" class="form-text small text-warning mb-0 mt-1 d-none">Period changed — click Apply period to refresh the CSV export.</p>
                     <div id="pbjAiScopeBody">
@@ -132,18 +135,15 @@
                                 <input type="radio" name="pbjAiToolkitAudience" value="researcher"><span>Researcher</span>
                             </label>
                         </div>
-                        <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white flex-shrink-0 pbj-ai-copy-prompt-btn" id="pbjAiPackCopyPromptBtn" onclick="pbjV2CopyAiStarterPrompt()" title="Copy starter prompt to clipboard" aria-label="Copy prompt">
-                            <i class="fas fa-copy me-1" aria-hidden="true"></i>Copy prompt
-                        </button>
                     </div>
                     <div class="mt-2">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
                             <span class="small fw-semibold text-body">Prompt preview</span>
                             <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                <button type="button" class="btn btn-sm pbj-btn-apply-navy text-white pbj-ai-copy-prompt-btn" id="pbjAiPackCopyPromptBtnInline" onclick="pbjV2CopyAiStarterPrompt()" title="Copy starter prompt to clipboard" aria-label="Copy prompt">
-                                    <i class="fas fa-copy me-1" aria-hidden="true"></i>Copy prompt
+                                <button type="button" class="btn btn-sm btn-outline-secondary pbj-ai-copy-prompt-btn" id="pbjAiPackCopyPromptBtn" onclick="pbjV2CopyAiStarterPrompt()" title="Copy starter prompt to clipboard" aria-label="Copy starter prompt">
+                                    <i class="fas fa-copy me-1" aria-hidden="true"></i><span class="pbj-ai-copy-prompt-label">Copy prompt</span>
                                 </button>
-                                <span id="pbjAiPackPromptStatus" class="small text-success" role="status" aria-live="polite"></span>
+                                <span id="pbjAiPackPromptStatus" class="small text-success d-none" role="status" aria-live="polite"></span>
                             </div>
                         </div>
                         <pre id="pbjAiToolkitPromptLive" class="pbj-ai-pack-preview pbj-ai-starter-prompt-live mb-0" aria-readonly="true"></pre>
@@ -465,12 +465,45 @@
         align-items: flex-start;
         gap: 0.5rem;
     }
-    #pbjAiPackCopyPromptBtn,
-    #pbjAiPackCopyPromptBtnInline,
+    .pbj-btn-apply-navy {
+        background: var(--pbj-ai-navy);
+        border-color: var(--pbj-ai-navy);
+        color: #fff;
+    }
+    .pbj-btn-apply-navy:hover,
+    .pbj-btn-apply-navy:focus-visible {
+        background: #1e293b;
+        border-color: #1e293b;
+        color: #fff;
+    }
+    .pbj-ai-scope-apply-btn {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.2rem 0.55rem;
+        white-space: nowrap;
+    }
+    .pbj-ai-scope-head-row .pbj-ai-scope-apply-btn:not(.d-none) {
+        display: inline-flex !important;
+    }
+    @media (max-width: 575.98px) {
+        .pbj-ai-scope-head-row .pbj-ai-scope-apply-btn:not(.d-none) {
+            display: none !important;
+        }
+        .pbj-ai-scope-apply-fallback:not(.d-none) {
+            display: flex !important;
+        }
+    }
+    @media (min-width: 576px) {
+        .pbj-ai-scope-apply-fallback {
+            display: none !important;
+        }
+    }
     .pbj-ai-copy-prompt-btn {
         display: inline-flex !important;
         align-items: center;
-        min-width: 6.75rem;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.2rem 0.55rem;
         white-space: nowrap;
     }
     .pbj-ai-step__num {

@@ -15515,10 +15515,9 @@
                                 </div>
                             </div>
                             <div class="ein-roster-picker ein-roster-picker-day" id="einRosterPickerDay" style="min-width: 8.5rem; max-width: 12rem;">
-                                <label class="form-label small text-muted mb-0 text-uppercase d-none d-md-block" for="einNursingWorkDayFilter">Work day</label>
+                                <label class="form-label small text-muted mb-0 text-uppercase" for="einNursingWorkDayFilter">Work day</label>
                                 <div class="d-flex gap-1 align-items-center">
                                     <div class="ein-roster-day-input-wrap flex-grow-1" id="einRosterDayInputWrap">
-                                        <span class="ein-roster-day-placeholder" id="einRosterDayPlaceholder" aria-hidden="true">Select date</span>
                                         <input type="date" class="form-control form-control-sm" id="einNursingWorkDayFilter" min="2017-01-01" {% if pbj_max_work_date %}max="{{ pbj_max_work_date }}"{% endif %} aria-label="Select a work day to load roster">
                                     </div>
                                     <button type="button" class="btn btn-sm btn-outline-secondary px-2 flex-shrink-0" id="einNursingWorkDayFilterClear" title="Clear work-day filter" aria-label="Clear work-day filter">×</button>
@@ -16894,18 +16893,18 @@
             }
             if (typeof window.roundHalfUpDisplay !== 'function') {
                 window.roundHalfUpDisplay = function (val, decimals) {
-                    if (val === null || val === undefined) return '';
+                    if (val === null || val === undefined || val === '') return '—';
                     var n = parseFloat(val);
-                    if (isNaN(n)) return '';
+                    if (isNaN(n)) return '—';
                     var factor = Math.pow(10, decimals);
                     return (Math.round(n * factor + 1e-10) / factor).toFixed(decimals);
                 };
             }
             if (typeof window.formatDailyCountDisplay !== 'function') {
                 window.formatDailyCountDisplay = function (val, decimals) {
-                    if (val === null || val === undefined) return '';
+                    if (val === null || val === undefined || val === '') return '—';
                     var n = parseFloat(val);
-                    if (isNaN(n)) return '';
+                    if (isNaN(n)) return '—';
                     var factor = Math.pow(10, decimals);
                     var rounded = Math.round(n * factor + 1e-10) / factor;
                     return rounded.toLocaleString('en-US', {
@@ -25491,7 +25490,7 @@
                 start = end;
                 end = t;
             }
-            tbody.innerHTML = '<tr><td colspan="12" class="text-muted small px-3 py-2">Loading employee roster for selected work day…</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" class="text-muted small px-3 py-2">Loading roster…</td></tr>';
             foot.textContent = '';
             const renderNonnurseRows = function (rows, meta, rangeStart, rangeEnd, fallbackUsed) {
                 const g0 = rows[0].groups && typeof rows[0].groups === 'object' ? rows[0].groups : {};
@@ -30916,9 +30915,9 @@
                 const wdParam = (rollingIso && /^\d{4}-\d{2}-\d{2}$/.test(rollingIso))
                     ? ('&work_date=' + encodeURIComponent(rollingIso))
                     : '';
-                setEinNursingRowCount('Loading employee roster for selected work day…');
+                setEinNursingRowCount(null);
                 einRosterSetLoadingState(true, 'Loading roster…');
-                renderEinNonnurseStatusRow('loading', 'Loading non-nurse roster…');
+                renderEinNonnurseStatusRow('loading', 'Loading roster…');
                 fetchEinNonnursePbjDayMeta(iso);
                 fetch(pbjApiUrl('/api/ein-nonnurse-employees?quarter=' + encodeURIComponent(q) + '&offset=0' + pgParam + wdParam))
                     .then(function (r) { return r.json(); })
@@ -31796,6 +31795,32 @@
                     }
                 }
             }
+            function einRosterApplyWorkDayKeysFromResponse(data, dayIso) {
+                if (!dayIso || einRosterGetPeriodGrain() !== 'day') {
+                    window._einRosterWorkDayKeys = undefined;
+                    return;
+                }
+                var set = new Set();
+                var employees = (data && data.employees) ? data.employees : [];
+                employees.forEach(function (e) {
+                    if (!e) {
+                        return;
+                    }
+                    if (
+                        data.work_day_filtered ||
+                        (e.hours_selected_work_day != null && e.hours_selected_work_day !== '')
+                    ) {
+                        set.add(String(e.sys_employee_id) + '|' + String(e.job_code));
+                    }
+                });
+                if (data && data.work_day_filtered) {
+                    window._einRosterWorkDayKeys = set;
+                } else if (set.size) {
+                    window._einRosterWorkDayKeys = set;
+                } else {
+                    window._einRosterWorkDayKeys = undefined;
+                }
+            }
             function loadEinNursingEmployeeRows() {
                 var grain = einRosterGetPeriodGrain();
                 if (einRosterPeriodNeedsSelection(grain)) {
@@ -31815,8 +31840,7 @@
                     ? ('&work_date=' + encodeURIComponent(rollingIso))
                     : '';
                 const hadCache = !!(window._einNursingEmployeesCache && window._einNursingEmployeesCache.length);
-                const rosterLoadMsg = 'Loading employee roster for selected work day…';
-                setEinNursingRowCount(rosterLoadMsg);
+                const rosterLoadMsg = 'Loading roster…';
                 einRosterSetLoadingState(true, rosterLoadMsg);
                 renderEinNursingStatusRow('loading', rosterLoadMsg);
                 fetch(pbjApiUrl('/api/ein-nursing-employees?quarter=' + encodeURIComponent(q) + '&offset=0' + pgParam + wdParam))
@@ -31845,6 +31869,7 @@
                             limit: data.limit,
                             source: data.source
                         };
+                        einRosterApplyWorkDayKeysFromResponse(data, iso);
                         if (einRosterShouldDeferNursingRender(iso)) {
                             window._einRosterPendingRenderAfterDayKeys = true;
                         } else {
@@ -33644,60 +33669,25 @@
                 }
                 window._einDayRosterReqSeq = (window._einDayRosterReqSeq || 0) + 1;
                 const reqId = window._einDayRosterReqSeq;
-                window._einRosterWorkDayKeys = null;
+                window._einRosterWorkDayKeys = undefined;
                 window._einRosterPendingRenderAfterDayKeys = false;
-                var matchMsg = 'Matching PBJ employee records to the selected date…';
-                einRosterSetLoadingState(true, matchMsg);
-                renderEinNursingStatusRow('loading', matchMsg, '');
+                loadEinNursingEmployeeRows();
+                if (einRosterModeIsNonnurse()) {
+                    loadEinNonnurseEmployeeRows();
+                }
                 fetch(pbjApiUrl('/api/ein-day-roster?date=' + encodeURIComponent(iso)))
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
                         if (reqId !== window._einDayRosterReqSeq) {
                             return;
                         }
-                        var keysFromApi =
-                            typeof pbjEinRosterWorkDayKeysFromDayRosterResponse === 'function'
-                                ? pbjEinRosterWorkDayKeysFromDayRosterResponse(d)
-                                : undefined;
-                        if (keysFromApi === undefined && d && d.ok && d.employees && d.employees.length) {
-                            var setFallback = new Set();
-                            d.employees.forEach(function (row) {
-                                setFallback.add(String(row.sys_employee_id) + '|' + String(row.job_code));
-                            });
-                            keysFromApi = setFallback.size ? setFallback : undefined;
-                        }
                         pbjRenderEinHeadcountSummary(iso, d && d.ok ? d.headcount_metrics : null);
-                        window._einRosterWorkDayKeys = keysFromApi;
-                        einRosterFlushPendingNursingRender();
-                        loadEinNursingEmployeeRows();
-                        if (einRosterModeIsNonnurse()) {
-                            loadEinNonnurseEmployeeRows();
-                        }
                     })
                     .catch(function () {
                         if (reqId !== window._einDayRosterReqSeq) {
                             return;
                         }
                         pbjRenderEinHeadcountSummary('', null);
-                        window._einRosterWorkDayKeys = undefined;
-                        einRosterFlushPendingNursingRender();
-                        loadEinNursingEmployeeRows();
-                        if (einRosterModeIsNonnurse()) {
-                            loadEinNonnurseEmployeeRows();
-                        }
-                    })
-                    .finally(function () {
-                        if (reqId !== window._einDayRosterReqSeq) {
-                            return;
-                        }
-                        if (
-                            window._einRosterPendingRenderAfterDayKeys &&
-                            window._einNursingEmployeesCache &&
-                            window._einNursingEmployeesCache.length &&
-                            !einRosterShouldDeferNursingRender(iso)
-                        ) {
-                            einRosterFlushPendingNursingRender();
-                        }
                     });
             }
             document.querySelectorAll('input[name="einRosterPeriodGrain"]').forEach(function (radio) {
@@ -34698,7 +34688,7 @@
                 tbody.innerHTML =
                     '<tr><td colspan="6" class="text-muted dashboard-status-row">' +
                     '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
-                    escapeHtmlBr('Loading employee roster for selected work day…') +
+                    escapeHtmlBr('Loading roster…') +
                     '</td></tr>';
             }
             einPbjBridgeOpenModalShell(titleText);
@@ -36356,7 +36346,7 @@
                 key: 'einRosterExplorer',
                 selector: '#einNursingEmployeeSection',
                 loadingHtml:
-                    '<p class="small text-muted mb-0">Loading employee roster for selected work day…</p>',
+                    '<p class="small text-muted mb-0">Loading roster…</p>',
                 loadFn: function () {
                     if (typeof initEinNursingEmployeeExplorer === 'function') {
                         initEinNursingEmployeeExplorer();
@@ -36454,7 +36444,7 @@
                 key: 'einRosterExplorer',
                 selector: '#einNursingEmployeeSection',
                 loadingHtml:
-                    '<p class="small text-muted mb-0">Loading employee roster for selected work day…</p>',
+                    '<p class="small text-muted mb-0">Loading roster…</p>',
                 loadFn: function () {
                     if (typeof initEinNursingEmployeeExplorer === 'function') {
                         initEinNursingEmployeeExplorer();
@@ -51237,7 +51227,7 @@
                 typeof opts.formatFn === 'function'
                     ? opts.formatFn
                     : function (v) {
-                          return roundHalfUpDisplay(v || 0, 2);
+                          return roundHalfUpDisplay(v, 2);
                       };
             const v = formatFn(displayVal);
             const wdIso =
@@ -51623,11 +51613,11 @@
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_LPNadmin, 'lpn_admin_hours')}
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_CNA, 'cna_hours')}
                     <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.CNA_HPRD, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_NAtrn || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_MedAide || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_RN_ctr || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_LPN_ctr || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_CNA_ctr || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_NAtrn, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_MedAide, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_RN_ctr, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_LPN_ctr, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_CNA_ctr, 2)}</td>
                `;
                 tbody.appendChild(tr);
             }
@@ -53183,7 +53173,7 @@
                     String(r.job_title_short || r.job_title || r.job_code || ''),
                     ten,
                     nw,
-                    roundHalfUpDisplay(r.hours || 0, 2),
+                    roundHalfUpDisplay(r.hours, 2),
                     parseFloat(r.pct_contract_hours || 0) > 0 ? 'Contract' : 'Staff'
                 ];
             });

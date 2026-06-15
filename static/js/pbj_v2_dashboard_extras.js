@@ -2074,7 +2074,45 @@
         }
     }
 
+    function pbjV2SyncFilterTypeFromFloatingGrain(preferredGrain) {
+        var grain = preferredGrain || null;
+        if (!grain) {
+            var fq = document.getElementById('pbjFloatingQuarterSelect');
+            var fy = document.getElementById('pbjFloatingYearSelect');
+            var quarterPicked = fq && Array.prototype.some.call(fq.selectedOptions || [], function (o) {
+                var v = String(o.value || '').trim();
+                return v && v !== 'all';
+            });
+            var yearPicked = fy && Array.prototype.some.call(fy.selectedOptions || [], function (o) {
+                var v = String(o.value || '').trim();
+                return v && v !== 'all';
+            });
+            if (quarterPicked) {
+                grain = 'quarters';
+            } else if (yearPicked) {
+                grain = 'years';
+            }
+        }
+        if (!grain) {
+            var activeGrain = document.querySelector('[data-pbj-floating-grain].active');
+            grain = activeGrain ? activeGrain.getAttribute('data-pbj-floating-grain') : null;
+        }
+        if (!grain) {
+            return;
+        }
+        var radio = document.querySelector('input[name="filterType"][value="' + grain + '"]');
+        if (!radio || radio.checked) {
+            return;
+        }
+        radio.checked = true;
+        if (typeof global.onFilterTypeChange === 'function') {
+            global.onFilterTypeChange();
+        }
+        pbjV2SyncFloatingPeriodFieldsVisibility();
+    }
+
     function pbjV2FloatingApplyPeriod() {
+        pbjV2SyncFilterTypeFromFloatingGrain();
         pbjV2PushFloatingPeriodToSummary();
         if (typeof global.pbjV2RefreshScopeLabel === 'function') {
             global.pbjV2RefreshScopeLabel();
@@ -2214,6 +2252,11 @@
     }
 
     function pbjV2RefreshAiQuarterSelectOptions() {
+        if (!document.getElementById('quarterRange') && typeof global.pbjRb3RefreshAiToolkitQuarterOptions === 'function') {
+            global.pbjRb3RefreshAiToolkitQuarterOptions();
+            pbjV2EnsureAiSelectPlaceholder('pbjAiQuarterSelect', 'Select quarters…');
+            return;
+        }
         pbjV2CopySelectOptions('quarterRange', 'pbjAiQuarterSelect');
         var dst = document.getElementById('pbjAiQuarterSelect');
         if (dst && pbjV2FloatingSelectNeedsPopulate('pbjAiQuarterSelect', dst)) {
@@ -2223,6 +2266,11 @@
     }
 
     function pbjV2RefreshAiYearSelectOptions() {
+        if (!document.getElementById('years') && typeof global.pbjRb3RefreshAiToolkitYearOptions === 'function') {
+            global.pbjRb3RefreshAiToolkitYearOptions();
+            pbjV2EnsureAiSelectPlaceholder('pbjAiYearSelect', 'Select years…');
+            return;
+        }
         pbjV2CopySelectOptions('years', 'pbjAiYearSelect');
         var dst = document.getElementById('pbjAiYearSelect');
         if (dst && pbjV2FloatingSelectNeedsPopulate('pbjAiYearSelect', dst)) {
@@ -2270,7 +2318,61 @@
             }
             return null;
         }
+        if (grain === 'quarters') {
+            var qKeys = pbjV2GetMultiSelectValue('pbjAiQuarterSelect', '')
+                .split(',')
+                .map(function (q) { return q.trim(); })
+                .filter(Boolean);
+            if (!qKeys.length) {
+                return null;
+            }
+            qKeys.sort(function (a, b) {
+                return pbjCyQuarterSortKey(a) - pbjCyQuarterSortKey(b);
+            });
+            var qLo = pbjV2QuarterIsoBounds(qKeys[0]);
+            var qHi = pbjV2QuarterIsoBounds(qKeys[qKeys.length - 1]);
+            if (qLo && qHi) {
+                return { start: qLo.start, end: qHi.end, grain: grain };
+            }
+            return null;
+        }
+        if (grain === 'years') {
+            var yrs = pbjV2GetMultiSelectValue('pbjAiYearSelect', '')
+                .split(',')
+                .map(function (y) { return parseInt(String(y).trim(), 10); })
+                .filter(function (y) { return isFinite(y); })
+                .sort(function (a, b) { return a - b; });
+            if (!yrs.length) {
+                return null;
+            }
+            return {
+                start: yrs[0] + '-01-01',
+                end: yrs[yrs.length - 1] + '-12-31',
+                grain: grain
+            };
+        }
         return null;
+    }
+
+    function pbjV2QuarterIsoBounds(qKey) {
+        if (typeof global.rb3QuarterBounds === 'function') {
+            return global.rb3QuarterBounds(qKey);
+        }
+        var m = String(qKey || '').match(/^(\d{4})Q([1-4])$/i);
+        if (!m) {
+            return null;
+        }
+        var year = parseInt(m[1], 10);
+        var q = parseInt(m[2], 10);
+        if (!year || !q) {
+            return null;
+        }
+        var startMonth = (q - 1) * 3 + 1;
+        var endMonth = startMonth + 2;
+        var start = year + '-' + String(startMonth).padStart(2, '0') + '-01';
+        var endDate = new Date(year, endMonth, 0);
+        var end = year + '-' + String(endMonth).padStart(2, '0') + '-' + String(endDate.getDate()).padStart(2, '0');
+        return { start: start, end: end };
     }
 
     function pbjV2FetchDailyRowsByIsoRange(start, end) {
@@ -2390,28 +2492,80 @@
         }
     }
 
-    function pbjV2SyncAiScopeStaleHint() {
-        var hint = document.getElementById('pbjAiScopeStaleHint');
-        if (!hint) {
-            return;
+    function pbjV2AiModalScopeFingerprint() {
+        var grain = pbjV2GetActiveAiGrain();
+        var payload = { grain: grain };
+        if (grain === 'quarters') {
+            payload.quarters = pbjV2GetMultiSelectValue('pbjAiQuarterSelect', '');
+        } else if (grain === 'years') {
+            payload.years = pbjV2GetMultiSelectValue('pbjAiYearSelect', '');
+        } else if (grain === 'daterange') {
+            var sd = document.getElementById('pbjAiStartDate');
+            var ed = document.getElementById('pbjAiEndDate');
+            payload.start = sd ? String(sd.value || '').trim() : '';
+            payload.end = ed ? String(ed.value || '').trim() : '';
+        } else if (grain === 'day') {
+            var fd = document.getElementById('pbjAiFilterDay');
+            var note = document.getElementById('pbjAiDayNote');
+            payload.day = fd ? String(fd.value || '').trim() : '';
+            payload.dayNote = note ? String(note.value || '').trim() : '';
         }
+        return JSON.stringify(payload);
+    }
+
+    function pbjV2CaptureAiAppliedScopeFingerprint() {
+        global.__pbjAiAppliedScopeFingerprint = pbjV2AiModalScopeFingerprint();
+    }
+
+    function pbjV2RecomputeAiPackScopeStale() {
+        var applied = global.__pbjAiAppliedScopeFingerprint;
+        if (!applied) {
+            global.__pbjAiPackScopeStale = true;
+        } else {
+            global.__pbjAiPackScopeStale = pbjV2AiModalScopeFingerprint() !== applied;
+        }
+        pbjV2RefreshAiToolkitScopeLine();
+        pbjV2SyncAiScopeApplyUi();
+    }
+
+    function pbjV2SyncAiScopeApplyUi() {
+        var hint = document.getElementById('pbjAiScopeStaleHint');
         var stale = !!global.__pbjAiPackScopeStale;
-        hint.classList.toggle('d-none', !stale);
+        if (hint) {
+            hint.classList.toggle('d-none', !stale);
+        }
+        document.querySelectorAll('.pbj-ai-scope-apply-btn').forEach(function (btn) {
+            btn.classList.toggle('d-none', !stale);
+            btn.disabled = !stale;
+            btn.setAttribute('aria-hidden', stale ? 'false' : 'true');
+        });
+        var fallbackRow = document.getElementById('pbjAiScopeApplyRow');
+        if (fallbackRow) {
+            fallbackRow.classList.toggle('d-none', !stale);
+        }
+    }
+
+    function pbjV2SyncAiScopeStaleHint() {
+        pbjV2SyncAiScopeApplyUi();
     }
 
     function pbjV2MarkAiPackScopeStale() {
-        global.__pbjAiPackScopeStale = true;
-        pbjV2SyncAiScopeStaleHint();
+        pbjV2RecomputeAiPackScopeStale();
     }
 
     function pbjV2AiToolkitApplyScope() {
+        if (typeof global.pbjRb3ApplyAiToolkitScope === 'function' && document.getElementById('rb3StartDate')) {
+            global.pbjRb3ApplyAiToolkitScope();
+            return;
+        }
         pbjV2PushAiScopeToDashboard();
         if (typeof global.applyFilters === 'function') {
             global.applyFilters();
         }
         pbjV2InvalidateAiPackCache();
         global.__pbjAiPackScopeStale = false;
-        pbjV2SyncAiScopeStaleHint();
+        pbjV2CaptureAiAppliedScopeFingerprint();
+        pbjV2SyncAiScopeApplyUi();
         pbjV2RefreshAiToolkitScopeLine();
         var grainBtn = document.querySelector('[data-pbj-ai-grain].active');
         var grain = grainBtn ? grainBtn.getAttribute('data-pbj-ai-grain') : '';
@@ -2438,16 +2592,18 @@
                 } else if (grain === 'years') {
                     pbjV2RefreshAiYearSelectOptions();
                 }
-                global.__pbjAiPackScopeStale = true;
-                pbjV2SyncAiScopeStaleHint();
+                pbjV2RecomputeAiPackScopeStale();
             });
         });
-        var applyBtn = document.getElementById('pbjAiScopeApplyBtn');
-        if (applyBtn) {
-            applyBtn.addEventListener('click', function () {
+        document.querySelectorAll('.pbj-ai-scope-apply-btn').forEach(function (btn) {
+            if (btn.dataset.pbjAiScopeApplyBound === '1') {
+                return;
+            }
+            btn.dataset.pbjAiScopeApplyBound = '1';
+            btn.addEventListener('click', function () {
                 pbjV2AiToolkitApplyScope();
             });
-        }
+        });
         var aiQ = document.getElementById('pbjAiQuarterSelect');
         var aiY = document.getElementById('pbjAiYearSelect');
         if (aiQ) {
@@ -2716,7 +2872,7 @@
         pbjV2AiFocusDatesSyncHidden();
         pbjV2AiFocusDatesMarkUserEdited();
         pbjV2RefreshAiStarterPromptPreview(global.__pbjLastAiPackMeta || {});
-        global.__pbjAiPackScopeStale = true;
+        pbjV2RecomputeAiPackScopeStale();
     }
 
     function pbjV2AiFocusDatesRender() {
@@ -3029,51 +3185,62 @@
         var totalCensus = 0;
         var contractSum = 0;
         var contractN = 0;
+        var observedDays = 0;
         rows.forEach(function (r) {
-            var census = parseFloat(r.MDScensus);
-            if (!isFinite(census) || census <= 0) {
+            var census = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.MDScensus) : parseFloat(r.MDScensus);
+            if (census === null || census <= 0) {
                 return;
             }
-            totalCensus += census;
-            var th = parseFloat(r.Total_Staff_Hours || r.Total_Nurse_Hours || 0);
-            if (isFinite(th)) {
-                totalHours += th;
+            var th = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_Staff_Hours) : parseFloat(r.Total_Staff_Hours);
+            if (th === null) {
+                th = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_Nurse_Hours) : parseFloat(r.Total_Nurse_Hours);
             }
-            var dh = parseFloat(r.Nurse_Staff_Hours_Excl_Admin || 0);
-            if (isFinite(dh)) {
+            if (th === null) {
+                return;
+            }
+            observedDays += 1;
+            totalCensus += census;
+            totalHours += th;
+            var dh = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Nurse_Staff_Hours_Excl_Admin) : parseFloat(r.Nurse_Staff_Hours_Excl_Admin);
+            if (dh !== null) {
                 directHours += dh;
             }
-            var rh = parseFloat(r.Total_RN_Hours || 0);
-            if (isFinite(rh)) {
+            var rh = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_RN_Hours) : parseFloat(r.Total_RN_Hours);
+            if (rh !== null) {
                 rnHours += rh;
             }
-            var lh = parseFloat(r.Total_LPN_Hours || 0);
-            if (isFinite(lh)) {
+            var lh = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_LPN_Hours) : parseFloat(r.Total_LPN_Hours);
+            if (lh !== null) {
                 lpnHours += lh;
             }
-            var ah = parseFloat(r.Total_Nurse_Aide_Hours || 0);
-            if (isFinite(ah)) {
+            var ah = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_Nurse_Aide_Hours) : parseFloat(r.Total_Nurse_Aide_Hours);
+            if (ah !== null) {
                 naHours += ah;
             }
-            var cp = parseFloat(r.RN_Contract_Pct || r.Contract_Percentage || '');
-            if (isFinite(cp)) {
+            var cp = typeof parseNumOrNull === 'function'
+                ? parseNumOrNull(r.RN_Contract_Pct || r.Contract_Percentage)
+                : parseFloat(r.RN_Contract_Pct || r.Contract_Percentage);
+            if (cp !== null) {
                 contractSum += cp;
                 contractN += 1;
             }
         });
-        if (totalCensus <= 0) {
+        if (totalCensus <= 0 || observedDays <= 0) {
             return null;
         }
         function hprd(hours) {
+            if (!hours) {
+                return '';
+            }
             return (hours / totalCensus).toFixed(2);
         }
         return {
-            workDays: rows.length,
+            workDays: observedDays,
             avgTotalHprd: hprd(totalHours),
             avgDirectHprd: directHours > 0 ? hprd(directHours) : '',
-            avgRnHprd: hprd(rnHours),
-            avgLpnHprd: hprd(lpnHours),
-            avgNaHprd: hprd(naHours),
+            avgRnHprd: rnHours > 0 ? hprd(rnHours) : '',
+            avgLpnHprd: lpnHours > 0 ? hprd(lpnHours) : '',
+            avgNaHprd: naHours > 0 ? hprd(naHours) : '',
             avgContractPct: contractN ? (contractSum / contractN).toFixed(1) : ''
         };
     }
@@ -3466,6 +3633,8 @@
         pbjV2RefreshAiStarterPromptPreview(packMeta);
         global.__pbjAiPackCacheFingerprint = pbjV2AiPackScopeFingerprint();
         global.__pbjAiPackScopeStale = false;
+        pbjV2CaptureAiAppliedScopeFingerprint();
+        pbjV2SyncAiScopeApplyUi();
     }
 
     function pbjV2UpdateAiToolkitSummaryIdle() {
@@ -3502,25 +3671,54 @@
     }
 
     function pbjV2CopyAiStarterPrompt() {
-        var text = pbjV2BuildAiStarterPrompt(
-            pbjV2GetAiToolkitAudience(),
-            global.__pbjLastAiPackMeta || pbjV2AiPackMetaFromPage() || {}
-        );
-        var btns = document.querySelectorAll('#pbjAiPackCopyPromptBtn, #pbjAiPackCopyPromptBtnInline, .pbj-ai-copy-prompt-btn');
-        pbjV2CopyTextToClipboard(text, 'pbjAiPackPromptStatus').then(function (ok) {
+        var live = document.getElementById('pbjAiToolkitPromptLive');
+        var text = live && String(live.textContent || '').trim()
+            ? String(live.textContent || '')
+            : pbjV2BuildAiStarterPrompt(
+                pbjV2GetAiToolkitAudience(),
+                global.__pbjLastAiPackMeta || pbjV2AiPackMetaFromPage() || {}
+            );
+        var btns = document.querySelectorAll('.pbj-ai-copy-prompt-btn');
+        function showCopied(ok) {
             if (!ok || !btns.length) {
                 return;
             }
             Array.prototype.forEach.call(btns, function (btn) {
-                var prev = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check me-1" aria-hidden="true"></i>Copied';
-                btn.setAttribute('aria-label', 'Copied');
+                var label = btn.querySelector('.pbj-ai-copy-prompt-label');
+                var prevText = label ? label.textContent : btn.textContent;
+                if (label) {
+                    label.textContent = 'Copied';
+                } else {
+                    btn.textContent = 'Copied';
+                }
+                btn.setAttribute('aria-label', 'Copied starter prompt');
                 setTimeout(function () {
-                    btn.innerHTML = prev;
-                    btn.setAttribute('aria-label', 'Copy prompt');
-                }, 2200);
+                    if (label) {
+                        label.textContent = prevText || 'Copy prompt';
+                    } else {
+                        btn.textContent = prevText || 'Copy prompt';
+                    }
+                    btn.setAttribute('aria-label', 'Copy starter prompt');
+                }, 1500);
             });
-        });
+            var st = document.getElementById('pbjAiPackPromptStatus');
+            if (st) {
+                st.textContent = 'Copied';
+                st.classList.remove('d-none');
+                setTimeout(function () {
+                    st.classList.add('d-none');
+                }, 1500);
+            }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                showCopied(true);
+            }).catch(function () {
+                pbjV2CopyTextToClipboard(text, null).then(showCopied);
+            });
+            return;
+        }
+        pbjV2CopyTextToClipboard(text, null).then(showCopied);
     }
 
     function pbjV2CopyAiContextPackCsv() {
@@ -6635,6 +6833,11 @@
     global.pbjV2AppendAiPackContextRows = pbjV2AppendAiPackContextRows;
     global.pbjV2AppendAiPackOwnershipRows = pbjV2AppendAiPackOwnershipRows;
     global.pbjV2AiToolkitApplyScope = pbjV2AiToolkitApplyScope;
+    global.pbjV2CaptureAiAppliedScopeFingerprint = pbjV2CaptureAiAppliedScopeFingerprint;
+    global.pbjV2RecomputeAiPackScopeStale = pbjV2RecomputeAiPackScopeStale;
+    global.pbjV2SyncAiScopeApplyUi = pbjV2SyncAiScopeApplyUi;
+    global.pbjV2EnsureAiSelectPlaceholder = pbjV2EnsureAiSelectPlaceholder;
+    global.pbjV2AiToolkitScopeLabel = pbjV2AiToolkitScopeLabel;
     global.pbjV2PullAiScopeFromDashboard = pbjV2PullAiScopeFromDashboard;
     global.pbjV2DownloadAiContextPackJson = pbjV2DownloadAiContextPackJson;
     global.pbjV2FormatIsoShort = pbjV2FormatIsoShort;
@@ -6642,6 +6845,8 @@
     global.pbjV2AiFocusDatesSetFromRows = pbjV2AiFocusDatesSetFromRows;
     global.pbjV2FormatCensusContextPeriodLabel = pbjV2FormatCensusContextPeriodLabel;
     global.pbjV2RenderAiPackPreview = pbjV2RenderAiPackPreview;
+    global.pbjV2RefreshAiPackPreview = pbjV2RefreshAiPackPreview;
+    global.pbjV2InvalidateAiPackCache = pbjV2InvalidateAiPackCache;
     global.pbjV2CopyAiStarterPrompt = pbjV2CopyAiStarterPrompt;
     global.pbjV2DownloadClaudeSkillZip = pbjV2DownloadClaudeSkillZip;
     global.pbjV2CopyAiContextPackCsv = pbjV2CopyAiContextPackCsv;
@@ -6732,6 +6937,7 @@
         document.addEventListener('pbjQuartersLoaded', function () {
             pbjV2RefreshFloatingPickerOptions();
             pbjV2PullFloatingPeriodFromSummary();
+            pbjV2SyncFloatingGrain();
             pbjV2RefreshScopeLabel();
         });
         setTimeout(function () {
@@ -6757,7 +6963,13 @@
                 pbjV2UpdateAiToolkitToolHelp();
                 pbjV2RefreshAiQuarterSelectOptions();
                 pbjV2RefreshAiYearSelectOptions();
-                pbjV2PullAiScopeFromDashboard();
+                if (typeof global.pbjRb3SeedAiToolkitPeriod === 'function') {
+                    global.pbjRb3SeedAiToolkitPeriod();
+                } else {
+                    pbjV2PullAiScopeFromDashboard();
+                    pbjV2CaptureAiAppliedScopeFingerprint();
+                    pbjV2RecomputeAiPackScopeStale();
+                }
                 var grain = pbjV2GetActiveAiGrain();
                 pbjV2SyncAiFocusDatesUiForGrain(grain);
                 if (typeof global.pbjRb3SyncFocusDatesToAiToolkit === 'function') {

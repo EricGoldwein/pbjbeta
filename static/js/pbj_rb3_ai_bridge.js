@@ -240,18 +240,21 @@
             var csv = buildSimplePackCsv(rows, range);
             window.__pbjLastAiContextPackCsv = csv;
             if (previewOnly) {
-                if (typeof window.pbjV2RenderAiPackPreview === 'function') {
-                    window.pbjV2RenderAiPackPreview({
-                        sectionCounts: { DAILY: rows.length, META: 1 },
-                        sampleLines: csv.split('\n').slice(1, 20),
-                        filterLabel: range.start + ' to ' + range.end,
-                        dailyRowCount: rows.length,
-                        dailyMetricRows: rows.length,
-                        quarters: [],
-                        facilityName: '',
-                        ccn: ccn,
-                    });
-                }
+            if (typeof window.pbjV2RenderAiPackPreview === 'function') {
+                var scopeLabel = typeof window.pbjV2AiToolkitScopeLabel === 'function'
+                    ? window.pbjV2AiToolkitScopeLabel()
+                    : '';
+                window.pbjV2RenderAiPackPreview({
+                    sectionCounts: { DAILY: rows.length, META: 1 },
+                    sampleLines: csv.split('\n').slice(1, 20),
+                    filterLabel: scopeLabel || (range.start + ' to ' + range.end),
+                    dailyRowCount: rows.length,
+                    dailyMetricRows: rows.length,
+                    quarters: [],
+                    facilityName: '',
+                    ccn: ccn,
+                });
+            }
                 return;
             }
             if (window.__pbjAiPackWantClipboard && navigator.clipboard) {

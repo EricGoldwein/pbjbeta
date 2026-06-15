@@ -202,24 +202,226 @@
         var toolkitLine = $('pbjAiToolkitScopeLine');
         if (rb3Line) rb3Line.textContent = label;
         if (toolkitLine) toolkitLine.textContent = label;
-        var aiStart = $('pbjAiStartDate');
-        var aiEnd = $('pbjAiEndDate');
-        if (aiStart && s) aiStart.value = s;
-        if (aiEnd && e) aiEnd.value = e;
+    }
+
+    function rb3MirrorSelectOptions(srcId, dstId) {
+        var src = $(srcId);
+        var dst = $(dstId);
+        if (!src || !dst) return;
+        var selected = Array.from(src.selectedOptions || []).map(function (o) { return String(o.value || ''); });
+        dst.innerHTML = '';
+        Array.from(src.options || []).forEach(function (opt) {
+            if (!opt.value) return;
+            var clone = document.createElement('option');
+            clone.value = opt.value;
+            clone.textContent = opt.textContent;
+            clone.selected = selected.indexOf(String(opt.value)) >= 0;
+            dst.appendChild(clone);
+        });
+    }
+
+    function rb3SetAiGrain(grain) {
         document.querySelectorAll('[data-pbj-ai-grain]').forEach(function (btn) {
-            var grain = btn.getAttribute('data-pbj-ai-grain');
-            var on = grain === 'daterange';
+            var on = btn.getAttribute('data-pbj-ai-grain') === grain;
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
-        ['pbjAiScopeQuarters', 'pbjAiScopeYears', 'pbjAiScopeDay'].forEach(function (id) {
+        ['pbjAiScopeQuarters', 'pbjAiScopeYears', 'pbjAiScopeRange', 'pbjAiScopeDay'].forEach(function (id) {
             var panel = $(id);
-            if (panel) panel.classList.add('d-none');
+            if (!panel) return;
+            var grainMap = {
+                pbjAiScopeQuarters: 'quarters',
+                pbjAiScopeYears: 'years',
+                pbjAiScopeRange: 'daterange',
+                pbjAiScopeDay: 'day'
+            };
+            panel.classList.toggle('d-none', grainMap[id] !== grain);
         });
-        var rangePanel = $('pbjAiScopeRange');
-        if (rangePanel) rangePanel.classList.remove('d-none');
-        if (typeof window !== 'undefined') {
-            window.__pbjAiPackScopeStale = true;
+        if (typeof global.pbjV2SyncAiFocusDatesUiForGrain === 'function') {
+            global.pbjV2SyncAiFocusDatesUiForGrain(grain);
+        }
+    }
+
+    function rb3AiToolkitLabelFromApplied() {
+        var mode = ($('rb3PeriodMode') || {}).value || 'quarter';
+        if (mode === 'quarter') {
+            var qs = Array.from(($('rb3PeriodQuarter') || {}).selectedOptions || [])
+                .map(function (o) { return rb3FormatQuarter(o.value); })
+                .filter(Boolean);
+            if (qs.length === 1) return qs[0];
+            if (qs.length > 1) return qs[0] + ' \u2013 ' + qs[qs.length - 1];
+        }
+        if (mode === 'year') {
+            var years = Array.from(($('rb3PeriodYear') || {}).selectedOptions || [])
+                .map(function (o) { return String(o.value || ''); })
+                .filter(Boolean)
+                .sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
+            if (years.length === 1) return years[0];
+            if (years.length > 1) return years[0] + ' \u2013 ' + years[years.length - 1];
+        }
+        var s = ($('rb3StartDate') || {}).value || '';
+        var e = ($('rb3EndDate') || {}).value || '';
+        if (s && e && s === e) {
+            return formatDisplayDate(s);
+        }
+        if (s && e) {
+            return formatDisplayDate(s) + ' \u2013 ' + formatDisplayDate(e);
+        }
+        return '\u2014';
+    }
+
+    function rb3AppliedAiGrain() {
+        var mode = ($('rb3PeriodMode') || {}).value || 'quarter';
+        if (mode === 'quarter') return 'quarters';
+        if (mode === 'year') return 'years';
+        if (mode === 'custom') return 'daterange';
+        return 'daterange';
+    }
+
+    function rb3SeedAiToolkitPeriod() {
+        rb3RefreshAiToolkitQuarterOptions();
+        rb3RefreshAiToolkitYearOptions();
+        var grain = rb3AppliedAiGrain();
+        rb3SetAiGrain(grain);
+        var s = ($('rb3StartDate') || {}).value || '';
+        var e = ($('rb3EndDate') || {}).value || '';
+        var aiStart = $('pbjAiStartDate');
+        var aiEnd = $('pbjAiEndDate');
+        if (aiStart) aiStart.value = s;
+        if (aiEnd) aiEnd.value = e;
+        if (grain === 'quarters') {
+            rb3MirrorSelectOptions('rb3PeriodQuarter', 'pbjAiQuarterSelect');
+            if (typeof global.pbjV2EnsureAiSelectPlaceholder === 'function') {
+                global.pbjV2EnsureAiSelectPlaceholder('pbjAiQuarterSelect', 'Select quarters\u2026');
+            }
+        } else if (grain === 'years') {
+            rb3MirrorSelectOptions('rb3PeriodYear', 'pbjAiYearSelect');
+            if (typeof global.pbjV2EnsureAiSelectPlaceholder === 'function') {
+                global.pbjV2EnsureAiSelectPlaceholder('pbjAiYearSelect', 'Select years\u2026');
+            }
+        }
+        var label = rb3AiToolkitLabelFromApplied();
+        var rb3Line = $('rb3AiScopeLine');
+        var toolkitLine = $('pbjAiToolkitScopeLine');
+        if (rb3Line) rb3Line.textContent = label;
+        if (toolkitLine) toolkitLine.textContent = label;
+        if (typeof global.pbjV2CaptureAiAppliedScopeFingerprint === 'function') {
+            global.pbjV2CaptureAiAppliedScopeFingerprint();
+        }
+        if (typeof global.pbjV2RecomputeAiPackScopeStale === 'function') {
+            global.pbjV2RecomputeAiPackScopeStale();
+        } else if (typeof window !== 'undefined') {
+            window.__pbjAiPackScopeStale = false;
+        }
+    }
+
+    function rb3RefreshAiToolkitQuarterOptions() {
+        var dst = $('pbjAiQuarterSelect');
+        var src = $('rb3PeriodQuarter');
+        if (!dst || !src) return;
+        rb3MirrorSelectOptions('rb3PeriodQuarter', 'pbjAiQuarterSelect');
+        if (typeof global.pbjV2EnsureAiSelectPlaceholder === 'function') {
+            global.pbjV2EnsureAiSelectPlaceholder('pbjAiQuarterSelect', 'Select quarters\u2026');
+        }
+    }
+
+    function rb3RefreshAiToolkitYearOptions() {
+        var dst = $('pbjAiYearSelect');
+        var src = $('rb3PeriodYear');
+        if (!dst || !src) return;
+        rb3MirrorSelectOptions('rb3PeriodYear', 'pbjAiYearSelect');
+        if (typeof global.pbjV2EnsureAiSelectPlaceholder === 'function') {
+            global.pbjV2EnsureAiSelectPlaceholder('pbjAiYearSelect', 'Select years\u2026');
+        }
+    }
+
+    function rb3ApplyAiToolkitScope() {
+        var grainBtn = document.querySelector('[data-pbj-ai-grain].active');
+        var grain = grainBtn ? grainBtn.getAttribute('data-pbj-ai-grain') : 'daterange';
+        var startEl = $('rb3StartDate');
+        var endEl = $('rb3EndDate');
+        var modeEl = $('rb3PeriodMode');
+        if (!startEl || !endEl) return;
+        var start = '';
+        var end = '';
+        if (grain === 'quarters') {
+            var qs = Array.from(($('pbjAiQuarterSelect') || {}).selectedOptions || [])
+                .map(function (o) { return String(o.value || '').trim(); })
+                .filter(Boolean);
+            if (!qs.length) return;
+            qs.sort(function (a, b) { return rb3QuarterSortNum(a) - rb3QuarterSortNum(b); });
+            var bLo = rb3QuarterBounds(qs[0]);
+            var bHi = rb3QuarterBounds(qs[qs.length - 1]);
+            if (!bLo || !bHi) return;
+            start = bLo.start;
+            end = bHi.end;
+            if (modeEl) modeEl.value = 'quarter';
+            var qSel = $('rb3PeriodQuarter');
+            if (qSel) {
+                Array.from(qSel.options).forEach(function (o) {
+                    o.selected = qs.indexOf(String(o.value || '')) >= 0;
+                });
+            }
+            syncPeriodModeUI();
+        } else if (grain === 'years') {
+            var years = Array.from(($('pbjAiYearSelect') || {}).selectedOptions || [])
+                .map(function (o) { return parseInt(String(o.value || ''), 10); })
+                .filter(function (v) { return !isNaN(v); });
+            if (!years.length) return;
+            var yMin = Math.min.apply(null, years);
+            var yMax = Math.max.apply(null, years);
+            start = yMin + '-01-01';
+            end = yMax + '-12-31';
+            if (modeEl) modeEl.value = 'year';
+            var ySel = $('rb3PeriodYear');
+            if (ySel) {
+                Array.from(ySel.options).forEach(function (o) {
+                    o.selected = years.indexOf(parseInt(String(o.value || ''), 10)) >= 0;
+                });
+            }
+            syncPeriodModeUI();
+        } else if (grain === 'day') {
+            var fd = ($('pbjAiFilterDay') || {}).value || '';
+            if (!fd) return;
+            start = fd;
+            end = fd;
+            if (modeEl) modeEl.value = 'custom';
+            syncPeriodModeUI();
+        } else {
+            start = ($('pbjAiStartDate') || {}).value || '';
+            end = ($('pbjAiEndDate') || {}).value || '';
+            if (!start || !end) return;
+            if (modeEl) modeEl.value = 'custom';
+            syncPeriodModeUI();
+        }
+        startEl.value = start;
+        endEl.value = end;
+        var label = typeof global.pbjV2AiToolkitScopeLabel === 'function'
+            ? global.pbjV2AiToolkitScopeLabel()
+            : rb3AiToolkitLabelFromApplied();
+        var rb3Line = $('rb3AiScopeLine');
+        var toolkitLine = $('pbjAiToolkitScopeLine');
+        if (rb3Line) rb3Line.textContent = label;
+        if (toolkitLine) toolkitLine.textContent = label;
+        updateSelectedPeriodLabel();
+        if (typeof global.pbjV2InvalidateAiPackCache === 'function') {
+            global.pbjV2InvalidateAiPackCache();
+        } else {
+            window.__pbjLastAiContextPackCsv = null;
+        }
+        window.__pbjAiPackScopeStale = false;
+        if (typeof global.pbjV2CaptureAiAppliedScopeFingerprint === 'function') {
+            global.pbjV2CaptureAiAppliedScopeFingerprint();
+        }
+        if (typeof global.pbjV2SyncAiScopeApplyUi === 'function') {
+            global.pbjV2SyncAiScopeApplyUi();
+        }
+        if (typeof global.pbjV2RefreshAiPackPreview === 'function') {
+            global.pbjV2RefreshAiPackPreview();
+        } else if (typeof window.exportPbj320AiContextPack === 'function') {
+            window.__pbjAiPackPreviewOnly = true;
+            window.exportPbj320AiContextPack();
+            window.__pbjAiPackPreviewOnly = false;
         }
     }
 
@@ -1227,7 +1429,11 @@
     }
 
     function openRb3AiToolkitModal() {
-        syncRb3AiScope();
+        if (typeof global.pbjRb3SeedAiToolkitPeriod === 'function') {
+            global.pbjRb3SeedAiToolkitPeriod();
+        } else {
+            syncRb3AiScope();
+        }
         var modalEl = document.getElementById('pbjAiToolkitModal');
         if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -1238,13 +1444,21 @@
         var trigger = $('rb3AiPanelTrigger');
         if (trigger) {
             trigger.addEventListener('click', function () {
-                syncRb3AiScope();
+                if (typeof global.pbjRb3SeedAiToolkitPeriod === 'function') {
+                    global.pbjRb3SeedAiToolkitPeriod();
+                } else {
+                    syncRb3AiScope();
+                }
             });
             trigger.addEventListener('keydown', function (ev) {
                 if (ev.key !== 'Enter' && ev.key !== ' ') {
                     return;
                 }
-                syncRb3AiScope();
+                if (typeof global.pbjRb3SeedAiToolkitPeriod === 'function') {
+                    global.pbjRb3SeedAiToolkitPeriod();
+                } else {
+                    syncRb3AiScope();
+                }
             });
         }
         var copyBtn = $('rb3AiCopyPromptBtn');
@@ -1358,6 +1572,11 @@
     }
 
     window.pbjRb3SyncFocusDatesToAiToolkit = syncRb3FocusDatesToAiToolkit;
+    window.pbjRb3SeedAiToolkitPeriod = rb3SeedAiToolkitPeriod;
+    window.pbjRb3ApplyAiToolkitScope = rb3ApplyAiToolkitScope;
+    window.pbjRb3RefreshAiToolkitQuarterOptions = rb3RefreshAiToolkitQuarterOptions;
+    window.pbjRb3RefreshAiToolkitYearOptions = rb3RefreshAiToolkitYearOptions;
+    window.rb3QuarterBounds = rb3QuarterBounds;
 
     window.pbjRb3CollectAiPackContext = function pbjRb3CollectAiPackContext() {
         syncQueuedUserItems();

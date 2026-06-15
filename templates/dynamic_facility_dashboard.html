@@ -25509,7 +25509,7 @@
 
         function fmtEinExpandedCell(workDate, val, einMetric) {
             const disp = isExpanded ? 'table-cell' : 'none';
-            const v = roundHalfUpDisplay(val || 0, 2);
+            const v = roundHalfUpDisplay(val, 2);
             const wd = String(workDate || '').replace(/"/g, '');
             const wdIso = wd.slice(0, 10);
             const einOk =
@@ -25707,19 +25707,19 @@
                      <td>${row.IsHoliday ? 'Yes' : 'No'}</td>
                      <!-- Expanded columns - Position Breakdown (click hours cells for EIN roster when available) -->
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_RN, 'rn_hours')}
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.RN_HPRD || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.RN_HPRD, 2)}</td>
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_RNadmin, 'rn_admin_hours')}
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_RNDON, 'rn_don_hours')}
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_LPN, 'lpn_hours')}
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.LPN_HPRD || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.LPN_HPRD, 2)}</td>
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_LPNadmin, 'lpn_admin_hours')}
                     ${fmtEinExpandedCell(row.WorkDate, row.Hrs_CNA, 'cna_hours')}
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.CNA_HPRD || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_NAtrn || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_MedAide || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_RN_ctr || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_LPN_ctr || 0, 2)}</td>
-                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_CNA_ctr || 0, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${roundHalfUpDisplay(row.CNA_HPRD, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_NAtrn, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_MedAide, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_RN_ctr, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_LPN_ctr, 2)}</td>
+                    <td class="expanded-col" style="display: ${isExpanded ? 'table-cell' : 'none'};">${formatDailyCountDisplay(row.Hrs_CNA_ctr, 2)}</td>
                `;
                 tbody.appendChild(tr);
             }
@@ -26967,7 +26967,7 @@
                     String(r.job_title_short || r.job_title || r.job_code || ''),
                     ten,
                     nw,
-                    roundHalfUpDisplay(r.hours || 0, 2),
+                    roundHalfUpDisplay(r.hours, 2),
                     parseFloat(r.pct_contract_hours || 0) > 0 ? 'Contract' : 'Staff'
                 ];
             });

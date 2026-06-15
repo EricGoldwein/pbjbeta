@@ -9,6 +9,7 @@ import re
 import hashlib
 import secrets
 import sys
+import threading
 
 # When this file is run as deployments/pbj320-<CCN>/facility_<CCN>_flask_app.py, Python puts that
 # folder first on sys.path and may load stale copies of shared modules. Prefer the repo root.
@@ -78,8 +79,14 @@ from facility_ein_employee_analytics import (
     ein_nursing_roster_for_work_date,
     ein_pbj_bridge_for_metric,
     enrich_nursing_roster_display_fields,
+    enrich_nursing_rows_multi_role_flags,
     enrich_nursing_rows_new_to_quarter_flags,
     enrich_nursing_rows_rolling_from_work_date,
+    enrich_nursing_rows_sustained_work_flags,
+    ein_sustained_work_pattern_flags,
+    ein_roster_work_day_pair_keys,
+    filter_ein_roster_rows_for_work_day,
+    NURSING_JOB_CODE_IDS,
     nursing_employee_daily_series,
     nursing_employee_summaries,
     prepare_ein_detail,
@@ -356,25 +363,51 @@ def _plotly_y_nullable_optional(df: pd.DataFrame, col: str) -> list:
 
 
 def _pbj_favicon_path() -> Optional[str]:
-    """Project-root favicon path when ``pbj_favicon.png`` is shipped with the app."""
-    p = os.path.join(_app_root, "pbj_favicon.png")
-    return p if os.path.isfile(p) else None
+    """Resolve a lightweight favicon PNG (prefer small bundled asset)."""
+    max_bytes = 51200
+    candidates = [
+        os.path.join(_app_root, "static", "pbj320_favicon.png"),
+        os.path.join(_app_root, "pbj_favicon.png"),
+        os.path.join(_app_root, "pbj_images", "pbj_favicon.png"),
+    ]
+    best: Optional[str] = None
+    best_size = max_bytes + 1
+    for p in candidates:
+        if not os.path.isfile(p):
+            continue
+        size = os.path.getsize(p)
+        if size <= max_bytes:
+            return p
+        if size < best_size:
+            best, best_size = p, size
+    return best
+
+
+def _pbj_favicon_directory_and_name() -> tuple[str, str] | None:
+    path = _pbj_favicon_path()
+    if not path:
+        return None
+    return os.path.dirname(path), os.path.basename(path)
 
 
 @app.route("/pbj_favicon.png")
 def pbj_favicon_png():
     """Serve ``pbj_favicon.png`` from the application directory (repo root for facility apps)."""
-    if not _pbj_favicon_path():
+    fav = _pbj_favicon_directory_and_name()
+    if not fav:
         return ("", 404)
-    return send_from_directory(_app_root, "pbj_favicon.png", mimetype="image/png")
+    directory, filename = fav
+    return send_from_directory(directory, filename, mimetype="image/png")
 
 
 @app.route("/favicon.ico")
 def favicon_ico():
     """Browsers request ``/favicon.ico`` by default; reuse the PNG asset when present."""
-    if not _pbj_favicon_path():
+    fav = _pbj_favicon_directory_and_name()
+    if not fav:
         return ("", 204)
-    return send_from_directory(_app_root, "pbj_favicon.png", mimetype="image/png")
+    directory, filename = fav
+    return send_from_directory(directory, filename, mimetype="image/png")
 
 # Global variables
 df = None
@@ -388,6 +421,10 @@ ein_job_quarterly_df = None
 ein_category_quarterly_df = None
 ein_employee_detail_df = None
 ein_nursing_summaries_df = None
+_EIN_NURSING_SUMMARIES_ROWS_CACHE: tuple[Any, ...] | None = None
+_EIN_NURSING_SUMMARIES_ROWS: list[dict[str, Any]] | None = None
+_EIN_ROSTER_PREWARM_STARTED = False
+_EIN_ROSTER_PREWARM_LOCK = threading.Lock()
 _PROVIDER_CHARTS_CACHE: dict[str, Any] | None = None
 _PROVIDER_CHARTS_CACHE_ID: tuple | None = None
 _NH_OWNERSHIP_CSV_PATH_CACHE: Optional[str] = None
@@ -1462,9 +1499,9 @@ def initialize_data():
     return global_df
 
 def round_financial(value, decimals=2):
-    """Round using financial rounding (ROUND_HALF_UP)"""
+    """Round using financial rounding (ROUND_HALF_UP). Missing values stay missing (None)."""
     if pd.isna(value) or value is None:
-        return 0.0
+        return None
     return float(Decimal(str(value)).quantize(Decimal('0.' + '0' * decimals), rounding=ROUND_HALF_UP))
 
 
@@ -3225,6 +3262,7 @@ def _load_ein_position_csvs(provnum: str | None = None) -> None:
             or ein_nursing_summaries_df is not None
         ):
             print(f"[EIN] Loaded tables for {prov} (detail={detail_base})")
+            _schedule_ein_roster_prewarm(prov)
         else:
             print(
                 f"[EIN] No Employee Detail extract found for {prov}. "
@@ -3247,33 +3285,182 @@ def _dashboard_auth_cookie_value(expected_password: str) -> str:
 
 
 def _dashboard_login_response(expected_password: str, *, error: str = "", status_code: int = 401) -> Response:
-    msg = f'<p style="color:#b91c1c;margin:0 0 12px 0;">{error}</p>' if error else ""
+    msg = f'<p class="error" role="alert">{error}</p>' if error else ""
+    favicon_href = url_for("pbj_favicon_png") if _pbj_favicon_path() else None
+    brand_icon = (
+        f'<img src="{favicon_href}" width="24" height="24" alt="" class="brand-icon" aria-hidden="true">'
+        if favicon_href
+        else ""
+    )
     html = f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PBJ320 Login</title>
+  <title>Premium Dashboard | PBJ320</title>
   <style>
-    body {{ font-family: Arial, sans-serif; background:#f5f7fb; margin:0; }}
-    .wrap {{ max-width:420px; margin:8vh auto; background:white; padding:24px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.08); }}
-    h1 {{ margin:0 0 8px 0; font-size:1.3rem; }}
-    p {{ color:#4b5563; }}
-    input[type=password] {{ width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; }}
-    .row {{ margin-top:12px; display:flex; gap:8px; align-items:center; }}
-    button {{ margin-top:14px; width:100%; padding:10px; border:0; border-radius:8px; background:#1f5fbf; color:#fff; font-weight:600; cursor:pointer; }}
+    *, *::before, *::after {{ box-sizing: border-box; }}
+    body {{
+      font-family: Arial, Helvetica, sans-serif;
+      background: #eef1f5;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }}
+    .wrap {{
+      width: 100%;
+      max-width: 520px;
+      background: #fff;
+      padding: 32px;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+    }}
+    .brand {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }}
+    .brand-icon {{
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+    }}
+    .brand-text {{
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
+    .brand-name {{
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }}
+    .brand-tagline {{
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.3;
+    }}
+    h1 {{
+      margin: 0 0 8px 0;
+      font-size: 26px;
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.25;
+    }}
+    .lead {{
+      margin: 0 0 20px 0;
+      font-size: 16px;
+      color: #6b7280;
+      line-height: 1.5;
+    }}
+    .error {{
+      color: #b91c1c;
+      margin: 0 0 12px 0;
+      font-size: 14px;
+    }}
+    form {{ margin: 0; }}
+    .field {{ margin: 0 0 12px 0; }}
+    .visually-hidden {{
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }}
+    input[type=password] {{
+      display: block;
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 15px;
+      line-height: 1.4;
+    }}
+    input[type=password]:focus {{
+      outline: 2px solid #1f5fbf;
+      outline-offset: 1px;
+      border-color: #1f5fbf;
+    }}
+    .remember {{
+      margin: 8px 0 0 0;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }}
+    .remember input[type=checkbox] {{
+      margin: 0;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+    }}
+    .remember label {{
+      font-size: 14px;
+      color: #374151;
+      line-height: 1.3;
+      cursor: pointer;
+      user-select: none;
+    }}
+    button[type=submit] {{
+      margin-top: 16px;
+      width: 100%;
+      padding: 11px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: #1f5fbf;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }}
+    button[type=submit]:hover {{ background: #184a96; }}
+    .footer-note {{
+      margin: 14px 0 0 0;
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: center;
+      line-height: 1.4;
+    }}
+    @media (max-width: 480px) {{
+      .wrap {{ padding: 24px; }}
+      h1 {{ font-size: 24px; }}
+    }}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>PBJ320 Dashboard</h1>
-    <p>Enter the dashboard password.</p>
+    <div class="brand">
+      {brand_icon}
+      <div class="brand-text">
+        <span class="brand-name">PBJ320</span>
+        <span class="brand-tagline">Nursing Home Staffing Intelligence</span>
+      </div>
+    </div>
+    <h1>Premium Dashboard</h1>
+    <p class="lead">Enter the PBJ320 password to view this facility dashboard.</p>
     {msg}
     <form method="get" action="">
       <input name="next" type="hidden" value="{(request.path or '/')}">
-      <input type="password" name="password" autocomplete="current-password" placeholder="Password" required>
-      <div class="row"><input type="checkbox" id="remember" name="remember" value="1"><label for="remember">Remember this computer</label></div>
+      <div class="field">
+        <label class="visually-hidden" for="password">Dashboard password</label>
+        <input id="password" type="password" name="password" autocomplete="current-password" placeholder="Dashboard password" required>
+      </div>
+      <div class="remember">
+        <input type="checkbox" id="remember" name="remember" value="1">
+        <label for="remember">Remember this computer</label>
+      </div>
       <button type="submit">Continue</button>
+      <p class="footer-note">Access is limited to authorized users.</p>
     </form>
   </div>
 </body>
@@ -3935,6 +4122,17 @@ def _parse_dashboard_iso_date_arg(raw: Optional[str], *, field: str) -> pd.Times
     return cast(pd.Timestamp, dt)
 
 
+def _normalize_dashboard_quarter_year_args(quarter: str, year: str) -> tuple[str, str]:
+    """Accept legacy ``year=2025&quarter=4`` combos as ``quarter=2025Q4``."""
+    q_raw = str(quarter or "all").strip()
+    y_raw = str(year or "all").strip()
+    if q_raw != "all" and re.fullmatch(r"[1-4]", q_raw):
+        year_token = y_raw.split(",")[0].strip() if y_raw != "all" else ""
+        if re.fullmatch(r"\d{4}", year_token):
+            return f"{year_token}Q{q_raw}", "all"
+    return q_raw, y_raw
+
+
 def _filter_facility_daily_for_dashboard(
     df: pd.DataFrame,
     *,
@@ -3950,6 +4148,7 @@ def _filter_facility_daily_for_dashboard(
     Coerces ``WorkDate`` to datetime, drops pre-2017 rows, and uses an exclusive
     upper bound on ``WorkDate`` so the last calendar day is included for date-only values.
     """
+    quarter, year = _normalize_dashboard_quarter_year_args(quarter, year)
     filtered_df = df.copy()
     filtered_df["WorkDate"] = pd.to_datetime(filtered_df["WorkDate"], errors="coerce")
     filtered_df = filtered_df[filtered_df["WorkDate"].notna()]
@@ -4252,16 +4451,16 @@ def get_summary():
                 'days_zero_census': census_days_zero,
             },
             'hprd_quality': hprd_q,
-            'avg_census': round_financial(
-                float(cast(Any, _as_1d_series(filtered_df["MDScensus"]).mean())) if len(filtered_df) > 0 else 0,
+            'avg_census': None if len(filtered_df) == 0 else round_financial(
+                float(cast(Any, _as_1d_series(filtered_df["MDScensus"]).mean())),
                 1,
             ),
-            'min_census': round_financial(
-                float(cast(Any, _as_1d_series(filtered_df["MDScensus"]).min())) if len(filtered_df) > 0 else 0,
+            'min_census': None if len(filtered_df) == 0 else round_financial(
+                float(cast(Any, _as_1d_series(filtered_df["MDScensus"]).min())),
                 1,
             ),
-            'max_census': round_financial(
-                float(cast(Any, _as_1d_series(filtered_df["MDScensus"]).max())) if len(filtered_df) > 0 else 0,
+            'max_census': None if len(filtered_df) == 0 else round_financial(
+                float(cast(Any, _as_1d_series(filtered_df["MDScensus"]).max())),
                 1,
             ),
             'avg_rn_hprd': None if avg_rn_hprd_weighted is None else round_financial(avg_rn_hprd_weighted, 2),
@@ -4284,8 +4483,8 @@ def get_summary():
             'avg_total_contract_pct': _mean_or_none(filtered_df['Total_Contract_Pct']) if len(filtered_df) > 0 else None,
             'total_rn_hours': float(filtered_df['Hrs_RN'].sum()) if len(filtered_df) > 0 else 0,
             # RN Sub 8 metrics - days with less than 8 hours of RN staffing
-            'total_rn_sub8': int((filtered_df['Total_RN_Hours'] < 8).sum()) if len(filtered_df) > 0 else 0,
-            'direct_rn_sub8': int((filtered_df['Hrs_RN'] < 8).sum()) if len(filtered_df) > 0 else 0,
+            'total_rn_sub8': int((filtered_df['Total_RN_Hours'] < 8).sum()) if len(filtered_df) > 0 else None,
+            'direct_rn_sub8': int((filtered_df['Hrs_RN'] < 8).sum()) if len(filtered_df) > 0 else None,
             'total_lpn_hours': float(filtered_df['Hrs_LPN'].sum()) if len(filtered_df) > 0 else 0,
             'total_cna_hours': float(filtered_df['Hrs_CNA'].sum()) if len(filtered_df) > 0 else 0,
             'holiday_days': len(filtered_df[filtered_df['IsHoliday'] == True]),
@@ -4353,7 +4552,7 @@ def get_provider_info():
         # Round numeric values
         numeric_cols = data.select_dtypes(include=[np.number]).columns
         for col in numeric_cols:
-            data[col] = data[col].apply(lambda x: round_financial(x, 3) if pd.notna(x) else 0)
+            data[col] = data[col].apply(lambda x: round_financial(x, 3) if pd.notna(x) else None)
         
         return jsonify({
             'data': data.to_dict('records'),
@@ -6650,16 +6849,16 @@ def get_provider_info_charts():
                 dt, rn = _lookup_pbj_direct_hprd(pbj_direct_lookup, quarter_normalized)
                 if dt is not None:
                     pbj_direct_data.append(
-                        {"quarter": quarter_orig, "pbj_direct_total": dt, "pbj_rn_direct": rn or 0.0}
+                        {"quarter": quarter_orig, "pbj_direct_total": dt, "pbj_rn_direct": rn}
                     )
                 else:
-                    pbj_direct_data.append({"quarter": quarter_orig, "pbj_direct_total": 0, "pbj_rn_direct": 0})
+                    pbj_direct_data.append({"quarter": quarter_orig, "pbj_direct_total": None, "pbj_rn_direct": None})
 
             pbj_direct_df = pd.DataFrame(pbj_direct_data)
             chart_data = chart_data.merge(pbj_direct_df, on="quarter", how="left")
         else:
-            chart_data["pbj_direct_total"] = 0
-            chart_data["pbj_rn_direct"] = 0
+            chart_data["pbj_direct_total"] = None
+            chart_data["pbj_rn_direct"] = None
         
         # Sort quarters chronologically using normalized format
         def quarter_sort_key(q_norm):
@@ -10571,7 +10770,7 @@ def get_state_standard_compliance():
             for _, row in filtered_df.iterrows():
                 work_date = pd.to_datetime(row['WorkDate'])
                 met = bool(row['Met_Standard'])
-                hrs_disp = round_financial(row[hours_col], 2) if pd.notna(row[hours_col]) else 0.0
+                hrs_disp = round_financial(row[hours_col], 2) if pd.notna(row[hours_col]) else None
                 daily_data.append({
                     'date': work_date.strftime('%Y-%m-%d'),
                     'hprd': hrs_disp,
@@ -10581,7 +10780,7 @@ def get_state_standard_compliance():
                         met=met,
                         hprd_type=hprd_type,
                         metric_unit='hours_per_day',
-                        value_for_message=float(hrs_disp),
+                        value_for_message=float(hrs_disp if hrs_disp is not None else 0),
                         threshold=float(threshold),
                         threshold_source=threshold_source,
                         range_choice='min',
@@ -10780,7 +10979,12 @@ def get_state_standard_compliance():
         state_vt = str(state_standard['Value_Type'])
         for _, row in filtered_df.iterrows():
             work_date = pd.to_datetime(row['WorkDate'])
-            hprd_display = round_financial(row[hprd_col_display], 2) if hprd_col_display in row.index else round_financial(row[hprd_col_raw], 2)
+            if hprd_col_display in row.index and pd.notna(row[hprd_col_display]):
+                hprd_display = round_financial(row[hprd_col_display], 2)
+            elif pd.notna(row[hprd_col_raw]):
+                hprd_display = round_financial(row[hprd_col_raw], 2)
+            else:
+                hprd_display = None
             met = bool(row['Met_Standard'])
             daily_data.append({
                 'date': work_date.strftime('%Y-%m-%d'),
@@ -10791,7 +10995,7 @@ def get_state_standard_compliance():
                     met=met,
                     hprd_type=hprd_type,
                     metric_unit='hprd',
-                    value_for_message=float(hprd_display),
+                    value_for_message=float(hprd_display if hprd_display is not None else 0),
                     threshold=float(threshold),
                     threshold_source=str(threshold_source),
                     range_choice=str(range_choice),
@@ -11829,6 +12033,90 @@ def _ensure_ein_employee_detail_loaded() -> None:
         _load_ein_employee_detail_only()
 
 
+def _ein_nursing_summaries_rows_all() -> list[dict[str, Any]]:
+    """Process precomputed nursing summaries once per loaded dataframe."""
+    global _EIN_NURSING_SUMMARIES_ROWS_CACHE, _EIN_NURSING_SUMMARIES_ROWS
+    df = ein_nursing_summaries_df
+    if df is None or df.empty:
+        return []
+    sig = (str(_ein_active_ccn()).strip().zfill(6), id(df), len(df))
+    if _EIN_NURSING_SUMMARIES_ROWS_CACHE == sig and _EIN_NURSING_SUMMARIES_ROWS is not None:
+        return _EIN_NURSING_SUMMARIES_ROWS
+
+    def _json_rows_from_df(df_in: pd.DataFrame) -> list[dict[str, Any]]:
+        rows_out: list[dict[str, Any]] = []
+        for r in df_in.to_dict(orient="records"):
+            rows_out.append({k: _ein_scalar_for_json(v) for k, v in r.items()})
+        return rows_out
+
+    rows_all = dedupe_nursing_roster_api_rows(_json_rows_from_df(cast(pd.DataFrame, df)))
+    enrich_nursing_roster_display_fields(rows_all)
+    enrich_nursing_rows_new_to_quarter_flags(rows_all)
+    enrich_nursing_rows_multi_role_flags(rows_all)
+    _EIN_NURSING_SUMMARIES_ROWS_CACHE = sig
+    _EIN_NURSING_SUMMARIES_ROWS = rows_all
+    return rows_all
+
+
+def _warm_ein_sustained_work_cache(prov: str) -> None:
+    """Precompute sustained-work flags once per process so roster day view stays fast."""
+    if not _ein_mode_enabled():
+        return
+    try:
+        _ensure_ein_employee_detail_loaded()
+        if ein_employee_detail_df is None or ein_employee_detail_df.empty:
+            return
+        df = ein_nursing_summaries_df
+        if df is None or df.empty or "quarter" not in df.columns:
+            return
+        quarters = sorted(
+            {
+                normalize_cy_qtr_ein(q)
+                for q in df["quarter"].astype(str).tolist()
+                if normalize_cy_qtr_ein(q)
+            }
+        )
+        if not quarters:
+            return
+        latest_q = quarters[-1]
+        dummy: list[dict[str, Any]] = [{"quarter": latest_q, "sys_employee_id": 0, "job_code": 1}]
+        enrich_nursing_rows_sustained_work_flags(
+            ein_employee_detail_df,
+            dummy,
+            facility_ccn=str(prov).strip().zfill(6),
+            limit_quarters=[latest_q],
+        )
+        _ein_nursing_summaries_rows_all()
+        print(f"[EIN] Pre-warmed roster caches for {latest_q}")
+    except Exception as exc:
+        print(f"[EIN] Roster pre-warm skipped: {exc}")
+
+
+def _schedule_ein_roster_prewarm(prov: str) -> None:
+    """Warm roster caches in a daemon thread so home-page init is not blocked."""
+    global _EIN_ROSTER_PREWARM_STARTED
+    if not _ein_mode_enabled():
+        return
+    if ein_nursing_summaries_df is None or ein_nursing_summaries_df.empty:
+        return
+    with _EIN_ROSTER_PREWARM_LOCK:
+        if _EIN_ROSTER_PREWARM_STARTED:
+            return
+        _EIN_ROSTER_PREWARM_STARTED = True
+
+    def _run() -> None:
+        try:
+            _warm_ein_sustained_work_cache(prov)
+        except Exception as exc:
+            print(f"[EIN] Background roster pre-warm failed: {exc}")
+
+    threading.Thread(
+        target=_run,
+        name=f"ein-roster-prewarm-{str(prov).strip().zfill(6)}",
+        daemon=True,
+    ).start()
+
+
 def _pbj_day_census_value(date_iso: str) -> float | None:
     """Best-effort daily census lookup from PBJ complete-data row for one date."""
     global global_df
@@ -11956,25 +12244,27 @@ def api_ein_nursing_employees():
             except (TypeError, ValueError):
                 return False
 
-        def _json_rows_from_df(df_in: pd.DataFrame) -> list[dict[str, Any]]:
-            rows_out: list[dict[str, Any]] = []
-            for r in df_in.to_dict(orient="records"):
-                rows_out.append({k: _ein_scalar_for_json(v) for k, v in r.items()})
-            return rows_out
+        import time as _time
+
+        _roster_t0 = _time.perf_counter()
+        _roster_timing: dict[str, float] = {}
+
+        def _roster_mark(label: str) -> None:
+            _roster_timing[label] = round((_time.perf_counter() - _roster_t0) * 1000.0, 1)
 
         if work_date_anchor:
             _ensure_ein_employee_detail_loaded()
 
+        work_day_filtered = False
+
         if ein_nursing_summaries_df is not None and not ein_nursing_summaries_df.empty:
-            df_all = cast(pd.DataFrame, ein_nursing_summaries_df)
-            rows_all = dedupe_nursing_roster_api_rows(_json_rows_from_df(df_all))
-            enrich_nursing_roster_display_fields(rows_all)
-            enrich_nursing_rows_new_to_quarter_flags(rows_all)
+            rows_all = _ein_nursing_summaries_rows_all()
+            _roster_mark("summaries_rows")
             pairs_by_q = roster_pairs_by_quarter_from_rows(rows_all)
             quarter_summary = (
                 compute_ein_quarter_roster_summary(q_filter_norm, pairs_by_q) if q_filter_norm else None
             )
-            if q_filter_norm and "quarter" in df_all.columns:
+            if q_filter_norm:
                 filtered = [
                     r for r in rows_all if normalize_cy_qtr_ein(r.get("quarter")) == q_filter_norm
                 ]
@@ -11986,6 +12276,17 @@ def api_ein_nursing_employees():
                 ]
             if job_code_raw:
                 filtered = [r for r in filtered if _matches_job_code(r)]
+            if (
+                work_date_anchor
+                and ein_employee_detail_df is not None
+                and not ein_employee_detail_df.empty
+            ):
+                pair_keys = ein_roster_work_day_pair_keys(
+                    ein_employee_detail_df, work_date_anchor, NURSING_JOB_CODE_IDS
+                )
+                filtered = filter_ein_roster_rows_for_work_day(filtered, pair_keys)
+                work_day_filtered = True
+            _roster_mark("filter")
             apply_roster_tenure_quarter_span(filtered, rows_for_global_bounds=rows_all)
             total = int(len(filtered))
             filtered.sort(
@@ -12003,30 +12304,47 @@ def api_ein_nursing_employees():
                 lim = max(1, int(limit_raw))
                 rows = filtered[offset : offset + lim]
             _enrich_nursing_api_rows(rows, ccn)
+            _roster_mark("cms_urls")
+            if (
+                ein_employee_detail_df is not None
+                and not ein_employee_detail_df.empty
+                and rows
+            ):
+                enrich_nursing_rows_sustained_work_flags(
+                    ein_employee_detail_df,
+                    rows,
+                    facility_ccn=ccn,
+                    limit_quarters=[q_filter_norm] if q_filter_norm else None,
+                )
+            _roster_mark("sustained_flags")
             if (
                 work_date_anchor
                 and ein_employee_detail_df is not None
                 and not ein_employee_detail_df.empty
+                and rows
             ):
                 enrich_nursing_rows_rolling_from_work_date(
                     ein_employee_detail_df, rows, work_date_anchor
                 )
-            return jsonify(
-                {
-                    "available": True,
-                    "employees": rows,
-                    "quarter_filter": quarter,
-                    "position_group": position_group,
-                    "quarter_summary": quarter_summary,
-                    "provnum": ccn,
-                    "cms_ein_landing_url": CMS_EIN_DETAIL_LANDING_URL,
-                    "total": total,
-                    "limit": len(rows),
-                    "offset": offset,
-                    "truncated": offset + len(rows) < total,
-                    "source": "precomputed",
-                }
-            )
+            _roster_mark("rolling")
+            payload: dict[str, Any] = {
+                "available": True,
+                "employees": rows,
+                "quarter_filter": quarter,
+                "position_group": position_group,
+                "quarter_summary": quarter_summary,
+                "provnum": ccn,
+                "cms_ein_landing_url": CMS_EIN_DETAIL_LANDING_URL,
+                "total": total,
+                "limit": len(rows),
+                "offset": offset,
+                "truncated": offset + len(rows) < total,
+                "source": "precomputed",
+                "work_day_filtered": work_day_filtered,
+            }
+            if os.environ.get("PBJ_ROSTER_TIMING", "").strip().lower() in ("1", "true", "yes"):
+                payload["timing_ms"] = _roster_timing
+            return jsonify(payload)
 
         _ensure_ein_employee_detail_loaded()
         if ein_employee_detail_df is None or ein_employee_detail_df.empty:
