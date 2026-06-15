@@ -363,12 +363,24 @@ def _plotly_y_nullable_optional(df: pd.DataFrame, col: str) -> list:
 
 
 def _pbj_favicon_path() -> Optional[str]:
-    """Resolve favicon PNG under app root or ``pbj_images/``."""
-    for rel in ("pbj_favicon.png", os.path.join("pbj_images", "pbj_favicon.png")):
-        p = os.path.join(_app_root, rel)
-        if os.path.isfile(p):
+    """Resolve a lightweight favicon PNG (prefer small bundled asset)."""
+    max_bytes = 51200
+    candidates = [
+        os.path.join(_app_root, "static", "pbj320_favicon.png"),
+        os.path.join(_app_root, "pbj_favicon.png"),
+        os.path.join(_app_root, "pbj_images", "pbj_favicon.png"),
+    ]
+    best: Optional[str] = None
+    best_size = max_bytes + 1
+    for p in candidates:
+        if not os.path.isfile(p):
+            continue
+        size = os.path.getsize(p)
+        if size <= max_bytes:
             return p
-    return None
+        if size < best_size:
+            best, best_size = p, size
+    return best
 
 
 def _pbj_favicon_directory_and_name() -> tuple[str, str] | None:
@@ -3285,7 +3297,7 @@ def _dashboard_login_response(expected_password: str, *, error: str = "", status
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Protected Dashboard | PBJ320</title>
+  <title>Premium Dashboard | PBJ320</title>
   <style>
     *, *::before, *::after {{ box-sizing: border-box; }}
     body {{
@@ -3434,7 +3446,7 @@ def _dashboard_login_response(expected_password: str, *, error: str = "", status
         <span class="brand-tagline">Nursing Home Staffing Intelligence</span>
       </div>
     </div>
-    <h1>Protected Dashboard</h1>
+    <h1>Premium Dashboard</h1>
     <p class="lead">Enter the PBJ320 password to view this facility dashboard.</p>
     {msg}
     <form method="get" action="">

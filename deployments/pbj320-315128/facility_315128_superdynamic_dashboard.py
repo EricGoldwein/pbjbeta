@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Dynamic Facility Dashboard
 Uses the complete CSV file for any facility for fast, detailed analysis
@@ -177,6 +177,12 @@ nursing_employee_daily_series = _fea_get("nursing_employee_daily_series", _fea_e
 nursing_employee_summaries = _fea_get("nursing_employee_summaries", _fea_empty_rows)
 prepare_ein_detail = _fea_get("prepare_ein_detail", _fea_empty_rows)
 roster_pairs_by_quarter_from_rows = _fea_get("roster_pairs_by_quarter_from_rows", _fea_empty_dict)
+ein_roster_work_day_pair_keys = _fea_get("ein_roster_work_day_pair_keys", lambda *a, **k: set())
+filter_ein_roster_rows_for_work_day = _fea_get(
+    "filter_ein_roster_rows_for_work_day",
+    _fea_passthrough_rows,
+)
+NURSING_JOB_CODE_IDS = _fea_get("NURSING_JOB_CODE_IDS", frozenset())
 workdate_to_iso = _fea_get("workdate_to_iso", lambda *a, **k: None)
 from pbj_staffing_normalize import (
     _load_or_build_provnum_chunk_index,
@@ -1082,12 +1088,24 @@ def _plotly_y_nullable_optional(df: pd.DataFrame, col: str) -> list:
 
 
 def _pbj_favicon_path() -> Optional[str]:
-    """Resolve favicon PNG under app root or ``pbj_images/``."""
-    for rel in ("pbj_favicon.png", os.path.join("pbj_images", "pbj_favicon.png")):
-        p = os.path.join(_app_root, rel)
-        if os.path.isfile(p):
+    """Resolve a lightweight favicon PNG (prefer small bundled asset)."""
+    max_bytes = 51200
+    candidates = [
+        os.path.join(_app_root, "static", "pbj320_favicon.png"),
+        os.path.join(_app_root, "pbj_favicon.png"),
+        os.path.join(_app_root, "pbj_images", "pbj_favicon.png"),
+    ]
+    best: Optional[str] = None
+    best_size = max_bytes + 1
+    for p in candidates:
+        if not os.path.isfile(p):
+            continue
+        size = os.path.getsize(p)
+        if size <= max_bytes:
             return p
-    return None
+        if size < best_size:
+            best, best_size = p, size
+    return best
 
 
 def _pbj_favicon_directory_and_name() -> tuple[str, str] | None:
@@ -6374,6 +6392,17 @@ def _parse_dashboard_iso_date_arg(raw: Optional[str], *, field: str) -> pd.Times
     return cast(pd.Timestamp, dt)
 
 
+def _normalize_dashboard_quarter_year_args(quarter: str, year: str) -> tuple[str, str]:
+    """Accept legacy ``year=2025&quarter=4`` combos as ``quarter=2025Q4``."""
+    q_raw = str(quarter or "all").strip()
+    y_raw = str(year or "all").strip()
+    if q_raw != "all" and re.fullmatch(r"[1-4]", q_raw):
+        year_token = y_raw.split(",")[0].strip() if y_raw != "all" else ""
+        if re.fullmatch(r"\d{4}", year_token):
+            return f"{year_token}Q{q_raw}", "all"
+    return q_raw, y_raw
+
+
 def _filter_facility_daily_for_dashboard(
     df: pd.DataFrame,
     *,
@@ -6384,6 +6413,7 @@ def _filter_facility_daily_for_dashboard(
     year: str,
     holidays_only: bool,
 ) -> pd.DataFrame:
+    quarter, year = _normalize_dashboard_quarter_year_args(quarter, year)
     """Same calendar filters as ``/api/data`` and ``/api/summary`` (inclusive end date).
 
     Coerces ``WorkDate`` to datetime, drops pre-2017 rows, and uses an exclusive
@@ -9894,8 +9924,8 @@ def _summary_dict_from_filtered_daily_df(filtered_df: pd.DataFrame) -> dict[str,
         'avg_total_contract_pct': _weighted_summary_total_contract_pct(cast(pd.DataFrame, filtered_df)),
         'total_rn_hours': float(filtered_df['Hrs_RN'].sum()) if len(filtered_df) > 0 else 0,
         # RN Sub 8 metrics - days with less than 8 hours of RN staffing
-        'total_rn_sub8': int((filtered_df['Total_RN_Hours'] < 8).sum()) if len(filtered_df) > 0 else 0,
-        'direct_rn_sub8': int((filtered_df['Hrs_RN'] < 8).sum()) if len(filtered_df) > 0 else 0,
+        'total_rn_sub8': int((filtered_df['Total_RN_Hours'] < 8).sum()) if len(filtered_df) > 0 else None,
+        'direct_rn_sub8': int((filtered_df['Hrs_RN'] < 8).sum()) if len(filtered_df) > 0 else None,
         'total_lpn_hours': float(filtered_df['Hrs_LPN'].sum()) if len(filtered_df) > 0 else 0,
         'total_cna_hours': float(filtered_df['Hrs_CNA'].sum()) if len(filtered_df) > 0 else 0,
         'holiday_days': len(filtered_df[filtered_df['IsHoliday'] == True]),
@@ -15792,26 +15822,15 @@ def api_ein_nursing_employees():
         use_precomputed = (
             ein_nursing_summaries_df is not None
             and not ein_nursing_summaries_df.empty
-            and (not work_anchor or not detail_ready)
         )
         if use_precomputed:
-            df_all = cast(pd.DataFrame, ein_nursing_summaries_df)
-            rows_all = dedupe_nursing_roster_api_rows(_json_rows_from_df(df_all))
-            enrich_nursing_roster_display_fields(rows_all)
-            enrich_nursing_rows_new_to_quarter_flags(rows_all)
-            enrich_nursing_rows_multi_role_flags(rows_all)
-            if detail_ready:
-                enrich_nursing_rows_sustained_work_flags(
-                    ein_employee_detail_df,
-                    rows_all,
-                    facility_ccn=ccn,
-                    limit_quarters=[q_filter_norm] if q_filter_norm else None,
-                )
+            rows_all = _ein_nursing_summaries_rows_all()
             pairs_by_q = roster_pairs_by_quarter_from_rows(rows_all)
             quarter_summary = (
                 compute_ein_quarter_roster_summary(q_filter_norm, pairs_by_q) if q_filter_norm else None
             )
-            if q_filter_norm and "quarter" in df_all.columns:
+            work_day_filtered = False
+            if q_filter_norm:
                 filtered = [
                     r for r in rows_all if normalize_cy_qtr_ein(r.get("quarter")) == q_filter_norm
                 ]
@@ -15821,6 +15840,16 @@ def api_ein_nursing_employees():
                 filtered = [
                     r for r in filtered if ein_job_code_matches_position_group(r.get("job_code"), position_group)
                 ]
+            if (
+                work_date_anchor
+                and ein_employee_detail_df is not None
+                and not ein_employee_detail_df.empty
+            ):
+                pair_keys = ein_roster_work_day_pair_keys(
+                    ein_employee_detail_df, work_date_anchor, NURSING_JOB_CODE_IDS
+                )
+                filtered = filter_ein_roster_rows_for_work_day(filtered, pair_keys)
+                work_day_filtered = True
             apply_roster_tenure_quarter_span(filtered, rows_for_global_bounds=rows_all)
             total = int(len(filtered))
             filtered.sort(
@@ -15839,9 +15868,21 @@ def api_ein_nursing_employees():
                 rows = filtered[offset : offset + lim]
             _enrich_nursing_api_rows(rows, ccn)
             if (
+                ein_employee_detail_df is not None
+                and not ein_employee_detail_df.empty
+                and rows
+            ):
+                enrich_nursing_rows_sustained_work_flags(
+                    ein_employee_detail_df,
+                    rows,
+                    facility_ccn=ccn,
+                    limit_quarters=[q_filter_norm] if q_filter_norm else None,
+                )
+            if (
                 work_date_anchor
                 and ein_employee_detail_df is not None
                 and not ein_employee_detail_df.empty
+                and rows
             ):
                 enrich_nursing_rows_rolling_from_work_date(
                     ein_employee_detail_df, rows, work_date_anchor
@@ -15860,6 +15901,7 @@ def api_ein_nursing_employees():
                     "offset": offset,
                     "truncated": offset + len(rows) < total,
                     "source": "precomputed",
+                    "work_day_filtered": work_day_filtered,
                 }
             )
 
