@@ -2390,12 +2390,28 @@
         }
     }
 
+    function pbjV2SyncAiScopeStaleHint() {
+        var hint = document.getElementById('pbjAiScopeStaleHint');
+        if (!hint) {
+            return;
+        }
+        var stale = !!global.__pbjAiPackScopeStale;
+        hint.classList.toggle('d-none', !stale);
+    }
+
+    function pbjV2MarkAiPackScopeStale() {
+        global.__pbjAiPackScopeStale = true;
+        pbjV2SyncAiScopeStaleHint();
+    }
+
     function pbjV2AiToolkitApplyScope() {
         pbjV2PushAiScopeToDashboard();
         if (typeof global.applyFilters === 'function') {
             global.applyFilters();
         }
         pbjV2InvalidateAiPackCache();
+        global.__pbjAiPackScopeStale = false;
+        pbjV2SyncAiScopeStaleHint();
         pbjV2RefreshAiToolkitScopeLine();
         var grainBtn = document.querySelector('[data-pbj-ai-grain].active');
         var grain = grainBtn ? grainBtn.getAttribute('data-pbj-ai-grain') : '';
@@ -2423,6 +2439,7 @@
                     pbjV2RefreshAiYearSelectOptions();
                 }
                 global.__pbjAiPackScopeStale = true;
+                pbjV2SyncAiScopeStaleHint();
             });
         });
         var applyBtn = document.getElementById('pbjAiScopeApplyBtn');
@@ -2435,10 +2452,20 @@
         var aiY = document.getElementById('pbjAiYearSelect');
         if (aiQ) {
             pbjWireMultiSelectShiftRange(aiQ);
+            aiQ.addEventListener('change', pbjV2MarkAiPackScopeStale);
         }
         if (aiY) {
             pbjWireMultiSelectShiftRange(aiY);
+            aiY.addEventListener('change', pbjV2MarkAiPackScopeStale);
         }
+        ['pbjAiStartDate', 'pbjAiEndDate', 'pbjAiFilterDay'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el || el.dataset.pbjAiScopeStaleBound === '1') {
+                return;
+            }
+            el.dataset.pbjAiScopeStaleBound = '1';
+            el.addEventListener('change', pbjV2MarkAiPackScopeStale);
+        });
     }
 
     function pbjV2EnsureAiPackDataThen(fn) {
@@ -3479,7 +3506,7 @@
             pbjV2GetAiToolkitAudience(),
             global.__pbjLastAiPackMeta || pbjV2AiPackMetaFromPage() || {}
         );
-        var btns = document.querySelectorAll('#pbjAiPackCopyPromptBtn, #pbjAiPackCopyPromptBtnInline');
+        var btns = document.querySelectorAll('#pbjAiPackCopyPromptBtn, #pbjAiPackCopyPromptBtnInline, .pbj-ai-copy-prompt-btn');
         pbjV2CopyTextToClipboard(text, 'pbjAiPackPromptStatus').then(function (ok) {
             if (!ok || !btns.length) {
                 return;
