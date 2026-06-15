@@ -233,6 +233,127 @@ function pbjDashOrNumber(val, decimals) {
     return roundHalfUpDisplay(n, decimals);
 }
 
+/** Parse numeric scalar; null/undefined/NaN → null (never 0). Use for calculations, not display. */
+function parseNumOrNull(val) {
+    if (val === null || val === undefined || val === '') {
+        return null;
+    }
+    var n = parseFloat(val);
+    return isFinite(n) ? n : null;
+}
+
+/**
+ * Sum hour fields on one daily row; null when any field is missing (do not treat missing as 0).
+ * @param {object} row
+ * @param {string[]} fieldNames
+ * @returns {number|null}
+ */
+function pbjSumHourFieldsOrNull(row, fieldNames) {
+    if (!row || !fieldNames || !fieldNames.length) {
+        return null;
+    }
+    var sum = 0;
+    for (var i = 0; i < fieldNames.length; i++) {
+        var v = parseNumOrNull(row[fieldNames[i]]);
+        if (v === null) {
+            return null;
+        }
+        sum += v;
+    }
+    return sum;
+}
+
+/** CMS PBJ total nurse hour columns (all positions incl. admin/DON). */
+var PBJ_TOTAL_NURSE_HOUR_FIELDS = [
+    'Hrs_RNDON', 'Hrs_RNadmin', 'Hrs_RN', 'Hrs_LPNadmin', 'Hrs_LPN',
+    'Hrs_CNA', 'Hrs_NAtrn', 'Hrs_MedAide'
+];
+var PBJ_TOTAL_RN_HOUR_FIELDS = ['Hrs_RNDON', 'Hrs_RNadmin', 'Hrs_RN'];
+var PBJ_DIRECT_CARE_HOUR_FIELDS = ['Hrs_RN', 'Hrs_LPN', 'Hrs_CNA', 'Hrs_NAtrn', 'Hrs_MedAide'];
+var PBJ_CONTRACT_HOUR_FIELDS = [
+    'Hrs_RNDON_ctr', 'Hrs_RNadmin_ctr', 'Hrs_RN_ctr', 'Hrs_LPNadmin_ctr', 'Hrs_LPN_ctr',
+    'Hrs_CNA_ctr', 'Hrs_NAtrn_ctr', 'Hrs_MedAide_ctr'
+];
+
+/**
+ * Pooled HPRD = sum(hours) / sum(census) on days with census > 0 and complete hours.
+ * @param {object[]} rows
+ * @param {string[]} hourFields
+ * @returns {number|null}
+ */
+function pbjPooledHprdFromRows(rows, hourFields) {
+    if (!rows || !rows.length || !hourFields || !hourFields.length) {
+        return null;
+    }
+    var totalHours = 0;
+    var totalCensus = 0;
+    rows.forEach(function (r) {
+        if (!r) {
+            return;
+        }
+        var cen = parseNumOrNull(r.MDScensus);
+        if (cen === null || cen <= 0) {
+            return;
+        }
+        var hrs = pbjSumHourFieldsOrNull(r, hourFields);
+        if (hrs === null) {
+            return;
+        }
+        totalHours += hrs;
+        totalCensus += cen;
+    });
+    if (totalCensus <= 0) {
+        return null;
+    }
+    return totalHours / totalCensus;
+}
+
+/**
+ * Contract share = 100 * sum(contract hours) / sum(total nurse hours); null when denominator missing.
+ */
+function pbjContractSharePctFromRows(rows) {
+    if (!rows || !rows.length) {
+        return null;
+    }
+    var contractHrs = 0;
+    var totalHrs = 0;
+    var hasData = false;
+    rows.forEach(function (r) {
+        if (!r) {
+            return;
+        }
+        var cen = parseNumOrNull(r.MDScensus);
+        if (cen === null || cen <= 0) {
+            return;
+        }
+        var th = pbjSumHourFieldsOrNull(r, PBJ_TOTAL_NURSE_HOUR_FIELDS);
+        var ch = pbjSumHourFieldsOrNull(r, PBJ_CONTRACT_HOUR_FIELDS);
+        if (th === null || ch === null) {
+            return;
+        }
+        totalHrs += th;
+        contractHrs += ch;
+        hasData = true;
+    });
+    if (!hasData || totalHrs <= 0) {
+        return null;
+    }
+    return (contractHrs / totalHrs) * 100;
+}
+
+/** Compliance share = days meeting / observed days; null when no observed days. */
+function pbjComplianceSharePct(daysMeeting, observedDays) {
+    var n = parseNumOrNull(observedDays);
+    if (n === null || n <= 0) {
+        return null;
+    }
+    var met = parseNumOrNull(daysMeeting);
+    if (met === null) {
+        return null;
+    }
+    return (met / n) * 100;
+}
+
 /** Census / hours: half-up rounding plus thousands separators in the integer part. */
 function formatDailyCountDisplay(val, decimals) {
     if (val === null || val === undefined) return '';

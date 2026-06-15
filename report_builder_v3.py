@@ -323,21 +323,25 @@ def generate_event_windows_section_html(
         wl = _xml_escape(str(w.get("window_label") or "Window"))
         avg_total = pm.get("total_hprd")
         avg_direct = pm.get("direct_care_hprd")
-        days_under_d = int(pm.get("days_under_minimum_direct") or 0)
-        days_under_t = int(pm.get("days_under_minimum_total") or 0)
+        days_under_d_raw = pm.get("days_under_minimum_direct")
+        days_under_t_raw = pm.get("days_under_minimum_total")
+        days_under_d = int(days_under_d_raw) if days_under_d_raw is not None else None
+        days_under_t = int(days_under_t_raw) if days_under_t_raw is not None else None
         total_days = int(pm.get("total_days") or 0)
         below_line = ""
         if min_staffing > 0 and total_days > 0:
-            if include_total and days_under_t:
+            if include_total and days_under_t_raw is not None:
                 below_line = (
                     f"<li>Days below threshold (total HPRD): <strong>{days_under_t}</strong> of {total_days}</li>"
                 )
-            elif days_under_d:
+            elif days_under_d_raw is not None:
                 below_line = (
                     f"<li>Days below threshold (direct care HPRD): <strong>{days_under_d}</strong> of {total_days}</li>"
                 )
             else:
-                below_line = f"<li>Days below threshold: 0 of {total_days}</li>"
+                below_line = (
+                    "<li>Days below threshold: <em>not computed for this window</em></li>"
+                )
         hprd_bits = []
         if include_total and avg_total is not None:
             hprd_bits.append(f"Average total HPRD: <strong>{float(avg_total):.2f}</strong>")

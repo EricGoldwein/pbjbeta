@@ -16,6 +16,20 @@ import json
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, Optional, List, Tuple, Union, Sequence, cast
 
+from pbj_metric_helpers import (
+    CONTRACT_HOUR_COLS,
+    DIRECT_CARE_HOUR_COLS,
+    TOTAL_NURSE_HOUR_COLS,
+    TOTAL_RN_HOUR_COLS,
+    coerce_num,
+    compliance_share,
+    contract_share_pct,
+    pooled_hprd_from_df,
+    round_half_up_display,
+    row_sum_hours,
+    safe_divide,
+)
+
 
 def _xml_escape(s: str) -> str:
     """Escape for use inside XML text so the reference doc's formatting is preserved."""
@@ -48,7 +62,7 @@ def round_half_up(value: float, decimals: int = 2) -> float:
     except Exception:
         pass
     if pd.isna(value) or value is None:
-        return 0.0
+        return None  # type: ignore[return-value]
     if decimals == 1:
         return float(Decimal(str(value)).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP))
     elif decimals == 0:
@@ -419,215 +433,174 @@ def get_daily_staffing(df: pd.DataFrame, date: datetime) -> Optional[Dict]:
         return None
     
     row = day_data.iloc[0]
-    census = row.get('MDScensus', 0)
+    census = coerce_num(row.get('MDScensus'))
     
-    # Calculate hours
-    hrs_rn = row.get('Hrs_RN', 0) or 0
-    hrs_rnadmin = row.get('Hrs_RNadmin', 0) or 0
-    hrs_rndon = row.get('Hrs_RNDON', 0) or 0
-    hrs_lpn = row.get('Hrs_LPN', 0) or 0
-    hrs_lpnadmin = row.get('Hrs_LPNadmin', 0) or 0
-    hrs_cna = row.get('Hrs_CNA', 0) or 0
-    hrs_natrn = row.get('Hrs_NAtrn', 0) or 0
-    hrs_medaide = row.get('Hrs_MedAide', 0) or 0
+    hrs_rn = coerce_num(row.get('Hrs_RN'))
+    hrs_rnadmin = coerce_num(row.get('Hrs_RNadmin'))
+    hrs_rndon = coerce_num(row.get('Hrs_RNDON'))
+    hrs_lpn = coerce_num(row.get('Hrs_LPN'))
+    hrs_lpnadmin = coerce_num(row.get('Hrs_LPNadmin'))
+    hrs_cna = coerce_num(row.get('Hrs_CNA'))
+    hrs_natrn = coerce_num(row.get('Hrs_NAtrn'))
+    hrs_medaide = coerce_num(row.get('Hrs_MedAide'))
     
-    total_rn_hours = hrs_rn + hrs_rnadmin + hrs_rndon
-    total_lpn_hours = hrs_lpn + hrs_lpnadmin  # Total LPN (includes admin) - for internal use only
-    direct_lpn_hours = hrs_lpn  # Direct LPN (excludes admin) - this is what we display as "LPN Hours"
-    total_nurse_aide_hours = hrs_cna + hrs_natrn + hrs_medaide
-    total_nurse_hours = total_rn_hours + total_lpn_hours + total_nurse_aide_hours
+    def _sum_or_none(*vals: Optional[float]) -> Optional[float]:
+        if any(v is None for v in vals):
+            return None
+        return sum(cast(float, v) for v in vals)
     
-    # Calculate HPRD
-    rn_hprd = (total_rn_hours / census) if census > 0 else 0
-    lpn_hprd = (direct_lpn_hours / census) if census > 0 else 0  # Direct LPN HPRD (excludes admin)
-    cna_hprd = (total_nurse_aide_hours / census) if census > 0 else 0
-    total_hprd = (total_nurse_hours / census) if census > 0 else 0
-    direct_care_rn_hprd = (hrs_rn / census) if census > 0 else 0
-    # Direct care hours (excluding admin/DON): RN + LPN + CNA + NAtrn + MedAide
-    direct_care_hours = hrs_rn + hrs_lpn + hrs_cna + hrs_natrn + hrs_medaide
-    direct_care_hprd = (direct_care_hours / census) if census > 0 else 0
+    total_rn_hours = _sum_or_none(hrs_rn, hrs_rnadmin, hrs_rndon)
+    total_lpn_hours = _sum_or_none(hrs_lpn, hrs_lpnadmin)
+    direct_lpn_hours = hrs_lpn
+    total_nurse_aide_hours = _sum_or_none(hrs_cna, hrs_natrn, hrs_medaide)
+    total_nurse_hours = _sum_or_none(total_rn_hours, total_lpn_hours, total_nurse_aide_hours)
     
-    # Contract hours: include all positions (RN, RN Admin, RN DON, LPN, LPN Admin, CNA, Med Aide, NA Trn) to match quarterly/period
-    hrs_rn_ctr = row.get('Hrs_RN_ctr', 0) or 0
-    hrs_rnadmin_ctr = row.get('Hrs_RNadmin_ctr', 0) or 0
-    hrs_rndon_ctr = row.get('Hrs_RNDON_ctr', 0) or 0
-    hrs_lpn_ctr = row.get('Hrs_LPN_ctr', 0) or 0
-    hrs_lpnadmin_ctr = row.get('Hrs_LPNadmin_ctr', 0) or 0
-    hrs_cna_ctr = row.get('Hrs_CNA_ctr', 0) or 0
-    hrs_natrn_ctr = row.get('Hrs_NAtrn_ctr', 0) or 0
-    hrs_medaide_ctr = row.get('Hrs_MedAide_ctr', 0) or 0
-    total_contract_hours = (hrs_rn_ctr + hrs_rnadmin_ctr + hrs_rndon_ctr + hrs_lpn_ctr + hrs_lpnadmin_ctr +
-                           hrs_cna_ctr + hrs_natrn_ctr + hrs_medaide_ctr)
-    # Contract % = contract hours as % of total nursing hours (all positions, incl. admin/DON)
-    contract_pct = (total_contract_hours / total_nurse_hours * 100) if total_nurse_hours > 0 else 0
+    rn_hprd = safe_divide(total_rn_hours, census) if total_rn_hours is not None else None
+    lpn_hprd = safe_divide(direct_lpn_hours, census)
+    cna_hprd = safe_divide(total_nurse_aide_hours, census)
+    total_hprd = safe_divide(total_nurse_hours, census)
+    direct_care_rn_hprd = safe_divide(hrs_rn, census)
+    direct_care_hours = _sum_or_none(hrs_rn, hrs_lpn, hrs_cna, hrs_natrn, hrs_medaide)
+    direct_care_hprd = safe_divide(direct_care_hours, census)
+    
+    hrs_rn_ctr = coerce_num(row.get('Hrs_RN_ctr'))
+    hrs_rnadmin_ctr = coerce_num(row.get('Hrs_RNadmin_ctr'))
+    hrs_rndon_ctr = coerce_num(row.get('Hrs_RNDON_ctr'))
+    hrs_lpn_ctr = coerce_num(row.get('Hrs_LPN_ctr'))
+    hrs_lpnadmin_ctr = coerce_num(row.get('Hrs_LPNadmin_ctr'))
+    hrs_cna_ctr = coerce_num(row.get('Hrs_CNA_ctr'))
+    hrs_natrn_ctr = coerce_num(row.get('Hrs_NAtrn_ctr'))
+    hrs_medaide_ctr = coerce_num(row.get('Hrs_MedAide_ctr'))
+    total_contract_hours = _sum_or_none(
+        hrs_rn_ctr, hrs_rnadmin_ctr, hrs_rndon_ctr, hrs_lpn_ctr, hrs_lpnadmin_ctr,
+        hrs_cna_ctr, hrs_natrn_ctr, hrs_medaide_ctr,
+    )
+    contract_pct = contract_share_pct(total_contract_hours, total_nurse_hours)
+    
+    def _rd(v: Optional[float], d: int) -> Any:
+        return round_half_up(v, d) if v is not None else None
     
     return {
         'date': date,
-        'census': round_half_up(census, 0),
-        'hrs_rn': round_half_up(hrs_rn, 2),
-        'hrs_rnadmin': round_half_up(hrs_rnadmin, 2),
-        'hrs_rndon': round_half_up(hrs_rndon, 2),
-        'hrs_lpn': round_half_up(hrs_lpn, 2),
-        'direct_care_rn_hours': round_half_up(hrs_rn, 2),
-        'hrs_lpnadmin': round_half_up(hrs_lpnadmin, 2),
-        'hrs_cna': round_half_up(hrs_cna, 2),
-        'hrs_natrn': round_half_up(hrs_natrn, 2),
-        'hrs_medaide': round_half_up(hrs_medaide, 2),
-        'total_rn_hours': round_half_up(total_rn_hours, 2),
-        'total_lpn_hours': round_half_up(total_lpn_hours, 2),  # Total LPN (includes admin) - for internal use
-        'direct_lpn_hours': round_half_up(direct_lpn_hours, 2),  # Direct LPN (excludes admin) - this is displayed as "LPN Hours" (rounded to 2 decimals)
-        'total_nurse_aide_hours': round_half_up(total_nurse_aide_hours, 2),
-        'total_nurse_hours': round_half_up(total_nurse_hours, 2),
-        'rn_hprd': round_half_up(rn_hprd, 2),
-        'lpn_hprd': round_half_up(lpn_hprd, 2),
-        'cna_hprd': round_half_up(cna_hprd, 2),
-        'total_hprd': round_half_up(total_hprd, 2),
-        'direct_care_hprd': round_half_up(direct_care_hprd, 2),
-        'direct_care_rn_hprd': round_half_up(direct_care_rn_hprd, 2),
-        'contract_pct': round_half_up(contract_pct, 1),
+        'census': _rd(census, 0),
+        'hrs_rn': _rd(hrs_rn, 2),
+        'hrs_rnadmin': _rd(hrs_rnadmin, 2),
+        'hrs_rndon': _rd(hrs_rndon, 2),
+        'hrs_lpn': _rd(hrs_lpn, 2),
+        'direct_care_rn_hours': _rd(hrs_rn, 2),
+        'hrs_lpnadmin': _rd(hrs_lpnadmin, 2),
+        'hrs_cna': _rd(hrs_cna, 2),
+        'hrs_natrn': _rd(hrs_natrn, 2),
+        'hrs_medaide': _rd(hrs_medaide, 2),
+        'total_rn_hours': _rd(total_rn_hours, 2),
+        'total_lpn_hours': _rd(total_lpn_hours, 2),
+        'direct_lpn_hours': _rd(direct_lpn_hours, 2),
+        'total_nurse_aide_hours': _rd(total_nurse_aide_hours, 2),
+        'total_nurse_hours': _rd(total_nurse_hours, 2),
+        'rn_hprd': _rd(rn_hprd, 2),
+        'lpn_hprd': _rd(lpn_hprd, 2),
+        'cna_hprd': _rd(cna_hprd, 2),
+        'total_hprd': _rd(total_hprd, 2),
+        'direct_care_hprd': _rd(direct_care_hprd, 2),
+        'direct_care_rn_hprd': _rd(direct_care_rn_hprd, 2),
+        'contract_pct': _rd(contract_pct, 1),
         'day_of_week': date.strftime('%A')
     }
 
 def calculate_quarterly_metrics(df: pd.DataFrame, quarter: str) -> Optional[Dict]:
-    """Calculate quarterly metrics for a facility."""
+    """Calculate quarterly metrics for a facility (pooled HPRD; missing hours stay missing)."""
     quarter_data = df[df['CY_Qtr'] == quarter].copy()
     
     if quarter_data.empty:
         return None
     
-    # Calculate totals
-    total_resident_days = quarter_data['MDScensus'].sum()
+    mdc = pd.to_numeric(quarter_data['MDScensus'], errors='coerce')
+    total_resident_days = float(mdc[mdc.notna() & (mdc > 0)].sum())
     
-    if total_resident_days == 0:
+    if total_resident_days <= 0:
         return None
     
-    # Calculate hours
-    total_nurse_hours = (
-        quarter_data['Hrs_RNDON'].fillna(0) +
-        quarter_data['Hrs_RNadmin'].fillna(0) +
-        quarter_data['Hrs_RN'].fillna(0) +
-        quarter_data['Hrs_LPNadmin'].fillna(0) +
-        quarter_data['Hrs_LPN'].fillna(0) +
-        quarter_data['Hrs_CNA'].fillna(0) +
-        quarter_data['Hrs_NAtrn'].fillna(0) +
-        quarter_data['Hrs_MedAide'].fillna(0)
-    ).sum()
+    total_hprd = pooled_hprd_from_df(quarter_data, TOTAL_NURSE_HOUR_COLS)
+    rn_hprd = pooled_hprd_from_df(quarter_data, TOTAL_RN_HOUR_COLS)
+    direct_care_rn_hprd = pooled_hprd_from_df(quarter_data, ('Hrs_RN',))
+    direct_care_hprd = pooled_hprd_from_df(quarter_data, DIRECT_CARE_HOUR_COLS)
     
-    total_rn_hours = (
-        quarter_data['Hrs_RNDON'].fillna(0) +
-        quarter_data['Hrs_RNadmin'].fillna(0) +
-        quarter_data['Hrs_RN'].fillna(0)
-    ).sum()
+    total_nurse_hours = row_sum_hours(quarter_data, TOTAL_NURSE_HOUR_COLS)
+    contract_hours = row_sum_hours(quarter_data, CONTRACT_HOUR_COLS)
+    ok = mdc.notna() & (mdc > 0) & total_nurse_hours.notna()
+    pooled_total_hours = float(total_nurse_hours[ok].sum()) if ok.any() else None
+    pooled_contract_hours = float(contract_hours[ok].sum()) if ok.any() and contract_hours.notna().any() else None
+    contract_pct = contract_share_pct(pooled_contract_hours, pooled_total_hours)
     
-    direct_care_rn_hours = quarter_data['Hrs_RN'].fillna(0).sum()
+    total_rn_hours = row_sum_hours(quarter_data, TOTAL_RN_HOUR_COLS)
+    pooled_rn_hours = float(total_rn_hours[ok].sum()) if ok.any() else None
     
-    # Calculate direct care hours (excluding admin/DON): RN + LPN + CNA + NAtrn + MedAide
-    direct_care_hours = (
-        quarter_data['Hrs_RN'].fillna(0) +
-        quarter_data['Hrs_LPN'].fillna(0) +
-        quarter_data['Hrs_CNA'].fillna(0) +
-        quarter_data['Hrs_NAtrn'].fillna(0) +
-        quarter_data['Hrs_MedAide'].fillna(0)
-    ).sum()
+    avg_census = coerce_num(mdc.mean())
     
-    # Calculate contract hours
-    contract_hours = (
-        quarter_data['Hrs_RNDON_ctr'].fillna(0) +
-        quarter_data['Hrs_RNadmin_ctr'].fillna(0) +
-        quarter_data['Hrs_RN_ctr'].fillna(0) +
-        quarter_data['Hrs_LPNadmin_ctr'].fillna(0) +
-        quarter_data['Hrs_LPN_ctr'].fillna(0) +
-        quarter_data['Hrs_CNA_ctr'].fillna(0) +
-        quarter_data['Hrs_NAtrn_ctr'].fillna(0) +
-        quarter_data['Hrs_MedAide_ctr'].fillna(0)
-    ).sum()
-    
-    # Calculate HPRD
-    total_hprd = total_nurse_hours / total_resident_days if total_resident_days > 0 else 0
-    rn_hprd = total_rn_hours / total_resident_days if total_resident_days > 0 else 0
-    direct_care_rn_hprd = direct_care_rn_hours / total_resident_days if total_resident_days > 0 else 0
-    direct_care_hprd = direct_care_hours / total_resident_days if total_resident_days > 0 else 0
-    
-    # Calculate contract percentage
-    contract_pct = (contract_hours / total_nurse_hours * 100) if total_nurse_hours > 0 else 0
-    
-    # Average census
-    avg_census = float(quarter_data['MDScensus'].mean())
+    def _rd(v: Optional[float], d: int) -> Any:
+        return round_half_up(v, d) if v is not None else None
     
     return {
         'quarter': quarter,
-        'avg_census': round_half_up(avg_census, 1),
-        'total_hprd': round_half_up(total_hprd, 2),
-        'rn_hprd': round_half_up(rn_hprd, 2),
-        'direct_care_rn_hprd': round_half_up(direct_care_rn_hprd, 2),
-        'direct_care_hprd': round_half_up(direct_care_hprd, 2),
-        'contract_pct': round_half_up(contract_pct, 1),
+        'avg_census': _rd(avg_census, 1),
+        'total_hprd': _rd(total_hprd, 2),
+        'rn_hprd': _rd(rn_hprd, 2),
+        'direct_care_rn_hprd': _rd(direct_care_rn_hprd, 2),
+        'direct_care_hprd': _rd(direct_care_hprd, 2),
+        'contract_pct': _rd(contract_pct, 1),
         'total_resident_days': total_resident_days,
-        'total_rn_hours': round_half_up(total_rn_hours, 2)
+        'total_rn_hours': _rd(pooled_rn_hours, 2)
     }
 
 def calculate_days_under_state_minimum(df: pd.DataFrame, start_date: datetime, end_date: datetime, state_minimum: float) -> Dict:
-    """Calculate number of days under state minimum staffing for both Total HPRD and Direct Care HPRD."""
-    # Ensure WorkDate is datetime
+    """Calculate days under state minimum for Total and Direct Care HPRD (null-aware daily math)."""
     if df['WorkDate'].dtype != 'datetime64[ns]':
         df['WorkDate'] = pd.to_datetime(df['WorkDate'], errors='coerce')
     
     period_data = df[
         (df['WorkDate'] >= start_date) &
         (df['WorkDate'] <= end_date) &
-        (df['MDScensus'] > 0)  # Only count days with census > 0
+        (pd.to_numeric(df['MDScensus'], errors='coerce') > 0)
     ].copy()
     
     if period_data.empty:
         return {
             'total_days': 0,
-            'days_under_minimum_total': 0,
-            'percentage_under_total': 0.0,
-            'days_under_minimum_direct': 0,
-            'percentage_under_direct': 0.0
+            'days_under_minimum_total': None,
+            'percentage_under_total': None,
+            'days_under_minimum_direct': None,
+            'percentage_under_direct': None,
+            'available': False,
         }
     
-    # Calculate total HPRD for each day (all staff including admin/DON)
-    period_data['Total_Nurse_Hours'] = (
-        period_data['Hrs_RNDON'].fillna(0) +
-        period_data['Hrs_RNadmin'].fillna(0) +
-        period_data['Hrs_RN'].fillna(0) +
-        period_data['Hrs_LPNadmin'].fillna(0) +
-        period_data['Hrs_LPN'].fillna(0) +
-        period_data['Hrs_CNA'].fillna(0) +
-        period_data['Hrs_NAtrn'].fillna(0) +
-        period_data['Hrs_MedAide'].fillna(0)
-    )
-    period_data['Total_HPRD'] = period_data['Total_Nurse_Hours'] / period_data['MDScensus']
+    period_data['Total_Nurse_Hours'] = row_sum_hours(period_data, TOTAL_NURSE_HOUR_COLS)
+    mdc = pd.to_numeric(period_data['MDScensus'], errors='coerce')
+    period_data['Total_HPRD'] = period_data['Total_Nurse_Hours'] / mdc
+    period_data.loc[~(mdc.notna() & (mdc > 0) & period_data['Total_Nurse_Hours'].notna()), 'Total_HPRD'] = np.nan
     
-    # Calculate direct care HPRD for each day (excluding admin/DON)
-    period_data['Direct_Care_Hours'] = (
-        period_data['Hrs_RN'].fillna(0) +
-        period_data['Hrs_LPN'].fillna(0) +
-        period_data['Hrs_CNA'].fillna(0) +
-        period_data['Hrs_NAtrn'].fillna(0) +
-        period_data['Hrs_MedAide'].fillna(0)
-    )
-    period_data['Direct_Care_HPRD'] = period_data['Direct_Care_Hours'] / period_data['MDScensus']
+    period_data['Direct_Care_Hours'] = row_sum_hours(period_data, DIRECT_CARE_HOUR_COLS)
+    period_data['Direct_Care_HPRD'] = period_data['Direct_Care_Hours'] / mdc
+    period_data.loc[~(mdc.notna() & (mdc > 0) & period_data['Direct_Care_Hours'].notna()), 'Direct_Care_HPRD'] = np.nan
     
-    # Count days under minimum for both metrics
-    days_under_total = (period_data['Total_HPRD'] < state_minimum).sum()
-    days_under_direct = (period_data['Direct_Care_HPRD'] < state_minimum).sum()
-    total_days = len(period_data)
-    percentage_under_total = (days_under_total / total_days * 100) if total_days > 0 else 0.0
-    percentage_under_direct = (days_under_direct / total_days * 100) if total_days > 0 else 0.0
+    total_obs = int(period_data['Total_HPRD'].notna().sum())
+    direct_obs = int(period_data['Direct_Care_HPRD'].notna().sum())
+    days_under_total = int((period_data['Total_HPRD'] < state_minimum).sum()) if total_obs else 0
+    days_under_direct = int((period_data['Direct_Care_HPRD'] < state_minimum).sum()) if direct_obs else 0
+    
+    pct_total = (float(days_under_total) / total_obs * 100.0) if total_obs else None
+    pct_direct = (float(days_under_direct) / direct_obs * 100.0) if direct_obs else None
     
     return {
-        'total_days': total_days,
-        'days_under_minimum_total': int(days_under_total),
-        'percentage_under_total': round_half_up(percentage_under_total, 1),
-        'days_under_minimum_direct': int(days_under_direct),
-        'percentage_under_direct': round_half_up(percentage_under_direct, 1)
+        'total_days': total_obs,
+        'days_under_minimum_total': days_under_total if total_obs else None,
+        'percentage_under_total': round_half_up(pct_total, 1) if pct_total is not None else None,
+        'days_under_minimum_direct': days_under_direct if direct_obs else None,
+        'percentage_under_direct': round_half_up(pct_direct, 1) if pct_direct is not None else None,
+        'available': total_obs > 0 or direct_obs > 0,
     }
 
 def calculate_period_metrics(df: pd.DataFrame, start_date: datetime, end_date: datetime) -> Optional[Dict]:
-    """Calculate metrics for a specific date range (not just quarters)."""
-    # Ensure WorkDate is datetime
+    """Calculate metrics for a specific date range (pooled HPRD; missing hours stay missing)."""
     if df['WorkDate'].dtype != 'datetime64[ns]':
         df['WorkDate'] = pd.to_datetime(df['WorkDate'], errors='coerce')
     
@@ -641,73 +614,37 @@ def calculate_period_metrics(df: pd.DataFrame, start_date: datetime, end_date: d
         print(f"    Available date range: {df['WorkDate'].min()} to {df['WorkDate'].max()}")
         return None
     
-    # Calculate totals
-    total_resident_days = period_data['MDScensus'].sum()
+    mdc = pd.to_numeric(period_data['MDScensus'], errors='coerce')
+    total_resident_days = float(mdc[mdc.notna() & (mdc > 0)].sum())
     
-    if total_resident_days == 0:
+    if total_resident_days <= 0:
         return None
     
-    # Calculate hours
-    total_nurse_hours = (
-        period_data['Hrs_RNDON'].fillna(0) +
-        period_data['Hrs_RNadmin'].fillna(0) +
-        period_data['Hrs_RN'].fillna(0) +
-        period_data['Hrs_LPNadmin'].fillna(0) +
-        period_data['Hrs_LPN'].fillna(0) +
-        period_data['Hrs_CNA'].fillna(0) +
-        period_data['Hrs_NAtrn'].fillna(0) +
-        period_data['Hrs_MedAide'].fillna(0)
-    ).sum()
+    total_hprd = pooled_hprd_from_df(period_data, TOTAL_NURSE_HOUR_COLS)
+    direct_care_hprd = pooled_hprd_from_df(period_data, DIRECT_CARE_HOUR_COLS)
+    rn_hprd = pooled_hprd_from_df(period_data, TOTAL_RN_HOUR_COLS)
+    direct_care_rn_hprd = pooled_hprd_from_df(period_data, ('Hrs_RN',))
     
-    total_rn_hours = (
-        period_data['Hrs_RNDON'].fillna(0) +
-        period_data['Hrs_RNadmin'].fillna(0) +
-        period_data['Hrs_RN'].fillna(0)
-    ).sum()
+    total_nurse_hours = row_sum_hours(period_data, TOTAL_NURSE_HOUR_COLS)
+    contract_hours = row_sum_hours(period_data, CONTRACT_HOUR_COLS)
+    ok = mdc.notna() & (mdc > 0) & total_nurse_hours.notna()
+    pooled_total_hours = float(total_nurse_hours[ok].sum()) if ok.any() else None
+    pooled_contract_hours = float(contract_hours[ok].sum()) if ok.any() and contract_hours.notna().any() else None
+    contract_pct = contract_share_pct(pooled_contract_hours, pooled_total_hours)
     
-    direct_care_rn_hours = period_data['Hrs_RN'].fillna(0).sum()
+    avg_census = coerce_num(mdc.mean())
     
-    # Direct care hours (excluding admin/DON) - RN + LPN + CNA + NAtrn + MedAide
-    direct_care_hours = (
-        period_data['Hrs_RN'].fillna(0) +
-        period_data['Hrs_LPN'].fillna(0) +
-        period_data['Hrs_CNA'].fillna(0) +
-        period_data['Hrs_NAtrn'].fillna(0) +
-        period_data['Hrs_MedAide'].fillna(0)
-    ).sum()
-    
-    # Calculate HPRD
-    total_hprd = total_nurse_hours / total_resident_days if total_resident_days > 0 else 0
-    direct_care_hprd = direct_care_hours / total_resident_days if total_resident_days > 0 else 0
-    rn_hprd = total_rn_hours / total_resident_days if total_resident_days > 0 else 0
-    direct_care_rn_hprd = direct_care_rn_hours / total_resident_days if total_resident_days > 0 else 0
-    
-    # Calculate contract hours
-    contract_hours = (
-        period_data['Hrs_RNDON_ctr'].fillna(0) +
-        period_data['Hrs_RNadmin_ctr'].fillna(0) +
-        period_data['Hrs_RN_ctr'].fillna(0) +
-        period_data['Hrs_LPNadmin_ctr'].fillna(0) +
-        period_data['Hrs_LPN_ctr'].fillna(0) +
-        period_data['Hrs_CNA_ctr'].fillna(0) +
-        period_data['Hrs_NAtrn_ctr'].fillna(0) +
-        period_data['Hrs_MedAide_ctr'].fillna(0)
-    ).sum()
-    
-    # Calculate contract percentage
-    contract_pct = (contract_hours / total_nurse_hours * 100) if total_nurse_hours > 0 else 0
-    
-    # Average census
-    avg_census = float(period_data['MDScensus'].mean())
+    def _rd(v: Optional[float], d: int) -> Any:
+        return round_half_up(v, d) if v is not None else None
     
     return {
-        'total_hprd': round_half_up(total_hprd, 2),
-        'direct_care_hprd': round_half_up(direct_care_hprd, 2),
-        'rn_hprd': round_half_up(rn_hprd, 2),
-        'direct_care_rn_hprd': round_half_up(direct_care_rn_hprd, 2),
-        'avg_census': round_half_up(avg_census, 1),
+        'total_hprd': _rd(total_hprd, 2),
+        'direct_care_hprd': _rd(direct_care_hprd, 2),
+        'rn_hprd': _rd(rn_hprd, 2),
+        'direct_care_rn_hprd': _rd(direct_care_rn_hprd, 2),
+        'avg_census': _rd(avg_census, 1),
         'total_resident_days': total_resident_days,
-        'contract_pct': round_half_up(contract_pct, 1)
+        'contract_pct': _rd(contract_pct, 1)
     }
 
 # Primary source: MACPAC compendium (state policies / legislation summary)
@@ -1334,21 +1271,32 @@ def generate_daily_staffing_table(daily_data: List[Dict], state_minimum: float =
     """Generate concise, styled HTML table for daily staffing on key dates."""
     if not daily_data:
         return "<p><em>No daily staffing data available for key dates.</em></p>"
+
+    def _fmt_num(v: Any, decimals: int = 2) -> str:
+        if v is None:
+            return "—"
+        try:
+            if pd.isna(v):
+                return "—"
+        except (TypeError, ValueError):
+            pass
+        return f"{float(v):.{decimals}f}"
     
     rows = []
     for day in daily_data:
         date_str = day['date'].strftime('%b %d, %Y')
         day_name = day['day_of_week'][:3]  # Abbreviated day name
         
-        # Check if direct care HPRD is below state minimum
-        direct_care_hprd = day.get('direct_care_hprd', 0)
-        direct_care_hprd_below = direct_care_hprd < state_minimum if state_minimum > 0 else False
+        # Check if direct care HPRD is below state minimum (skip when HPRD unavailable)
+        direct_care_hprd = day.get('direct_care_hprd')
+        direct_care_hprd_below = (
+            direct_care_hprd is not None and state_minimum > 0 and direct_care_hprd < state_minimum
+        )
         direct_care_hprd_class = 'class="below-state-min"' if direct_care_hprd_below else ''
         direct_care_compliance = '⚠️' if direct_care_hprd_below else ''
         
-        # Check if total HPRD is below state minimum (for appendix only)
-        total_hprd = day.get('total_hprd', 0)
-        total_hprd_below = total_hprd < state_minimum if state_minimum > 0 else False
+        total_hprd = day.get('total_hprd')
+        total_hprd_below = total_hprd is not None and state_minimum > 0 and total_hprd < state_minimum
         total_hprd_class = 'class="below-state-min"' if total_hprd_below else ''
         total_compliance = '⚠️' if total_hprd_below else ''
         
@@ -1360,37 +1308,38 @@ def generate_daily_staffing_table(daily_data: List[Dict], state_minimum: float =
         # Build row cells conditionally
         row_cells = [
             f'<td><strong>{date_str}</strong><br><span style="font-size: 8pt; color: #666;">{day_name}</span>{compliance_indicator}</td>',
-            f"<td>{day['census']:.0f}</td>"
+            f"<td>{_fmt_num(day['census'], 0)}</td>"
         ]
         
         if include_total_staffing:
-            total_hprd_display = f'<td {total_hprd_class}><strong>{day["total_hprd"]:.2f}</strong>'
+            total_hprd_display = f'<td {total_hprd_class}><strong>{_fmt_num(day.get("total_hprd"))}</strong>'
             if state_minimum > 0:
                 total_hprd_display += f'<br><span style="font-size: 7pt; color: {"#e74c3c" if total_hprd_below else "#27ae60"};">{total_compliance} {state_minimum:.2f}</span>'
             total_hprd_display += '</td>'
             row_cells.append(total_hprd_display)
         
-        direct_care_display = f'<td {direct_care_hprd_class}><strong>{direct_care_hprd:.2f}</strong>'
+        direct_care_display = f'<td {direct_care_hprd_class}><strong>{_fmt_num(direct_care_hprd)}</strong>'
         if state_minimum > 0:
             direct_care_display += f'<br><span style="font-size: 7pt; color: {"#e74c3c" if direct_care_hprd_below else "#27ae60"};">{direct_care_compliance} {state_minimum:.2f}</span>'
         direct_care_display += '</td>'
         row_cells.append(direct_care_display)
         
         if include_total_staffing:
-            row_cells.append(f"<td>{day['rn_hprd']:.2f}</td>")  # Total RN HPRD
+            row_cells.append(f"<td>{_fmt_num(day.get('rn_hprd'))}</td>")  # Total RN HPRD
         
-        row_cells.append(f"<td><strong>{day['direct_care_rn_hprd']:.2f}</strong></td>")  # RN HPRD (excl. Admin/DON)
-        row_cells.append(f"<td>{day['lpn_hprd']:.2f}</td>")
-        row_cells.append(f"<td>{day['cna_hprd']:.2f}</td>")
+        row_cells.append(f"<td><strong>{_fmt_num(day.get('direct_care_rn_hprd'))}</strong></td>")  # RN HPRD (excl. Admin/DON)
+        row_cells.append(f"<td>{_fmt_num(day.get('lpn_hprd'))}</td>")
+        row_cells.append(f"<td>{_fmt_num(day.get('cna_hprd'))}</td>")
         
         # Hours columns - match the HPRD columns shown
         if include_total_staffing:
-            row_cells.append(f"<td>{day['total_rn_hours']:.2f}</td>")  # Total RN Hours (matches Total RN HPRD)
-        row_cells.append(f"<td>{day.get('hrs_rn', day.get('direct_care_rn_hours', 0)):.2f}</td>")  # RN Hours (matches RN HPRD)
+            row_cells.append(f"<td>{_fmt_num(day.get('total_rn_hours'))}</td>")  # Total RN Hours (matches Total RN HPRD)
+        row_cells.append(f"<td>{_fmt_num(day.get('hrs_rn', day.get('direct_care_rn_hours')))}</td>")  # RN Hours (matches RN HPRD)
         
-        row_cells.append(f"<td>{day.get('direct_lpn_hours', day.get('hrs_lpn', 0)):.2f}</td>")  # Direct LPN Hours (excludes admin)
-        row_cells.append(f"<td>{day['total_nurse_aide_hours']:.2f}</td>")
-        row_cells.append(f"<td>{day['contract_pct']:.1f}%</td>")
+        row_cells.append(f"<td>{_fmt_num(day.get('direct_lpn_hours', day.get('hrs_lpn')))}</td>")  # Direct LPN Hours (excludes admin)
+        row_cells.append(f"<td>{_fmt_num(day.get('total_nurse_aide_hours'))}</td>")
+        pct = day.get('contract_pct')
+        row_cells.append(f"<td>{_fmt_num(pct, 1) + '%' if pct is not None else '—'}</td>")
         
         # Alternate row colors: white and light gray
         row_bg = '#ffffff' if len(rows) % 2 == 0 else '#f5f5f5'
@@ -1697,17 +1646,7 @@ def _quarterly_direct_care_hprd_raw(df: pd.DataFrame, quarter: str) -> Optional[
     quarter_data = df[df['CY_Qtr'] == quarter].copy()
     if quarter_data.empty:
         return None
-    total_resident_days = quarter_data['MDScensus'].sum()
-    if total_resident_days == 0:
-        return None
-    direct_care_hours = (
-        quarter_data['Hrs_RN'].fillna(0) +
-        quarter_data['Hrs_LPN'].fillna(0) +
-        quarter_data['Hrs_CNA'].fillna(0) +
-        quarter_data['Hrs_NAtrn'].fillna(0) +
-        quarter_data['Hrs_MedAide'].fillna(0)
-    ).sum()
-    return float(direct_care_hours / total_resident_days)
+    return pooled_hprd_from_df(quarter_data, DIRECT_CARE_HOUR_COLS)
 
 
 def _quarterly_direct_rn_hprd_raw(df: pd.DataFrame, quarter: str) -> Optional[float]:
@@ -1715,11 +1654,7 @@ def _quarterly_direct_rn_hprd_raw(df: pd.DataFrame, quarter: str) -> Optional[fl
     quarter_data = df[df['CY_Qtr'] == quarter].copy()
     if quarter_data.empty:
         return None
-    total_resident_days = quarter_data['MDScensus'].sum()
-    if total_resident_days == 0:
-        return None
-    rn_hours = quarter_data['Hrs_RN'].fillna(0).sum()
-    return float(rn_hours / total_resident_days)
+    return pooled_hprd_from_df(quarter_data, ('Hrs_RN',))
 
 
 def _quarterly_direct_cna_hprd_raw(df: pd.DataFrame, quarter: str) -> Optional[float]:
@@ -1727,18 +1662,7 @@ def _quarterly_direct_cna_hprd_raw(df: pd.DataFrame, quarter: str) -> Optional[f
     quarter_data = df[df['CY_Qtr'] == quarter].copy()
     if quarter_data.empty:
         return None
-    total_resident_days = quarter_data['MDScensus'].sum()
-    if total_resident_days == 0:
-        return None
-    for c in ('Hrs_CNA', 'Hrs_MedAide', 'Hrs_NAtrn'):
-        if c not in quarter_data.columns:
-            quarter_data[c] = 0.0
-    na_hours = (
-        quarter_data['Hrs_CNA'].fillna(0) +
-        quarter_data['Hrs_MedAide'].fillna(0) +
-        quarter_data['Hrs_NAtrn'].fillna(0)
-    ).sum()
-    return float(na_hours / total_resident_days)
+    return pooled_hprd_from_df(quarter_data, ('Hrs_CNA', 'Hrs_MedAide', 'Hrs_NAtrn'))
 
 
 def _harrington_constants() -> dict:

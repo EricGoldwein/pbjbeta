@@ -900,26 +900,26 @@
             if (!(cen > 0)) {
                 return;
             }
-            var hrsRN = parseFloat(r.Hrs_RN || 0) + parseFloat(r.Hrs_RNadmin || 0) + parseFloat(r.Hrs_RNDON || 0);
-            var hrsLPN = parseFloat(r.Hrs_LPN || 0) + parseFloat(r.Hrs_LPNadmin || 0);
-            var hrsAide =
-                parseFloat(r.Hrs_CNA || 0) + parseFloat(r.Hrs_NAtrn || 0) + parseFloat(r.Hrs_MedAide || 0);
-            var totalNurseHrs = hrsRN + hrsLPN + hrsAide;
-            var rnHrs = parseFloat(r.Hrs_RNDON || 0) + parseFloat(r.Hrs_RNadmin || 0) + parseFloat(r.Hrs_RN || 0);
-            var contractHrs =
-                parseFloat(r.Hrs_RNDON_ctr || 0) +
-                parseFloat(r.Hrs_RNadmin_ctr || 0) +
-                parseFloat(r.Hrs_RN_ctr || 0) +
-                parseFloat(r.Hrs_LPNadmin_ctr || 0) +
-                parseFloat(r.Hrs_LPN_ctr || 0) +
-                parseFloat(r.Hrs_CNA_ctr || 0) +
-                parseFloat(r.Hrs_NAtrn_ctr || 0) +
-                parseFloat(r.Hrs_MedAide_ctr || 0);
+            var totalNurseHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_TOTAL_NURSE_HOUR_FIELDS)
+                : null;
+            var rnHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_TOTAL_RN_HOUR_FIELDS)
+                : null;
+            var hrsAide = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, ['Hrs_CNA', 'Hrs_NAtrn', 'Hrs_MedAide'])
+                : null;
+            if (totalNurseHrs === null || rnHrs === null || hrsAide === null) {
+                return;
+            }
+            var contractHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_CONTRACT_HOUR_FIELDS)
+                : null;
             out[iso] = {
                 total_hprd: totalNurseHrs / cen,
                 total_rn_hprd: rnHrs / cen,
                 total_nurse_aide_hprd: hrsAide / cen,
-                contract_pct: totalNurseHrs > 0 ? (contractHrs / totalNurseHrs) * 100 : null,
+                contract_pct: contractHrs !== null && totalNurseHrs > 0 ? (contractHrs / totalNurseHrs) * 100 : null,
             };
         });
         return out;
@@ -964,23 +964,27 @@
             }
             var b = buckets[cy];
             b.residentDays += cen;
-            var hrsRN = parseFloat(r.Hrs_RN || 0) + parseFloat(r.Hrs_RNadmin || 0) + parseFloat(r.Hrs_RNDON || 0);
-            var hrsLPN = parseFloat(r.Hrs_LPN || 0) + parseFloat(r.Hrs_LPNadmin || 0);
-            var hrsAide =
-                parseFloat(r.Hrs_CNA || 0) + parseFloat(r.Hrs_NAtrn || 0) + parseFloat(r.Hrs_MedAide || 0);
-            var totalNurseHrs = hrsRN + hrsLPN + hrsAide;
+            var totalNurseHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_TOTAL_NURSE_HOUR_FIELDS)
+                : null;
+            var rnHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_TOTAL_RN_HOUR_FIELDS)
+                : null;
+            var hrsAide = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, ['Hrs_CNA', 'Hrs_NAtrn', 'Hrs_MedAide'])
+                : null;
+            var contractHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_CONTRACT_HOUR_FIELDS)
+                : null;
+            if (totalNurseHrs === null || rnHrs === null || hrsAide === null) {
+                return;
+            }
             b.totalNurseHrs += totalNurseHrs;
-            b.rnHrs += hrsRN;
+            b.rnHrs += rnHrs;
             b.aideHrs += hrsAide;
-            b.contractHrs +=
-                parseFloat(r.Hrs_RNDON_ctr || 0) +
-                parseFloat(r.Hrs_RNadmin_ctr || 0) +
-                parseFloat(r.Hrs_RN_ctr || 0) +
-                parseFloat(r.Hrs_LPNadmin_ctr || 0) +
-                parseFloat(r.Hrs_LPN_ctr || 0) +
-                parseFloat(r.Hrs_CNA_ctr || 0) +
-                parseFloat(r.Hrs_NAtrn_ctr || 0) +
-                parseFloat(r.Hrs_MedAide_ctr || 0);
+            if (contractHrs !== null) {
+                b.contractHrs += contractHrs;
+            }
         });
         var out = {};
         Object.keys(buckets).forEach(function (cy) {
@@ -1035,21 +1039,23 @@
             }
             var b = buckets[mk];
             b.residentDays += cen;
-            var hrsRN = parseFloat(r.Hrs_RN || 0) + parseFloat(r.Hrs_RNadmin || 0) + parseFloat(r.Hrs_RNDON || 0);
-            var hrsLPN = parseFloat(r.Hrs_LPN || 0) + parseFloat(r.Hrs_LPNadmin || 0);
-            var hrsAide =
-                parseFloat(r.Hrs_CNA || 0) + parseFloat(r.Hrs_NAtrn || 0) + parseFloat(r.Hrs_MedAide || 0);
-            b.totalNurseHrs += hrsRN + hrsLPN + hrsAide;
-            b.rnHrs += parseFloat(r.Hrs_RNDON || 0) + parseFloat(r.Hrs_RNadmin || 0) + parseFloat(r.Hrs_RN || 0);
-            b.contractHrs +=
-                parseFloat(r.Hrs_RNDON_ctr || 0) +
-                parseFloat(r.Hrs_RNadmin_ctr || 0) +
-                parseFloat(r.Hrs_RN_ctr || 0) +
-                parseFloat(r.Hrs_LPNadmin_ctr || 0) +
-                parseFloat(r.Hrs_LPN_ctr || 0) +
-                parseFloat(r.Hrs_CNA_ctr || 0) +
-                parseFloat(r.Hrs_NAtrn_ctr || 0) +
-                parseFloat(r.Hrs_MedAide_ctr || 0);
+            var totalNurseHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_TOTAL_NURSE_HOUR_FIELDS)
+                : null;
+            var rnHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_TOTAL_RN_HOUR_FIELDS)
+                : null;
+            var contractHrs = typeof pbjSumHourFieldsOrNull === 'function'
+                ? pbjSumHourFieldsOrNull(r, PBJ_CONTRACT_HOUR_FIELDS)
+                : null;
+            if (totalNurseHrs === null || rnHrs === null) {
+                return;
+            }
+            b.totalNurseHrs += totalNurseHrs;
+            b.rnHrs += rnHrs;
+            if (contractHrs !== null) {
+                b.contractHrs += contractHrs;
+            }
         });
         var out = {};
         Object.keys(buckets).forEach(function (mk) {

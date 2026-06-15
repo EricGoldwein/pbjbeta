@@ -1082,9 +1082,19 @@ def _plotly_y_nullable_optional(df: pd.DataFrame, col: str) -> list:
 
 
 def _pbj_favicon_path() -> Optional[str]:
-    """Project-root favicon path when ``pbj_favicon.png`` is shipped with the app."""
-    p = os.path.join(_app_root, "pbj_favicon.png")
-    return p if os.path.isfile(p) else None
+    """Resolve favicon PNG under app root or ``pbj_images/``."""
+    for rel in ("pbj_favicon.png", os.path.join("pbj_images", "pbj_favicon.png")):
+        p = os.path.join(_app_root, rel)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def _pbj_favicon_directory_and_name() -> tuple[str, str] | None:
+    path = _pbj_favicon_path()
+    if not path:
+        return None
+    return os.path.dirname(path), os.path.basename(path)
 
 
 def _default_provnum_for_bundle() -> str:
@@ -1177,17 +1187,21 @@ def before_request():
 @app.route("/pbj_favicon.png")
 def pbj_favicon_png():
     """Serve ``pbj_favicon.png`` from the application directory (repo root for facility apps)."""
-    if not _pbj_favicon_path():
+    fav = _pbj_favicon_directory_and_name()
+    if not fav:
         return ("", 404)
-    return send_from_directory(_app_root, "pbj_favicon.png", mimetype="image/png")
+    directory, filename = fav
+    return send_from_directory(directory, filename, mimetype="image/png")
 
 
 @app.route("/favicon.ico")
 def favicon_ico():
     """Browsers request ``/favicon.ico`` by default; reuse the PNG asset when present."""
-    if not _pbj_favicon_path():
+    fav = _pbj_favicon_directory_and_name()
+    if not fav:
         return ("", 204)
-    return send_from_directory(_app_root, "pbj_favicon.png", mimetype="image/png")
+    directory, filename = fav
+    return send_from_directory(directory, filename, mimetype="image/png")
 
 
 @app.route("/ai-icons/<path:icon_name>")
@@ -1252,6 +1266,10 @@ ein_job_quarterly_df = None
 ein_category_quarterly_df = None
 ein_employee_detail_df = None
 ein_nursing_summaries_df = None
+_EIN_NURSING_SUMMARIES_ROWS_CACHE: tuple[Any, ...] | None = None
+_EIN_NURSING_SUMMARIES_ROWS: list[dict[str, Any]] | None = None
+_EIN_ROSTER_PREWARM_STARTED = False
+_EIN_ROSTER_PREWARM_LOCK = threading.Lock()
 _PROVIDER_CHARTS_CACHE: dict[str, Any] | None = None
 _PROVIDER_CHARTS_CACHE_ID: tuple | None = None
 # Bump when provider-quarter aggregation changes so a running process drops stale JSON cache.
@@ -5368,6 +5386,7 @@ def _load_ein_position_csvs(provnum: str | None = None) -> None:
             or ein_nursing_summaries_df is not None
         ):
             print(f"[EIN] Loaded tables for {prov} (detail={detail_base})")
+            _schedule_ein_roster_prewarm(prov)
         else:
             print(
                 f"[EIN] No Employee Detail extract found for {prov}. "
@@ -15532,6 +15551,89 @@ def _enrich_nursing_api_rows(rows: list, ccn: str) -> None:
         else:
             row["tenure_label"] = None
 
+
+def _ein_nursing_summaries_rows_all() -> list[dict[str, Any]]:
+    """Process precomputed nursing summaries once per loaded dataframe."""
+    global _EIN_NURSING_SUMMARIES_ROWS_CACHE, _EIN_NURSING_SUMMARIES_ROWS
+    df = ein_nursing_summaries_df
+    if df is None or df.empty:
+        return []
+    sig = (str(_ein_active_ccn()).strip().zfill(6), id(df), len(df))
+    if _EIN_NURSING_SUMMARIES_ROWS_CACHE == sig and _EIN_NURSING_SUMMARIES_ROWS is not None:
+        return _EIN_NURSING_SUMMARIES_ROWS
+
+    def _json_rows_from_df(df_in: pd.DataFrame) -> list[dict[str, Any]]:
+        rows_out: list[dict[str, Any]] = []
+        for r in df_in.to_dict(orient="records"):
+            rows_out.append({k: _ein_scalar_for_json(v) for k, v in r.items()})
+        return rows_out
+
+    rows_all = dedupe_nursing_roster_api_rows(_json_rows_from_df(cast(pd.DataFrame, df)))
+    enrich_nursing_roster_display_fields(rows_all)
+    enrich_nursing_rows_new_to_quarter_flags(rows_all)
+    enrich_nursing_rows_multi_role_flags(rows_all)
+    _EIN_NURSING_SUMMARIES_ROWS_CACHE = sig
+    _EIN_NURSING_SUMMARIES_ROWS = rows_all
+    return rows_all
+
+
+def _warm_ein_sustained_work_cache(prov: str) -> None:
+    """Precompute sustained-work flags once per process so roster day view stays fast."""
+    if not _ein_mode_enabled():
+        return
+    try:
+        _ensure_ein_employee_detail_loaded()
+        if ein_employee_detail_df is None or ein_employee_detail_df.empty:
+            return
+        df = ein_nursing_summaries_df
+        if df is None or df.empty or "quarter" not in df.columns:
+            return
+        quarters = sorted(
+            {
+                normalize_cy_qtr_ein(q)
+                for q in df["quarter"].astype(str).tolist()
+                if normalize_cy_qtr_ein(q)
+            }
+        )
+        if not quarters:
+            return
+        latest_q = quarters[-1]
+        dummy: list[dict[str, Any]] = [{"quarter": latest_q, "sys_employee_id": 0, "job_code": 1}]
+        enrich_nursing_rows_sustained_work_flags(
+            ein_employee_detail_df,
+            dummy,
+            facility_ccn=str(prov).strip().zfill(6),
+            limit_quarters=[latest_q],
+        )
+        _ein_nursing_summaries_rows_all()
+        print(f"[EIN] Pre-warmed roster caches for {latest_q}")
+    except Exception as exc:
+        print(f"[EIN] Roster pre-warm skipped: {exc}")
+
+
+def _schedule_ein_roster_prewarm(prov: str) -> None:
+    """Warm roster caches in a daemon thread so home-page init is not blocked."""
+    global _EIN_ROSTER_PREWARM_STARTED
+    if not _ein_mode_enabled():
+        return
+    if ein_nursing_summaries_df is None or ein_nursing_summaries_df.empty:
+        return
+    with _EIN_ROSTER_PREWARM_LOCK:
+        if _EIN_ROSTER_PREWARM_STARTED:
+            return
+        _EIN_ROSTER_PREWARM_STARTED = True
+
+    def _run() -> None:
+        try:
+            _warm_ein_sustained_work_cache(prov)
+        except Exception as exc:
+            print(f"[EIN] Background roster pre-warm failed: {exc}")
+
+    threading.Thread(
+        target=_run,
+        name=f"ein-roster-prewarm-{str(prov).strip().zfill(6)}",
+        daemon=True,
+    ).start()
 
 def _ensure_ein_employee_detail_loaded() -> None:
     global ein_employee_detail_df

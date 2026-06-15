@@ -2074,7 +2074,45 @@
         }
     }
 
+    function pbjV2SyncFilterTypeFromFloatingGrain(preferredGrain) {
+        var grain = preferredGrain || null;
+        if (!grain) {
+            var fq = document.getElementById('pbjFloatingQuarterSelect');
+            var fy = document.getElementById('pbjFloatingYearSelect');
+            var quarterPicked = fq && Array.prototype.some.call(fq.selectedOptions || [], function (o) {
+                var v = String(o.value || '').trim();
+                return v && v !== 'all';
+            });
+            var yearPicked = fy && Array.prototype.some.call(fy.selectedOptions || [], function (o) {
+                var v = String(o.value || '').trim();
+                return v && v !== 'all';
+            });
+            if (quarterPicked) {
+                grain = 'quarters';
+            } else if (yearPicked) {
+                grain = 'years';
+            }
+        }
+        if (!grain) {
+            var activeGrain = document.querySelector('[data-pbj-floating-grain].active');
+            grain = activeGrain ? activeGrain.getAttribute('data-pbj-floating-grain') : null;
+        }
+        if (!grain) {
+            return;
+        }
+        var radio = document.querySelector('input[name="filterType"][value="' + grain + '"]');
+        if (!radio || radio.checked) {
+            return;
+        }
+        radio.checked = true;
+        if (typeof global.onFilterTypeChange === 'function') {
+            global.onFilterTypeChange();
+        }
+        pbjV2SyncFloatingPeriodFieldsVisibility();
+    }
+
     function pbjV2FloatingApplyPeriod() {
+        pbjV2SyncFilterTypeFromFloatingGrain();
         pbjV2PushFloatingPeriodToSummary();
         if (typeof global.pbjV2RefreshScopeLabel === 'function') {
             global.pbjV2RefreshScopeLabel();
@@ -3029,51 +3067,62 @@
         var totalCensus = 0;
         var contractSum = 0;
         var contractN = 0;
+        var observedDays = 0;
         rows.forEach(function (r) {
-            var census = parseFloat(r.MDScensus);
-            if (!isFinite(census) || census <= 0) {
+            var census = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.MDScensus) : parseFloat(r.MDScensus);
+            if (census === null || census <= 0) {
                 return;
             }
-            totalCensus += census;
-            var th = parseFloat(r.Total_Staff_Hours || r.Total_Nurse_Hours || 0);
-            if (isFinite(th)) {
-                totalHours += th;
+            var th = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_Staff_Hours) : parseFloat(r.Total_Staff_Hours);
+            if (th === null) {
+                th = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_Nurse_Hours) : parseFloat(r.Total_Nurse_Hours);
             }
-            var dh = parseFloat(r.Nurse_Staff_Hours_Excl_Admin || 0);
-            if (isFinite(dh)) {
+            if (th === null) {
+                return;
+            }
+            observedDays += 1;
+            totalCensus += census;
+            totalHours += th;
+            var dh = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Nurse_Staff_Hours_Excl_Admin) : parseFloat(r.Nurse_Staff_Hours_Excl_Admin);
+            if (dh !== null) {
                 directHours += dh;
             }
-            var rh = parseFloat(r.Total_RN_Hours || 0);
-            if (isFinite(rh)) {
+            var rh = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_RN_Hours) : parseFloat(r.Total_RN_Hours);
+            if (rh !== null) {
                 rnHours += rh;
             }
-            var lh = parseFloat(r.Total_LPN_Hours || 0);
-            if (isFinite(lh)) {
+            var lh = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_LPN_Hours) : parseFloat(r.Total_LPN_Hours);
+            if (lh !== null) {
                 lpnHours += lh;
             }
-            var ah = parseFloat(r.Total_Nurse_Aide_Hours || 0);
-            if (isFinite(ah)) {
+            var ah = typeof parseNumOrNull === 'function' ? parseNumOrNull(r.Total_Nurse_Aide_Hours) : parseFloat(r.Total_Nurse_Aide_Hours);
+            if (ah !== null) {
                 naHours += ah;
             }
-            var cp = parseFloat(r.RN_Contract_Pct || r.Contract_Percentage || '');
-            if (isFinite(cp)) {
+            var cp = typeof parseNumOrNull === 'function'
+                ? parseNumOrNull(r.RN_Contract_Pct || r.Contract_Percentage)
+                : parseFloat(r.RN_Contract_Pct || r.Contract_Percentage);
+            if (cp !== null) {
                 contractSum += cp;
                 contractN += 1;
             }
         });
-        if (totalCensus <= 0) {
+        if (totalCensus <= 0 || observedDays <= 0) {
             return null;
         }
         function hprd(hours) {
+            if (!hours) {
+                return '';
+            }
             return (hours / totalCensus).toFixed(2);
         }
         return {
-            workDays: rows.length,
+            workDays: observedDays,
             avgTotalHprd: hprd(totalHours),
             avgDirectHprd: directHours > 0 ? hprd(directHours) : '',
-            avgRnHprd: hprd(rnHours),
-            avgLpnHprd: hprd(lpnHours),
-            avgNaHprd: hprd(naHours),
+            avgRnHprd: rnHours > 0 ? hprd(rnHours) : '',
+            avgLpnHprd: lpnHours > 0 ? hprd(lpnHours) : '',
+            avgNaHprd: naHours > 0 ? hprd(naHours) : '',
             avgContractPct: contractN ? (contractSum / contractN).toFixed(1) : ''
         };
     }
@@ -6732,6 +6781,7 @@
         document.addEventListener('pbjQuartersLoaded', function () {
             pbjV2RefreshFloatingPickerOptions();
             pbjV2PullFloatingPeriodFromSummary();
+            pbjV2SyncFloatingGrain();
             pbjV2RefreshScopeLabel();
         });
         setTimeout(function () {

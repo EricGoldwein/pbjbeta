@@ -1139,6 +1139,67 @@ def ein_job_role_index_by_pair_from_scope(scope: pd.DataFrame) -> dict[tuple[int
     return letter_map
 
 
+def _ein_detail_cache_sig(detail: pd.DataFrame) -> tuple[int, int, int]:
+    """Stable signature for caching analytics derived from a detail extract."""
+    if detail is None or detail.empty:
+        return (0, 0, 0)
+    wd = pd.to_numeric(detail["WorkDate"], errors="coerce")
+    wd_valid = wd.dropna()
+    if wd_valid.empty:
+        return (len(detail), 0, 0)
+    return (len(detail), int(wd_valid.min()), int(wd_valid.max()))
+
+
+def ein_roster_work_day_pair_keys(
+    detail: pd.DataFrame,
+    anchor_iso: str,
+    job_code_allowlist: frozenset[int],
+) -> frozenset[tuple[int, int]]:
+    """(SYS_EMPLEE_ID, job_code) pairs with positive hours on one calendar work day."""
+    anchor_iso = str(anchor_iso).strip()
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", anchor_iso)
+    if not m:
+        return frozenset()
+    try:
+        anchor_int = _ein_date_to_yyyymmdd(datetime.strptime(anchor_iso, "%Y-%m-%d").date())
+    except ValueError:
+        return frozenset()
+    d = prepare_ein_detail(detail)
+    if d.empty:
+        return frozenset()
+    d = d[
+        (d["WorkDate"].astype(int) == anchor_int)
+        & d["EMPLEE_JOB_CD_ID"].astype(int).isin(list(job_code_allowlist))
+    ]
+    if d.empty:
+        return frozenset()
+    pairs: set[tuple[int, int]] = set()
+    for eid_raw, jc_raw in d[["SYS_EMPLEE_ID", "EMPLEE_JOB_CD_ID"]].itertuples(index=False, name=None):
+        try:
+            pairs.add((int(eid_raw), int(jc_raw)))
+        except (TypeError, ValueError):
+            continue
+    return frozenset(pairs)
+
+
+def filter_ein_roster_rows_for_work_day(
+    rows: list[dict[str, Any]],
+    pair_keys: frozenset[tuple[int, int]],
+) -> list[dict[str, Any]]:
+    """Keep roster summary rows for employees who worked the selected calendar day."""
+    if not pair_keys:
+        return []
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            key = (int(row["sys_employee_id"]), int(row["job_code"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if key in pair_keys:
+            out.append(row)
+    return out
+
+
 def enrich_ein_rows_rolling_from_work_date(
     detail: pd.DataFrame,
     rows: list[dict[str, Any]],
@@ -1174,8 +1235,40 @@ def enrich_ein_rows_rolling_from_work_date(
         row["avg_hours_per_day_last_365"] = None
         row["day_contract_flag"] = False
 
+    if not rows:
+        return
+
+    pairs_needed: set[tuple[int, int]] = set()
+    for row in rows:
+        sid_raw = row.get("sys_employee_id")
+        jcid_raw = row.get("job_code")
+        if sid_raw is None or jcid_raw is None:
+            continue
+        try:
+            pairs_needed.add((int(sid_raw), int(jcid_raw)))
+        except (TypeError, ValueError):
+            continue
+    if not pairs_needed:
+        for row in rows:
+            _blank_rolling(row)
+        return
+
     d = prepare_ein_detail(detail)
     d = d[d["EMPLEE_JOB_CD_ID"].astype(int).isin(list(job_code_allowlist))]
+    if d.empty:
+        for row in rows:
+            _blank_rolling(row)
+        return
+
+    wd = d["WorkDate"].astype(int)
+    eids = {p[0] for p in pairs_needed}
+    jcs = {p[1] for p in pairs_needed}
+    d = d.loc[
+        (wd >= lo365_i)
+        & (wd <= anchor_int)
+        & d["SYS_EMPLEE_ID"].astype(int).isin(eids)
+        & d["EMPLEE_JOB_CD_ID"].astype(int).isin(jcs)
+    ]
     if d.empty:
         for row in rows:
             _blank_rolling(row)
@@ -3537,6 +3630,9 @@ def _strip_sustained_work_internal_keys(flags: list[dict[str, Any]]) -> list[dic
     return [_prepare_sustained_work_flag_for_api(f) for f in flags]
 
 
+_SUSTAINED_WORK_FLAGS_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+
 def ein_sustained_work_pattern_flags(
     detail: pd.DataFrame,
     *,
@@ -3554,17 +3650,26 @@ def ein_sustained_work_pattern_flags(
         "sustained_work_pattern_flags_by_period": {},
         "limitations": [],
     }
+    quarters = [normalize_cy_qtr_ein(pk) for pk in period_keys]
+    quarters = sorted({q for q in quarters if q})
+    cache_key = (
+        str(facility_ccn).strip().zfill(6),
+        tuple(quarters),
+        _ein_detail_cache_sig(detail),
+    )
+    cached = _SUSTAINED_WORK_FLAGS_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
     role_day, emp_day_total, limitations = _consolidate_sustained_work_day_rows(detail)
     if role_day.empty:
         empty["limitations"] = limitations
+        _SUSTAINED_WORK_FLAGS_CACHE[cache_key] = empty
         return empty
 
     continuity_quarters = _continuity_flag_quarters(employee_id_continuity_by_period or {})
     all_employee_flags: list[dict[str, Any]] = []
     by_period: dict[str, list[dict[str, Any]]] = {}
-
-    quarters = [normalize_cy_qtr_ein(pk) for pk in period_keys]
-    quarters = [q for q in quarters if q]
 
     def _q_sort(q: str) -> tuple:
         sk = parse_ein_quarter_bound(q)
@@ -3604,11 +3709,13 @@ def ein_sustained_work_pattern_flags(
         )
 
     flat.sort(key=_flat_sort_key)
-    return {
+    result = {
         "sustained_work_pattern_flags": flat,
         "sustained_work_pattern_flags_by_period": by_period,
         "limitations": limitations,
     }
+    _SUSTAINED_WORK_FLAGS_CACHE[cache_key] = result
+    return result
 
 
 def ein_headcount_by_job_longitudinal_series(
