@@ -1,0 +1,34 @@
+# Keep Vercel/serverless warm for Virtua Berlin (315461) premium dashboard.
+# Hits the lightweight login page only (no password, no CSV init).
+name: Keepalive premium 315461
+
+on:
+  schedule:
+    # Every 10 minutes (GitHub cron uses UTC).
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keepalive-premium-315461
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Warm https://www.pbj320.com/premium/315461/__pbj_login
+        run: |
+          set -euo pipefail
+          url="https://www.pbj320.com/premium/315461/__pbj_login"
+          code=$(curl -fsS -o /tmp/pbj_keepalive.html -w "%{http_code}" --max-time 90 "$url")
+          bytes=$(wc -c < /tmp/pbj_keepalive.html | tr -d ' ')
+          if [ "$code" != "200" ]; then
+            echo "Unexpected HTTP $code from $url"
+            exit 1
+          fi
+          if [ "$bytes" -lt 500 ]; then
+            echo "Response too small ($bytes bytes) — possible error page"
+            exit 1
+          fi
+          echo "OK status=$code bytes=$bytes"
