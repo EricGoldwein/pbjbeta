@@ -224,10 +224,30 @@ def metrics_backups_dir(root: Path | None = None) -> Path:
 
 
 
+def ownership_dir(root: Path | None = None) -> Path:
+
+    """Monthly NH_Ownership_* facility contact files (CMS provider-info zip; not SNF_All_Owners)."""
+
+    return (root or repo_root()) / "ownership"
+
+
+
+
+
 def citations_dir(root: Path | None = None) -> Path:
 
     """NH health deficiency citations (separate from provider-info monthly zips)."""
 
     return (root or repo_root()) / "Citations"
+
+
+
+
+
+def provider_release_manifest_dir(release_key: str, root: Path | None = None) -> Path:
+
+    """Tracked manifest folder for one CMS provider release (e.g. ``2026-06``)."""
+
+    return provider_info_dir(root) / "_manifests" / release_key
 
 
