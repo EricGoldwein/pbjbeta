@@ -34,6 +34,7 @@ if str(_ROOT) not in sys.path:
 
 from cms_data_ops import (  # noqa: E402
     acquire_provider_info,
+    approve_release_authoritative,
     check_provider_info_cms,
     derived_signals_payload,
     probe_all_sources,
@@ -44,7 +45,6 @@ from cms_source_registry import get_registry, get_source  # noqa: E402
 from data_ops_approval import (  # noqa: E402
     ApprovalError,
     acknowledge_requires_review,
-    approve_release,
     read_audit,
 )
 from data_ops_dashboard import (  # noqa: E402
@@ -55,7 +55,6 @@ from data_ops_dashboard import (  # noqa: E402
     refresh_existing_v2_runtime,
     run_preflight,
 )
-from data_ops_zweli import ZweliState  # noqa: E402
 
 PASSWORD_ENV = "PBJ_DATA_OPS_PASSWORD"
 SECRET_ENV = "PBJ_DATA_OPS_SECRET"
@@ -254,10 +253,11 @@ def create_app() -> Flask:
     def action_approve():
         source_id = (request.form.get("source_id") or "").strip()
         release_id = (request.form.get("release_id") or "").strip()
-        zweli = (request.form.get("zweli_status") or ZweliState.NOT_RUN.value).strip()
         note = (request.form.get("note") or "").strip()
+        # Form may display Zweli status but must never be authoritative.
+        _ = request.form.get("zweli_status")
         try:
-            approve_release(source_id, release_id, zweli_state=zweli, note=note)
+            approve_release_authoritative(source_id, release_id, note=note)
             flash(f"Approved {source_id} {release_id}", "ok")
         except ApprovalError as exc:
             flash(str(exc), "error")

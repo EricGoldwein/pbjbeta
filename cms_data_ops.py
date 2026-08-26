@@ -742,3 +742,99 @@ def recommended_next_automation() -> dict[str, str]:
 
 def derived_signals_payload() -> list[dict[str, Any]]:
     return [s.to_dict() for s in get_derived_signals()]
+
+
+def load_zweli_report_for_release(
+    source_id: str,
+    release_id: str,
+    *,
+    root: Path | None = None,
+) -> Optional[dict[str, Any]]:
+    """Load stored Zweli report if present and matching source/release."""
+    root = root or cms_data_paths.repo_root()
+    if source_id != "cms.provider_info":
+        return None
+    path = (
+        cms_data_paths.provider_release_manifest_dir(release_id, root) / "zweli_report.json"
+    )
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if data.get("source_id") != source_id or data.get("release_id") != release_id:
+        return None
+    if not data.get("state"):
+        return None
+    return data
+
+
+def resolve_zweli_state_for_release(
+    source_id: str,
+    release_id: str,
+    *,
+    root: Path | None = None,
+) -> ZweliState:
+    """Server-authoritative Zweli state for approval (never trust the browser).
+
+    Prefer the stored report for ``source_id``+``release_id``; otherwise recompute
+    via canonical probe. Fail closed (raise) when state cannot be established.
+    """
+    from data_ops_approval import ApprovalError
+
+    root = root or cms_data_paths.repo_root()
+    release_id = (release_id or "").strip()
+    source_id = (source_id or "").strip()
+    if not source_id or not release_id:
+        raise ApprovalError("source_id and release_id are required for approval")
+
+    stored = load_zweli_report_for_release(source_id, release_id, root=root)
+    if stored:
+        try:
+            return ZweliState(stored["state"])
+        except ValueError as exc:
+            raise ApprovalError(
+                f"Stored Zweli report has invalid state for {source_id} {release_id}"
+            ) from exc
+
+    # Recompute via canonical probe (Provider Info profile in V0).
+    snap = probe_source(source_id, check_cms=False, root=root, run_zweli=True)
+    if snap.release_id != release_id:
+        raise ApprovalError(
+            f"Zweli report missing/mismatched for {source_id} {release_id} "
+            f"(probe release={snap.release_id!r}) — fail closed"
+        )
+    if not snap.zweli_report or snap.zweli_status == ZweliState.NOT_RUN.value:
+        raise ApprovalError(
+            f"Zweli NOT_RUN / missing for {source_id} {release_id} — fail closed"
+        )
+    if snap.zweli_report.get("source_id") not in (None, source_id):
+        raise ApprovalError("Zweli report source_id mismatch — fail closed")
+    if snap.zweli_report.get("release_id") not in (None, release_id):
+        raise ApprovalError("Zweli report release_id mismatch — fail closed")
+    try:
+        return ZweliState(snap.zweli_status)
+    except ValueError as exc:
+        raise ApprovalError(f"Invalid Zweli state {snap.zweli_status!r}") from exc
+
+
+def approve_release_authoritative(
+    source_id: str,
+    release_id: str,
+    *,
+    note: str = "",
+    root: Path | None = None,
+    audit_path: Path | None = None,
+) -> Any:
+    """Approve using server-resolved Zweli state only (form status ignored)."""
+    from data_ops_approval import approve_release
+
+    state = resolve_zweli_state_for_release(source_id, release_id, root=root)
+    return approve_release(
+        source_id,
+        release_id,
+        zweli_state=state,
+        note=note,
+        audit_path=audit_path,
+    )

@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import cms_data_ops as ops
+import cms_data_paths
 import cms_provider_info_acquire as acq
 import data_ops_approval as approval
 import data_ops_dashboard as dash
@@ -217,3 +218,145 @@ def test_recommended_next_nurse():
     nxt = ops.recommended_next_automation()
     assert nxt["source_id"] == "cms.pbj_nurse_staffing"
     assert "first_broken_layer" in nxt
+
+
+def _write_zweli_report(root: Path, release_id: str, state: str) -> Path:
+    man = root / "provider_info" / "_manifests" / release_id
+    man.mkdir(parents=True, exist_ok=True)
+    path = man / "zweli_report.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_id": "cms.provider_info",
+                "release_id": release_id,
+                "profile": "provider_info_v0",
+                "state": state,
+                "findings": [],
+                "checked_at": "2026-08-26T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_forged_form_pass_cannot_approve_blocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Browser-submitted zweli_status=PASS must not override server BLOCKED."""
+    monkeypatch.setenv("PBJ_DATA_OPS_PASSWORD", "test-ops-pw")
+    monkeypatch.setenv("PBJ_DATA_OPS_SECRET", "test-secret")
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
+    _write_zweli_report(tmp_path, "2026-08", "BLOCKED")
+    audit = tmp_path / "provider_info" / "_manifests" / "_data_ops_audit.jsonl"
+
+    # Direct service: forged PASS ignored when resolving from stored report
+    with pytest.raises(approval.ApprovalError, match="BLOCKED"):
+        ops.approve_release_authoritative(
+            "cms.provider_info",
+            "2026-08",
+            note="forged",
+            root=tmp_path,
+            audit_path=audit,
+        )
+
+    app = create_app()
+    client = app.test_client()
+    assert client.post("/login", data={"password": "test-ops-pw"}).status_code == 302
+    r = client.post(
+        "/actions/approve",
+        data={
+            "source_id": "cms.provider_info",
+            "release_id": "2026-08",
+            "zweli_status": "PASS",  # forged
+            "note": "should fail",
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    assert b"Approved cms.provider_info" not in r.data
+    body = r.data.decode("utf-8", errors="replace")
+    assert "BLOCKED" in body or "cannot be approved" in body
+    assert not approval.has_approval("cms.provider_info", "2026-08", audit)
+
+
+def test_authoritative_requires_review_and_pass(tmp_path: Path):
+    audit = tmp_path / "audit.jsonl"
+    _write_zweli_report(tmp_path, "2026-08", "REQUIRES_REVIEW")
+    with pytest.raises(approval.ApprovalError, match="acknowledgement"):
+        ops.approve_release_authoritative(
+            "cms.provider_info", "2026-08", root=tmp_path, audit_path=audit
+        )
+    approval.acknowledge_requires_review(
+        "cms.provider_info", "2026-08", audit_path=audit
+    )
+    entry = ops.approve_release_authoritative(
+        "cms.provider_info", "2026-08", root=tmp_path, audit_path=audit
+    )
+    assert entry.action == "approve"
+
+    _write_zweli_report(tmp_path, "2026-09", "PASS")
+    entry2 = ops.approve_release_authoritative(
+        "cms.provider_info", "2026-09", root=tmp_path, audit_path=audit
+    )
+    assert entry2.action == "approve"
+
+
+def test_stale_missing_zweli_fails_closed(tmp_path: Path):
+    audit = tmp_path / "audit.jsonl"
+    with pytest.raises(approval.ApprovalError, match="fail closed|NOT_RUN|missing"):
+        ops.approve_release_authoritative(
+            "cms.provider_info", "2099-01", root=tmp_path, audit_path=audit
+        )
+
+
+def test_unavailable_and_unprocessed_block_refresh(tmp_path: Path):
+    # Minimal V2-looking deploy + ref so only source gates matter
+    ref = "315128"
+    for ccn in (ref, "999999"):
+        d = tmp_path / "deployments" / f"pbj320-{ccn}"
+        d.mkdir(parents=True)
+        (d / f"facility_{ccn}_superdynamic_dashboard.py").write_text("# v2\n", encoding="utf-8")
+
+    st_unavail = dash.facility_dashboard_status(
+        "999999",
+        root=tmp_path,
+        provider_available=False,
+        provider_processed=True,
+        structural_ok=True,
+        zweli_state=ZweliState.PASS,
+        run_readiness=False,
+    )
+    assert dash.DashboardActionBlocker.SOURCE_UNAVAILABLE.value in st_unavail.blockers
+    assert st_unavail.can_generate_refresh is False
+
+    st_unproc = dash.facility_dashboard_status(
+        "999999",
+        root=tmp_path,
+        provider_available=True,
+        provider_processed=False,
+        structural_ok=True,
+        zweli_state=ZweliState.PASS,
+        run_readiness=False,
+    )
+    assert dash.DashboardActionBlocker.UNPROCESSED.value in st_unproc.blockers
+    assert st_unproc.can_generate_refresh is False
+
+
+def test_v2_safety_still_blocks_without_ref_or_non_v2(tmp_path: Path):
+    # No V2 reference anywhere
+    d = tmp_path / "deployments" / "pbj320-999999"
+    d.mkdir(parents=True)
+    (d / "facility_999999_flask_app.py").write_text("# legacy\n", encoding="utf-8")
+    st = dash.facility_dashboard_status(
+        "999999",
+        root=tmp_path,
+        provider_available=True,
+        provider_processed=True,
+        zweli_state=ZweliState.PASS,
+        run_readiness=False,
+    )
+    assert st.can_generate_refresh is False
+    assert dash.DashboardActionBlocker.UNSAFE_PACKAGE_PATH.value in st.blockers
+    assert dash.DashboardActionBlocker.NO_V2_REFERENCE.value in st.blockers

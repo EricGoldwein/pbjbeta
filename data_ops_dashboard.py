@@ -118,6 +118,18 @@ def _facility_name_from_bundle(deploy_dir: Path, ccn: str) -> Optional[str]:
     return None
 
 
+# Source-data blockers that must disable Generate/Refresh (fail closed).
+SOURCE_DATA_REFRESH_BLOCKERS: frozenset[str] = frozenset(
+    {
+        DashboardActionBlocker.SOURCE_UNAVAILABLE.value,
+        DashboardActionBlocker.UNPROCESSED.value,
+        DashboardActionBlocker.STRUCTURAL_BLOCKED.value,
+        DashboardActionBlocker.ZWELI_BLOCKED.value,
+        DashboardActionBlocker.ZWELI_REQUIRES_ACK.value,
+    }
+)
+
+
 def evaluate_source_gates_for_dashboard(
     *,
     zweli_state: ZweliState | str | None = None,
@@ -287,13 +299,12 @@ def facility_dashboard_status(
     if run_readiness and exists:
         readiness = check_facility_readiness(ccn, root=root)
 
+    source_data_blocked = any(b in SOURCE_DATA_REFRESH_BLOCKERS for b in blockers)
     can_refresh = (
         exists
         and is_v2
         and ref is not None
-        and DashboardActionBlocker.ZWELI_BLOCKED.value not in blockers
-        and DashboardActionBlocker.ZWELI_REQUIRES_ACK.value not in blockers
-        and DashboardActionBlocker.STRUCTURAL_BLOCKED.value not in blockers
+        and not source_data_blocked
     )
     can_preflight = exists and is_v2
 
