@@ -40,8 +40,10 @@ from data_ops_access import (  # noqa: E402
 )
 from data_ops_approval import has_acknowledgement, has_approval, read_audit  # noqa: E402
 from data_ops_zweli import (  # noqa: E402
+    BaselineAvailability,
     ZweliReport,
     ZweliState,
+    expected_prior_month,
     not_run_report,
     run_provider_info_zweli,
     write_zweli_report,
@@ -268,23 +270,34 @@ def _probe_provider_info(
             snap.publisher_latest = cms.data_vintage_label
             snap.cms_latest = cms.data_vintage_label
 
-        # Zweli
-        if run_zweli and raw_path and raw_path.is_file():
+        # Zweli — comparable prior = previous calendar month for monthly PI
+        if run_zweli and raw_path and raw_path.is_file() and local:
             snaps = acq.list_local_provider_info_snapshots(root)
+            ey, em = expected_prior_month(local[0], local[1])
+            expected_rel = f"{ey:04d}-{em:02d}"
             baseline_path = None
-            baseline_rel = None
-            if local and snaps:
-                older = [(y, m, p) for y, m, p in snaps if (y, m) < (local[0], local[1])]
-                if older:
-                    by, bm, bp = max(older, key=lambda t: (t[0], t[1]))
-                    baseline_path = bp
-                    baseline_rel = f"{by:04d}-{bm:02d}"
-            report = run_provider_info_zweli(
-                raw_path,
-                release_id or "unknown",
-                baseline_csv=baseline_path,
-                baseline_release=baseline_rel,
-            )
+            for y, m, p in snaps:
+                if (y, m) == (ey, em):
+                    baseline_path = p
+                    break
+            if baseline_path is not None:
+                report = run_provider_info_zweli(
+                    raw_path,
+                    release_id or "unknown",
+                    baseline_csv=baseline_path,
+                    baseline_release=expected_rel,
+                    baseline_availability=BaselineAvailability.PRESENT,
+                    expected_baseline_release=expected_rel,
+                )
+            else:
+                report = run_provider_info_zweli(
+                    raw_path,
+                    release_id or "unknown",
+                    baseline_csv=None,
+                    baseline_release=expected_rel,
+                    baseline_availability=BaselineAvailability.UNAVAILABLE_IN_RUNTIME,
+                    expected_baseline_release=expected_rel,
+                )
             snap.zweli_status = report.state.value
             snap.quality_reviewed = report.state.value
             snap.zweli_report = report.to_dict()

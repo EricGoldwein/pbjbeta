@@ -110,6 +110,68 @@ def test_structural_and_zweli_are_separate():
     assert isinstance(report.findings, list)
 
 
+def test_baseline_unavailable_in_runtime_is_not_run():
+    cur = zweli.ProviderInfoMetrics("2026-08", 14690, 14690)
+    report = zweli.compare_provider_info_releases(
+        cur,
+        None,
+        baseline_availability=zweli.BaselineAvailability.UNAVAILABLE_IN_RUNTIME,
+        expected_baseline_release="2026-07",
+    )
+    assert report.state == ZweliState.NOT_RUN
+    assert any(f.check_id == "baseline_unavailable_in_runtime" for f in report.findings)
+    assert not any(f.check_id == "no_baseline" for f in report.findings)
+
+
+def test_genuine_first_release_still_requires_review():
+    cur = zweli.ProviderInfoMetrics("2020-01", 1000, 1000)
+    report = zweli.compare_provider_info_releases(
+        cur,
+        None,
+        baseline_availability=zweli.BaselineAvailability.NONE_EXPECTED,
+    )
+    assert report.state == ZweliState.REQUIRES_REVIEW
+    assert any(f.check_id == "no_baseline" for f in report.findings)
+
+
+def test_zweli_not_run_blocks_dashboard_refresh():
+    blockers = dash.evaluate_source_gates_for_dashboard(zweli_state=ZweliState.NOT_RUN)
+    assert dash.DashboardActionBlocker.ZWELI_NOT_RUN.value in blockers
+    assert dash.DashboardActionBlocker.ZWELI_NOT_RUN.value in dash.SOURCE_DATA_REFRESH_BLOCKERS
+
+
+def test_not_run_cannot_be_approved(tmp_path: Path):
+    audit = tmp_path / "audit.jsonl"
+    with pytest.raises(approval.ApprovalError, match="NOT_RUN"):
+        approval.approve_release(
+            "cms.provider_info",
+            "2026-08",
+            zweli_state=ZweliState.NOT_RUN,
+            audit_path=audit,
+        )
+
+
+def test_probe_aug_without_july_is_not_run(tmp_path: Path):
+    pi = tmp_path / "provider_info"
+    norm = tmp_path / "provider_info_normalized"
+    pi.mkdir()
+    norm.mkdir()
+    (pi / "NH_ProviderInfo_Aug2026.csv").write_bytes(_nh_csv_bytes(1200, "2026-08-01", "200"))
+    (norm / "ProviderInfoNorm_2026_08.csv").write_bytes(_nh_csv_bytes(1200, "2026-08-01", "200"))
+    snap = ops.probe_source(
+        "cms.provider_info",
+        check_cms=False,
+        root=tmp_path,
+        run_zweli=True,
+    )
+    assert snap.zweli_status == "NOT_RUN"
+    assert snap.zweli_report
+    assert any(
+        f["check_id"] == "baseline_unavailable_in_runtime"
+        for f in snap.zweli_report["findings"]
+    )
+
+
 def test_synthetic_60x_scale_blocked():
     cur = zweli.ProviderInfoMetrics("2026-08", 60000, 60000)
     base = zweli.ProviderInfoMetrics("2026-07", 1000, 1000)

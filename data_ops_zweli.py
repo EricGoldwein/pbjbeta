@@ -33,6 +33,14 @@ class ZweliSeverity(str, Enum):
     BLOCKING = "blocking"
 
 
+class BaselineAvailability(str, Enum):
+    """How to interpret a missing Provider Info Zweli baseline."""
+
+    PRESENT = "present"
+    UNAVAILABLE_IN_RUNTIME = "unavailable_in_runtime"
+    NONE_EXPECTED = "none_expected"  # genuine first / no comparable predecessor
+
+
 @dataclass
 class ZweliFinding:
     check_id: str
@@ -183,12 +191,22 @@ def compare_provider_info_releases(
     row_review_ratio: float = 0.08,
     row_block_ratio: float = 0.35,
     null_review_delta: float = 0.15,
+    baseline_availability: BaselineAvailability | str = BaselineAvailability.PRESENT,
+    expected_baseline_release: str | None = None,
 ) -> ZweliReport:
     """Provider Information Zweli profile v0 — distribution / schema / nulls.
 
     Does NOT use naive 'change > 20% = bad'. Large shifts → REQUIRES_REVIEW
     unless a scale signature or invariant fires → BLOCKED.
+
+    Baseline semantics:
+    - baseline present → normal PASS / REQUIRES_REVIEW / BLOCKED
+    - expected prior unavailable in this runtime → NOT_RUN (not REQUIRES_REVIEW)
+    - genuine first / no prior expected → REQUIRES_REVIEW (no_baseline)
     """
+    if isinstance(baseline_availability, str):
+        baseline_availability = BaselineAvailability(baseline_availability)
+
     findings: list[ZweliFinding] = []
     findings.append(
         ZweliFinding(
@@ -214,6 +232,45 @@ def compare_provider_info_releases(
         findings.append(bad)
 
     if baseline is None:
+        if baseline_availability == BaselineAvailability.PRESENT:
+            # Inconsistent args: claimed present but no metrics — treat as runtime gap.
+            baseline_availability = BaselineAvailability.UNAVAILABLE_IN_RUNTIME
+
+        if baseline_availability == BaselineAvailability.UNAVAILABLE_IN_RUNTIME:
+            findings.append(
+                ZweliFinding(
+                    check_id="baseline_unavailable_in_runtime",
+                    source_id=source_id,
+                    metric_field="baseline",
+                    current_release=current.release_id,
+                    baseline_release=expected_baseline_release,
+                    observed_value=None,
+                    observed_change=None,
+                    expected_or_baseline=expected_baseline_release,
+                    severity=ZweliSeverity.INFO,
+                    explanation=(
+                        "Comparable prior release is expected but not available in this "
+                        "runtime — Zweli NOT_RUN (runtime availability), not a substantive "
+                        "quality review finding."
+                    ),
+                    sample_evidence={
+                        "expected_baseline_release": expected_baseline_release,
+                        "reason": "runtime_availability",
+                    },
+                )
+            )
+            return ZweliReport(
+                source_id=source_id,
+                release_id=current.release_id,
+                profile="provider_info_v0",
+                state=ZweliState.NOT_RUN,
+                findings=findings,
+                checked_at=_utc_now(),
+                baseline_release=expected_baseline_release,
+                notes="Baseline unavailable in this runtime",
+            )
+
+        # Genuine first / no comparable predecessor expected
         findings.append(
             ZweliFinding(
                 check_id="no_baseline",
@@ -225,7 +282,10 @@ def compare_provider_info_releases(
                 observed_change=None,
                 expected_or_baseline=None,
                 severity=ZweliSeverity.WARNING,
-                explanation="No prior release for comparison — REQUIRES_REVIEW for first/isolated run",
+                explanation=(
+                    "No prior comparable release expected/exists — REQUIRES_REVIEW "
+                    "for genuine first release"
+                ),
             )
         )
         return ZweliReport(
@@ -235,7 +295,7 @@ def compare_provider_info_releases(
             state=aggregate_state(findings),
             findings=findings,
             checked_at=_utc_now(),
-            notes="Baseline missing",
+            notes="Genuine first release — no prior comparable baseline",
         )
 
     # Schema drift
@@ -415,19 +475,45 @@ def metrics_from_provider_csv(path: Path, release_id: str) -> ProviderInfoMetric
     )
 
 
+def expected_prior_month(year: int, month: int) -> tuple[int, int]:
+    """Previous calendar month for monthly Provider Info cadence."""
+    if month <= 1:
+        return year - 1, 12
+    return year, month - 1
+
+
 def run_provider_info_zweli(
     current_csv: Path,
     current_release: str,
     baseline_csv: Path | None = None,
     baseline_release: str | None = None,
+    *,
+    baseline_availability: BaselineAvailability | str | None = None,
+    expected_baseline_release: str | None = None,
 ) -> ZweliReport:
     current = metrics_from_provider_csv(current_csv, current_release)
     baseline = None
-    if baseline_csv and baseline_csv.is_file():
+    if baseline_csv is not None and baseline_csv.is_file():
         baseline = metrics_from_provider_csv(
             baseline_csv, baseline_release or baseline_csv.stem
         )
-    return compare_provider_info_releases(current, baseline)
+        availability = BaselineAvailability.PRESENT
+    elif baseline_availability is not None:
+        availability = (
+            BaselineAvailability(baseline_availability)
+            if isinstance(baseline_availability, str)
+            else baseline_availability
+        )
+    else:
+        # Default when caller omits both baseline file and availability:
+        # treat as expected-prior unavailable (runtime), not genuine first.
+        availability = BaselineAvailability.UNAVAILABLE_IN_RUNTIME
+    return compare_provider_info_releases(
+        current,
+        baseline,
+        baseline_availability=availability,
+        expected_baseline_release=expected_baseline_release or baseline_release,
+    )
 
 
 def write_zweli_report(report: ZweliReport, path: Path) -> Path:

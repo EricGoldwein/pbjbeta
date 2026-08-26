@@ -41,6 +41,7 @@ class DashboardActionBlocker(str, Enum):
     STRUCTURAL_BLOCKED = "STRUCTURAL_BLOCKED"
     ZWELI_BLOCKED = "ZWELI_BLOCKED"
     ZWELI_REQUIRES_ACK = "ZWELI_REQUIRES_ACK"
+    ZWELI_NOT_RUN = "ZWELI_NOT_RUN"
     NO_V2_REFERENCE = "NO_V2_REFERENCE"
     UNSAFE_PACKAGE_PATH = "UNSAFE_PACKAGE_PATH"
     MISSING_DEPLOY_DIR = "MISSING_DEPLOY_DIR"
@@ -126,6 +127,7 @@ SOURCE_DATA_REFRESH_BLOCKERS: frozenset[str] = frozenset(
         DashboardActionBlocker.STRUCTURAL_BLOCKED.value,
         DashboardActionBlocker.ZWELI_BLOCKED.value,
         DashboardActionBlocker.ZWELI_REQUIRES_ACK.value,
+        DashboardActionBlocker.ZWELI_NOT_RUN.value,
     }
 )
 
@@ -152,6 +154,8 @@ def evaluate_source_gates_for_dashboard(
         blockers.append(DashboardActionBlocker.ZWELI_BLOCKED.value)
     if state == ZweliState.REQUIRES_REVIEW and not zweli_ack:
         blockers.append(DashboardActionBlocker.ZWELI_REQUIRES_ACK.value)
+    if state == ZweliState.NOT_RUN:
+        blockers.append(DashboardActionBlocker.ZWELI_NOT_RUN.value)
     return blockers
 
 
