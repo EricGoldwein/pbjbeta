@@ -23,6 +23,22 @@ MONTH_MAP = {
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
+LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
+
+
+def is_git_lfs_pointer(path: Path) -> bool:
+    """True if path is a Git LFS pointer stub, not real CSV bytes."""
+    try:
+        with path.open("rb") as f:
+            head = f.read(128)
+    except OSError:
+        return False
+    return head.startswith(LFS_POINTER_PREFIX)
+
+
+class LfsPointerError(ValueError):
+    """Raised when a Git LFS pointer is passed where real CMS data is required."""
+
 
 def parse_month_year_from_filename(filename: str) -> tuple[int, int] | None:
     match = re.search(r"([A-Za-z]{3})(\d{4})", filename)
@@ -42,6 +58,12 @@ def _template_columns(output_dir: Path) -> list[str]:
 
 
 def normalize_nh_file(nh_path: Path, output_path: Path, template_cols: list[str]) -> int:
+    if is_git_lfs_pointer(nh_path):
+        raise LfsPointerError(
+            f"refusing to normalize Git LFS pointer (not real CMS data): {nh_path}"
+        )
+    if not nh_path.is_file() or nh_path.stat().st_size == 0:
+        raise ValueError(f"raw Provider Info CSV missing or empty: {nh_path}")
     nh = pd.read_csv(nh_path, dtype=str, low_memory=False)
     nh.columns = [str(c).replace("\ufeff", "").strip() for c in nh.columns]
     out: dict[str, pd.Series] = {}
@@ -86,11 +108,11 @@ def normalize_nh_file(nh_path: Path, output_path: Path, template_cols: list[str]
     return len(df)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Normalize NH_ProviderInfo snapshots")
     parser.add_argument("--force", action="store_true", help="Rebuild even if output exists")
     parser.add_argument("--file", type=str, default="", help="Single NH_ProviderInfo_*.csv basename")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     input_dir = cms_data_paths.provider_info_dir()
     output_dir = cms_data_paths.provider_info_normalized_dir()
@@ -111,12 +133,22 @@ def main() -> int:
         if not date_info:
             print(f"Skip (unparsed filename): {nh_path.name}")
             continue
+        if is_git_lfs_pointer(nh_path):
+            print(
+                f"ERROR: refusing Git LFS pointer (not real CMS data): {nh_path.name}",
+                file=sys.stderr,
+            )
+            return 1
         year, month = date_info
         out_path = output_dir / f"ProviderInfoNorm_{year}_{month:02d}.csv"
         if out_path.exists() and not args.force:
             print(f"Skip existing: {out_path}")
             continue
-        normalize_nh_file(nh_path, out_path, template_cols)
+        try:
+            normalize_nh_file(nh_path, out_path, template_cols)
+        except LfsPointerError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
         wrote += 1
     if wrote == 0:
         print("No new provider info files normalized")

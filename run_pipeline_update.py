@@ -166,7 +166,10 @@ def detect_new_nonnurse_pbj_files(force: bool = False) -> List[Path]:
 
 
 def detect_new_provider_info_files(force: bool = False) -> List[Path]:
-    """Detect new provider info files that need normalization."""
+    """Detect new provider info files that need normalization.
+
+    Git LFS pointer stubs are never processable input — skip/reject them.
+    """
     input_dir = Path('provider_info')
     output_dir = Path('provider_info_normalized')
     
@@ -181,7 +184,14 @@ def detect_new_provider_info_files(force: bool = False) -> List[Path]:
     
     # Check which ones have normalized outputs
     new_files = []
+    skipped_lfs = 0
     for input_file in input_files:
+        if _is_git_lfs_pointer(input_file):
+            skipped_lfs += 1
+            logger.warning(
+                f"Skipping Git LFS pointer (not real CMS data): {input_file.name}"
+            )
+            continue
         date_info = parse_month_year_from_filename(input_file.name)
         if date_info:
             year, month = date_info
@@ -191,8 +201,21 @@ def detect_new_provider_info_files(force: bool = False) -> List[Path]:
         else:
             logger.warning(f"Could not parse date from filename: {input_file.name}")
     
-    logger.info(f"Provider Info: Found {len(input_files)} input files, {len(new_files)} new files")
+    logger.info(
+        f"Provider Info: Found {len(input_files)} input files, "
+        f"{skipped_lfs} LFS pointers skipped, {len(new_files)} new files"
+    )
     return new_files
+
+
+def _is_git_lfs_pointer(path: Path) -> bool:
+    """True if path is a Git LFS pointer stub (defense in depth vs normalize)."""
+    try:
+        with path.open("rb") as f:
+            head = f.read(128)
+    except OSError:
+        return False
+    return head.startswith(b"version https://git-lfs.github.com/spec/v1")
 
 
 def detect_latest_ownership_file() -> Optional[Path]:

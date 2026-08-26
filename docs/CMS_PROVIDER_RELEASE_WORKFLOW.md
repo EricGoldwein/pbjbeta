@@ -84,53 +84,35 @@ Never label June 2026 provider information as PBJ Q2 2026 staffing.
 
 | Artifact | Build command |
 |----------|----------------|
-| `provider_info_normalized/ProviderInfoNorm_YYYY_MM.csv` | Automatic via ingest-release normalize step |
-| `provider_info_combined.csv` | `python scripts/build_provider_info_combined.py --output provider_info_combined.csv` |
+| `provider_info_normalized/ProviderInfoNorm_YYYY_MM.csv` | Automatic via `provider acquire` / ingest-release normalize step |
 
-Combined semantics: one row per `(processing_date, ccn)` from all `ProviderInfoNorm_*.csv` inputs (dedupe keeps last).
-
-### June 2026 combined-table evidence (tracked in `release_manifest.json`)
-
-| Metric | Value |
-|--------|-------|
-| Pre-June reconstruction (through 2026-05) | 1,412,822 rows — exact key match with prior combined artifact |
-| June-inclusive rebuild | 1,427,517 rows |
-| June-inclusive SHA-256 | `2e7567c56545831cc1e2e8f6a75e5547a7f7a7946699022101b319fbf8222428` |
-
-Rebuild validation gates (fail on duplicate keys within a Norm file, missing required months, or column schema drift across Norm snapshots): `python scripts/build_provider_info_combined.py --verify-only --through 2026-05`
+Combined national rollups (`provider_info_combined.csv`) and yearly-zip local validation helpers are **out of scope** for the Provider Information acquire pilot; rebuild them in a later task if needed.
 
 ## National sources vs deployment bundles
 
-Ingest-release validates **national sources** and local slice-generation logic. It does **not** refresh `deployments/pbj320-<CCN>/` bundles. Existing deployed facility sites continue to serve whatever slice generation last wrote until `create_vercel_deployment.py` (or equivalent) is run locally.
+Acquire / ingest-release validate **national Provider Info sources**. They do **not** refresh `deployments/pbj320-<CCN>/` bundles. Existing deployed facility sites continue to serve whatever slice generation last wrote until `create_vercel_deployment.py` (or equivalent) is run locally.
 
 ## Related ownership source families (separate CMS drops)
 
-These are **not** inside the monthly provider-information archive:
+These are **not** inside the Provider Information acquire pilot:
 
 | Family | Doc / path |
 |--------|------------|
 | CMS CHOW (change of ownership transactions) | `ownership/_sources/cms_chow/` — see README there |
 | CMS chain performance measures | `ownership/_sources/cms_chain_performance/` — see README there |
-| Monthly facility ownership contacts | `ownership/NH_Ownership_*.csv` (from provider-info zip) |
+| Monthly facility ownership contacts | `ownership/NH_Ownership_*.csv` (from provider-info zip ingest) |
 | CMS enrollment all-owners | `ownership/SNF_All_Owners_*.csv` (separate CMS dataset) |
 
-**CHOW note:** The currently consumed PBJapp CHOW index was built in pbj-root from a legacy ZIP container whose SHA-256 differs from PBJapp’s canonical raw ZIP. However, both archives have identical member inventories and identical payload hashes for every member, including SNF_CHOW_2026.04.01.csv. The underlying CMS source content is therefore verified as equivalent, and the currently served source release is Q1 2026. The remaining issue is architectural rather than source freshness: PBJapp consumes a pbj-root-built derived `chow_index.json` through a fallback path, without a formal PBJapp-to-pbj-root source handoff and index-validation contract. See `ownership/_sources/cms_chow/README.md`.
-
-## pbj-root handoff
+## pbj-root handoff (contract only in this pilot)
 
 ```bash
-python scripts/sync_to_pbj_root.py checklist --release-key 2026-05
-python scripts/sync_to_pbj_root.py provider-release --release-key 2026-05 --force
+python scripts/manage_cms_sources.py provider acquire
+# Writes provider_info/_manifests/YYYY-MM/pbj_root_handoff.json
+# Does NOT copy into pbj-root.
 ```
 
-**Contract:** `provider-release` copies **both** `ProviderInfoNorm_YYYY_MM.csv` (committed in pbj-root) and paired `NH_ProviderInfo_MonYYYY.csv` (local/gitignored). Norm-only sync is treated as a bug.
+**Contract:** `pbj_root_handoff.json` records `pbj_root_sync.sha256` / `row_count` for `ProviderInfoNorm_YYYY_MM.csv` and NH parity metadata. Cross-repo copy into pbj-root is an **explicit later step**, not part of acquire.
 
-`pbj_root_handoff.json` records `provider_promotion.ready_for_pbj_commit` — must be `true` (Norm + NH in PBJapp) before handoff.
+`provider_promotion.ready_for_pbj_commit` must be `true` (Norm + NH present in PBJapp) before any public handoff.
 
-Gates in pbj-root (sync sets `PBJAPP_ROOT` automatically): backfill → validate → simulate → **`verify_provider_release_handoff.py`**
-
-Derived (run by sync): `build_state_page_aggregates.py`, **`generate_search_index.py`**
-
-Manual before pbj-root commit: rebuild `provider_info_combined_latest.csv`, `validate_release.py`
-
-Full routing: `docs/PBJ_ROOT_HANDOFF.md`, `docs/PBJ_ROOT_DATA_LAYERS.md`
+Gates in pbj-root (when handoff is performed later): backfill → validate → simulate → **`verify_provider_release_handoff.py`**

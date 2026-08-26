@@ -16,10 +16,10 @@
     "row_count": 14690,
     "gitignored_in_pbj_root": true,
     "required_for_parity": true,
-    "note": "Copied by sync_to_pbj_root.py; local only \u2014 not deployed on Render"
+    "note": "NH snapshot is local/gitignored for parity gates; Norm is the public handoff artifact. Cross-repo copy is a separate explicit step \u2014 not part of acquire."
   },
   "pbj_root_combined_latest_note": "Rebuild provider_info_combined_latest.csv separately in pbj-root after Norm export; do not copy full PBJapp provider_info_combined.csv.",
-  "sync_command": "python scripts/sync_to_pbj_root.py provider-release --release-key 2026-08 --force",
+  "sync_command": "# Provider Info pilot: handoff artifact only \u2014 no auto cross-repo write. When ready for public handoff, copy ProviderInfoNorm_2026_08.csv per pbj_root_sync and run pbj-root verify_provider_release_handoff.py --release-key 2026-08",
   "gates_to_run_in_pbj_root": [
     "python scripts/backfill_provider_norm_urban.py",
     "python scripts/validate_provider_norm_snapshot.py",
@@ -49,7 +49,7 @@
   "pbj_metrics_verify_scope": "verify_pbjapp_sync.py checks facility/state/national quarterly CSVs only \u2014 not provider Norm/NH or handoff parity",
   "snf_owners_state_lists": {
     "source_glob": "ownership/SNF_All_Owners*.csv",
-    "sync_command": "python scripts/sync_to_pbj_root.py snf-all-owners --rebuild",
+    "sync_command": "# Separate ownership family \u2014 explicit future handoff; not part of Provider Info acquire",
     "rebuild_scripts": [
       "python scripts/build_snf_owners_index.py",
       "python scripts/build_snf_owners_ccn_index.py",
