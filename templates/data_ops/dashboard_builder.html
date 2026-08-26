@@ -1,0 +1,61 @@
+{% extends "data_ops/base.html" %}
+{% block title %}Dashboard Builder{% endblock %}
+{% block content %}
+<section class="do-page-head">
+  <h1>Subscription Dashboard Builder</h1>
+  <p class="do-muted">Premium / dynamic facility dashboards — not public pbj-root. No Deploy in V0.</p>
+</section>
+
+<form class="do-form do-form-row" method="get" action="{{ url_for('dashboard_builder') }}">
+  <label class="do-label" for="ccn">CCN</label>
+  <input id="ccn" class="do-input do-mono" name="ccn" value="{{ ccn }}" placeholder="315128" pattern="[0-9A-Za-z]{5,6}" required>
+  <button class="do-btn do-btn-primary" type="submit">Resolve</button>
+</form>
+
+{% if status %}
+<section class="do-section">
+  <h2>{{ status.facility_name or 'Facility' }} <span class="do-mono">{{ status.ccn }}</span></h2>
+  <dl class="do-dl do-dl-wide">
+    <div><dt>Bundle</dt><dd><span class="do-badge">{{ status.bundle_state }}</span></dd></div>
+    <div><dt>V2</dt><dd>{{ status.is_v2 }}</dd></div>
+    <div><dt>Deploy dir</dt><dd class="do-mono">{{ status.deploy_dir or '—' }}</dd></div>
+    <div><dt>V2 reference</dt><dd class="do-mono">{{ status.reference_ccn or 'none in runtime' }}</dd></div>
+    <div><dt>Blockers</dt><dd class="do-mono">{{ status.blockers|join(', ') or 'none' }}</dd></div>
+    <div><dt>Source gates</dt><dd class="do-mono">{{ status.source_gates | tojson }}</dd></div>
+  </dl>
+  <p>{{ status.detail }}</p>
+
+  <div class="do-actions">
+    <form method="post" action="{{ url_for('action_dash_readiness') }}">
+      <input type="hidden" name="ccn" value="{{ status.ccn }}">
+      <button class="do-btn" type="submit">Check readiness</button>
+    </form>
+    <form method="post" action="{{ url_for('action_dash_refresh') }}">
+      <input type="hidden" name="ccn" value="{{ status.ccn }}">
+      <button class="do-btn do-btn-primary" type="submit" {% if not status.can_generate_refresh %}disabled{% endif %}>Generate / Refresh</button>
+    </form>
+    <form method="post" action="{{ url_for('action_dash_preflight') }}">
+      <input type="hidden" name="ccn" value="{{ status.ccn }}">
+      <button class="do-btn" type="submit" {% if not status.can_run_preflight %}disabled{% endif %}>Run Preflight</button>
+    </form>
+  </div>
+  {% if not status.can_generate_refresh %}
+  <p class="do-flash-error">Generate/Refresh disabled: {{ status.blockers|join(', ') }}</p>
+  {% endif %}
+{% endif %}
+
+<details class="do-details">
+  <summary>Proven paths</summary>
+  <p><strong>Existing V2 refresh</strong></p>
+  <p class="do-mono do-small">{{ existing_refresh_path }}</p>
+  <p><strong>Cold / new V2</strong></p>
+  <p class="do-mono do-small">{{ cold_new_path }}</p>
+</details>
+
+{% if last_action %}
+<details class="do-details" open>
+  <summary>Last action</summary>
+  <pre class="do-pre">{{ last_action | tojson(indent=2) }}</pre>
+</details>
+{% endif %}
+{% endblock %}

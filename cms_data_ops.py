@@ -1,11 +1,12 @@
-"""PBJ Data Ops status probes and Provider Info action wrappers (v0).
+"""PBJ Data Ops status probes and Provider Info action wrappers.
 
-Provider Info check/acquire call scripts/cms_provider_info_acquire.py only.
-Other families are local read-only probes — no new ingestion.
+Control plane over canonical services — UI must call these modules, not
+duplicate ETL. Provider Info check/acquire → scripts/cms_provider_info_acquire.py.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from dataclasses import asdict, dataclass, field
@@ -23,11 +24,27 @@ if str(_SCRIPTS) not in sys.path:
 import cms_data_paths  # noqa: E402
 from cms_source_registry import (  # noqa: E402
     CMS_SOURCE_REGISTRY,
+    AccessMode,
     CmsSourceRecord,
     OpsStatus,
     SourceFamily,
+    get_derived_signals,
     get_registry,
     get_source,
+)
+from data_ops_access import (  # noqa: E402
+    ArtifactRef,
+    RuntimeAvailability,
+    cms_http_ref,
+    local_file_ref,
+)
+from data_ops_approval import has_acknowledgement, has_approval, read_audit  # noqa: E402
+from data_ops_zweli import (  # noqa: E402
+    ZweliReport,
+    ZweliState,
+    not_run_report,
+    run_provider_info_zweli,
+    write_zweli_report,
 )
 
 FetchJson = Callable[[str], Any]
@@ -39,11 +56,18 @@ class SourceOpsSnapshot:
     human_name: str
     source_family: str
     formats: list[str]
+    containers: list[str]
     cadence: str
-    automation_level: str
+    automation_maturity: str
     cms_dataset_id: Optional[str]
-    cms_latest: Optional[str]
-    pbjapp_latest: Optional[str]
+    publisher_latest: Optional[str]
+    raw_available: str
+    processed: Optional[str]
+    quality_reviewed: str
+    approved: str
+    structural_status: str
+    zweli_status: str
+    runtime_access: str
     status: str
     last_checked: str
     last_successful_local_processing: Optional[str]
@@ -52,6 +76,12 @@ class SourceOpsSnapshot:
     detail: str = ""
     actions_enabled: list[str] = field(default_factory=list)
     error: Optional[str] = None
+    # Compat with initial #64 UI fields
+    cms_latest: Optional[str] = None
+    pbjapp_latest: Optional[str] = None
+    automation_level: Optional[str] = None
+    release_id: Optional[str] = None
+    zweli_report: Optional[dict[str, Any]] = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -85,18 +115,8 @@ def _quarter_label_from_name(name: str) -> Optional[str]:
 
 
 _MONTH_NAME_TO_NUM = {
-    "jan": 1,
-    "feb": 2,
-    "mar": 3,
-    "apr": 4,
-    "may": 5,
-    "jun": 6,
-    "jul": 7,
-    "aug": 8,
-    "sep": 9,
-    "oct": 10,
-    "nov": 11,
-    "dec": 12,
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
 
@@ -121,45 +141,82 @@ def _chain_sort_key(path: Path) -> tuple[int, int, float]:
     return (int(m.group(2)), mon, path.stat().st_mtime)
 
 
+def _base_snap(record: CmsSourceRecord) -> SourceOpsSnapshot:
+    formats = [f.value for f in record.formats] if record.formats else [c.value for c in record.containers]
+    return SourceOpsSnapshot(
+        source_id=record.source_id,
+        human_name=record.human_name,
+        source_family=record.source_family.value,
+        formats=formats,
+        containers=[c.value for c in record.containers],
+        cadence=record.cadence.value,
+        automation_maturity=record.automation_maturity.value,
+        cms_dataset_id=record.cms_dataset_id,
+        publisher_latest=None,
+        raw_available="—",
+        processed=None,
+        quality_reviewed=ZweliState.NOT_RUN.value,
+        approved="no",
+        structural_status="NOT_RUN",
+        zweli_status=ZweliState.NOT_RUN.value,
+        runtime_access=AccessMode.UNAVAILABLE.value,
+        status=OpsStatus.UNKNOWN.value,
+        last_checked=_utc_now_iso(),
+        last_successful_local_processing=None,
+        actions_enabled=list(record.actions_enabled),
+        automation_level=record.automation_maturity.value,
+    )
+
+
+def _apply_raw_ref(snap: SourceOpsSnapshot, ref: ArtifactRef) -> None:
+    snap.runtime_access = ref.access_mode.value
+    if ref.availability == RuntimeAvailability.AVAILABLE:
+        snap.raw_available = ref.release_id or "yes"
+        snap.local_raw_present = ref.access_mode == AccessMode.LOCAL_FILESYSTEM
+    elif ref.availability == RuntimeAvailability.NOT_AVAILABLE_IN_THIS_RUNTIME:
+        snap.raw_available = "NOT AVAILABLE IN THIS RUNTIME"
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+    else:
+        snap.raw_available = "—"
+
+
 def _probe_provider_info(
     record: CmsSourceRecord,
     *,
     check_cms: bool,
     fetch_json: FetchJson | None,
     root: Path,
+    run_zweli: bool = True,
 ) -> SourceOpsSnapshot:
     import cms_provider_info_acquire as acq
     import cms_provider_release_lib as cpr
 
-    checked = _utc_now_iso()
-    snap = SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=record.cms_dataset_id,
-        cms_latest=None,
-        pbjapp_latest=None,
-        status=OpsStatus.UNKNOWN.value,
-        last_checked=checked,
-        last_successful_local_processing=None,
-        actions_enabled=list(record.actions_enabled),
-    )
-
+    snap = _base_snap(record)
     try:
         handoff_ready = False
+        release_id = None
         local = acq.latest_local_provider_info(root)
+        raw_path = None
+        norm_path = None
         if local:
             ly, lm, lpath = local
+            raw_path = lpath
+            release_id = f"{ly:04d}-{lm:02d}"
+            snap.release_id = release_id
             snap.pbjapp_latest = f"{acq._MONTH_ABBR[lm]} {ly}"
+            snap.processed = None
             snap.local_raw_present = True
-            norm = (
+            _apply_raw_ref(
+                snap,
+                local_file_ref("provider_info_raw", lpath, release_id=release_id),
+            )
+            norm_path = (
                 cms_data_paths.provider_info_normalized_dir(root)
                 / f"ProviderInfoNorm_{ly}_{lm:02d}.csv"
             )
-            snap.local_derived_present = norm.is_file() and norm.stat().st_size > 0
+            snap.local_derived_present = norm_path.is_file() and norm_path.stat().st_size > 0
+            if snap.local_derived_present:
+                snap.processed = release_id
             key = cpr.release_key(ly, lm)
             acq_path = (
                 cms_data_paths.provider_release_manifest_dir(key.label, root) / "acquisition.json"
@@ -169,23 +226,21 @@ def _probe_provider_info(
                 / "pbj_root_handoff.json"
             )
             if acq_path.is_file():
-                import json
-
                 try:
                     acq_data = json.loads(acq_path.read_text(encoding="utf-8"))
-                    snap.last_successful_local_processing = acq_data.get(
-                        "acquired_at"
-                    ) or _mtime_iso(acq_path)
+                    snap.last_successful_local_processing = acq_data.get("acquired_at") or _mtime_iso(
+                        acq_path
+                    )
+                    snap.structural_status = "PASS" if acq_data.get("validation") else "UNKNOWN"
                 except (OSError, json.JSONDecodeError):
                     snap.last_successful_local_processing = _mtime_iso(acq_path)
             elif snap.local_derived_present:
-                snap.last_successful_local_processing = _mtime_iso(norm)
+                snap.last_successful_local_processing = _mtime_iso(norm_path)
+                snap.structural_status = "PASS"
             else:
                 snap.last_successful_local_processing = _mtime_iso(lpath)
 
             if handoff_path.is_file():
-                import json
-
                 try:
                     handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
                     promo = handoff.get("provider_promotion") or {}
@@ -195,10 +250,56 @@ def _probe_provider_info(
                 except (OSError, json.JSONDecodeError):
                     handoff_ready = True
 
+            if has_approval(record.source_id, release_id):
+                snap.approved = "yes"
+        else:
+            _apply_raw_ref(
+                snap,
+                local_file_ref(
+                    "provider_info_raw",
+                    cms_data_paths.provider_info_dir(root) / "(none)",
+                    expected_elsewhere=True,
+                ),
+            )
+
         cms = None
         if check_cms:
             cms = acq.resolve_cms_provider_info_release(fetch_json=fetch_json)
+            snap.publisher_latest = cms.data_vintage_label
             snap.cms_latest = cms.data_vintage_label
+
+        # Zweli
+        if run_zweli and raw_path and raw_path.is_file():
+            snaps = acq.list_local_provider_info_snapshots(root)
+            baseline_path = None
+            baseline_rel = None
+            if local and snaps:
+                older = [(y, m, p) for y, m, p in snaps if (y, m) < (local[0], local[1])]
+                if older:
+                    by, bm, bp = max(older, key=lambda t: (t[0], t[1]))
+                    baseline_path = bp
+                    baseline_rel = f"{by:04d}-{bm:02d}"
+            report = run_provider_info_zweli(
+                raw_path,
+                release_id or "unknown",
+                baseline_csv=baseline_path,
+                baseline_release=baseline_rel,
+            )
+            snap.zweli_status = report.state.value
+            snap.quality_reviewed = report.state.value
+            snap.zweli_report = report.to_dict()
+            if release_id:
+                try:
+                    write_zweli_report(
+                        report,
+                        cms_data_paths.provider_release_manifest_dir(release_id, root)
+                        / "zweli_report.json",
+                    )
+                except OSError:
+                    pass
+        else:
+            snap.zweli_status = ZweliState.NOT_RUN.value
+            snap.quality_reviewed = ZweliState.NOT_RUN.value
 
         if cms is not None and acq.cms_is_newer_than_local(cms, root):
             snap.status = OpsStatus.CMS_NEWER.value
@@ -206,8 +307,8 @@ def _probe_provider_info(
             return snap
 
         if not snap.local_raw_present:
-            snap.status = OpsStatus.UNKNOWN.value
-            snap.detail = "No real (non-LFS) local NH_ProviderInfo CSV found"
+            snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+            snap.detail = "No real (non-LFS) local NH_ProviderInfo CSV in this runtime"
             return snap
 
         if not snap.local_derived_present:
@@ -215,234 +316,145 @@ def _probe_provider_info(
             snap.detail = "Raw Provider Info present; normalized output missing"
             return snap
 
-        if (
-            handoff_ready
-            and cms is not None
-            and not acq.cms_is_newer_than_local(cms, root)
-        ):
+        if snap.zweli_status == ZweliState.BLOCKED.value:
+            snap.status = OpsStatus.ERROR.value
+            snap.detail = "Zweli BLOCKED — not ready for handoff"
+            return snap
+
+        if handoff_ready and cms is not None:
             snap.status = OpsStatus.READY_FOR_HANDOFF.value
             snap.detail = "Local matches CMS; Norm + handoff artifact present"
             return snap
 
-        if cms is not None and not acq.cms_is_newer_than_local(cms, root):
+        if cms is not None:
             snap.status = OpsStatus.CURRENT.value
             snap.detail = "Local Provider Info vintage matches CMS"
             return snap
 
-        if snap.local_derived_present:
-            snap.status = OpsStatus.UNKNOWN.value
-            snap.detail = "Local processed snapshot present; CMS not checked"
-            return snap
-
         snap.status = OpsStatus.UNKNOWN.value
+        snap.detail = "Local processed snapshot present; CMS not checked"
         return snap
-    except Exception as exc:  # noqa: BLE001 — surface as ERROR status for ops UI
+    except Exception as exc:  # noqa: BLE001
         snap.status = OpsStatus.ERROR.value
         snap.error = str(exc)
         snap.detail = f"Provider Info probe failed: {exc}"
         return snap
 
 
-def _probe_nurse(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
-    checked = _utc_now_iso()
-    raw_dir = cms_data_paths.nurse_raw_dir(root)
-    std_dir = cms_data_paths.standardized_nurse_dir(root)
-    raw = _latest_by_glob(raw_dir, "PBJ_dailynurse*.csv")
-    std = _latest_by_glob(std_dir, "PBJ_dailynurse*.csv")
+def _probe_quarterly_csv_family(
+    record: CmsSourceRecord,
+    root: Path,
+    *,
+    raw_dir: Path,
+    std_dir: Path,
+    raw_glob: str,
+    std_glob: str,
+) -> SourceOpsSnapshot:
+    snap = _base_snap(record)
+    raw = _latest_by_glob(raw_dir, raw_glob)
+    std = _latest_by_glob(std_dir, std_glob)
     label = None
     if std:
         label = _quarter_label_from_name(std.name)
     elif raw:
         label = _quarter_label_from_name(raw.name)
-
-    if raw and not std:
-        status = OpsStatus.PROCESSING_REQUIRED.value
-        detail = "Raw nurse CSV present; standardized output missing"
-    elif not raw and not std:
-        status = OpsStatus.UNKNOWN.value
-        detail = "No local nurse PBJ files found"
-    elif std and not raw:
-        status = OpsStatus.UNKNOWN.value
-        detail = "Standardized nurse files present; CMS currency unknown (no dataset ID)"
+    snap.pbjapp_latest = label
+    snap.processed = label if std else None
+    if raw:
+        _apply_raw_ref(snap, local_file_ref("raw", raw, release_id=label))
+        snap.local_raw_present = True
     else:
-        status = OpsStatus.UNKNOWN.value
-        detail = "Local nurse files present; CMS currency unknown (no dataset ID)"
-
-    return SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=None,
-        cms_latest=None,
-        pbjapp_latest=label,
-        status=status,
-        last_checked=checked,
-        last_successful_local_processing=_mtime_iso(std) if std else None,
-        local_raw_present=bool(raw),
-        local_derived_present=bool(std),
-        detail=detail,
-        actions_enabled=[],
-    )
-
-
-def _probe_nonnurse(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
-    checked = _utc_now_iso()
-    raw_dir = cms_data_paths.nonnurse_raw_dir(root)
-    std_dir = cms_data_paths.standardized_nonnurse_dir(root)
-    raw = _latest_by_glob(raw_dir, "PBJ_dailynonnurse*.csv")
-    if raw is None:
-        raw = _latest_by_glob(raw_dir, "PBJ_dailyNonnurse*.csv")
-    std = _latest_by_glob(std_dir, "PBJ_dailynonnurse*.csv")
-    label = None
-    if std:
-        label = _quarter_label_from_name(std.name)
-    elif raw:
-        label = _quarter_label_from_name(raw.name)
-
+        _apply_raw_ref(
+            snap,
+            local_file_ref("raw", raw_dir / "(none)", expected_elsewhere=True),
+        )
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+        snap.detail = (
+            "Raw not accessible in this runtime (may exist under PBJ_DATA_ROOT / "
+            "operator machine). CMS dataset ID is registered."
+        )
+        return snap
+    snap.local_derived_present = bool(std)
+    snap.last_successful_local_processing = _mtime_iso(std) if std else None
     if raw and not std:
-        status, detail = (
-            OpsStatus.PROCESSING_REQUIRED.value,
-            "Raw non-nurse CSV present; standardized output missing",
-        )
-    elif not raw and not std:
-        status, detail = OpsStatus.UNKNOWN.value, "No local non-nurse PBJ files found"
+        snap.status = OpsStatus.PROCESSING_REQUIRED.value
+        snap.structural_status = "PENDING"
+        snap.detail = "Raw present; standardized output missing"
     else:
-        status, detail = (
-            OpsStatus.UNKNOWN.value,
-            "Local non-nurse files present; CMS currency unknown (no dataset ID). "
-            "Acquire CLI broken-legacy (missing ingest script).",
+        snap.status = OpsStatus.UNKNOWN.value
+        snap.structural_status = "UNKNOWN"
+        snap.detail = (
+            f"Local artifacts present; publisher comparison not automated for "
+            f"{record.cms_dataset_id}"
         )
-
-    return SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=None,
-        cms_latest=None,
-        pbjapp_latest=label,
-        status=status,
-        last_checked=checked,
-        last_successful_local_processing=_mtime_iso(std) if std else None,
-        local_raw_present=bool(raw),
-        local_derived_present=bool(std),
-        detail=detail,
-        actions_enabled=[],
-    )
+    snap.zweli_status = ZweliState.NOT_RUN.value
+    snap.quality_reviewed = ZweliState.NOT_RUN.value
+    return snap
 
 
 def _probe_ein(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
-    checked = _utc_now_iso()
+    snap = _base_snap(record)
     mono = cms_data_paths.ein_monolithic_dir(root)
     quarters = cms_data_paths.ein_quarters_dir(root)
     extracted = cms_data_paths.ein_extracted_dir(root)
+    ein_root = cms_data_paths.ein_root(root)
     mono_zips = list(mono.glob("*.zip")) if mono.is_dir() else []
     q_zips = list(quarters.glob("*.zip")) if quarters.is_dir() else []
-    # Also check legacy EIN/*.zip at root of EIN
-    ein_root = cms_data_paths.ein_root(root)
     root_zips = list(ein_root.glob("*.zip")) if ein_root.is_dir() else []
     raw_present = bool(mono_zips or q_zips or root_zips)
     derived = _latest_by_glob(extracted, "CY*.csv") if extracted.is_dir() else None
-
     label = None
     if q_zips:
-        labels = [_quarter_label_from_name(z.name) for z in q_zips]
-        labels = [x for x in labels if x]
+        labels = [x for x in (_quarter_label_from_name(z.name) for z in q_zips) if x]
         if labels:
             label = max(labels)
     if label is None and mono_zips:
-        label = "monolithic PUF present"
+        label = "monolithic PUF"
     elif label is None and root_zips:
         label = root_zips[0].name
-
-    if raw_present and not derived:
-        status = OpsStatus.LOCAL_RAW_ONLY.value
-        detail = "EIN zip(s) present; extracted national CSV not found (broken-legacy ingest)"
-    elif not raw_present:
-        status = OpsStatus.UNKNOWN.value
-        detail = "No local EIN zips found"
+    snap.pbjapp_latest = label
+    snap.processed = label if derived else None
+    if raw_present:
+        path = (q_zips or mono_zips or root_zips)[0]
+        _apply_raw_ref(snap, local_file_ref("ein_zip", path, release_id=label))
+        snap.local_raw_present = True
+        snap.status = (
+            OpsStatus.LOCAL_RAW_ONLY.value if not derived else OpsStatus.UNKNOWN.value
+        )
+        snap.detail = "EIN zip(s) in runtime; broken-legacy ingest scripts not restored"
     else:
-        status = OpsStatus.UNKNOWN.value
-        detail = "Local EIN artifacts present; CMS currency unknown (no dataset ID)"
-
-    return SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=None,
-        cms_latest=None,
-        pbjapp_latest=label,
-        status=status,
-        last_checked=checked,
-        last_successful_local_processing=_mtime_iso(derived) if derived else None,
-        local_raw_present=raw_present,
-        local_derived_present=bool(derived),
-        detail=detail,
-        actions_enabled=[],
-    )
+        _apply_raw_ref(
+            snap, local_file_ref("ein_zip", ein_root / "(none)", expected_elsewhere=True)
+        )
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+        snap.detail = "EIN zips not available in this runtime"
+    snap.local_derived_present = bool(derived)
+    snap.last_successful_local_processing = _mtime_iso(derived) if derived else None
+    return snap
 
 
 def _probe_snf_all_owners(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
-    checked = _utc_now_iso()
+    snap = _base_snap(record)
     own = cms_data_paths.ownership_dir(root)
     raw = _latest_by_glob(own, "SNF_All_Owners*.csv")
     if raw:
-        status = OpsStatus.LOCAL_RAW_ONLY.value
-        detail = "SNF_All_Owners CSV present; no normalize/index scripts on main"
-        label = raw.name
+        _apply_raw_ref(snap, local_file_ref("snf_all_owners", raw, release_id=raw.name))
+        snap.pbjapp_latest = raw.name
+        snap.status = OpsStatus.LOCAL_RAW_ONLY.value
+        snap.detail = "CSV present; normalize scripts absent on main"
+        snap.last_successful_local_processing = _mtime_iso(raw)
+        snap.local_raw_present = True
     else:
-        status = OpsStatus.UNKNOWN.value
-        detail = "No SNF_All_Owners*.csv in ownership/"
-        label = None
-    return SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=None,
-        cms_latest=None,
-        pbjapp_latest=label,
-        status=status,
-        last_checked=checked,
-        last_successful_local_processing=_mtime_iso(raw) if raw else None,
-        local_raw_present=bool(raw),
-        local_derived_present=False,
-        detail=detail,
-        actions_enabled=[],
-    )
-
-
-def _probe_placeholder(record: CmsSourceRecord, detail: str) -> SourceOpsSnapshot:
-    return SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=record.cms_dataset_id,
-        cms_latest=None,
-        pbjapp_latest=None,
-        status=OpsStatus.UNKNOWN.value,
-        last_checked=_utc_now_iso(),
-        last_successful_local_processing=None,
-        detail=detail,
-        actions_enabled=[],
-    )
+        _apply_raw_ref(
+            snap, local_file_ref("snf_all_owners", own / "(none)", expected_elsewhere=True)
+        )
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+        snap.detail = "SNF_All_Owners not in this runtime (dataset ID registered)"
+    return snap
 
 
 def _probe_chain(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
-    checked = _utc_now_iso()
+    snap = _base_snap(record)
     own = cms_data_paths.ownership_dir(root)
     candidates: list[Path] = []
     if own.is_dir():
@@ -451,62 +463,54 @@ def _probe_chain(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
     raw = max(candidates, key=_chain_sort_key) if candidates else None
     label = _chain_label_from_name(raw.name) if raw else None
     if raw:
-        status = OpsStatus.LOCAL_RAW_ONLY.value
-        detail = "Chain performance CSV present; manual drop / detection only"
+        _apply_raw_ref(snap, local_file_ref("chain", raw, release_id=label))
+        snap.pbjapp_latest = label or raw.name
+        snap.status = OpsStatus.LOCAL_RAW_ONLY.value
+        snap.detail = "Chain performance CSV present; manual acquire"
+        snap.last_successful_local_processing = _mtime_iso(raw)
+        snap.local_raw_present = True
     else:
-        status = OpsStatus.UNKNOWN.value
-        detail = "No chain performance CSV in ownership/"
-    return SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=None,
-        cms_latest=None,
-        pbjapp_latest=label or (raw.name if raw else None),
-        status=status,
-        last_checked=checked,
-        last_successful_local_processing=_mtime_iso(raw) if raw else None,
-        local_raw_present=bool(raw),
-        local_derived_present=False,
-        detail=detail,
-        actions_enabled=[],
-    )
+        _apply_raw_ref(snap, local_file_ref("chain", own / "(none)", expected_elsewhere=True))
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+        snap.detail = "Chain performance CSV not in this runtime"
+    return snap
 
 
-def _probe_sff(record: CmsSourceRecord, root: Path, *, check_cms: bool, fetch_json: FetchJson | None) -> SourceOpsSnapshot:
-    """SFF tracks Provider Info column; PDF list not ingested on main."""
-    pi = _probe_provider_info(
-        get_source("cms.provider_info"),  # type: ignore[arg-type]
-        check_cms=check_cms,
-        fetch_json=fetch_json,
-        root=root,
-    )
-    return SourceOpsSnapshot(
-        source_id=record.source_id,
-        human_name=record.human_name,
-        source_family=record.source_family.value,
-        formats=[f.value for f in record.formats],
-        cadence=record.cadence.value,
-        automation_level=record.automation_level.value,
-        cms_dataset_id=None,
-        cms_latest=pi.cms_latest,
-        pbjapp_latest=pi.pbjapp_latest,
-        status=pi.status if pi.status != OpsStatus.READY_FOR_HANDOFF.value else OpsStatus.CURRENT.value,
-        last_checked=pi.last_checked,
-        last_successful_local_processing=pi.last_successful_local_processing,
-        local_raw_present=pi.local_raw_present,
-        local_derived_present=pi.local_derived_present,
-        detail=(
-            "SFF via Provider Info Special Focus Status column. "
-            "PDF container supported in registry; no separate PDF ingest on main. "
-            + (pi.detail or "")
-        ),
-        actions_enabled=[],
-        error=pi.error,
-    )
+def _probe_unmodeled(record: CmsSourceRecord, detail: str) -> SourceOpsSnapshot:
+    snap = _base_snap(record)
+    snap.detail = detail
+    snap.status = OpsStatus.UNKNOWN.value
+    snap.raw_available = "NOT AVAILABLE IN THIS RUNTIME"
+    snap.runtime_access = AccessMode.UNAVAILABLE.value
+    return snap
+
+
+def _probe_health_citations(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
+    snap = _base_snap(record)
+    cit = cms_data_paths.citations_dir(root)
+    # Prefer standalone-looking files; still report co-extracted NH_* if only those exist
+    standalone = _latest_by_glob(cit, "*Citation*.csv") if cit.is_dir() else None
+    if standalone is None and cit.is_dir():
+        standalone = _latest_by_glob(cit, "*.csv")
+    if standalone:
+        _apply_raw_ref(
+            snap, local_file_ref("citations", standalone, release_id=standalone.name)
+        )
+        snap.pbjapp_latest = standalone.name
+        snap.local_raw_present = True
+        snap.status = OpsStatus.LOCAL_RAW_ONLY.value
+        snap.detail = (
+            "Citation CSV present in Citations/. Distinct dataset r5ix-sfxw — "
+            "co-extracted NH_HealthCitations_* from PI zip is a different path."
+        )
+        snap.last_successful_local_processing = _mtime_iso(standalone)
+    else:
+        _apply_raw_ref(
+            snap, local_file_ref("citations", cit / "(none)", expected_elsewhere=True)
+        )
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+        snap.detail = "Health Citations dataset not accessible in this runtime"
+    return snap
 
 
 def probe_source(
@@ -515,6 +519,7 @@ def probe_source(
     check_cms: bool = True,
     fetch_json: FetchJson | None = None,
     root: Path | None = None,
+    run_zweli: bool = True,
 ) -> SourceOpsSnapshot:
     root = root or cms_data_paths.repo_root()
     record = get_source(source_id)
@@ -524,11 +529,18 @@ def probe_source(
             human_name=source_id,
             source_family="unknown",
             formats=[],
+            containers=[],
             cadence="unknown",
-            automation_level="fully_manual",
+            automation_maturity="unmodeled",
             cms_dataset_id=None,
-            cms_latest=None,
-            pbjapp_latest=None,
+            publisher_latest=None,
+            raw_available="—",
+            processed=None,
+            quality_reviewed=ZweliState.NOT_RUN.value,
+            approved="no",
+            structural_status="NOT_RUN",
+            zweli_status=ZweliState.NOT_RUN.value,
+            runtime_access=AccessMode.UNAVAILABLE.value,
             status=OpsStatus.ERROR.value,
             last_checked=_utc_now_iso(),
             last_successful_local_processing=None,
@@ -538,33 +550,51 @@ def probe_source(
 
     family = record.source_family
     if family == SourceFamily.PROVIDER_INFO:
-        return _probe_provider_info(record, check_cms=check_cms, fetch_json=fetch_json, root=root)
+        return _probe_provider_info(
+            record, check_cms=check_cms, fetch_json=fetch_json, root=root, run_zweli=run_zweli
+        )
     if family == SourceFamily.PBJ_NURSE:
-        return _probe_nurse(record, root)
+        return _probe_quarterly_csv_family(
+            record,
+            root,
+            raw_dir=cms_data_paths.nurse_raw_dir(root),
+            std_dir=cms_data_paths.standardized_nurse_dir(root),
+            raw_glob="PBJ_dailynurse*.csv",
+            std_glob="PBJ_dailynurse*.csv",
+        )
     if family == SourceFamily.PBJ_NON_NURSE:
-        return _probe_nonnurse(record, root)
+        return _probe_quarterly_csv_family(
+            record,
+            root,
+            raw_dir=cms_data_paths.nonnurse_raw_dir(root),
+            std_dir=cms_data_paths.standardized_nonnurse_dir(root),
+            raw_glob="PBJ_dailynonnurse*.csv",
+            std_glob="PBJ_dailynonnurse*.csv",
+        )
     if family == SourceFamily.PBJ_EIN:
         return _probe_ein(record, root)
     if family == SourceFamily.SNF_ALL_OWNERS:
         return _probe_snf_all_owners(record, root)
     if family == SourceFamily.SNF_ENROLLMENTS:
-        return _probe_placeholder(
+        return _probe_unmodeled(
             record,
-            "No standalone SNF Enrollments drop verified on main",
+            "SNF Enrollments is a separate CMS source from All Owners; unmodeled on main",
         )
     if family == SourceFamily.SNF_CHOW:
-        chow_doc = root / "ownership" / "_sources" / "cms_chow"
-        detail = (
-            f"Documented path exists locally: {chow_doc}"
-            if chow_doc.is_dir()
-            else "Documented ownership/_sources/cms_chow/ missing on main; fully manual"
+        return _probe_unmodeled(
+            record,
+            "SNF CHOW manual/cross-repo; raw path often absent in this runtime",
         )
-        return _probe_placeholder(record, detail)
     if family == SourceFamily.CHAIN_PERFORMANCE:
         return _probe_chain(record, root)
-    if family == SourceFamily.SFF:
-        return _probe_sff(record, root, check_cms=check_cms, fetch_json=fetch_json)
-    return _probe_placeholder(record, "Unhandled source family")
+    if family == SourceFamily.HEALTH_CITATIONS:
+        return _probe_health_citations(record, root)
+    if family == SourceFamily.SFF_PDF_LIST:
+        return _probe_unmodeled(
+            record,
+            "SFF PDF/list publication UNMODELED — distinct from signal.sff_status on Provider Info",
+        )
+    return _probe_unmodeled(record, "Unhandled source family")
 
 
 def probe_all_sources(
@@ -572,11 +602,64 @@ def probe_all_sources(
     check_cms: bool = True,
     fetch_json: FetchJson | None = None,
     root: Path | None = None,
+    run_zweli: bool = True,
 ) -> list[SourceOpsSnapshot]:
     return [
-        probe_source(r.source_id, check_cms=check_cms, fetch_json=fetch_json, root=root)
+        probe_source(
+            r.source_id,
+            check_cms=check_cms,
+            fetch_json=fetch_json,
+            root=root,
+            run_zweli=run_zweli,
+        )
         for r in get_registry()
     ]
+
+
+def release_review_items(
+    snapshots: list[SourceOpsSnapshot] | None = None,
+    *,
+    check_cms: bool = True,
+    root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Items needing human attention for Release Review UI."""
+    snaps = snapshots or probe_all_sources(check_cms=check_cms, root=root)
+    items: list[dict[str, Any]] = []
+    for s in snaps:
+        reason = None
+        if s.status == OpsStatus.CMS_NEWER.value:
+            reason = "new_source_release"
+        elif s.status == OpsStatus.PROCESSING_REQUIRED.value:
+            reason = "acquired_unprocessed"
+        elif s.structural_status in {"FAIL", "ERROR"}:
+            reason = "structural_error"
+        elif s.zweli_status == ZweliState.REQUIRES_REVIEW.value:
+            reason = "zweli_requires_review"
+        elif s.zweli_status == ZweliState.BLOCKED.value:
+            reason = "zweli_blocked"
+        elif s.status == OpsStatus.ERROR.value:
+            reason = "processing_failure"
+        elif s.status == OpsStatus.READY_FOR_HANDOFF.value and s.approved != "yes":
+            reason = "ready_for_approval"
+        if reason:
+            items.append(
+                {
+                    "reason": reason,
+                    "source_id": s.source_id,
+                    "human_name": s.human_name,
+                    "release_id": s.release_id or s.pbjapp_latest,
+                    "status": s.status,
+                    "zweli_status": s.zweli_status,
+                    "structural_status": s.structural_status,
+                    "detail": s.detail,
+                    "zweli_report": s.zweli_report,
+                    "acknowledged": bool(
+                        s.release_id
+                        and has_acknowledgement(s.source_id, s.release_id)
+                    ),
+                }
+            )
+    return items
 
 
 def check_provider_info_cms(
@@ -584,7 +667,6 @@ def check_provider_info_cms(
     fetch_json: FetchJson | None = None,
     root: Path | None = None,
 ) -> dict[str, Any]:
-    """Refresh/check CMS for Provider Info via canonical acquire resolve (no download)."""
     import cms_provider_info_acquire as acq
 
     root = root or cms_data_paths.repo_root()
@@ -606,9 +688,7 @@ def check_provider_info_cms(
             {"year": local[0], "month": local[1], "path": str(local[2])} if local else None
         ),
         "cms_is_newer": newer,
-        "dry_run": acq.acquire_and_process(
-            root=root, fetch_json=fetch_json, dry_run=True
-        ),
+        "dry_run": acq.acquire_and_process(root=root, fetch_json=fetch_json, dry_run=True),
         "snapshot": snap.to_dict(),
     }
 
@@ -621,7 +701,6 @@ def acquire_provider_info(
     fetch_bytes: Callable[[str], bytes] | None = None,
     root: Path | None = None,
 ) -> dict[str, Any]:
-    """Acquire/process current Provider Info via PR #63 machinery only."""
     import cms_provider_info_acquire as acq
 
     root = root or cms_data_paths.repo_root()
@@ -646,15 +725,20 @@ def acquire_provider_info(
 
 
 def recommended_next_automation() -> dict[str, str]:
-    """Heuristic: next family to automate after Provider Info pilot."""
     return {
         "source_id": "cms.pbj_nurse_staffing",
         "human_name": "PBJ nurse staffing",
         "why": (
             "Highest-volume core product input with existing detection + "
-            "standardization on main, a documented CMS landing URL, and no "
-            "broken missing-script acquire path (unlike non-nurse/EIN). "
-            "Automating CMS quarter discovery/download would close the largest "
-            "manual gap without first repairing broken-legacy CLI stubs."
+            "standardization, verified CMS dataset ID, and no broken missing-script "
+            "acquire path (unlike non-nurse/EIN)."
+        ),
+        "first_broken_layer": (
+            "acquisition — CMS quarter discovery/download not implemented; "
+            "manual place-into-PBJcsv/ then standardize"
         ),
     }
+
+
+def derived_signals_payload() -> list[dict[str, Any]]:
+    return [s.to_dict() for s in get_derived_signals()]

@@ -1,0 +1,65 @@
+{% extends "data_ops/base.html" %}
+{% block title %}Release Review{% endblock %}
+{% block content %}
+<section class="do-page-head">
+  <h1>Release Review</h1>
+</section>
+
+{% if not items %}
+<p class="do-muted">No items requiring attention right now.</p>
+{% endif %}
+
+<div class="do-review-list">
+{% for item in items %}
+  <article class="do-review-item">
+    <header>
+      <strong>{{ item.human_name }}</strong>
+      <span class="do-badge">{{ item.reason }}</span>
+      <span class="do-badge do-zweli-{{ item.zweli_status|lower|replace('_','-') }}">{{ item.zweli_status }}</span>
+    </header>
+    <p class="do-mono do-small">{{ item.source_id }} · release {{ item.release_id or '—' }}</p>
+    <p>{{ item.detail }}</p>
+    {% if item.zweli_report and item.zweli_report.findings %}
+    <details class="do-details">
+      <summary>Evidence ({{ item.zweli_report.findings|length }} findings)</summary>
+      <ul class="do-findings">
+        {% for f in item.zweli_report.findings %}
+        <li>
+          <span class="do-mono">{{ f.check_id }}</span> · {{ f.severity }} · {{ f.metric_field }}
+          <div>{{ f.explanation }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+    <div class="do-actions">
+      {% if item.zweli_status == 'REQUIRES_REVIEW' and not item.acknowledged %}
+      <form method="post" action="{{ url_for('action_acknowledge') }}" class="do-form-inline">
+        <input type="hidden" name="source_id" value="{{ item.source_id }}">
+        <input type="hidden" name="release_id" value="{{ item.release_id or '' }}">
+        <input class="do-input" type="text" name="note" placeholder="Note (optional)">
+        <button class="do-btn" type="submit">Acknowledge review</button>
+      </form>
+      {% endif %}
+      {% if item.reason == 'ready_for_approval' or item.acknowledged %}
+      <form method="post" action="{{ url_for('action_approve') }}" class="do-form-inline">
+        <input type="hidden" name="source_id" value="{{ item.source_id }}">
+        <input type="hidden" name="release_id" value="{{ item.release_id or '' }}">
+        <input type="hidden" name="zweli_status" value="{{ item.zweli_status }}">
+        <input class="do-input" type="text" name="note" placeholder="Approval note">
+        <button class="do-btn do-btn-primary" type="submit" {% if item.zweli_status == 'BLOCKED' %}disabled title="BLOCKED cannot be approved"{% endif %}>Approve</button>
+      </form>
+      {% endif %}
+      {% if item.zweli_status == 'BLOCKED' %}
+      <p class="do-flash-error">BLOCKED — cannot approve in V0</p>
+      {% endif %}
+    </div>
+  </article>
+{% endfor %}
+</div>
+
+<details class="do-details">
+  <summary>Audit trail (recent)</summary>
+  <pre class="do-pre">{{ audit | tojson(indent=2) }}</pre>
+</details>
+{% endblock %}

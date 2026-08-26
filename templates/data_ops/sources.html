@@ -1,0 +1,102 @@
+{% extends "data_ops/base.html" %}
+{% block title %}Sources{% endblock %}
+{% block content %}
+<section class="do-page-head">
+  <h1>Sources</h1>
+  <form class="do-inline" method="get" action="{{ url_for('sources') }}">
+    <label class="do-check"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Query CMS (Provider Info)</label>
+  </form>
+</section>
+
+<div class="do-table-wrap">
+  <table class="do-table" data-do-table>
+    <thead>
+      <tr>
+        <th>Source</th>
+        <th>Publisher latest</th>
+        <th>Raw</th>
+        <th>Processed</th>
+        <th>Zweli</th>
+        <th>Approved</th>
+        <th>Format</th>
+        <th>Cadence</th>
+        <th>Runtime</th>
+        <th>Structural</th>
+        <th>Automation</th>
+        <th>Checked</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in snapshots %}
+      <tr>
+        <td><a href="{{ url_for('source_detail', source_id=s.source_id) }}">{{ s.human_name }}</a>
+          <div class="do-mono do-muted">{{ s.source_id }}</div>
+          <span class="do-badge do-badge-{{ s.status|lower|replace('_','-') }}">{{ s.status }}</span>
+        </td>
+        <td class="do-mono">{{ s.publisher_latest or s.cms_latest or '—' }}</td>
+        <td class="do-mono">{{ s.raw_available }}</td>
+        <td class="do-mono">{{ s.processed or '—' }}</td>
+        <td><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></td>
+        <td>{{ s.approved }}</td>
+        <td>{{ s.formats|join(', ') }}</td>
+        <td>{{ s.cadence }}</td>
+        <td class="do-mono">{{ s.runtime_access }}</td>
+        <td>{{ s.structural_status }}</td>
+        <td>{{ s.automation_maturity or s.automation_level }}</td>
+        <td class="do-mono do-small">{{ s.last_checked }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# Mobile stacked cards #}
+<div class="do-cards" data-do-cards>
+  {% for s in snapshots %}
+  <article class="do-source-card">
+    <header>
+      <a href="{{ url_for('source_detail', source_id=s.source_id) }}"><strong>{{ s.human_name }}</strong></a>
+      <span class="do-badge do-badge-{{ s.status|lower|replace('_','-') }}">{{ s.status }}</span>
+    </header>
+    <dl class="do-dl">
+      <div><dt>Publisher</dt><dd class="do-mono">{{ s.publisher_latest or '—' }}</dd></div>
+      <div><dt>Raw</dt><dd class="do-mono">{{ s.raw_available }}</dd></div>
+      <div><dt>Processed</dt><dd class="do-mono">{{ s.processed or '—' }}</dd></div>
+      <div><dt>Zweli</dt><dd><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></dd></div>
+      <div><dt>Format</dt><dd>{{ s.formats|join(', ') }}</dd></div>
+      <div><dt>Cadence</dt><dd>{{ s.cadence }}</dd></div>
+    </dl>
+    {% if s.source_id == 'cms.provider_info' %}
+    <div class="do-actions">
+      <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
+      <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+
+<section class="do-section">
+  <h2>Provider Information actions</h2>
+  <div class="do-actions">
+    <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
+    <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
+    <form method="post" action="{{ url_for('action_pi_acquire') }}">
+      <input type="hidden" name="dry_run" value="1">
+      <button class="do-btn do-btn-ghost" type="submit">Dry-run acquire</button>
+    </form>
+  </div>
+  {% if session.get('last_pi_action') %}
+  <pre class="do-pre">{{ session.get('last_pi_action') | tojson(indent=2) }}</pre>
+  {% endif %}
+</section>
+
+<details class="do-details">
+  <summary>Derived signals</summary>
+  <ul>
+    {% for sig in signals %}
+    <li><span class="do-mono">{{ sig.signal_id }}</span> — {{ sig.human_name }} ← {{ sig.upstream_source_ids|join(', ') }}</li>
+    {% endfor %}
+  </ul>
+</details>
+{% endblock %}

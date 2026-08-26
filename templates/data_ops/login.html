@@ -1,0 +1,14 @@
+{% extends "data_ops/base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<section class="do-login">
+  <h1>Data Ops</h1>
+  <p class="do-lead">Internal control plane</p>
+  {% if error %}<p class="do-flash-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="{{ url_for('login_post') }}" class="do-form">
+    <label class="do-label" for="password">Password</label>
+    <input id="password" class="do-input" type="password" name="password" autocomplete="current-password" required autofocus>
+    <button class="do-btn do-btn-primary" type="submit">Unlock</button>
+  </form>
+</section>
+{% endblock %}
