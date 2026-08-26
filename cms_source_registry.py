@@ -288,15 +288,21 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
             "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing"
         ),
         catalog_mechanism=CatalogMechanism.DATA_CMS_GOV_DATASET_UUID,
-        metadata_endpoint=None,
+        metadata_endpoint=(
+            f"https://data.cms.gov/data-api/v1/dataset/{CMS_ID_PBJ_NURSE}/resources"
+        ),
         raw_artifact_resolver="cms_data_paths.nurse_raw_dir (PBJcsv/)",
         normalized_artifact_resolver="cms_data_paths.standardized_nurse_dir (standardized_PBJ/)",
-        acquisition_implementation=None,
-        structural_validator="standardize_pbj_files.py (structure warnings)",
+        acquisition_implementation="scripts/cms_pbj_nurse_acquire.acquire_and_process",
+        structural_validator="scripts/cms_pbj_nurse_acquire.validate_raw_nurse_csv",
         zweli_quality_profile=None,
         downstream_consumers=("generate_metrics.py", "PBJ_Dashboard.py", "facility slices"),
         automation_maturity=AutomationMaturity.PARTIALLY_AUTOMATED,
-        automation_notes="Detection + standardize exist; CMS download not automated on main.",
+        automation_notes=(
+            "CMS data-api resources acquire + structural validate + existing "
+            "standardize_pbj_files.py. Detection already existed. No metrics promotion."
+        ),
+        actions_enabled=("check_cms", "acquire_process"),
         evidence=("run_pipeline_update.py", "cms_data_paths.py", "pbj_identifiers/urls.py"),
     ),
     _rec(

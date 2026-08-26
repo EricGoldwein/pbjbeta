@@ -354,6 +354,52 @@ def _probe_provider_info(
         return snap
 
 
+def _probe_nurse(
+    record: CmsSourceRecord,
+    root: Path,
+    *,
+    check_cms: bool,
+    fetch_json: FetchJson | None = None,
+) -> SourceOpsSnapshot:
+    snap = _probe_quarterly_csv_family(
+        record,
+        root,
+        raw_dir=cms_data_paths.nurse_raw_dir(root),
+        std_dir=cms_data_paths.standardized_nurse_dir(root),
+        raw_glob="PBJ_dailynurse*.csv",
+        std_glob="PBJ_dailynurse*.csv",
+    )
+    if not check_cms:
+        return snap
+    try:
+        import cms_pbj_nurse_acquire as nurse_acq
+
+        cms = nurse_acq.resolve_cms_nurse_release(fetch_json=fetch_json)
+        snap.publisher_latest = cms.quarter_label
+        snap.cms_latest = cms.quarter_label
+        if nurse_acq.cms_is_newer_than_local(cms, root):
+            snap.status = OpsStatus.CMS_NEWER.value
+            snap.detail = (
+                f"CMS Primary {cms.quarter_label} newer than local "
+                f"{snap.pbjapp_latest or '(none)'}"
+            )
+        elif snap.local_raw_present and snap.local_derived_present:
+            snap.status = OpsStatus.CURRENT.value
+            snap.detail = "Local nurse quarter matches CMS Primary (raw+standardized)"
+        elif snap.local_raw_present and not snap.local_derived_present:
+            snap.status = OpsStatus.PROCESSING_REQUIRED.value
+            snap.detail = "CMS vintage present raw; standardization required"
+        else:
+            snap.status = OpsStatus.CMS_NEWER.value
+            snap.detail = "CMS Primary known; raw not available in this runtime"
+            snap.raw_available = "NOT AVAILABLE IN THIS RUNTIME"
+    except Exception as exc:  # noqa: BLE001
+        snap.status = OpsStatus.ERROR.value
+        snap.error = str(exc)
+        snap.detail = f"Nurse CMS probe failed: {exc}"
+    return snap
+
+
 def _probe_quarterly_csv_family(
     record: CmsSourceRecord,
     root: Path,
@@ -567,14 +613,7 @@ def probe_source(
             record, check_cms=check_cms, fetch_json=fetch_json, root=root, run_zweli=run_zweli
         )
     if family == SourceFamily.PBJ_NURSE:
-        return _probe_quarterly_csv_family(
-            record,
-            root,
-            raw_dir=cms_data_paths.nurse_raw_dir(root),
-            std_dir=cms_data_paths.standardized_nurse_dir(root),
-            raw_glob="PBJ_dailynurse*.csv",
-            std_glob="PBJ_dailynurse*.csv",
-        )
+        return _probe_nurse(record, root, check_cms=check_cms, fetch_json=fetch_json)
     if family == SourceFamily.PBJ_NON_NURSE:
         return _probe_quarterly_csv_family(
             record,
@@ -737,18 +776,83 @@ def acquire_provider_info(
     }
 
 
+def check_nurse_cms(
+    *,
+    fetch_json: FetchJson | None = None,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    import cms_pbj_nurse_acquire as nurse_acq
+
+    root = root or cms_data_paths.repo_root()
+    cms = nurse_acq.resolve_cms_nurse_release(fetch_json=fetch_json)
+    newer = nurse_acq.cms_is_newer_than_local(cms, root)
+    local = nurse_acq.latest_local_nurse(root)
+    snap = probe_source(
+        "cms.pbj_nurse_staffing", check_cms=True, fetch_json=fetch_json, root=root
+    )
+    dry = nurse_acq.acquire_and_process(root=root, fetch_json=fetch_json, dry_run=True)
+    return {
+        "action": "check_cms",
+        "cms": {
+            "dataset_id": cms.dataset_id,
+            "quarter_label": cms.quarter_label,
+            "distribution_filename": cms.distribution_filename,
+            "distribution_url": cms.distribution_url,
+            "title": cms.title,
+        },
+        "local": (
+            {"year": local[0], "quarter": local[1], "path": str(local[2])} if local else None
+        ),
+        "cms_is_newer": newer,
+        "dry_run": dry,
+        "snapshot": snap.to_dict(),
+    }
+
+
+def acquire_nurse(
+    *,
+    dry_run: bool = False,
+    force: bool = False,
+    fetch_json: FetchJson | None = None,
+    fetch_bytes: Callable[[str], bytes] | None = None,
+    root: Path | None = None,
+    skip_standardize: bool = False,
+) -> dict[str, Any]:
+    import cms_pbj_nurse_acquire as nurse_acq
+
+    root = root or cms_data_paths.repo_root()
+    report = nurse_acq.acquire_and_process(
+        root=root,
+        fetch_json=fetch_json,
+        fetch_bytes=fetch_bytes,
+        dry_run=dry_run,
+        force=force,
+        skip_standardize=skip_standardize,
+    )
+    snap = probe_source(
+        "cms.pbj_nurse_staffing",
+        check_cms=not dry_run,
+        fetch_json=fetch_json,
+        root=root,
+    )
+    return {
+        "action": "acquire_process",
+        "acquire_report": report,
+        "snapshot": snap.to_dict(),
+    }
+
+
 def recommended_next_automation() -> dict[str, str]:
     return {
-        "source_id": "cms.pbj_nurse_staffing",
-        "human_name": "PBJ nurse staffing",
+        "source_id": "cms.pbj_non_nurse_staffing",
+        "human_name": "PBJ non-nurse staffing",
         "why": (
-            "Highest-volume core product input with existing detection + "
-            "standardization, verified CMS dataset ID, and no broken missing-script "
-            "acquire path (unlike non-nurse/EIN)."
+            "Same quarterly CMS pattern as nurse; detection + standardize exist, but "
+            "acquire CLI is broken-legacy (missing ingest_cms_nonnurse_quarter.py)."
         ),
         "first_broken_layer": (
-            "acquisition — CMS quarter discovery/download not implemented; "
-            "manual place-into-PBJcsv/ then standardize"
+            "acquisition — manage_cms_sources nonnurse ingest references a missing "
+            "script; repair/replace with data-api resources acquire like nurse"
         ),
     }
 

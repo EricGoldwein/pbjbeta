@@ -584,6 +584,20 @@ def main() -> int:
     p_nn_ing.add_argument("--standardize", action="store_true")
     p_nn_ing.add_argument("--dry-run", action="store_true")
 
+    p_nurse = sub.add_parser("nurse", help="PBJ daily nurse staffing")
+    nurse_sub = p_nurse.add_subparsers(dest="nurse_cmd", required=True)
+    p_nurse_acq = nurse_sub.add_parser(
+        "acquire",
+        help=(
+            "Resolve CMS PBJ nurse Primary CSV (data-api resources), download if needed, "
+            "structurally validate, run standardize_pbj_files.py"
+        ),
+    )
+    p_nurse_acq.add_argument("--dry-run", action="store_true")
+    p_nurse_acq.add_argument("--force", action="store_true")
+    p_nurse_acq.add_argument("--skip-standardize", action="store_true")
+    p_nurse_acq.add_argument("--json", action="store_true")
+
     p_prov = sub.add_parser(
         "provider",
         help="CMS provider info monthly archives (NH_ProviderInfo + DataCollectionIntervals)",
@@ -657,6 +671,8 @@ def main() -> int:
             return rc
     if args.command == "nonnurse" and args.nn_cmd == "ingest":
         return cmd_nonnurse_ingest(args)
+    if args.command == "nurse" and args.nurse_cmd == "acquire":
+        return cmd_nurse_acquire(args)
     if args.command == "provider":
         if args.prov_cmd == "extract":
             return cmd_provider_extract_month(args)
@@ -706,6 +722,42 @@ def cmd_provider_acquire(args: argparse.Namespace) -> int:
         "CURRENT",
         "READY_FOR_PUBLIC_HANDOFF",
         "WOULD_ACQUIRE",
+        "ACQUIRED_RAW_ONLY",
+    }
+    return 0 if ok else 2
+
+
+def cmd_nurse_acquire(args: argparse.Namespace) -> int:
+    """CMS data-api resources → PBJcsv → structural validate → standardize_pbj_files."""
+    sys.path.insert(0, str(_ROOT / "scripts"))
+    import cms_pbj_nurse_acquire as nurse_acq  # noqa: E402
+
+    try:
+        report = nurse_acq.acquire_and_process(
+            root=_ROOT,
+            dry_run=bool(args.dry_run),
+            force=bool(args.force),
+            skip_standardize=bool(args.skip_standardize),
+        )
+    except nurse_acq.AcquireError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print(f"nurse acquire status: {report.get('status')} lifecycle={report.get('lifecycle')}")
+        cms = report.get("cms") or {}
+        print(
+            f"  CMS quarter: {cms.get('quarter_label')} "
+            f"file={cms.get('distribution_filename')} id={cms.get('dataset_id')}"
+        )
+        if report.get("acquisition_path"):
+            print(f"  acquisition: {report['acquisition_path']}")
+    ok = report.get("status") in {
+        "CURRENT",
+        "PROCESSED",
+        "WOULD_ACQUIRE",
+        "WOULD_STANDARDIZE",
         "ACQUIRED_RAW_ONLY",
     }
     return 0 if ok else 2

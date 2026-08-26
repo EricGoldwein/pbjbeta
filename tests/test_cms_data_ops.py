@@ -69,6 +69,7 @@ def test_probe_all_sources_runtime_unavailable(tmp_path: Path):
     assert by_id["cms.snf_enrollments"].source_id != by_id["cms.snf_all_owners"].source_id
     assert "NOT AVAILABLE" in by_id["cms.pbj_nurse_staffing"].raw_available
     assert by_id["cms.provider_info"].actions_enabled == ["check_cms", "acquire_process"]
+    assert by_id["cms.pbj_nurse_staffing"].actions_enabled == ["check_cms", "acquire_process"]
     assert by_id["cms.health_citations"].cms_dataset_id == "r5ix-sfxw"
     assert by_id["cms.sff_pdf_list"].automation_maturity == "unmodeled"
 
@@ -278,7 +279,7 @@ def test_probe_chain_prefers_nov(tmp_path: Path):
 
 def test_recommended_next_nurse():
     nxt = ops.recommended_next_automation()
-    assert nxt["source_id"] == "cms.pbj_nurse_staffing"
+    assert nxt["source_id"] == "cms.pbj_non_nurse_staffing"
     assert "first_broken_layer" in nxt
 
 

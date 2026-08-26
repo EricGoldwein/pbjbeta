@@ -101,12 +101,14 @@ def test_containers_represented():
     assert SourceContainer.PDF in containers
 
 
-def test_provider_info_actions_others_readonly():
+def test_provider_info_and_nurse_actions():
     pi = get_source("cms.provider_info")
-    assert pi is not None
-    assert "check_cms" in pi.actions_enabled
+    nurse = get_source("cms.pbj_nurse_staffing")
+    assert pi is not None and nurse is not None
+    assert "check_cms" in pi.actions_enabled and "acquire_process" in pi.actions_enabled
+    assert "check_cms" in nurse.actions_enabled and "acquire_process" in nurse.actions_enabled
     for r in CMS_SOURCE_REGISTRY:
-        if r.source_id != "cms.provider_info":
+        if r.source_id not in {"cms.provider_info", "cms.pbj_nurse_staffing"}:
             assert r.actions_enabled == ()
 
 

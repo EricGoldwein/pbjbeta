@@ -33,8 +33,10 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from cms_data_ops import (  # noqa: E402
+    acquire_nurse,
     acquire_provider_info,
     approve_release_authoritative,
+    check_nurse_cms,
     check_provider_info_cms,
     derived_signals_payload,
     probe_all_sources,
@@ -223,6 +225,46 @@ def create_app() -> Flask:
             flash(f"Acquire {'dry-run ' if dry else ''}status: {ar.get('status')}", "ok")
         except Exception as exc:  # noqa: BLE001
             flash(f"Acquire failed: {exc}", "error")
+        return redirect(url_for("sources"))
+
+    @app.post("/actions/nurse/check")
+    @require_auth
+    def action_nurse_check():
+        try:
+            result = check_nurse_cms()
+            session["last_nurse_action"] = {
+                "action": "check_cms",
+                "cms": result.get("cms"),
+                "cms_is_newer": result.get("cms_is_newer"),
+                "dry_run_status": (result.get("dry_run") or {}).get("status"),
+            }
+            flash(
+                f"Nurse CMS {result['cms']['quarter_label']} · newer={result['cms_is_newer']}",
+                "ok",
+            )
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Nurse check failed: {exc}", "error")
+        return redirect(url_for("sources"))
+
+    @app.post("/actions/nurse/acquire")
+    @require_auth
+    def action_nurse_acquire():
+        dry = request.form.get("dry_run") == "1"
+        try:
+            result = acquire_nurse(dry_run=dry)
+            ar = result.get("acquire_report") or {}
+            session["last_nurse_action"] = {
+                "action": "acquire_process",
+                "status": ar.get("status"),
+                "lifecycle": ar.get("lifecycle"),
+                "dry_run": dry,
+            }
+            flash(
+                f"Nurse acquire {'dry-run ' if dry else ''}status: {ar.get('status')}",
+                "ok",
+            )
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Nurse acquire failed: {exc}", "error")
         return redirect(url_for("sources"))
 
     @app.get("/release-review")

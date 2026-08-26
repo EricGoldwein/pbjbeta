@@ -4,7 +4,7 @@
 <section class="do-page-head">
   <h1>Sources</h1>
   <form class="do-inline" method="get" action="{{ url_for('sources') }}">
-    <label class="do-check"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Query CMS (Provider Info)</label>
+    <label class="do-check"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Query CMS (Provider Info / nurse)</label>
   </form>
 </section>
 
@@ -71,6 +71,11 @@
       <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
       <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
     </div>
+    {% elif s.source_id == 'cms.pbj_nurse_staffing' %}
+    <div class="do-actions">
+      <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
+      <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
+    </div>
     {% endif %}
   </article>
   {% endfor %}
@@ -88,6 +93,21 @@
   </div>
   {% if session.get('last_pi_action') %}
   <pre class="do-pre">{{ session.get('last_pi_action') | tojson(indent=2) }}</pre>
+  {% endif %}
+</section>
+
+<section class="do-section">
+  <h2>PBJ nurse staffing actions</h2>
+  <div class="do-actions">
+    <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
+    <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
+    <form method="post" action="{{ url_for('action_nurse_acquire') }}">
+      <input type="hidden" name="dry_run" value="1">
+      <button class="do-btn do-btn-ghost" type="submit">Dry-run acquire</button>
+    </form>
+  </div>
+  {% if session.get('last_nurse_action') %}
+  <pre class="do-pre">{{ session.get('last_nurse_action') | tojson(indent=2) }}</pre>
   {% endif %}
 </section>
 
