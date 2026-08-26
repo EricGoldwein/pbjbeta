@@ -377,15 +377,40 @@ def _probe_nurse(
         cms = nurse_acq.resolve_cms_nurse_release(fetch_json=fetch_json)
         snap.publisher_latest = cms.quarter_label
         snap.cms_latest = cms.quarter_label
-        if nurse_acq.cms_is_newer_than_local(cms, root):
+        identity = nurse_acq.assess_local_release_identity(cms, root=root)
+        snap.detail = identity.detail
+        if identity.verdict == nurse_acq.IDENTITY_MANIFEST_MISMATCH:
+            snap.status = OpsStatus.ERROR.value
+            snap.structural_status = "FAIL"
+            snap.error = identity.detail
+            snap.detail = f"Provenance mismatch: {identity.detail}"
+        elif identity.cryptographically_identical:
+            if snap.local_derived_present:
+                snap.status = OpsStatus.CURRENT.value
+                snap.detail = (
+                    "Local nurse quarter cryptographically matches CMS Primary "
+                    "(manifest SHA + raw + standardized)"
+                )
+            else:
+                snap.status = OpsStatus.PROCESSING_REQUIRED.value
+                snap.detail = (
+                    "Manifest-identical raw present; standardization required"
+                )
+        elif identity.verdict == nurse_acq.IDENTITY_UNMANIFESTED_OK:
+            snap.status = OpsStatus.UNKNOWN.value
+            snap.detail = (
+                f"CMS {cms.quarter_label}: {identity.detail}"
+            )
+            if snap.local_raw_present and not snap.local_derived_present:
+                snap.status = OpsStatus.PROCESSING_REQUIRED.value
+        elif nurse_acq.cms_is_newer_than_local(cms, root):
             snap.status = OpsStatus.CMS_NEWER.value
             snap.detail = (
-                f"CMS Primary {cms.quarter_label} newer than local "
+                f"CMS Primary {cms.quarter_label} newer/missing vs local "
                 f"{snap.pbjapp_latest or '(none)'}"
             )
-        elif snap.local_raw_present and snap.local_derived_present:
-            snap.status = OpsStatus.CURRENT.value
-            snap.detail = "Local nurse quarter matches CMS Primary (raw+standardized)"
+            if not snap.local_raw_present:
+                snap.raw_available = "NOT AVAILABLE IN THIS RUNTIME"
         elif snap.local_raw_present and not snap.local_derived_present:
             snap.status = OpsStatus.PROCESSING_REQUIRED.value
             snap.detail = "CMS vintage present raw; standardization required"

@@ -55,7 +55,12 @@ REQUIRED_COLUMN_ALIASES: tuple[tuple[str, ...], ...] = (
 )
 
 FetchJson = Callable[[str], Any]
+# Test/fixture inject: returns full bytes (small fixtures only). Production downloads stream.
 FetchBytes = Callable[[str], bytes]
+# Production/stream inject: write URL body to path, return SHA-256 hex.
+StreamDownload = Callable[[str, Path], str]
+
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MiB
 
 
 class AcquireError(Exception):
@@ -76,6 +81,27 @@ class CmsNurseRelease:
     raw_fingerprint: str  # hash of identity fields (not file body)
 
 
+@dataclass(frozen=True)
+class LocalIdentityResult:
+    """Provenance-aware assessment of a local raw nurse artifact vs CMS release."""
+
+    verdict: str
+    cryptographically_identical: bool
+    path: Optional[Path]
+    local_sha256: Optional[str]
+    manifest_sha256: Optional[str]
+    detail: str
+
+
+# Verdicts for LocalIdentityResult.verdict
+IDENTITY_MISSING = "MISSING"
+IDENTITY_IDENTICAL = "IDENTICAL"
+IDENTITY_MANIFEST_MISMATCH = "MANIFEST_MISMATCH"
+IDENTITY_CMS_DIVERGENCE = "CMS_DIVERGENCE"
+IDENTITY_UNMANIFESTED_OK = "UNMANIFESTED_OK"
+IDENTITY_UNMANIFESTED_FAIL = "UNMANIFESTED_FAIL"
+
+
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -83,7 +109,7 @@ def _sha256_bytes(data: bytes) -> str:
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+        for chunk in iter(lambda: f.read(DOWNLOAD_CHUNK_SIZE), b""):
             h.update(chunk)
     return h.hexdigest()
 
@@ -97,17 +123,63 @@ def _default_fetch_json(url: str) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _default_fetch_bytes(url: str) -> bytes:
+def _default_stream_download(
+    url: str,
+    dest: Path,
+    *,
+    chunk_size: int = DOWNLOAD_CHUNK_SIZE,
+) -> str:
+    """Stream CMS → file in chunks while hashing. Bounded memory."""
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "PBJapp-pbj-nurse-acquire/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=600) as resp:
-        data = resp.read()
-    if not data:
+    h = hashlib.sha256()
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp, dest.open("wb") as out:
+            while True:
+                chunk = resp.read(chunk_size)
+                if not chunk:
+                    break
+                h.update(chunk)
+                out.write(chunk)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        dest.unlink(missing_ok=True)
+        raise AcquireError(f"stream download failed: {exc}") from exc
+    if not dest.is_file() or dest.stat().st_size == 0:
+        dest.unlink(missing_ok=True)
         raise AcquireError(f"empty download from {url}")
-    return data
+    return h.hexdigest()
 
+
+def _write_bytes_chunked(data: bytes, dest: Path, *, chunk_size: int = DOWNLOAD_CHUNK_SIZE) -> str:
+    """Write injectable fixture bytes in chunks (tests); still hashes streaming-style."""
+    if not data:
+        raise AcquireError("empty download (inject)")
+    h = hashlib.sha256()
+    with dest.open("wb") as out:
+        view = memoryview(data)
+        for i in range(0, len(view), chunk_size):
+            chunk = view[i : i + chunk_size]
+            h.update(chunk)
+            out.write(chunk)
+    return h.hexdigest()
+
+
+def stream_url_to_path(
+    url: str,
+    dest: Path,
+    *,
+    fetch_bytes: FetchBytes | None = None,
+    stream_download: StreamDownload | None = None,
+    chunk_size: int = DOWNLOAD_CHUNK_SIZE,
+) -> str:
+    """Download URL to ``dest`` with bounded memory; return SHA-256 hex."""
+    if stream_download is not None:
+        return stream_download(url, dest)
+    if fetch_bytes is not None:
+        return _write_bytes_chunked(fetch_bytes(url), dest, chunk_size=chunk_size)
+    return _default_stream_download(url, dest, chunk_size=chunk_size)
 
 def parse_nurse_filename(filename: str) -> tuple[int, int, str]:
     m = FILENAME_RE.match(Path(filename).name)
@@ -209,15 +281,149 @@ def latest_local_nurse(root: Path | None = None) -> Optional[tuple[int, int, Pat
     return max(snaps, key=lambda t: (t[0], t[1]))
 
 
-def cms_is_newer_than_local(cms: CmsNurseRelease, root: Path | None = None) -> bool:
+def load_acquisition_manifest(
+    quarter_label: str,
+    *,
+    root: Path | None = None,
+) -> Optional[dict[str, Any]]:
+    path = nurse_manifest_dir(quarter_label, root) / "acquisition.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    sha = data.get("sha256")
+    if not isinstance(sha, str) or len(sha) != 64:
+        return None
+    return data
+
+
+def assess_local_release_identity(
+    cms: CmsNurseRelease,
+    *,
+    root: Path | None = None,
+    min_rows: int = 1000,
+    min_bytes: int = 10_000,
+) -> LocalIdentityResult:
+    """Prove local raw identity against CMS + acquisition provenance when present.
+
+    Cryptographic ``IDENTICAL`` requires a trustworthy ``acquisition.json`` whose
+    SHA-256 matches the on-disk file, plus filename/quarter (and CMS size/uuid
+    when available). Same filename alone never yields IDENTICAL / CURRENT.
+    """
     dest = cms_data_paths.nurse_raw_dir(root) / cms.distribution_filename
-    if dest.is_file() and not _looks_like_lfs_pointer(dest) and dest.stat().st_size > 0:
-        return False
-    local = latest_local_nurse(root)
-    if local is None:
-        return True
-    ly, lq, _ = local
-    return (cms.year, cms.quarter) > (ly, lq)
+    if not dest.is_file() or _looks_like_lfs_pointer(dest) or dest.stat().st_size == 0:
+        return LocalIdentityResult(
+            verdict=IDENTITY_MISSING,
+            cryptographically_identical=False,
+            path=None,
+            local_sha256=None,
+            manifest_sha256=None,
+            detail="No usable local raw for CMS Primary filename",
+        )
+
+    local_size = dest.stat().st_size
+    local_sha = _sha256_file(dest)
+    manifest = load_acquisition_manifest(cms.quarter_label, root=root)
+
+    if manifest is not None:
+        m_sha = str(manifest["sha256"]).lower()
+        m_name = str(manifest.get("source_filename") or "")
+        m_quarter = str(manifest.get("quarter_label") or "")
+        if m_name and m_name != cms.distribution_filename:
+            return LocalIdentityResult(
+                verdict=IDENTITY_CMS_DIVERGENCE,
+                cryptographically_identical=False,
+                path=dest,
+                local_sha256=local_sha,
+                manifest_sha256=m_sha,
+                detail=(
+                    f"Manifest filename {m_name!r} != CMS Primary "
+                    f"{cms.distribution_filename!r}"
+                ),
+            )
+        if m_quarter and m_quarter.upper() != cms.quarter_label.upper():
+            return LocalIdentityResult(
+                verdict=IDENTITY_CMS_DIVERGENCE,
+                cryptographically_identical=False,
+                path=dest,
+                local_sha256=local_sha,
+                manifest_sha256=m_sha,
+                detail=f"Manifest quarter {m_quarter} != CMS {cms.quarter_label}",
+            )
+        if local_sha.lower() != m_sha:
+            return LocalIdentityResult(
+                verdict=IDENTITY_MANIFEST_MISMATCH,
+                cryptographically_identical=False,
+                path=dest,
+                local_sha256=local_sha,
+                manifest_sha256=m_sha,
+                detail=(
+                    "Local raw SHA-256 does not match acquisition.json; "
+                    "refusing to treat as CURRENT"
+                ),
+            )
+        if cms.file_size is not None and local_size != int(cms.file_size):
+            return LocalIdentityResult(
+                verdict=IDENTITY_CMS_DIVERGENCE,
+                cryptographically_identical=False,
+                path=dest,
+                local_sha256=local_sha,
+                manifest_sha256=m_sha,
+                detail=(
+                    f"Local size {local_size} != CMS-reported file_size {cms.file_size}"
+                ),
+            )
+        m_uuid = manifest.get("cms_file_uuid")
+        if cms.file_uuid and m_uuid and str(m_uuid) != str(cms.file_uuid):
+            return LocalIdentityResult(
+                verdict=IDENTITY_CMS_DIVERGENCE,
+                cryptographically_identical=False,
+                path=dest,
+                local_sha256=local_sha,
+                manifest_sha256=m_sha,
+                detail="Manifest cms_file_uuid differs from current CMS file_uuid",
+            )
+        return LocalIdentityResult(
+            verdict=IDENTITY_IDENTICAL,
+            cryptographically_identical=True,
+            path=dest,
+            local_sha256=local_sha,
+            manifest_sha256=m_sha,
+            detail="Manifest SHA-256 matches local raw; CMS filename/quarter aligned",
+        )
+
+    # No trustworthy provenance: structural gate only — never cryptographic identical.
+    try:
+        validate_raw_nurse_csv(
+            dest,
+            expected_quarter=cms.quarter_label,
+            min_rows=min_rows,
+            min_bytes=min_bytes,
+        )
+    except AcquireError as exc:
+        return LocalIdentityResult(
+            verdict=IDENTITY_UNMANIFESTED_FAIL,
+            cryptographically_identical=False,
+            path=dest,
+            local_sha256=local_sha,
+            manifest_sha256=None,
+            detail=f"Unmanifested raw failed structural validation: {exc}",
+        )
+    return LocalIdentityResult(
+        verdict=IDENTITY_UNMANIFESTED_OK,
+        cryptographically_identical=False,
+        path=dest,
+        local_sha256=local_sha,
+        manifest_sha256=None,
+        detail=(
+            "Local raw structurally OK but no acquisition.json provenance; "
+            "not cryptographically identical to CMS"
+        ),
+    )
 
 
 def local_has_identical_release(
@@ -225,14 +431,52 @@ def local_has_identical_release(
     *,
     root: Path | None = None,
     expected_sha256: str | None = None,
+    min_rows: int = 1000,
+    min_bytes: int = 10_000,
 ) -> bool:
-    dest = cms_data_paths.nurse_raw_dir(root) / cms.distribution_filename
-    if not dest.is_file() or _looks_like_lfs_pointer(dest) or dest.stat().st_size == 0:
-        return False
+    """True only when local raw is cryptographically identical to the CMS release."""
     if expected_sha256:
-        return _sha256_file(dest) == expected_sha256
-    # Filename match + non-empty is enough for CURRENT without rehashing huge files
-    return True
+        dest = cms_data_paths.nurse_raw_dir(root) / cms.distribution_filename
+        if not dest.is_file() or _looks_like_lfs_pointer(dest) or dest.stat().st_size == 0:
+            return False
+        return _sha256_file(dest).lower() == expected_sha256.lower()
+    return assess_local_release_identity(
+        cms, root=root, min_rows=min_rows, min_bytes=min_bytes
+    ).cryptographically_identical
+
+
+def cms_is_newer_than_local(
+    cms: CmsNurseRelease,
+    root: Path | None = None,
+    *,
+    min_rows: int = 1000,
+    min_bytes: int = 10_000,
+) -> bool:
+    """True when CMS Primary is not cryptographically present locally.
+
+    Unmanifested structural-OK local files are not treated as possessing the
+    release for CURRENT, but also do not count as a strictly newer CMS quarter
+    when the same filename already exists (see probe for conservative status).
+    """
+    identity = assess_local_release_identity(
+        cms, root=root, min_rows=min_rows, min_bytes=min_bytes
+    )
+    if identity.cryptographically_identical:
+        return False
+    if identity.verdict == IDENTITY_UNMANIFESTED_OK:
+        return False
+    if identity.verdict in {
+        IDENTITY_MANIFEST_MISMATCH,
+        IDENTITY_CMS_DIVERGENCE,
+        IDENTITY_UNMANIFESTED_FAIL,
+    }:
+        # Local artifact for this name is wrong/untrusted — treat as needing acquire.
+        return True
+    local = latest_local_nurse(root)
+    if local is None:
+        return True
+    ly, lq, _ = local
+    return (cms.year, cms.quarter) > (ly, lq)
 
 
 def _normalize_header(name: str) -> str:
@@ -328,97 +572,117 @@ def download_nurse_csv(
     dest: Path,
     *,
     fetch_bytes: FetchBytes | None = None,
+    stream_download: StreamDownload | None = None,
     min_bytes: int = 10_000,
     validate: bool = True,
     min_rows: int = 1000,
 ) -> dict[str, Any]:
-    """Download to a temp file, optionally validate, then install atomically.
+    """Stream CMS → temp file (chunked SHA-256), validate, then install atomically.
 
     If ``dest`` already exists with a different checksum, refuse overwrite and
-    leave the existing file untouched.
+    leave the existing file untouched. Partial failures delete temp artifacts only.
     """
-    fetch = fetch_bytes or _default_fetch_bytes
     dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path: Path | None = None
+    staged: Path | None = None
     try:
-        data = fetch(cms.distribution_url)
-    except (urllib.error.URLError, TimeoutError, OSError, AcquireError) as exc:
-        raise AcquireError(f"download failed: {exc}") from exc
-    if len(data) < min_bytes:
-        raise AcquireError(f"download too small ({len(data)} bytes)")
-    head = data[:300].lstrip(b"\xef\xbb\xbf")
-    if b"," not in head:
-        raise AcquireError("download does not look like CSV")
-    head_l = head.lower()
-    if b"special focus status" in head_l:
-        raise AcquireError("download looks like Provider Info CSV")
+        with tempfile.NamedTemporaryFile(
+            dir=str(dest.parent),
+            prefix=f".{dest.name}.",
+            suffix=".partial",
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
 
-    digest = _sha256_bytes(data)
-    if dest.is_file() and not _looks_like_lfs_pointer(dest):
-        existing = _sha256_file(dest)
-        if existing == digest:
-            return {
-                "action": "skipped_identical",
-                "path": str(dest),
-                "sha256": existing,
-                "byte_size": dest.stat().st_size,
-            }
-        # Different content — do not overwrite; caller sees failure, dest untouched
-        raise AcquireError(
-            f"refusing overwrite of differing file {dest.name} "
-            f"(existing={existing[:12]}… new={digest[:12]}…)"
-        )
+        try:
+            digest = stream_url_to_path(
+                cms.distribution_url,
+                tmp_path,
+                fetch_bytes=fetch_bytes,
+                stream_download=stream_download,
+            )
+        except AcquireError:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+            raise
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+            raise AcquireError(f"download failed: {exc}") from exc
 
-    with tempfile.NamedTemporaryFile(
-        dir=str(dest.parent),
-        prefix=f".{dest.name}.",
-        suffix=".partial",
-        delete=False,
-    ) as tmp:
-        tmp.write(data)
-        tmp_path = Path(tmp.name)
+        size = tmp_path.stat().st_size
+        if size < min_bytes:
+            tmp_path.unlink(missing_ok=True)
+            raise AcquireError(f"download too small ({size} bytes)")
 
-    validation: dict[str, Any] | None = None
-    try:
-        # Rename temp to expected basename for filename/quarter checks
+        with tmp_path.open("rb") as f:
+            head = f.read(300).lstrip(b"\xef\xbb\xbf")
+        if b"," not in head:
+            tmp_path.unlink(missing_ok=True)
+            raise AcquireError("download does not look like CSV")
+        head_l = head.lower()
+        if b"special focus status" in head_l:
+            tmp_path.unlink(missing_ok=True)
+            raise AcquireError("download looks like Provider Info CSV")
+
+        if dest.is_file() and not _looks_like_lfs_pointer(dest):
+            existing = _sha256_file(dest)
+            if existing == digest:
+                tmp_path.unlink(missing_ok=True)
+                return {
+                    "action": "skipped_identical",
+                    "path": str(dest),
+                    "sha256": existing,
+                    "byte_size": dest.stat().st_size,
+                }
+            tmp_path.unlink(missing_ok=True)
+            raise AcquireError(
+                f"refusing overwrite of differing file {dest.name} "
+                f"(existing={existing[:12]}… new={digest[:12]}…)"
+            )
+
         staged = dest.parent / f".staging_{dest.name}"
         staged.unlink(missing_ok=True)
         tmp_path.replace(staged)
+        tmp_path = None
+
+        validation: dict[str, Any] | None = None
         if validate:
-            # validate using staged path but parse_nurse_filename needs real name
-            named = dest.parent / dest.name
-            if named.exists():
-                raise AcquireError(f"unexpected existing dest during staging: {named}")
-            staged.replace(named)
+            if dest.exists():
+                staged.unlink(missing_ok=True)
+                raise AcquireError(f"unexpected existing dest during staging: {dest}")
+            staged.replace(dest)
+            staged = None
             try:
                 validation = validate_raw_nurse_csv(
-                    named,
+                    dest,
                     expected_quarter=cms.quarter_label,
                     min_rows=min_rows,
                     min_bytes=min_bytes,
                 )
             except AcquireError:
-                named.unlink(missing_ok=True)
+                dest.unlink(missing_ok=True)
                 raise
-            # named is final dest
-            dest = named
         else:
             staged.replace(dest)
-    except Exception:
-        tmp_path.unlink(missing_ok=True)
-        staged = dest.parent / f".staging_{dest.name}"
-        staged.unlink(missing_ok=True)
-        raise
+            staged = None
 
-    out = {
-        "action": "written",
-        "path": str(dest),
-        "sha256": digest,
-        "byte_size": dest.stat().st_size,
-        "acquired_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if validation:
-        out["validation"] = validation
-    return out
+        out: dict[str, Any] = {
+            "action": "written",
+            "path": str(dest),
+            "sha256": digest,
+            "byte_size": dest.stat().st_size,
+            "acquired_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if validation:
+            out["validation"] = validation
+        return out
+    except Exception:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+        raise
 
 
 def write_acquisition_record(
@@ -459,6 +723,7 @@ def acquire_and_process(
     root: Path | None = None,
     fetch_json: FetchJson | None = None,
     fetch_bytes: FetchBytes | None = None,
+    stream_download: StreamDownload | None = None,
     dry_run: bool = False,
     force: bool = False,
     skip_standardize: bool = False,
@@ -482,15 +747,33 @@ def acquire_and_process(
         "metrics_promoted": False,
     }
 
-    already = local_has_identical_release(cms, root=root) and not force
-    if already and dest.is_file():
+    identity = assess_local_release_identity(
+        cms, root=root, min_rows=min_rows, min_bytes=min_bytes
+    )
+    report["identity"] = {
+        "verdict": identity.verdict,
+        "cryptographically_identical": identity.cryptographically_identical,
+        "detail": identity.detail,
+        "local_sha256": identity.local_sha256,
+        "manifest_sha256": identity.manifest_sha256,
+    }
+
+    if identity.verdict == IDENTITY_MANIFEST_MISMATCH and not force:
+        report["status"] = "PROVENANCE_MISMATCH"
+        report["lifecycle"] = "STRUCTURAL_FAIL"
+        report["error"] = identity.detail
+        raise AcquireError(identity.detail)
+
+    if identity.cryptographically_identical and not force:
         report["lifecycle"] = "ACQUIRED"
         if std.is_file() and std.stat().st_size > 0:
             report["status"] = "CURRENT"
             report["lifecycle"] = "PROCESSED"
-            report["note"] = "PBJapp already possesses this CMS nurse quarter (raw+standardized)"
+            report["note"] = (
+                "PBJapp already possesses this CMS nurse quarter "
+                "(manifest SHA + raw + standardized)"
+            )
             return report
-        # Raw present, maybe need standardize
         if dry_run:
             report["status"] = "WOULD_STANDARDIZE"
             return report
@@ -512,23 +795,41 @@ def acquire_and_process(
             report["status"] = "ACQUIRED_RAW_ONLY"
         return report
 
-    if not cms_is_newer_than_local(cms, root) and dest.is_file() and not force:
-        report["status"] = "CURRENT"
-        report["note"] = "Local nurse vintage already at or ahead of CMS Primary"
+    if identity.verdict == IDENTITY_UNMANIFESTED_OK and not force:
+        report["lifecycle"] = "STRUCTURAL_PASS"
+        report["status"] = "LOCAL_UNMANIFESTED"
+        report["note"] = identity.detail
+        if dry_run:
+            return report
+        if not std.is_file() or std.stat().st_size == 0:
+            if not skip_standardize:
+                run_standardize_nurse(root=root)
+                report["lifecycle"] = "PROCESSED"
+                report["status"] = "LOCAL_UNMANIFESTED"
+                report["note"] = (
+                    identity.detail + "; standardized without claiming CMS identity"
+                )
         return report
+
+    if identity.verdict == IDENTITY_UNMANIFESTED_FAIL and not force:
+        report["status"] = "STRUCTURAL_FAIL"
+        report["lifecycle"] = "STRUCTURAL_FAIL"
+        report["error"] = identity.detail
+        raise AcquireError(identity.detail)
 
     if dry_run:
         report["status"] = "WOULD_ACQUIRE"
         report["lifecycle"] = "DETECTED"
         return report
 
-    # Preserve existing on failure: download validates before finalizing new dest;
+    # Preserve existing on failure: stream validates before finalizing new dest;
     # differing existing dest is never overwritten.
     try:
         dl = download_nurse_csv(
             cms,
             dest,
             fetch_bytes=fetch_bytes,
+            stream_download=stream_download,
             min_bytes=min_bytes,
             validate=True,
             min_rows=min_rows,
@@ -628,6 +929,7 @@ def main(argv: list[str] | None = None) -> int:
         "WOULD_ACQUIRE",
         "WOULD_STANDARDIZE",
         "ACQUIRED_RAW_ONLY",
+        "LOCAL_UNMANIFESTED",
     }
     return 0 if ok else 2
 
