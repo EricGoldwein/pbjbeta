@@ -1,0 +1,62 @@
+{
+  "release_key": "2026-08",
+  "provider_processing_month": "2026-08",
+  "staffing_case_mix_quarter": null,
+  "staffing_period": {},
+  "pbj_root_sync": {
+    "source_file": "provider_info_normalized/ProviderInfoNorm_2026_08.csv",
+    "destination_file": "provider_info/ProviderInfoNorm_2026_08.csv",
+    "sha256": "4c9fff3da9f797d6e48e332623b1a7465bd414efb38b6e94d6bf507424bde506",
+    "row_count": 14690
+  },
+  "pbj_root_nh_snapshot_sync": {
+    "source_file": "provider_info/NH_ProviderInfo_Aug2026.csv",
+    "destination_file": "provider_info/NH_ProviderInfo_Aug2026.csv",
+    "sha256": "a5808fcded1ca73a629fde88fc23dcba3b6ff8ed75199883062a262e14ef8fe0",
+    "row_count": 14690,
+    "gitignored_in_pbj_root": true,
+    "required_for_parity": true,
+    "note": "Copied by sync_to_pbj_root.py; local only \u2014 not deployed on Render"
+  },
+  "pbj_root_combined_latest_note": "Rebuild provider_info_combined_latest.csv separately in pbj-root after Norm export; do not copy full PBJapp provider_info_combined.csv.",
+  "sync_command": "python scripts/sync_to_pbj_root.py provider-release --release-key 2026-08 --force",
+  "gates_to_run_in_pbj_root": [
+    "python scripts/backfill_provider_norm_urban.py",
+    "python scripts/validate_provider_norm_snapshot.py",
+    "python scripts/simulate_render_deploy_gates.py",
+    "python scripts/verify_provider_release_handoff.py --release-key 2026-08"
+  ],
+  "derived_rebuilds_in_pbj_root": [
+    "python scripts/build_state_page_aggregates.py",
+    "python generate_search_index.py"
+  ],
+  "manual_before_pbj_commit": [
+    "Rebuild provider_info_combined_latest.csv",
+    "python scripts/validate_release.py"
+  ],
+  "provider_promotion": {
+    "nh_snapshot": "provider_info/NH_ProviderInfo_Aug2026.csv",
+    "nh_present_in_pbjapp": true,
+    "ready_for_pbj_commit": true,
+    "validate_mode": "NH parity",
+    "note": "Norm-only sync is a bug. Both NH (local) and Norm (committed) must exist in PBJapp before provider-release. Render deploys Norm; NH drives parity gates and search_index."
+  },
+  "pbj_metrics_rebuild_when_synced": [
+    "python scripts/patch_state_quarterly_lpn.py",
+    "python scripts/patch_state_quarterly_medians.py",
+    "python scripts/verify_pbjapp_sync.py --source <PBJapp>"
+  ],
+  "pbj_metrics_verify_scope": "verify_pbjapp_sync.py checks facility/state/national quarterly CSVs only \u2014 not provider Norm/NH or handoff parity",
+  "snf_owners_state_lists": {
+    "source_glob": "ownership/SNF_All_Owners*.csv",
+    "sync_command": "python scripts/sync_to_pbj_root.py snf-all-owners --rebuild",
+    "rebuild_scripts": [
+      "python scripts/build_snf_owners_index.py",
+      "python scripts/build_snf_owners_ccn_index.py",
+      "python scripts/validate_ownership_linkage.py"
+    ],
+    "note": "State /owners/* pages use SNF_All_Owners + build_snf_owners_index.py (not monthly NH_Ownership_* from provider zip)."
+  },
+  "dropped_ccns_vs_prior_month": [],
+  "ownership_rows_aug2026": 0
+}

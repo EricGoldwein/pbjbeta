@@ -88,7 +88,15 @@ NonNursecsv/
 standardized_PBJ/
 standardized_NonNurse/
 EIN/
-provider_info/
+# National provider-info tree — ignore bulk; track lightweight release manifests only
+provider_info/**
+!provider_info/_manifests/
+!provider_info/_manifests/*/
+provider_info/_manifests/*/*
+!provider_info/_manifests/*/release_manifest.json
+!provider_info/_manifests/*/pbj_root_handoff.json
+!provider_info/_manifests/*/release_diff.json
+!provider_info/_manifests/*/acquisition.json
 provider_info_normalized/
 provider_info_extracted/
 provider_info_combined.csv
