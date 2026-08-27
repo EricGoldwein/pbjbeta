@@ -510,25 +510,25 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
         release_identity_strategy=(
             "CMS Special Focus Facility / Candidate publication (PDF/list + archives)"
         ),
-        fingerprint_strategy="PDF/list checksum when acquired (not implemented V0)",
+        fingerprint_strategy="source PDF SHA-256 plus normalized CSV SHA-256",
         cms_dataset_id=None,
         cms_dataset_id_provenance=(
             "No stable open-data dataset ID verified for the PDF/list publication "
             "in PBJapp; distinct from Provider Info sff_status column."
         ),
-        landing_url=None,
+        landing_url="https://www.cms.gov/medicare/health-safety-standards/certification-compliance/special-focus-facility-program",
         catalog_mechanism=CatalogMechanism.NONE_VERIFIED,
         metadata_endpoint=None,
-        raw_artifact_resolver="(unmodeled — not acquired in PBJapp V0)",
-        normalized_artifact_resolver="(none — parser MANUAL/UNMODELED)",
-        acquisition_implementation=None,
-        structural_validator=None,
+        raw_artifact_resolver="sff/releases/<YYYY-MM>/cms_sff_posting_<YYYY-MM>.pdf",
+        normalized_artifact_resolver="sff/releases/<YYYY-MM>/cms_sff_posting_<YYYY-MM>.csv",
+        acquisition_implementation="sff_release.stage_pdf (CMS-domain restricted, explicit)",
+        structural_validator="sff_release.validate_rows",
         zweli_quality_profile=None,
         downstream_consumers=("future SFF history / cross-check vs Provider Info signal",),
-        automation_maturity=AutomationMaturity.UNMODELED,
+        automation_maturity=AutomationMaturity.PARTIALLY_AUTOMATED,
         automation_notes=(
-            "Do not parse PDF in V0 merely for registry completeness. "
-            "Product SFF UI today uses Provider Info sff_status (derived signal)."
+            "Monitored/manual recurring acquisition because no stable CMS index is verified. "
+            "The posting is parsed and validated but promotion remains explicit."
         ),
         evidence=("registry architecture requirement",),
     ),

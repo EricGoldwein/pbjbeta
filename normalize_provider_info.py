@@ -51,6 +51,27 @@ def parse_month_year_from_filename(filename: str) -> tuple[int, int] | None:
 
 
 def _template_columns(output_dir: Path) -> list[str]:
+    # The ACTIVE normalized Provider release is the schema authority. This
+    # keeps a candidate built in a separate data-ops worktree comparable to
+    # the deployed contract without copying or guessing a "latest" file.
+    try:
+        from active_release_registry import get_active_release, registry_path, sha256_file
+        from urllib.parse import unquote, urlparse
+        active = get_active_release(
+            "cms.provider_info",
+            registry_path(Path(__file__).resolve().parent),
+        )
+        if active:
+            parsed = urlparse(str(active.get("source_uri") or ""))
+            raw = unquote(parsed.path)
+            if raw.startswith("/") and len(raw) > 2 and raw[2] == ":":
+                raw = raw[1:]
+            source = Path(raw)
+            if parsed.scheme != "file" or not source.is_file() or sha256_file(source) != active.get("hash"):
+                raise ValueError("ACTIVE Provider schema source is unavailable or hash-mismatched")
+            return list(pd.read_csv(source, nrows=0).columns)
+    except ImportError:
+        pass
     existing = sorted(output_dir.glob("ProviderInfoNorm_*.csv"))
     if existing:
         return list(pd.read_csv(existing[-1], nrows=0).columns)
