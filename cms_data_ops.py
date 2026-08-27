@@ -7,6 +7,7 @@ duplicate ETL. Provider Info check/acquire → scripts/cms_provider_info_acquire
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from dataclasses import asdict, dataclass, field
@@ -39,6 +40,7 @@ from data_ops_access import (  # noqa: E402
     local_file_ref,
 )
 from data_ops_approval import has_acknowledgement, has_approval, read_audit  # noqa: E402
+from active_release_registry import sha256_file  # noqa: E402
 from data_ops_zweli import (  # noqa: E402
     BaselineAvailability,
     ZweliReport,
@@ -84,6 +86,7 @@ class SourceOpsSnapshot:
     automation_level: Optional[str] = None
     release_id: Optional[str] = None
     zweli_report: Optional[dict[str, Any]] = None
+    canonical_source_path: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -175,6 +178,7 @@ def _apply_raw_ref(snap: SourceOpsSnapshot, ref: ArtifactRef) -> None:
     if ref.availability == RuntimeAvailability.AVAILABLE:
         snap.raw_available = ref.release_id or "yes"
         snap.local_raw_present = ref.access_mode == AccessMode.LOCAL_FILESYSTEM
+        snap.canonical_source_path = ref.path
     elif ref.availability == RuntimeAvailability.NOT_AVAILABLE_IN_THIS_RUNTIME:
         snap.raw_available = "NOT AVAILABLE IN THIS RUNTIME"
         snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
@@ -270,19 +274,36 @@ def _probe_provider_info(
             snap.publisher_latest = cms.data_vintage_label
             snap.cms_latest = cms.data_vintage_label
 
-        # Zweli — comparable prior = previous calendar month for monthly PI
+        # Zweli — comparable prior = previous calendar month for monthly PI.
+        # Resolve the baseline from the authoritative ACTIVE registry first;
+        # legacy same-directory snapshots are only eligible when no matching
+        # ACTIVE record exists. Never infer "latest" here.
         if run_zweli and raw_path and raw_path.is_file() and local:
-            snaps = acq.list_local_provider_info_snapshots(root)
             ey, em = expected_prior_month(local[0], local[1])
             expected_rel = f"{ey:04d}-{em:02d}"
             baseline_path = None
-            for y, m, p in snaps:
-                if (y, m) == (ey, em):
-                    baseline_path = p
-                    break
+            from active_release_registry import get_active_release, registry_path
+            from urllib.parse import unquote, urlparse
+            active = get_active_release("cms.provider_info", registry_path(Path(__file__).resolve().parent))
+            if active and active.get("active_release_id") == expected_rel:
+                uri = str(active.get("source_uri") or "")
+                parsed = urlparse(uri)
+                if parsed.scheme == "file":
+                    active_raw = unquote(parsed.path)
+                    if os.name == "nt" and active_raw.startswith("/") and len(active_raw) > 2 and active_raw[2] == ":":
+                        active_raw = active_raw[1:]
+                    candidate = Path(active_raw)
+                    if candidate.is_file() and sha256_file(candidate) == active.get("hash"):
+                        baseline_path = candidate
+            if baseline_path is None and not active:
+                for y, m, p in acq.list_local_provider_info_snapshots(root):
+                    if (y, m) == (ey, em):
+                        baseline_path = p
+                        break
+            current_compare_path = norm_path if norm_path and norm_path.is_file() else raw_path
             if baseline_path is not None:
                 report = run_provider_info_zweli(
-                    raw_path,
+                    current_compare_path,
                     release_id or "unknown",
                     baseline_csv=baseline_path,
                     baseline_release=expected_rel,
@@ -291,7 +312,7 @@ def _probe_provider_info(
                 )
             else:
                 report = run_provider_info_zweli(
-                    raw_path,
+                    current_compare_path,
                     release_id or "unknown",
                     baseline_csv=None,
                     baseline_release=expected_rel,
@@ -435,17 +456,22 @@ def _probe_quarterly_csv_family(
     std_glob: str,
 ) -> SourceOpsSnapshot:
     snap = _base_snap(record)
-    raw = _latest_by_glob(raw_dir, raw_glob)
-    std = _latest_by_glob(std_dir, std_glob)
-    label = None
-    if std:
-        label = _quarter_label_from_name(std.name)
-    elif raw:
-        label = _quarter_label_from_name(raw.name)
+    def _quarter_key(path: Path) -> tuple[int, int]:
+        label = _quarter_label_from_name(path.name) or ""
+        match = re.search(r"CY(\d{4})Q([1-4])", label)
+        return (int(match.group(1)), int(match.group(2))) if match else (0, 0)
+
+    raw_files = [p for p in raw_dir.glob(raw_glob) if p.is_file()] if raw_dir.is_dir() else []
+    std_files = [p for p in std_dir.glob(std_glob) if p.is_file()] if std_dir.is_dir() else []
+    raw = max(raw_files, key=_quarter_key) if raw_files else None
+    std = max(std_files, key=_quarter_key) if std_files else None
+    canonical = max([p for p in (raw, std) if p], key=_quarter_key, default=None)
+    label = _quarter_label_from_name(canonical.name) if canonical else None
     snap.pbjapp_latest = label
+    snap.release_id = label
     snap.processed = label if std else None
-    if raw:
-        _apply_raw_ref(snap, local_file_ref("raw", raw, release_id=label))
+    if canonical:
+        _apply_raw_ref(snap, local_file_ref("raw", canonical, release_id=label))
         snap.local_raw_present = True
     else:
         _apply_raw_ref(
@@ -520,9 +546,20 @@ def _probe_ein(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
 def _probe_snf_all_owners(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
     snap = _base_snap(record)
     own = cms_data_paths.ownership_dir(root)
-    raw = _latest_by_glob(own, "SNF_All_Owners*.csv")
+    raw = None
+    policy_path = own / "ownership_release_policy.json"
+    if policy_path.is_file():
+        try:
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            release = str(policy.get("active_release_date") or "")
+            filename = str(((policy.get("releases") or {}).get(release) or {}).get("ownership_source_filename") or "")
+            candidate = own / filename
+            raw = candidate if candidate.is_file() else None
+        except (OSError, json.JSONDecodeError):
+            raw = None
     if raw:
         _apply_raw_ref(snap, local_file_ref("snf_all_owners", raw, release_id=raw.name))
+        snap.release_id = release or raw.name
         snap.pbjapp_latest = raw.name
         snap.status = OpsStatus.LOCAL_RAW_ONLY.value
         snap.detail = "CSV present; normalize scripts absent on main"
@@ -534,6 +571,37 @@ def _probe_snf_all_owners(record: CmsSourceRecord, root: Path) -> SourceOpsSnaps
         )
         snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
         snap.detail = "SNF_All_Owners not in this runtime (dataset ID registered)"
+    return snap
+
+
+def _probe_snf_enrollments(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
+    snap = _base_snap(record)
+    policy_path = cms_data_paths.ownership_dir(root) / "ownership_release_policy.json"
+    raw = None
+    release = ""
+    if policy_path.is_file():
+        try:
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            release = str(policy.get("active_release_date") or "")
+            entry = ((policy.get("releases") or {}).get(release) or {})
+            filename = str(entry.get("enrollment_source_filename") or "")
+            candidate = (
+                cms_data_paths.ownership_dir(root)
+                / "_sources" / "cms_snf_enrollments" / "raw" / "downloaded" / filename
+            )
+            raw = candidate if candidate.is_file() else None
+        except (OSError, json.JSONDecodeError):
+            raw = None
+    if raw:
+        _apply_raw_ref(snap, local_file_ref("snf_enrollments", raw, release_id=release))
+        snap.release_id = release
+        snap.pbjapp_latest = release
+        snap.status = OpsStatus.LOCAL_RAW_ONLY.value
+        snap.detail = "Policy-aligned enrollment snapshot present; validation required before promotion"
+        snap.local_raw_present = True
+    else:
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+        snap.detail = "Policy-selected SNF enrollment snapshot unavailable"
     return snap
 
 
@@ -572,15 +640,18 @@ def _probe_unmodeled(record: CmsSourceRecord, detail: str) -> SourceOpsSnapshot:
 def _probe_health_citations(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
     snap = _base_snap(record)
     cit = cms_data_paths.citations_dir(root)
-    # Prefer standalone-looking files; still report co-extracted NH_* if only those exist
-    standalone = _latest_by_glob(cit, "*Citation*.csv") if cit.is_dir() else None
-    if standalone is None and cit.is_dir():
-        standalone = _latest_by_glob(cit, "*.csv")
+    # Facility citation builder consumes this exact source family, not descriptions.
+    candidates = list(cit.glob("NH_HealthCitations_*.csv")) if cit.is_dir() else []
+    def _citation_key(path: Path) -> tuple[int, int]:
+        m = re.search(r"_([A-Za-z]{3})(\d{4})\.csv$", path.name)
+        return (int(m.group(2)), _MONTH_NAME_TO_NUM.get(m.group(1).lower(), 0)) if m else (0, 0)
+    standalone = max(candidates, key=_citation_key) if candidates else None
     if standalone:
         _apply_raw_ref(
             snap, local_file_ref("citations", standalone, release_id=standalone.name)
         )
         snap.pbjapp_latest = standalone.name
+        snap.release_id = standalone.name
         snap.local_raw_present = True
         snap.status = OpsStatus.LOCAL_RAW_ONLY.value
         snap.detail = (
@@ -653,10 +724,7 @@ def probe_source(
     if family == SourceFamily.SNF_ALL_OWNERS:
         return _probe_snf_all_owners(record, root)
     if family == SourceFamily.SNF_ENROLLMENTS:
-        return _probe_unmodeled(
-            record,
-            "SNF Enrollments is a separate CMS source from All Owners; unmodeled on main",
-        )
+        return _probe_snf_enrollments(record, root)
     if family == SourceFamily.SNF_CHOW:
         return _probe_unmodeled(
             record,
@@ -751,6 +819,23 @@ def check_provider_info_cms(
     newer = acq.cms_is_newer_than_local(cms, root)
     local = acq.latest_local_provider_info(root)
     snap = probe_source("cms.provider_info", check_cms=True, fetch_json=fetch_json, root=root)
+    if newer:
+        from release_control_plane import ReleaseState, record_candidate
+
+        label = str(cms.data_vintage_label or "").strip()
+        release_match = re.fullmatch(r"([A-Za-z]{3,9})\s+(20\d{2})", label)
+        if not release_match:
+            raise RuntimeError(f"ambiguous Provider Information release identity: {label!r}")
+        month = _MONTH_NAME_TO_NUM.get(release_match.group(1).lower()[:3])
+        if not month:
+            raise RuntimeError(f"unrecognized Provider Information month: {label!r}")
+        canonical_release_id = f"{release_match.group(2)}-{month:02d}"
+
+        record_candidate(
+            "cms.provider_info", canonical_release_id, ReleaseState.DETECTED,
+            metadata={"publisher_label": label, "publisher_modified": cms.modified, "publisher_released": cms.released},
+            root=Path(__file__).resolve().parent,
+        )
     return {
         "action": "check_cms",
         "cms": {
@@ -794,6 +879,15 @@ def acquire_provider_info(
         fetch_json=fetch_json,
         root=root,
     )
+    if not dry_run and snap.canonical_source_path and snap.release_id:
+        from release_control_plane import ReleaseState, record_candidate
+
+        record_candidate(
+            "cms.provider_info", snap.release_id, ReleaseState.ACQUIRED,
+            source_path=snap.canonical_source_path,
+            metadata={"structural_status": snap.structural_status, "zweli_status": snap.zweli_status},
+            root=Path(__file__).resolve().parent,
+        )
     return {
         "action": "acquire_process",
         "acquire_report": report,
@@ -816,6 +910,14 @@ def check_nurse_cms(
         "cms.pbj_nurse_staffing", check_cms=True, fetch_json=fetch_json, root=root
     )
     dry = nurse_acq.acquire_and_process(root=root, fetch_json=fetch_json, dry_run=True)
+    if newer:
+        from release_control_plane import ReleaseState, record_candidate
+
+        record_candidate(
+            "cms.pbj_nurse_staffing", cms.quarter_label, ReleaseState.DETECTED,
+            metadata={"publisher_dataset_id": cms.dataset_id},
+            root=Path(__file__).resolve().parent,
+        )
     return {
         "action": "check_cms",
         "cms": {
@@ -860,6 +962,15 @@ def acquire_nurse(
         fetch_json=fetch_json,
         root=root,
     )
+    if not dry_run and snap.canonical_source_path and snap.release_id:
+        from release_control_plane import ReleaseState, record_candidate
+
+        record_candidate(
+            "cms.pbj_nurse_staffing", snap.release_id, ReleaseState.ACQUIRED,
+            source_path=snap.canonical_source_path,
+            metadata={"structural_status": snap.structural_status},
+            root=Path(__file__).resolve().parent,
+        )
     return {
         "action": "acquire_process",
         "acquire_report": report,
@@ -970,13 +1081,31 @@ def approve_release_authoritative(
     audit_path: Path | None = None,
 ) -> Any:
     """Approve using server-resolved Zweli state only (form status ignored)."""
-    from data_ops_approval import approve_release
+    from data_ops_approval import ApprovalError, approve_release
+    from release_control_plane import ReleaseState, promote_candidate, record_candidate
 
     state = resolve_zweli_state_for_release(source_id, release_id, root=root)
-    return approve_release(
+    snap = probe_source(source_id, check_cms=False, root=root, run_zweli=False)
+    if snap.release_id != release_id or not snap.canonical_source_path:
+        raise ApprovalError(
+            f"release {source_id} {release_id} has no matching canonical local source"
+        )
+    entry = approve_release(
         source_id,
         release_id,
         zweli_state=state,
         note=note,
         audit_path=audit_path,
     )
+    control_root = Path(__file__).resolve().parent
+    record_candidate(
+        source_id,
+        release_id,
+        ReleaseState.VALIDATED,
+        source_path=snap.canonical_source_path,
+        validation={"status": "PASS", "validated_at": entry.timestamp},
+        metadata={"zweli_state": state.value, "approval_note": note},
+        root=control_root,
+    )
+    promote_candidate(source_id, root=control_root)
+    return entry

@@ -8,12 +8,60 @@
   </form>
 </section>
 
+<section class="do-section">
+  <h2>Active releases</h2>
+  <form method="post" action="{{ url_for('action_control_panel_refresh') }}">
+    <button class="do-btn" type="submit">Refresh health and facility status</button>
+  </form>
+  <div class="do-table-wrap">
+    <table class="do-table">
+      <thead><tr><th>Dataset</th><th>ACTIVE</th><th>PENDING</th><th>Update mechanism</th><th>New?</th><th>Last checked</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for row in control.datasets %}
+        <tr>
+          <td><strong>{{ row.dataset_id }}</strong></td>
+          <td>{{ (row.active or {}).get('active_release_id', '—') }}</td>
+          <td>
+            {% if row.pending %}{{ row.pending.release_id }} — {{ row.pending.state }}{% else %}—{% endif %}
+          </td>
+          {% set check = check_by_dataset.get(row.dataset_id, {}) %}
+          <td>{{ check.get('mechanism', '—') }}</td>
+          <td>{{ 'YES' if check.get('new_release_available') == true else ('NO' if check.get('new_release_available') == false else '—') }}</td>
+          <td>{{ check.get('checked_at', '—') }}</td>
+          <td><span class="do-badge">{{ row.health }}</span></td>
+        </tr>
+        {% if row.pending %}
+        <tr><td colspan="8" class="do-muted">Would mark stale: {{ row.impact.would_mark_stale|join(', ') or 'none' }}</td></tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="do-muted">Release check: {{ releases_checked_at or 'not yet' }}. Validation, activation, source location and full hashes are available in dataset detail.</p>
+</section>
+
+<section class="do-section">
+  <h2>Facility package status</h2>
+  {% set facility = control.facilities.facilities.get('335581') %}
+  {% if facility %}
+    <p><strong>335581</strong> — <span class="do-badge">{{ facility.status }}</span></p>
+    <dl class="do-dl">
+      {% for capability, status in facility.capabilities.items() %}
+      <div><dt>{{ capability }}</dt><dd>{{ status }}</dd></div>
+      {% endfor %}
+    </dl>
+  {% else %}
+    <p class="do-muted">No cached facility status. Refresh the control panel.</p>
+  {% endif %}
+</section>
+
 <div class="do-table-wrap">
   <table class="do-table" data-do-table>
     <thead>
       <tr>
         <th>Source</th>
         <th>Publisher latest</th>
+        <th>Active release</th>
         <th>Raw</th>
         <th>Processed</th>
         <th>Zweli</th>
@@ -34,6 +82,7 @@
           <span class="do-badge do-badge-{{ s.status|lower|replace('_','-') }}">{{ s.status }}</span>
         </td>
         <td class="do-mono">{{ s.publisher_latest or s.cms_latest or '—' }}</td>
+        <td class="do-mono">{{ (active_releases.get(s.source_id) or {}).get('active_release_id', '—') }}</td>
         <td class="do-mono">{{ s.raw_available }}</td>
         <td class="do-mono">{{ s.processed or '—' }}</td>
         <td><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></td>
@@ -60,6 +109,7 @@
     </header>
     <dl class="do-dl">
       <div><dt>Publisher</dt><dd class="do-mono">{{ s.publisher_latest or '—' }}</dd></div>
+      <div><dt>Active</dt><dd class="do-mono">{{ (active_releases.get(s.source_id) or {}).get('active_release_id', '—') }}</dd></div>
       <div><dt>Raw</dt><dd class="do-mono">{{ s.raw_available }}</dd></div>
       <div><dt>Processed</dt><dd class="do-mono">{{ s.processed or '—' }}</dd></div>
       <div><dt>Zweli</dt><dd><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></dd></div>

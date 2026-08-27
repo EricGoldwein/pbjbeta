@@ -21,6 +21,7 @@ from pathlib import Path
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -44,6 +45,13 @@ from cms_data_ops import (  # noqa: E402
     release_review_items,
 )
 from cms_source_registry import get_registry, get_source  # noqa: E402
+from active_release_registry import load_registry  # noqa: E402
+from release_control_plane import (  # noqa: E402
+    control_panel_payload,
+    refresh_facility_index,
+    refresh_source_health,
+)
+from release_check import load_check_state  # noqa: E402
 from data_ops_approval import (  # noqa: E402
     ApprovalError,
     acknowledge_requires_review,
@@ -166,13 +174,32 @@ def create_app() -> Flask:
     def sources():
         check_cms = request.args.get("check_cms", "1") != "0"
         snaps = [s.to_dict() for s in probe_all_sources(check_cms=check_cms)]
+        control = control_panel_payload()
+        release_checks = load_check_state()
+        check_by_dataset = {row["dataset_id"]: row for row in release_checks.get("datasets", [])}
         return render_template(
             "data_ops/sources.html",
             snapshots=snaps,
             check_cms=check_cms,
             signals=derived_signals_payload(),
             registry=[r.to_dict() for r in get_registry()],
+            active_releases=load_registry().get("datasets", {}),
+            control=control,
+            check_by_dataset=check_by_dataset,
+            releases_checked_at=release_checks.get("checked_at"),
         )
+
+    @app.post("/actions/control-panel/refresh")
+    @require_auth
+    def action_control_panel_refresh():
+        try:
+            refresh_source_health()
+            pbjapp_root = Path(os.environ.get("PBJ_REPO_ROOT") or _ROOT)
+            refresh_facility_index(pbjapp_root, ccns=("335581",))
+            flash("Control-plane health and facility status refreshed", "ok")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Control-plane refresh failed: {exc}", "error")
+        return redirect(url_for("sources", check_cms="0"))
 
     @app.get("/sources/<source_id>")
     @require_auth
@@ -185,11 +212,26 @@ def create_app() -> Flask:
             (s for s in probe_all_sources(check_cms=True) if s.source_id == source_id),
             None,
         )
+        control = control_panel_payload()
+        control_row = next((row for row in control["datasets"] if row["dataset_id"] == source_id), None)
         return render_template(
             "data_ops/source_detail.html",
             record=rec.to_dict(),
             snapshot=snap.to_dict() if snap else None,
+            control_row=control_row,
         )
+
+    @app.get("/api/control-plane/status")
+    @require_auth
+    def api_control_plane_status():
+        return jsonify(control_panel_payload())
+
+    @app.get("/api/control-plane/impact/<source_id>")
+    @require_auth
+    def api_control_plane_impact(source_id: str):
+        from release_control_plane import what_would_change
+
+        return jsonify(what_would_change(source_id))
 
     @app.post("/actions/provider-info/check")
     @require_auth
