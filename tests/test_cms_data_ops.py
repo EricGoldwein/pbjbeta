@@ -141,15 +141,15 @@ def test_zweli_not_run_blocks_dashboard_refresh():
     assert dash.DashboardActionBlocker.ZWELI_NOT_RUN.value in dash.SOURCE_DATA_REFRESH_BLOCKERS
 
 
-def test_not_run_cannot_be_approved(tmp_path: Path):
+def test_not_run_can_be_approved(tmp_path: Path):
     audit = tmp_path / "audit.jsonl"
-    with pytest.raises(approval.ApprovalError, match="NOT_RUN"):
-        approval.approve_release(
-            "cms.provider_info",
-            "2026-08",
-            zweli_state=ZweliState.NOT_RUN,
-            audit_path=audit,
-        )
+    entry = approval.approve_release(
+        "cms.provider_info",
+        "2026-08",
+        zweli_state=ZweliState.NOT_RUN,
+        audit_path=audit,
+    )
+    assert entry.action == "approve"
 
 
 def test_probe_aug_without_july_is_not_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -480,6 +480,87 @@ def test_release_review_includes_governed_pending_not_approvable(tmp_path: Path)
     assert provider["zweli_status"] == "NOT_RUN"
 
 
+def test_release_review_validated_not_run_is_approvable(tmp_path: Path):
+    _write_control_plane_state(
+        tmp_path,
+        active={
+            "cms.provider_info": {
+                "release_id": "2026-07",
+                "status": "ACTIVE",
+                "zweli_status": "PASS",
+            },
+        },
+        pending={
+            "cms.provider_info": {
+                "release_id": "2026-08",
+                "state": "VALIDATED",
+                "zweli_status": "NOT_RUN",
+            },
+        },
+    )
+    import release_control_plane as rcp
+
+    control = rcp.control_panel_payload(tmp_path)
+    items = ops.release_review_items(check_cms=False, root=tmp_path, control=control)
+    provider = next(i for i in items if i["source_id"] == "cms.provider_info")
+    assert provider["approvable"] is True
+    assert provider["zweli_status"] == "NOT_RUN"
+
+
+def test_authoritative_not_run_can_promote(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
+    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    audit = tmp_path / "audit.jsonl"
+    entry = ops.approve_release_authoritative(
+        "cms.provider_info",
+        "2026-08",
+        root=tmp_path,
+        audit_path=audit,
+    )
+    assert entry.action == "approve"
+
+
+def test_authoritative_structural_fail_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    import dataclasses
+
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
+    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    audit = tmp_path / "audit.jsonl"
+    real_probe = ops.probe_source
+
+    def _probe(*args, run_zweli=False, **kwargs):
+        snap = real_probe(*args, run_zweli=run_zweli, **kwargs)
+        if not run_zweli:
+            return dataclasses.replace(snap, structural_status="FAIL")
+        return snap
+
+    monkeypatch.setattr(ops, "probe_source", _probe)
+    with pytest.raises(approval.ApprovalError, match="structural validation"):
+        ops.approve_release_authoritative(
+            "cms.provider_info",
+            "2026-08",
+            root=tmp_path,
+            audit_path=audit,
+        )
+
+
+def test_build_provider_info_promotion_bundle_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
+    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    bundle = ops.build_provider_info_promotion_bundle("2026-08", data_root=tmp_path)
+    assert bundle["source_path"].name == "ProviderInfoNorm_2026_08.csv"
+    roles = {m["role"] for m in bundle["metadata"]["source_set"]}
+    assert roles == {"provider_info", "nh_ownership"}
+
+
 def test_promote_candidate_permitted_requires_validated():
     assert ops.promote_candidate_permitted({"state": "VALIDATED"}) is True
     assert ops.promote_candidate_permitted({"state": "ACQUIRED"}) is False
@@ -492,11 +573,13 @@ def _write_provider_info_release(
     month: int,
     prefix: str = "300",
 ) -> Path:
-    """Minimal local Provider Info raw (+ norm) for approval/canonical-source tests."""
+    """Minimal local Provider Info raw (+ norm + ownership) for promotion tests."""
     pi = root / "provider_info"
     norm = root / "provider_info_normalized"
+    own = root / "ownership"
     pi.mkdir(parents=True, exist_ok=True)
     norm.mkdir(parents=True, exist_ok=True)
+    own.mkdir(parents=True, exist_ok=True)
     month_names = (
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
@@ -507,6 +590,17 @@ def _write_provider_info_release(
     raw.write_bytes(_nh_csv_bytes(1200, month_label, prefix))
     (norm / f"ProviderInfoNorm_{year}_{month:02d}.csv").write_bytes(
         _nh_csv_bytes(1200, month_label, prefix)
+    )
+    own_path = own / f"NH_Ownership_{label}.csv"
+    own_path.write_text(
+        "CMS Certification Number (CCN),Owner Name\n015009,Example Owner LLC\n",
+        encoding="utf-8",
+    )
+    man = root / "provider_info" / "_manifests" / f"{year:04d}-{month:02d}"
+    man.mkdir(parents=True, exist_ok=True)
+    (man / "release_manifest.json").write_text(
+        json.dumps({"release_key": f"{year:04d}-{month:02d}", "source_members": []}),
+        encoding="utf-8",
     )
     return raw
 
@@ -576,6 +670,7 @@ def test_forged_form_pass_cannot_approve_blocked(
 def test_authoritative_promotion_writes_isolated_registry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
     _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
     audit = tmp_path / "audit.jsonl"
@@ -589,11 +684,15 @@ def test_authoritative_promotion_writes_isolated_registry(
     isolated = json.loads(
         (tmp_path / "state" / "active_releases.json").read_text(encoding="utf-8")
     )
-    active = isolated["datasets"]["cms.provider_info"]["active_release_id"]
-    assert active == "2026-08"
+    record = isolated["datasets"]["cms.provider_info"]
+    assert record["active_release_id"] == "2026-08"
+    assert record["source_filename"] == "ProviderInfoNorm_2026_08.csv"
+    roles = {m["role"] for m in record["metadata"]["source_set"]}
+    assert roles == {"provider_info", "nh_ownership"}
 
 
 def test_authoritative_requires_review_and_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
     _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
     audit = tmp_path / "audit.jsonl"

@@ -131,8 +131,7 @@ def approve_release(
         raise ApprovalError(
             "REQUIRES_REVIEW releases need explicit acknowledgement before approval"
         )
-    if state == ZweliState.NOT_RUN:
-        raise ApprovalError("Cannot approve release with Zweli NOT_RUN")
+    # Zweli NOT_RUN is optional review evidence — structural validation is the hard gate.
     entry = AuditEntry(
         timestamp=datetime.now(timezone.utc).isoformat(),
         source_id=source_id,

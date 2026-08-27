@@ -981,9 +981,12 @@ def _governed_candidate_review_item(
     elif state == "ZWELI_BLOCKED" or zweli_status == ZweliState.BLOCKED.value:
         reason = "governed_zweli_blocked"
 
+    if snap is not None and snap.release_id == release_id and snap.zweli_status:
+        zweli_status = snap.zweli_status
+
     approvable = False
     if source_id == "cms.provider_info" and promote_candidate_permitted(candidate):
-        if zweli_status == ZweliState.PASS.value:
+        if zweli_status in {ZweliState.PASS.value, ZweliState.NOT_RUN.value}:
             approvable = True
         elif zweli_status == ZweliState.REQUIRES_REVIEW.value and has_acknowledgement(
             source_id, release_id
@@ -1588,6 +1591,72 @@ def load_zweli_report_for_release(
     return data
 
 
+def provider_info_pbjapp_root(root: Path | None = None) -> Path:
+    """PBJapp data root for canonical Provider Info / ownership artifacts."""
+    if root is not None:
+        return Path(root).resolve()
+    configured = (os.environ.get("PBJ_REPO_ROOT") or "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    sibling = (_ROOT.parent / "PBJapp").resolve()
+    if sibling.is_dir():
+        return sibling
+    return cms_data_paths.repo_root()
+
+
+def _parse_provider_release_id(release_id: str) -> tuple[int, int, str]:
+    match = re.fullmatch(r"(\d{4})-(\d{2})", (release_id or "").strip())
+    if not match:
+        raise ValueError(f"invalid provider release_id: {release_id!r}")
+    year, month = int(match.group(1)), int(match.group(2))
+    if month < 1 or month > 12:
+        raise ValueError(f"invalid provider release month: {release_id!r}")
+    month_abbr = (
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    )[month - 1]
+    return year, month, month_abbr
+
+
+def build_provider_info_promotion_bundle(
+    release_id: str,
+    *,
+    data_root: Path | None = None,
+) -> dict[str, Any]:
+    """Canonical ACTIVE shape: normalized primary + nh_ownership source_set."""
+    from data_ops_approval import ApprovalError
+
+    year, month, month_abbr = _parse_provider_release_id(release_id)
+    base = provider_info_pbjapp_root(data_root)
+    norm = (
+        cms_data_paths.provider_info_normalized_dir(base)
+        / f"ProviderInfoNorm_{year}_{month:02d}.csv"
+    )
+    ownership = cms_data_paths.ownership_dir(base) / f"NH_Ownership_{month_abbr}{year}.csv"
+    manifest = (
+        cms_data_paths.provider_release_manifest_dir(release_id, base)
+        / "release_manifest.json"
+    )
+    if not norm.is_file() or norm.stat().st_size <= 0:
+        raise ApprovalError(f"canonical normalized Provider Info missing: {norm}")
+    if not ownership.is_file() or ownership.stat().st_size <= 0:
+        raise ApprovalError(f"canonical NH Ownership missing: {ownership}")
+    metadata: dict[str, Any] = {
+        "source_set": [
+            {"role": "provider_info", "source_path": str(norm)},
+            {"role": "nh_ownership", "source_path": str(ownership)},
+        ],
+    }
+    if manifest.is_file():
+        metadata["validation_evidence"] = str(manifest)
+    return {
+        "source_path": norm,
+        "source_hash": sha256_file(norm),
+        "release_date": release_id,
+        "metadata": metadata,
+    }
+
+
 def resolve_zweli_state_for_release(
     source_id: str,
     release_id: str,
@@ -1597,7 +1666,8 @@ def resolve_zweli_state_for_release(
     """Server-authoritative Zweli state for approval (never trust the browser).
 
     Prefer the stored report for ``source_id``+``release_id``; otherwise recompute
-    via canonical probe. Fail closed (raise) when state cannot be established.
+    via canonical probe. NOT_RUN is returned when Zweli could not compare — it is
+    optional evidence, not an activation blocker.
     """
     from data_ops_approval import ApprovalError
 
@@ -1616,23 +1686,19 @@ def resolve_zweli_state_for_release(
                 f"Stored Zweli report has invalid state for {source_id} {release_id}"
             ) from exc
 
-    # Recompute via canonical probe (Provider Info profile in V0).
     snap = probe_source(source_id, check_cms=False, root=root, run_zweli=True)
     if snap.release_id != release_id:
         raise ApprovalError(
             f"Zweli report missing/mismatched for {source_id} {release_id} "
             f"(probe release={snap.release_id!r}) — fail closed"
         )
-    if not snap.zweli_report or snap.zweli_status == ZweliState.NOT_RUN.value:
-        raise ApprovalError(
-            f"Zweli NOT_RUN / missing for {source_id} {release_id} — fail closed"
-        )
-    if snap.zweli_report.get("source_id") not in (None, source_id):
-        raise ApprovalError("Zweli report source_id mismatch — fail closed")
-    if snap.zweli_report.get("release_id") not in (None, release_id):
-        raise ApprovalError("Zweli report release_id mismatch — fail closed")
+    if snap.zweli_report:
+        if snap.zweli_report.get("source_id") not in (None, source_id):
+            raise ApprovalError("Zweli report source_id mismatch — fail closed")
+        if snap.zweli_report.get("release_id") not in (None, release_id):
+            raise ApprovalError("Zweli report release_id mismatch — fail closed")
     try:
-        return ZweliState(snap.zweli_status)
+        return ZweliState(snap.zweli_status or ZweliState.NOT_RUN.value)
     except ValueError as exc:
         raise ApprovalError(f"Invalid Zweli state {snap.zweli_status!r}") from exc
 
@@ -1651,10 +1717,27 @@ def approve_release_authoritative(
 
     state = resolve_zweli_state_for_release(source_id, release_id, root=root)
     snap = probe_source(source_id, check_cms=False, root=root, run_zweli=False)
-    if snap.release_id != release_id or not snap.canonical_source_path:
+    if snap.release_id != release_id:
         raise ApprovalError(
             f"release {source_id} {release_id} has no matching canonical local source"
         )
+    if (snap.structural_status or "").upper() not in {"PASS", "UNKNOWN"}:
+        raise ApprovalError(
+            f"structural validation must pass before approval ({snap.structural_status})"
+        )
+    if source_id == "cms.provider_info":
+        bundle = build_provider_info_promotion_bundle(release_id)
+        source_path = bundle["source_path"]
+        promotion_metadata = dict(bundle["metadata"])
+        promotion_metadata["zweli_state"] = state.value
+        promotion_metadata["approval_note"] = note
+    else:
+        if not snap.canonical_source_path:
+            raise ApprovalError(
+                f"release {source_id} {release_id} has no matching canonical local source"
+            )
+        source_path = snap.canonical_source_path
+        promotion_metadata = {"zweli_state": state.value, "approval_note": note}
     entry = approve_release(
         source_id,
         release_id,
@@ -1667,10 +1750,79 @@ def approve_release_authoritative(
         source_id,
         release_id,
         ReleaseState.VALIDATED,
-        source_path=snap.canonical_source_path,
+        source_path=source_path,
         validation={"status": "PASS", "validated_at": entry.timestamp},
-        metadata={"zweli_state": state.value, "approval_note": note},
+        metadata=promotion_metadata,
         root=control_root,
     )
     promote_candidate(source_id, root=control_root)
     return entry
+
+
+def prepare_provider_info_validated_candidate(
+    release_id: str,
+    *,
+    root: Path | None = None,
+    data_root: Path | None = None,
+) -> dict[str, Any]:
+    """Validate canonical August/July-style bundle and record VALIDATED (no ACTIVE)."""
+    from data_ops_approval import ApprovalError
+    from release_control_plane import ReleaseState, control_plane_root, record_candidate
+
+    import cms_provider_info_acquire as acq
+
+    control_root = control_plane_root(root)
+    pbj_root = provider_info_pbjapp_root(data_root)
+    year, month, month_abbr = _parse_provider_release_id(release_id)
+    raw = cms_data_paths.provider_info_dir(pbj_root) / f"NH_ProviderInfo_{month_abbr}{year}.csv"
+    if not raw.is_file():
+        raise ApprovalError(f"raw Provider Info missing in PBJapp: {raw}")
+    prior_path = None
+    if month > 1:
+        py, pm, pabbr = year, month - 1, None
+        pabbr = _parse_provider_release_id(f"{py:04d}-{pm:02d}")[2]
+        prior_path = cms_data_paths.provider_info_dir(pbj_root) / f"NH_ProviderInfo_{pabbr}{py}.csv"
+        if not prior_path.is_file():
+            prior_path = None
+    elif year > 2000:
+        py, pm = year - 1, 12
+        pabbr = _parse_provider_release_id(f"{py:04d}-{pm:02d}")[2]
+        prior_path = cms_data_paths.provider_info_dir(pbj_root) / f"NH_ProviderInfo_{pabbr}{py}.csv"
+        if not prior_path.is_file():
+            prior_path = None
+    validation = acq.validate_raw_provider_info_csv(raw, prior_path=prior_path)
+    if validation.get("row_count", 0) < 1000:
+        raise ApprovalError("structural validation failed: row count too low")
+    bundle = build_provider_info_promotion_bundle(release_id, data_root=pbj_root)
+    zweli_state = resolve_zweli_state_for_release(
+        "cms.provider_info", release_id, root=control_root
+    )
+    metadata = dict(bundle["metadata"])
+    metadata["structural_status"] = "PASS"
+    metadata["zweli_status"] = zweli_state.value
+    metadata["acquisition_manifest"] = (
+        f"provider_info/_manifests/{release_id}/release_manifest.json"
+    )
+    candidate = record_candidate(
+        "cms.provider_info",
+        release_id,
+        ReleaseState.VALIDATED,
+        source_path=bundle["source_path"],
+        validation={"status": "PASS", "validated_at": datetime.now(timezone.utc).isoformat()},
+        metadata=metadata,
+        root=control_root,
+    )
+    impact = __import__("release_control_plane", fromlist=["what_would_change"]).what_would_change(
+        "cms.provider_info"
+    )
+    return {
+        "candidate": candidate,
+        "validation": validation,
+        "bundle": {
+            "source_path": str(bundle["source_path"]),
+            "source_hash": bundle["source_hash"],
+            "source_set": metadata.get("source_set"),
+        },
+        "zweli_status": zweli_state.value,
+        "downstream_impact": impact,
+    }
