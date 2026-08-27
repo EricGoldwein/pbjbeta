@@ -1,48 +1,13 @@
 {% extends "data_ops/base.html" %}
 {% block title %}{{ record.human_name }}{% endblock %}
 {% block content %}
-<section class="do-page-head">
-  <h1>{{ record.human_name }}</h1>
-  <p class="do-mono do-muted">{{ record.source_id }} · {{ record.cms_dataset_id or 'no dataset id' }}</p>
+<section class="do-page-head do-page-head-compact">
+  <div>
+    <h1>{{ record.human_name }}</h1>
+    <p class="do-mono do-muted do-small">{{ record.source_id }} · {{ record.cms_dataset_id or 'no dataset id' }}</p>
+  </div>
+  <p class="do-back-link"><a href="{{ url_for('sources') }}">← Sources</a></p>
 </section>
-{% if snapshot %}
-<p><span class="do-badge do-badge-{{ snapshot.status|lower|replace('_','-') }}">{{ snapshot.status }}</span>
-<span class="do-badge do-zweli-{{ snapshot.zweli_status|lower|replace('_','-') }}">Zweli {{ snapshot.zweli_status }}</span></p>
-<p class="do-muted">{{ snapshot.detail }}</p>
-{% endif %}
-{% if control_row %}
-<section class="do-section">
-  <h2>Release control</h2>
-  <dl class="do-dl do-dl-wide">
-    <div><dt>ACTIVE</dt><dd>{{ (control_row.active or {}).get('active_release_id', '—') }}</dd></div>
-    <div><dt>PENDING</dt><dd>{% if control_row.pending %}{{ control_row.pending.release_id }} — {{ control_row.pending.state }}{% else %}—{% endif %}</dd></div>
-    <div><dt>Health</dt><dd>{{ control_row.health }} — {{ control_row.health_detail }}</dd></div>
-    <div><dt>Source URI</dt><dd class="do-mono">{{ (control_row.active or {}).get('source_uri', '—') }}</dd></div>
-    <div><dt>SHA-256</dt><dd class="do-mono">{{ (control_row.active or {}).get('hash', '—') }}</dd></div>
-    <div><dt>Validated</dt><dd>{{ (control_row.active or {}).get('validated_at', '—') }}</dd></div>
-    <div><dt>Activated</dt><dd>{{ (control_row.active or {}).get('promoted_at', '—') }}</dd></div>
-    <div><dt>Promotion impact</dt><dd>{{ control_row.impact.would_mark_stale|join(', ') or 'none' }}</dd></div>
-  </dl>
-</section>
-{% endif %}
-<dl class="do-dl do-dl-wide">
-  <div><dt>Cadence</dt><dd>{{ record.cadence }}</dd></div>
-  <div><dt>Containers</dt><dd>{{ record.containers|join(', ') }}</dd></div>
-  <div><dt>Automation</dt><dd>{{ record.automation_maturity }}</dd></div>
-  <div><dt>Landing</dt><dd class="do-mono">{{ record.landing_url or '—' }}</dd></div>
-  <div><dt>Raw resolver</dt><dd class="do-mono">{{ record.raw_artifact_resolver }}</dd></div>
-  <div><dt>Normalized resolver</dt><dd class="do-mono">{{ record.normalized_artifact_resolver }}</dd></div>
-  <div><dt>Acquisition</dt><dd class="do-mono">{{ record.acquisition_implementation or '—' }}</dd></div>
-  <div><dt>Structural validator</dt><dd class="do-mono">{{ record.structural_validator or '—' }}</dd></div>
-  <div><dt>Zweli profile</dt><dd class="do-mono">{{ record.zweli_quality_profile or '—' }}</dd></div>
-  <div><dt>ID provenance</dt><dd>{{ record.cms_dataset_id_provenance or '—' }}</dd></div>
-  <div><dt>Notes</dt><dd>{{ record.automation_notes }}</dd></div>
-</dl>
-{% if snapshot and snapshot.zweli_report %}
-<details class="do-details" open>
-  <summary>Zweli findings</summary>
-  <pre class="do-pre">{{ snapshot.zweli_report | tojson(indent=2) }}</pre>
-</details>
-{% endif %}
-<p><a href="{{ url_for('sources') }}">← Sources</a></p>
+
+{% include 'data_ops/partials/source_detail_panel.html' %}
 {% endblock %}

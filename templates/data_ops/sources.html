@@ -1,172 +1,241 @@
 {% extends "data_ops/base.html" %}
 {% block title %}Sources{% endblock %}
 {% block content %}
-<section class="do-page-head">
-  <h1>Sources</h1>
-  <form class="do-inline" method="get" action="{{ url_for('sources') }}">
-    <label class="do-check"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Query CMS (Provider Info / nurse)</label>
-  </form>
-</section>
-
-<section class="do-section">
-  <h2>Active releases</h2>
-  <form method="post" action="{{ url_for('action_control_panel_refresh') }}">
-    <button class="do-btn" type="submit">Refresh health and facility status</button>
-  </form>
-  <div class="do-table-wrap">
-    <table class="do-table">
-      <thead><tr><th>Dataset</th><th>ACTIVE</th><th>PENDING</th><th>Update mechanism</th><th>New?</th><th>Last checked</th><th>Status</th></tr></thead>
+<section class="do-section do-section-primary do-section-flush-top">
+  <div class="do-release-toolbar">
+    <h1 class="do-release-title">Active releases</h1>
+    <div class="do-toolbar-controls" data-do-release-filters>
+      <input class="do-input do-input-compact" type="search" placeholder="Filter datasets…" data-do-release-search aria-label="Filter datasets">
+      <label class="do-check do-check-compact do-check-attention">
+        <input type="checkbox" data-do-needs-attention-only> Needs attention
+      </label>
+      <form method="post" action="{{ url_for('action_control_panel_refresh') }}">
+        <button class="do-btn do-btn-compact" type="submit">Refresh health</button>
+      </form>
+      <form class="do-inline" method="get" action="{{ url_for('sources') }}">
+        <label class="do-check do-check-compact"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Query CMS</label>
+      </form>
+    </div>
+  </div>
+  <div class="do-table-wrap do-table-wrap-compact">
+    <table class="do-table do-table-compact do-table-striped" data-do-release-table>
+      <thead>
+        <tr>
+          <th>Dataset</th>
+          <th>Active</th>
+          <th>Pending</th>
+          <th>Mechanism</th>
+          <th>New?</th>
+          <th>Checked</th>
+          <th>Status</th>
+        </tr>
+      </thead>
       <tbody>
       {% for row in control.datasets %}
-        <tr>
-          <td><strong>{{ row.dataset_id }}</strong></td>
-          <td>{{ (row.active or {}).get('active_release_id', '—') }}</td>
-          <td>
-            {% if row.pending %}{{ row.pending.release_id }} — {{ row.pending.state }}{% else %}—{% endif %}
+        {% set check = check_by_dataset.get(row.dataset_id, {}) %}
+        {% set active_id = (row.active or {}).get('active_release_id') %}
+        {% set pending = row.pending %}
+        {% set pending_state = (pending.state if pending else '')|upper %}
+        {% set health = row.health|upper %}
+        {% set checked_raw = check.get('checked_at') %}
+        {% set needs_attention = pending or health not in ['PASS', 'CURRENT'] or pending_state in ['ACQUIRED', 'VALIDATED', 'DETECTED'] %}
+        <tr data-do-release-row data-dataset-id="{{ row.dataset_id }}" data-needs-attention="{{ '1' if needs_attention else '0' }}">
+          <td class="do-cell-dataset">
+            <div class="do-dataset-cell">
+              <button type="button" class="do-dataset-trigger" data-do-source-panel="{{ url_for('source_detail_panel', source_id=row.dataset_id) }}" aria-haspopup="dialog">
+                <span class="do-dataset-name">{{ source_labels.get(row.dataset_id, row.dataset_id) }}</span>
+                <span class="do-mono do-tiny do-muted">{{ row.dataset_id }}</span>
+              </button>
+              <a class="do-dataset-page-link" href="{{ url_for('source_detail', source_id=row.dataset_id) }}" aria-label="Open {{ source_labels.get(row.dataset_id, row.dataset_id) }} full page" title="Open full page">↗</a>
+            </div>
           </td>
-          {% set check = check_by_dataset.get(row.dataset_id, {}) %}
-          <td>{{ check.get('mechanism', '—') }}</td>
-          <td>{{ 'YES' if check.get('new_release_available') == true else ('NO' if check.get('new_release_available') == false else '—') }}</td>
-          <td>{{ check.get('checked_at', '—') }}</td>
-          <td><span class="do-badge">{{ row.health }}</span></td>
+          <td>
+            {% if active_id %}
+            <span class="do-release-cell">
+              <span class="do-mono">{{ active_id }}</span>
+              <span class="do-badge do-badge-active">ACTIVE</span>
+            </span>
+            {% else %}<span class="do-muted">—</span>{% endif %}
+          </td>
+          <td>
+            {% if pending %}
+            <span class="do-release-cell">
+              <span class="do-mono">{{ pending.release_id }}</span>
+              <span class="do-badge do-badge-{{ pending_state|lower }}">{{ pending_state }}</span>
+            </span>
+            {% else %}<span class="do-muted">—</span>{% endif %}
+          </td>
+          <td class="do-small">{{ check.get('mechanism', '—') }}</td>
+          <td class="do-small">{{ 'YES' if check.get('new_release_available') == true else ('NO' if check.get('new_release_available') == false else '—') }}</td>
+          <td class="do-mono do-small" {% if checked_raw %}title="{{ checked_raw }}"{% endif %}>{{ checked_raw | do_datetime if checked_raw else '—' }}</td>
+          <td>
+            <span class="do-badge do-badge-health-{{ health|lower|replace(' ', '-') }}">{{ row.health }}</span>
+          </td>
         </tr>
-        {% if row.pending %}
-        <tr><td colspan="8" class="do-muted">Would mark stale: {{ row.impact.would_mark_stale|join(', ') or 'none' }}</td></tr>
+        {% if pending and row.impact.would_mark_stale %}
+        <tr class="do-row-impact" data-do-release-impact data-dataset-id="{{ row.dataset_id }}" data-needs-attention="{{ '1' if needs_attention else '0' }}">
+          <td colspan="7">
+            <details class="do-impact-details">
+              <summary>Stale impact · {{ row.impact.would_mark_stale|length }}</summary>
+              <span class="do-muted do-tiny">{{ row.impact.would_mark_stale|join(', ') }}</span>
+            </details>
+          </td>
+        </tr>
         {% endif %}
       {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="do-muted">Release check: {{ releases_checked_at or 'not yet' }}. Validation, activation, source location and full hashes are available in dataset detail.</p>
+  <p class="do-muted do-tiny do-footnote">Release check: {% if releases_checked_at %}<span title="{{ releases_checked_at }}">{{ releases_checked_at | do_datetime }}</span>{% else %}not yet{% endif %}. Full validation in dataset view.</p>
 </section>
 
-<section class="do-section">
-  <h2>Facility package status</h2>
+<details class="do-collapse-panel">
+  <summary>Facility package status{% if control.facilities.facilities.get('335581') %} · <span class="do-muted">335581 · {{ control.facilities.facilities.get('335581').status }}</span>{% endif %}</summary>
   {% set facility = control.facilities.facilities.get('335581') %}
   {% if facility %}
-    <p><strong>335581</strong> — <span class="do-badge">{{ facility.status }}</span></p>
-    <dl class="do-dl">
+    <p class="do-compact-summary"><strong>335581</strong> — <span class="do-badge do-badge-{{ facility.status|lower }}">{{ facility.status }}</span></p>
+    <dl class="do-dl do-dl-compact">
       {% for capability, status in facility.capabilities.items() %}
       <div><dt>{{ capability }}</dt><dd>{{ status }}</dd></div>
       {% endfor %}
     </dl>
   {% else %}
-    <p class="do-muted">No cached facility status. Refresh the control panel.</p>
+    <p class="do-muted do-small">No cached facility status. Refresh the control panel.</p>
   {% endif %}
-</section>
+</details>
 
-<div class="do-table-wrap">
-  <table class="do-table" data-do-table>
-    <thead>
-      <tr>
-        <th>Source</th>
-        <th>Publisher latest</th>
-        <th>Active release</th>
-        <th>Raw</th>
-        <th>Processed</th>
-        <th>Zweli</th>
-        <th>Approved</th>
-        <th>Format</th>
-        <th>Cadence</th>
-        <th>Runtime</th>
-        <th>Structural</th>
-        <th>Automation</th>
-        <th>Checked</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for s in snapshots %}
-      <tr>
-        <td><a href="{{ url_for('source_detail', source_id=s.source_id) }}">{{ s.human_name }}</a>
-          <div class="do-mono do-muted">{{ s.source_id }}</div>
-          <span class="do-badge do-badge-{{ s.status|lower|replace('_','-') }}">{{ s.status }}</span>
-        </td>
-        <td class="do-mono">{{ s.publisher_latest or s.cms_latest or '—' }}</td>
-        <td class="do-mono">{{ (active_releases.get(s.source_id) or {}).get('active_release_id', '—') }}</td>
-        <td class="do-mono">{{ s.raw_available }}</td>
-        <td class="do-mono">{{ s.processed or '—' }}</td>
-        <td><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></td>
-        <td>{{ s.approved }}</td>
-        <td>{{ s.formats|join(', ') }}</td>
-        <td>{{ s.cadence }}</td>
-        <td class="do-mono">{{ s.runtime_access }}</td>
-        <td>{{ s.structural_status }}</td>
-        <td>{{ s.automation_maturity or s.automation_level }}</td>
-        <td class="do-mono do-small">{{ s.last_checked }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<details class="do-collapse-panel">
+  <summary>Source diagnostics <span class="do-muted">({{ snapshots|length }} sources)</span></summary>
+  <div class="do-filter-bar do-filter-bar-inline" data-do-diag-filters>
+    <input class="do-input do-input-compact" type="search" placeholder="Filter sources…" data-do-diag-search aria-label="Filter sources">
+    <label class="do-check do-check-compact do-check-attention">
+      <input type="checkbox" data-do-diag-needs-attention-only> Needs attention
+    </label>
+  </div>
+  <div class="do-table-wrap do-table-wrap-compact do-table-wrap-diag-only">
+    <table class="do-table do-table-compact do-table-diag" data-do-diag-table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Publisher</th>
+          <th>Active</th>
+          <th>Pending</th>
+          <th>Raw</th>
+          <th>Processed</th>
+          <th>Zweli</th>
+          <th>Val</th>
+          <th>Approved</th>
+          <th>Runtime</th>
+          <th>Structural</th>
+          <th>Checked</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in snapshots %}
+        {% set needs_diag = s.pending_release_id or s.zweli_status not in ['PASS', 'NOT_RUN'] or (s.validation_status and s.validation_status != 'PASS') or (s.legacy_status and s.legacy_status != s.status) %}
+        <tr data-do-diag-row data-source-id="{{ s.source_id }}" data-needs-attention="{{ '1' if needs_diag else '0' }}">
+          <td class="do-cell-source">
+            <a href="{{ url_for('source_detail', source_id=s.source_id) }}">{{ s.human_name }}</a>
+            <div class="do-mono do-muted do-tiny">{{ s.source_id }}</div>
+            <span class="do-badge do-badge-{{ (s.display_status or s.status)|lower|replace('_','-') }}">{{ s.display_status or s.status }}</span>
+            {% if s.legacy_status and s.legacy_status != s.status %}
+            <div class="do-mono do-tiny do-probe-hint" title="Legacy runtime probe">probe: {{ s.legacy_status }}</div>
+            {% endif %}
+          </td>
+          <td class="do-mono do-tiny">{{ s.publisher_latest or s.cms_latest or '—' }}</td>
+          <td class="do-mono do-tiny">
+            {% if s.active_release_id %}{{ s.active_release_id }}<span class="do-muted">/{{ s.active_release_status or 'ACTIVE' }}</span>{% else %}—{% endif %}
+          </td>
+          <td class="do-mono do-tiny">
+            {% if s.pending_release_id %}{{ s.pending_release_id }}<span class="do-muted">/{{ s.pending_release_state or '—' }}</span>{% else %}—{% endif %}
+          </td>
+          <td class="do-mono do-tiny">{{ s.raw_available }}</td>
+          <td class="do-mono do-tiny">{{ s.processed or '—' }}</td>
+          <td><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></td>
+          <td class="do-mono do-tiny">{{ s.validation_status or '—' }}</td>
+          <td class="do-tiny">{{ s.approved }}</td>
+          <td class="do-mono do-tiny">{{ s.runtime_access }}</td>
+          <td class="do-tiny">{{ s.structural_status }}</td>
+          <td class="do-mono do-tiny" {% if s.last_checked %}title="{{ s.last_checked }}"{% endif %}>{{ s.last_checked | do_datetime if s.last_checked else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
-{# Mobile stacked cards #}
-<div class="do-cards" data-do-cards>
-  {% for s in snapshots %}
-  <article class="do-source-card">
-    <header>
-      <a href="{{ url_for('source_detail', source_id=s.source_id) }}"><strong>{{ s.human_name }}</strong></a>
-      <span class="do-badge do-badge-{{ s.status|lower|replace('_','-') }}">{{ s.status }}</span>
-    </header>
-    <dl class="do-dl">
-      <div><dt>Publisher</dt><dd class="do-mono">{{ s.publisher_latest or '—' }}</dd></div>
-      <div><dt>Active</dt><dd class="do-mono">{{ (active_releases.get(s.source_id) or {}).get('active_release_id', '—') }}</dd></div>
-      <div><dt>Raw</dt><dd class="do-mono">{{ s.raw_available }}</dd></div>
-      <div><dt>Processed</dt><dd class="do-mono">{{ s.processed or '—' }}</dd></div>
-      <div><dt>Zweli</dt><dd><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></dd></div>
-      <div><dt>Format</dt><dd>{{ s.formats|join(', ') }}</dd></div>
-      <div><dt>Cadence</dt><dd>{{ s.cadence }}</dd></div>
-    </dl>
-    {% if s.source_id == 'cms.provider_info' %}
-    <div class="do-actions">
-      <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
-      <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
-    </div>
-    {% elif s.source_id == 'cms.pbj_nurse_staffing' %}
-    <div class="do-actions">
-      <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
-      <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
-    </div>
-    {% endif %}
-  </article>
-  {% endfor %}
-</div>
+  <div class="do-cards do-cards-diag" data-do-cards>
+    {% for s in snapshots %}
+    <article class="do-source-card do-source-card-compact">
+      <header>
+        <a href="{{ url_for('source_detail', source_id=s.source_id) }}"><strong>{{ s.human_name }}</strong></a>
+        <span class="do-badge do-badge-{{ (s.display_status or s.status)|lower|replace('_','-') }}">{{ s.display_status or s.status }}</span>
+      </header>
+      <dl class="do-dl do-dl-compact">
+        <div><dt>Active</dt><dd class="do-mono">{% if s.active_release_id %}{{ s.active_release_id }} / {{ s.active_release_status or 'ACTIVE' }}{% else %}—{% endif %}</dd></div>
+        <div><dt>Pending</dt><dd class="do-mono">{% if s.pending_release_id %}{{ s.pending_release_id }} / {{ s.pending_release_state or '—' }}{% else %}—{% endif %}</dd></div>
+        <div><dt>Zweli</dt><dd><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></dd></div>
+      </dl>
+      {% if s.source_id == 'cms.provider_info' %}
+      <div class="do-actions">
+        <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
+        <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire</button></form>
+      </div>
+      {% elif s.source_id == 'cms.pbj_nurse_staffing' %}
+      <div class="do-actions">
+        <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
+        <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire</button></form>
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</details>
 
-<section class="do-section">
-  <h2>Provider Information actions</h2>
+<section class="do-section do-section-actions">
+  <h2 class="do-section-title-sm">Provider Information actions</h2>
   <div class="do-actions">
-    <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
-    <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
+    <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
+    <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
     <form method="post" action="{{ url_for('action_pi_acquire') }}">
       <input type="hidden" name="dry_run" value="1">
-      <button class="do-btn do-btn-ghost" type="submit">Dry-run acquire</button>
+      <button class="do-btn do-btn-compact do-btn-ghost" type="submit">Dry-run</button>
     </form>
   </div>
   {% if session.get('last_pi_action') %}
-  <pre class="do-pre">{{ session.get('last_pi_action') | tojson(indent=2) }}</pre>
+  <pre class="do-pre do-pre-compact">{{ session.get('last_pi_action') | tojson(indent=2) }}</pre>
   {% endif %}
 </section>
 
-<section class="do-section">
-  <h2>PBJ nurse staffing actions</h2>
+<section class="do-section do-section-actions">
+  <h2 class="do-section-title-sm">PBJ nurse staffing actions</h2>
   <div class="do-actions">
-    <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn" type="submit">Check CMS</button></form>
-    <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-primary" type="submit">Acquire / Process</button></form>
-    <form method="post" action="{{ url_for('action_nurse_acquire') }}">
+    <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
+    <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
+    <form method="post" action="{{ url_for('action_pi_acquire') }}">
       <input type="hidden" name="dry_run" value="1">
-      <button class="do-btn do-btn-ghost" type="submit">Dry-run acquire</button>
+      <button class="do-btn do-btn-compact do-btn-ghost" type="submit">Dry-run</button>
     </form>
   </div>
   {% if session.get('last_nurse_action') %}
-  <pre class="do-pre">{{ session.get('last_nurse_action') | tojson(indent=2) }}</pre>
+  <pre class="do-pre do-pre-compact">{{ session.get('last_nurse_action') | tojson(indent=2) }}</pre>
   {% endif %}
 </section>
 
-<details class="do-details">
+<details class="do-details do-details-compact">
   <summary>Derived signals</summary>
-  <ul>
+  <ul class="do-list-compact">
     {% for sig in signals %}
     <li><span class="do-mono">{{ sig.signal_id }}</span> — {{ sig.human_name }} ← {{ sig.upstream_source_ids|join(', ') }}</li>
     {% endfor %}
   </ul>
 </details>
+
+<div class="do-modal" id="do-source-modal" hidden>
+  <div class="do-modal-backdrop" data-do-modal-close tabindex="-1"></div>
+  <div class="do-modal-panel" role="dialog" aria-modal="true" aria-labelledby="do-source-panel-title" tabindex="-1">
+    <div class="do-modal-body" data-do-modal-body>
+      <p class="do-muted do-small">Loading…</p>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -37,12 +37,17 @@ from cms_data_ops import (  # noqa: E402
     acquire_nurse,
     acquire_provider_info,
     approve_release_authoritative,
+    build_source_operator_workflow,
     check_nurse_cms,
     check_provider_info_cms,
     derived_signals_payload,
+    format_do_timestamp,
+    minimal_record_for_dataset,
+    overlay_control_plane_on_snapshot,
     probe_all_sources,
     recommended_next_automation,
     release_review_items,
+    snapshots_with_control_plane,
 )
 from cms_source_registry import get_registry, get_source  # noqa: E402
 from active_release_registry import load_registry  # noqa: E402
@@ -69,6 +74,32 @@ from data_ops_dashboard import (  # noqa: E402
 PASSWORD_ENV = "PBJ_DATA_OPS_PASSWORD"
 SECRET_ENV = "PBJ_DATA_OPS_SECRET"
 COOKIE_NAME = "pbj_data_ops_auth"
+
+
+def _source_detail_context(source_id: str) -> dict | None:
+    rec = get_source(source_id)
+    control = control_panel_payload()
+    control_row = next((row for row in control["datasets"] if row["dataset_id"] == source_id), None)
+    if rec is None and control_row is None:
+        return None
+    snap = next(
+        (s for s in probe_all_sources(check_cms=True) if s.source_id == source_id),
+        None,
+    )
+    snapshot = overlay_control_plane_on_snapshot(snap, control) if snap else None
+    record = rec.to_dict() if rec is not None else minimal_record_for_dataset(source_id)
+    workflow = build_source_operator_workflow(
+        source_id,
+        record=record,
+        snapshot=snapshot,
+        control_row=control_row,
+    )
+    return {
+        "record": record,
+        "snapshot": snapshot,
+        "control_row": control_row,
+        "workflow": workflow,
+    }
 
 
 def create_app() -> Flask:
@@ -127,7 +158,13 @@ def create_app() -> Flask:
                 "mark": "PBJ320 CSS text mark (templates/partials/v2/brand_*)",
             },
             "next_automation": recommended_next_automation(),
+            "do_datetime": format_do_timestamp,
+            "source_labels": {r.source_id: r.human_name for r in get_registry()},
         }
+
+    @app.template_filter("do_datetime")
+    def _do_datetime_filter(value: str | None) -> str:
+        return format_do_timestamp(value)
 
     @app.get("/login")
     def login():
@@ -173,10 +210,10 @@ def create_app() -> Flask:
     @require_auth
     def sources():
         check_cms = request.args.get("check_cms", "1") != "0"
-        snaps = [s.to_dict() for s in probe_all_sources(check_cms=check_cms)]
         control = control_panel_payload()
         release_checks = load_check_state()
         check_by_dataset = {row["dataset_id"]: row for row in release_checks.get("datasets", [])}
+        snaps = snapshots_with_control_plane(check_cms=check_cms, control=control)
         return render_template(
             "data_ops/sources.html",
             snapshots=snaps,
@@ -204,22 +241,20 @@ def create_app() -> Flask:
     @app.get("/sources/<source_id>")
     @require_auth
     def source_detail(source_id: str):
-        rec = get_source(source_id)
-        if rec is None:
+        ctx = _source_detail_context(source_id)
+        if ctx is None:
             flash("Unknown source", "error")
             return redirect(url_for("sources"))
-        snap = next(
-            (s for s in probe_all_sources(check_cms=True) if s.source_id == source_id),
-            None,
-        )
-        control = control_panel_payload()
-        control_row = next((row for row in control["datasets"] if row["dataset_id"] == source_id), None)
-        return render_template(
-            "data_ops/source_detail.html",
-            record=rec.to_dict(),
-            snapshot=snap.to_dict() if snap else None,
-            control_row=control_row,
-        )
+        return render_template("data_ops/source_detail.html", **ctx)
+
+    @app.get("/sources/<source_id>/panel")
+    @require_auth
+    def source_detail_panel(source_id: str):
+        ctx = _source_detail_context(source_id)
+        if ctx is None:
+            return ("Unknown source", 404)
+        ctx["panel_mode"] = "modal"
+        return render_template("data_ops/partials/source_detail_panel.html", **ctx)
 
     @app.get("/api/control-plane/status")
     @require_auth
@@ -312,11 +347,13 @@ def create_app() -> Flask:
     @app.get("/release-review")
     @require_auth
     def release_review():
-        items = release_review_items(check_cms=True)
+        control = control_panel_payload()
+        items = release_review_items(check_cms=True, control=control)
         return render_template(
             "data_ops/release_review.html",
             items=items,
             audit=read_audit(limit=50),
+            control=control,
         )
 
     @app.post("/actions/acknowledge")

@@ -1,0 +1,179 @@
+{% from 'data_ops/partials/source_detail_macros.html' import render_workflow_action %}
+
+{% if panel_mode == 'modal' %}
+<header class="do-panel-head">
+  <div>
+    <h2 class="do-panel-title" id="do-source-panel-title">{{ record.human_name }}</h2>
+    <p class="do-mono do-muted do-small">{{ record.source_id }}</p>
+  </div>
+  <button type="button" class="do-btn do-btn-compact do-btn-ghost" data-do-modal-close aria-label="Close">Close</button>
+</header>
+{% endif %}
+
+{% if workflow %}
+<section class="do-workflow-panel{% if panel_mode != 'modal' %} do-section do-section-primary{% endif %}">
+  <div class="do-workflow-head">
+    <h3 class="do-section-title-sm">{% if panel_mode == 'modal' %}Workflow{% else %}Operator workflow{% endif %}</h3>
+    {% if snapshot %}
+    <span class="do-badge do-badge-{{ snapshot.status|lower|replace('_','-') }}">{{ snapshot.status }}</span>
+    {% endif %}
+  </div>
+
+  <dl class="do-dl do-dl-wide do-workflow-summary">
+    <div>
+      <dt>ACTIVE</dt>
+      <dd>
+        {% if workflow.active_release_id %}
+        <span class="do-release-cell">
+          <span class="do-mono">{{ workflow.active_release_id }}</span>
+          <span class="do-badge do-badge-active">ACTIVE</span>
+        </span>
+        {% else %}<span class="do-muted">—</span>{% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Pending</dt>
+      <dd>
+        {% if workflow.pending_release_id %}
+        <span class="do-release-cell">
+          <span class="do-mono">{{ workflow.pending_release_id }}</span>
+          <span class="do-badge do-badge-pending do-badge-{{ (workflow.pending_state or '')|lower }}">{{ workflow.pending_state }}</span>
+        </span>
+        {% else %}<span class="do-muted">—</span>{% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Validation</dt>
+      <dd>
+        {% if workflow.validation_status %}
+        <span class="do-badge do-badge-val-{{ workflow.validation_status|lower }}">{{ workflow.validation_status }}</span>
+        {% else %}—{% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Health</dt>
+      <dd>
+        {% if workflow.health %}
+        <span class="do-badge do-badge-health-{{ workflow.health|lower|replace(' ', '-') }}">{{ workflow.health }}</span>
+        {% if workflow.health_detail %}<span class="do-muted do-small"> · {{ workflow.health_detail }}</span>{% endif %}
+        {% else %}—{% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Zweli</dt>
+      <dd>
+        {% if workflow.zweli_status %}
+        <span class="do-badge do-zweli-{{ workflow.zweli_status|lower|replace('_','-') }}">{{ workflow.zweli_status }}</span>
+        {% else %}<span class="do-muted">—</span>{% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Downstream</dt>
+      <dd>
+        {% if workflow.downstream_capabilities %}
+        {{ workflow.downstream_capabilities|join(', ') }}
+        {% else %}
+        <span class="do-muted">No stale impact on promotion</span>
+        {% endif %}
+      </dd>
+    </div>
+  </dl>
+
+  <div class="do-next-action">
+    <h4 class="do-subhead">Next recommended action</h4>
+    <p class="do-next-action-label">{{ workflow.next_action.label }}</p>
+    <p class="do-muted do-small">{{ workflow.next_action.detail }}</p>
+    <div class="do-actions do-actions-inline">
+      {{ render_workflow_action(workflow.next_action) }}
+      <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for('release_review') }}">Release Review</a>
+    </div>
+  </div>
+
+  {% if workflow.lifecycle_steps %}
+  <div class="do-lifecycle">
+    <h4 class="do-subhead">SFF lifecycle</h4>
+    <ol class="do-lifecycle-steps">
+      {% for step in workflow.lifecycle_steps %}
+      <li class="do-lifecycle-step do-lifecycle-{{ step.state }}">
+        <div class="do-lifecycle-step-head">
+          <span class="do-lifecycle-label">{{ step.label }}</span>
+          <span class="do-lifecycle-state">{{ step.state|replace('_', ' ') }}</span>
+        </div>
+        <p class="do-muted do-small do-lifecycle-detail">{{ step.detail }}</p>
+        {% if step.action %}
+        <div class="do-actions do-actions-inline">
+          {{ render_workflow_action(step.action) }}
+        </div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if record.source_id == 'cms.provider_info' and panel_mode != 'modal' %}
+<section class="do-section do-section-actions">
+  <h2 class="do-section-title-sm">Provider Information actions</h2>
+  <div class="do-actions">
+    <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
+    <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
+  </div>
+</section>
+{% elif record.source_id == 'cms.pbj_nurse_staffing' and panel_mode != 'modal' %}
+<section class="do-section do-section-actions">
+  <h2 class="do-section-title-sm">PBJ nurse staffing actions</h2>
+  <div class="do-actions">
+    <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
+    <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
+  </div>
+</section>
+{% endif %}
+
+{% if snapshot and snapshot.detail %}
+<p class="do-muted do-small">{{ snapshot.detail }}</p>
+{% endif %}
+
+{% if control_row %}
+<details class="do-collapse-panel">
+  <summary>Release control metadata</summary>
+  <dl class="do-dl do-dl-wide do-dl-compact">
+    <div><dt>Source URI</dt><dd class="do-mono do-small">{{ (control_row.active or {}).get('source_uri', '—') }}</dd></div>
+    <div><dt>SHA-256</dt><dd class="do-mono do-small">{{ (control_row.active or {}).get('hash', '—') }}</dd></div>
+    <div><dt>Validated</dt><dd {% if (control_row.active or {}).get('validated_at') %}title="{{ (control_row.active or {}).get('validated_at') }}"{% endif %}>{{ (control_row.active or {}).get('validated_at') | do_datetime if (control_row.active or {}).get('validated_at') else '—' }}</dd></div>
+    <div><dt>Activated</dt><dd {% if (control_row.active or {}).get('promoted_at') %}title="{{ (control_row.active or {}).get('promoted_at') }}"{% endif %}>{{ (control_row.active or {}).get('promoted_at') | do_datetime if (control_row.active or {}).get('promoted_at') else '—' }}</dd></div>
+    <div><dt>Promotion impact</dt><dd>{{ control_row.impact.would_mark_stale|join(', ') or 'none' }}</dd></div>
+  </dl>
+</details>
+{% endif %}
+
+<details class="do-collapse-panel">
+  <summary>Source registry</summary>
+  <dl class="do-dl do-dl-wide do-dl-compact">
+    <div><dt>Cadence</dt><dd>{{ record.cadence }}</dd></div>
+    <div><dt>Containers</dt><dd>{{ record.containers|join(', ') if record.containers else '—' }}</dd></div>
+    <div><dt>Automation</dt><dd>{{ record.automation_maturity }}</dd></div>
+    <div><dt>Landing</dt><dd class="do-mono do-small">{{ record.landing_url or '—' }}</dd></div>
+    <div><dt>Raw resolver</dt><dd class="do-mono do-small">{{ record.raw_artifact_resolver }}</dd></div>
+    <div><dt>Normalized resolver</dt><dd class="do-mono do-small">{{ record.normalized_artifact_resolver }}</dd></div>
+    <div><dt>Acquisition</dt><dd class="do-mono do-small">{{ record.acquisition_implementation or '—' }}</dd></div>
+    <div><dt>Structural validator</dt><dd class="do-mono do-small">{{ record.structural_validator or '—' }}</dd></div>
+    <div><dt>Zweli profile</dt><dd class="do-mono do-small">{{ record.zweli_quality_profile or '—' }}</dd></div>
+    <div><dt>ID provenance</dt><dd>{{ record.cms_dataset_id_provenance or '—' }}</dd></div>
+    <div><dt>Notes</dt><dd>{{ record.automation_notes or '—' }}</dd></div>
+  </dl>
+</details>
+
+{% if snapshot and snapshot.zweli_report %}
+<details class="do-details do-details-compact">
+  <summary>Zweli findings</summary>
+  <pre class="do-pre do-pre-compact">{{ snapshot.zweli_report | tojson(indent=2) }}</pre>
+</details>
+{% endif %}
+
+{% if panel_mode == 'modal' %}
+<footer class="do-panel-foot">
+  <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for('source_detail', source_id=record.source_id) }}">Open full page</a>
+</footer>
+{% endif %}

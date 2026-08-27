@@ -761,50 +761,615 @@ def probe_all_sources(
     ]
 
 
+def _control_plane_ui_view(control: dict[str, Any]) -> dict[str, Any]:
+    """Normalize release_control_plane.control_panel_payload() for UI overlay."""
+    if control.get("active") is not None and control.get("pending_by_source") is not None:
+        return control
+
+    active: dict[str, dict[str, Any]] = {}
+    candidates: list[dict[str, Any]] = []
+    pending_by_source: dict[str, dict[str, Any]] = {}
+
+    for row in control.get("datasets") or []:
+        dataset_id = str(row.get("dataset_id") or "")
+        if not dataset_id:
+            continue
+
+        active_rec = row.get("active")
+        if isinstance(active_rec, dict):
+            release_id = str(active_rec.get("active_release_id") or "")
+            meta = active_rec.get("metadata") if isinstance(active_rec.get("metadata"), dict) else {}
+            validation = active_rec.get("validation") if isinstance(active_rec.get("validation"), dict) else {}
+            active[dataset_id] = {
+                "source_id": dataset_id,
+                "release_id": release_id,
+                "status": str(active_rec.get("status") or "ACTIVE").upper(),
+                "validation_status": validation.get("status"),
+                "zweli_status": meta.get("zweli_status"),
+            }
+
+        pending_rec = row.get("pending")
+        if isinstance(pending_rec, dict):
+            release_id = str(pending_rec.get("release_id") or "")
+            meta = pending_rec.get("metadata") if isinstance(pending_rec.get("metadata"), dict) else {}
+            validation = pending_rec.get("validation") if isinstance(pending_rec.get("validation"), dict) else {}
+            state = str(pending_rec.get("state") or "UNKNOWN").upper()
+            normalized = {
+                "source_id": dataset_id,
+                "release_id": release_id,
+                "state": state,
+                "validation_status": validation.get("status"),
+                "zweli_status": meta.get("zweli_status"),
+                "requires_review": bool(pending_rec.get("requires_review"))
+                or state in {"ACQUIRED", "VALIDATED"},
+                "detail": str(meta.get("detail") or ""),
+            }
+            candidates.append(normalized)
+            pending_by_source[dataset_id] = normalized
+
+    return {
+        "active": active,
+        "candidates": candidates,
+        "pending_by_source": pending_by_source,
+    }
+
+
+def promote_candidate_permitted(candidate: dict[str, Any]) -> bool:
+    """Whether lifecycle permits promotion review (read-only; does not promote)."""
+    return (candidate.get("state") or "").upper() == "VALIDATED"
+
+
+def overlay_control_plane_on_snapshot(
+    snap: SourceOpsSnapshot | dict[str, Any],
+    control: dict[str, Any] | None = None,
+    *,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Merge authoritative control-plane active/pending state onto a probe snapshot."""
+    if control is None:
+        from release_control_plane import control_panel_payload
+
+        control = control_panel_payload(Path(__file__).resolve().parent)
+    payload = _control_plane_ui_view(control)
+    data = snap.to_dict() if isinstance(snap, SourceOpsSnapshot) else dict(snap)
+    source_id = data.get("source_id") or ""
+    active = (payload.get("active") or {}).get(source_id)
+    pending = (payload.get("pending_by_source") or {}).get(source_id)
+
+    data["legacy_status"] = data.get("status")
+    data["legacy_raw_available"] = data.get("raw_available")
+
+    if active:
+        data["active_release_id"] = active.get("release_id")
+        data["active_release_status"] = active.get("status")
+        data["release_id"] = active.get("release_id") or data.get("release_id")
+        data["raw_available"] = active.get("release_id") or data.get("raw_available")
+        data["pbjapp_latest"] = active.get("release_id") or data.get("pbjapp_latest")
+        if active.get("validation_status") is not None:
+            data["validation_status"] = active.get("validation_status")
+        if active.get("zweli_status") is not None:
+            data["zweli_status"] = active.get("zweli_status")
+            data["quality_reviewed"] = active.get("zweli_status")
+        if data.get("legacy_status") in {
+            OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value,
+            OpsStatus.UNKNOWN.value,
+        } and (
+            data.get("legacy_raw_available") == "NOT AVAILABLE IN THIS RUNTIME"
+            or "NOT AVAILABLE" in str(data.get("legacy_raw_available") or "")
+        ):
+            data["status"] = active.get("status") or OpsStatus.CURRENT.value
+            data["runtime_access"] = AccessMode.REMOTE_STORE.value
+            if not data.get("detail") or "UNMODELED" in (data.get("detail") or "").upper():
+                data["detail"] = (
+                    f"Governed active release {active.get('release_id')} "
+                    f"({active.get('status')}); legacy probe unavailable in runtime"
+                )
+        elif active.get("status") == "ACTIVE":
+            data["status"] = OpsStatus.CURRENT.value
+
+    if pending:
+        data["pending_release_id"] = pending.get("release_id")
+        data["pending_release_state"] = pending.get("state")
+        if pending.get("validation_status") is not None:
+            data["validation_status"] = pending.get("validation_status")
+        if pending.get("zweli_status") is not None and not active:
+            data["zweli_status"] = pending.get("zweli_status")
+            data["quality_reviewed"] = pending.get("zweli_status")
+
+    data["display_status"] = (
+        data.get("active_release_status")
+        if active and data.get("active_release_status")
+        else data.get("status")
+    )
+    return data
+
+
+def snapshots_with_control_plane(
+    *,
+    check_cms: bool = True,
+    fetch_json: FetchJson | None = None,
+    root: Path | None = None,
+    run_zweli: bool = True,
+    control: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Probe all sources and overlay authoritative control-plane state."""
+    root = root or cms_data_paths.repo_root()
+    if control is None:
+        from release_control_plane import control_panel_payload
+
+        control = control_panel_payload(Path(__file__).resolve().parent)
+    snaps = probe_all_sources(
+        check_cms=check_cms,
+        fetch_json=fetch_json,
+        root=root,
+        run_zweli=run_zweli,
+    )
+    return [overlay_control_plane_on_snapshot(s, control, root=root) for s in snaps]
+
+
+def _legacy_release_review_item(s: SourceOpsSnapshot) -> Optional[dict[str, Any]]:
+    reason = None
+    if s.status == OpsStatus.CMS_NEWER.value:
+        reason = "new_source_release"
+    elif s.status == OpsStatus.PROCESSING_REQUIRED.value:
+        reason = "acquired_unprocessed"
+    elif s.structural_status in {"FAIL", "ERROR"}:
+        reason = "structural_error"
+    elif s.zweli_status == ZweliState.REQUIRES_REVIEW.value:
+        reason = "zweli_requires_review"
+    elif s.zweli_status == ZweliState.BLOCKED.value:
+        reason = "zweli_blocked"
+    elif s.status == OpsStatus.ERROR.value:
+        reason = "processing_failure"
+    elif s.status == OpsStatus.READY_FOR_HANDOFF.value and s.approved != "yes":
+        reason = "ready_for_approval"
+    if not reason:
+        return None
+    release_id = s.release_id or s.pbjapp_latest
+    return {
+        "reason": reason,
+        "source_id": s.source_id,
+        "human_name": s.human_name,
+        "release_id": release_id,
+        "status": s.status,
+        "zweli_status": s.zweli_status,
+        "structural_status": s.structural_status,
+        "detail": s.detail,
+        "zweli_report": s.zweli_report,
+        "acknowledged": bool(release_id and has_acknowledgement(s.source_id, release_id)),
+        "approvable": reason == "ready_for_approval"
+        or (
+            bool(release_id and has_acknowledgement(s.source_id, release_id))
+            and s.zweli_status != ZweliState.BLOCKED.value
+        ),
+        "governed": False,
+    }
+
+
+def _governed_candidate_review_item(
+    candidate: dict[str, Any],
+    *,
+    snap: Optional[SourceOpsSnapshot],
+    root: Path | None,
+) -> Optional[dict[str, Any]]:
+    state = (candidate.get("state") or "").upper()
+    requires_review = bool(candidate.get("requires_review"))
+    if not requires_review and state not in {
+        "ACQUIRED",
+        "VALIDATED",
+        "STRUCTURAL_FAIL",
+        "ZWELI_REQUIRES_REVIEW",
+        "ZWELI_BLOCKED",
+        "READY",
+    }:
+        return None
+
+    source_id = candidate["source_id"]
+    release_id = candidate["release_id"]
+    zweli_status = candidate.get("zweli_status")
+    if zweli_status is None and snap is not None:
+        zweli_status = snap.zweli_status
+    zweli_status = zweli_status or ZweliState.NOT_RUN.value
+
+    reason = "governed_pending_acquired"
+    if state == "VALIDATED":
+        reason = "governed_pending_validated"
+    elif state in {"STRUCTURAL_FAIL", "ERROR"}:
+        reason = "governed_structural_error"
+    elif state == "ZWELI_REQUIRES_REVIEW" or zweli_status == ZweliState.REQUIRES_REVIEW.value:
+        reason = "governed_zweli_requires_review"
+    elif state == "ZWELI_BLOCKED" or zweli_status == ZweliState.BLOCKED.value:
+        reason = "governed_zweli_blocked"
+
+    approvable = False
+    if source_id == "cms.provider_info" and promote_candidate_permitted(candidate):
+        if zweli_status == ZweliState.PASS.value:
+            approvable = True
+        elif zweli_status == ZweliState.REQUIRES_REVIEW.value and has_acknowledgement(
+            source_id, release_id
+        ):
+            approvable = True
+
+    detail = candidate.get("detail") or (
+        f"Governed pending release {release_id} ({state}) awaiting operator review"
+    )
+    zweli_report = None
+    if snap is not None and snap.zweli_report and snap.release_id == release_id:
+        zweli_report = snap.zweli_report
+    elif source_id == "cms.provider_info":
+        zweli_report = load_zweli_report_for_release(source_id, release_id, root=root)
+
+    return {
+        "reason": reason,
+        "source_id": source_id,
+        "human_name": (snap.human_name if snap else source_id),
+        "release_id": release_id,
+        "status": state,
+        "pending_state": state,
+        "validation_status": candidate.get("validation_status"),
+        "zweli_status": zweli_status,
+        "structural_status": snap.structural_status if snap else "NOT_RUN",
+        "detail": detail,
+        "zweli_report": zweli_report,
+        "acknowledged": has_acknowledgement(source_id, release_id),
+        "approvable": approvable,
+        "governed": True,
+    }
+
+
 def release_review_items(
     snapshots: list[SourceOpsSnapshot] | None = None,
     *,
     check_cms: bool = True,
     root: Path | None = None,
+    control: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Items needing human attention for Release Review UI."""
+    root = root or cms_data_paths.repo_root()
+    if control is None:
+        from release_control_plane import control_panel_payload
+
+        control = control_panel_payload(Path(__file__).resolve().parent)
+    payload = _control_plane_ui_view(control)
     snaps = snapshots or probe_all_sources(check_cms=check_cms, root=root)
+    by_id = {s.source_id: s for s in snaps}
     items: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
     for s in snaps:
-        reason = None
-        if s.status == OpsStatus.CMS_NEWER.value:
-            reason = "new_source_release"
-        elif s.status == OpsStatus.PROCESSING_REQUIRED.value:
-            reason = "acquired_unprocessed"
-        elif s.structural_status in {"FAIL", "ERROR"}:
-            reason = "structural_error"
-        elif s.zweli_status == ZweliState.REQUIRES_REVIEW.value:
-            reason = "zweli_requires_review"
-        elif s.zweli_status == ZweliState.BLOCKED.value:
-            reason = "zweli_blocked"
-        elif s.status == OpsStatus.ERROR.value:
-            reason = "processing_failure"
-        elif s.status == OpsStatus.READY_FOR_HANDOFF.value and s.approved != "yes":
-            reason = "ready_for_approval"
-        if reason:
-            items.append(
-                {
-                    "reason": reason,
-                    "source_id": s.source_id,
-                    "human_name": s.human_name,
-                    "release_id": s.release_id or s.pbjapp_latest,
-                    "status": s.status,
-                    "zweli_status": s.zweli_status,
-                    "structural_status": s.structural_status,
-                    "detail": s.detail,
-                    "zweli_report": s.zweli_report,
-                    "acknowledged": bool(
-                        s.release_id
-                        and has_acknowledgement(s.source_id, s.release_id)
-                    ),
-                }
-            )
+        item = _legacy_release_review_item(s)
+        if item:
+            key = (item["source_id"], str(item.get("release_id") or ""))
+            if key not in seen:
+                seen.add(key)
+                items.append(item)
+
+    for candidate in payload.get("candidates") or []:
+        if not isinstance(candidate, dict):
+            continue
+        snap = by_id.get(candidate.get("source_id", ""))
+        item = _governed_candidate_review_item(candidate, snap=snap, root=root)
+        if not item:
+            continue
+        key = (item["source_id"], str(item.get("release_id") or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(item)
+
     return items
+
+
+def format_do_timestamp(value: str | None, *, suffix: str = " ET") -> str:
+    """Compact human-readable timestamp for UI (does not mutate stored values)."""
+    if not value or not str(value).strip():
+        return "—"
+    raw = str(value).strip()
+    try:
+        from zoneinfo import ZoneInfo
+
+        normalized = raw.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.astimezone(ZoneInfo("America/New_York"))
+        label = dt.strftime("%b %d, %I:%M %p").replace(" 0", " ")
+        return f"{label}{suffix}".strip()
+    except ValueError:
+        return raw
+
+
+def minimal_record_for_dataset(dataset_id: str) -> dict[str, Any]:
+    """Fallback registry row when a control-plane dataset has no CMS source entry."""
+    return {
+        "source_id": dataset_id,
+        "human_name": dataset_id,
+        "cms_dataset_id": None,
+        "cadence": "—",
+        "containers": [],
+        "automation_maturity": "—",
+        "landing_url": None,
+        "raw_artifact_resolver": "—",
+        "normalized_artifact_resolver": "—",
+        "acquisition_implementation": None,
+        "structural_validator": None,
+        "zweli_quality_profile": None,
+        "cms_dataset_id_provenance": "Control-plane dataset without CMS source registry entry",
+        "automation_notes": "",
+        "actions_enabled": [],
+    }
+
+
+def _validation_status_from_control(control_row: dict[str, Any] | None) -> str | None:
+    if not control_row:
+        return None
+    pending = control_row.get("pending") or {}
+    active = control_row.get("active") or {}
+    validation = pending.get("validation") if isinstance(pending, dict) else None
+    if isinstance(validation, dict) and validation.get("status"):
+        return str(validation.get("status"))
+    meta = active.get("metadata") if isinstance(active.get("metadata"), dict) else {}
+    if meta.get("validation"):
+        return str(meta.get("validation"))
+    return None
+
+
+def _next_operator_action(
+    source_id: str,
+    *,
+    record: dict[str, Any] | None,
+    snapshot: dict[str, Any] | None,
+    control_row: dict[str, Any] | None,
+) -> dict[str, Any]:
+    pending = (control_row or {}).get("pending") or {}
+    pending_state = str(pending.get("state") or "").upper()
+    active_id = ((control_row or {}).get("active") or {}).get("active_release_id")
+    actions = list((record or {}).get("actions_enabled") or [])
+
+    if pending_state == "ACQUIRED":
+        return {
+            "label": "Review pending release",
+            "detail": f"Pending {pending.get('release_id')} is ACQUIRED — review in Release Review before promotion.",
+            "endpoint": "release_review",
+            "wired": True,
+            "read_only": True,
+        }
+    if pending_state == "VALIDATED" and source_id == "cms.provider_info":
+        approvable = promote_candidate_permitted(
+            {
+                "state": pending_state,
+                "source_id": source_id,
+                "release_id": pending.get("release_id"),
+            }
+        )
+        return {
+            "label": "Approve for promotion" if approvable else "Complete Zweli / acknowledgement gates",
+            "detail": "VALIDATED candidate — promotion stays explicit via Release Review.",
+            "endpoint": "release_review",
+            "wired": True,
+            "read_only": not approvable,
+        }
+    if source_id == "cms.provider_info" and "check_cms" in actions:
+        return {
+            "label": "Check CMS for newer Provider Information",
+            "detail": "Compare publisher vintage against local raw/processed artifacts.",
+            "endpoint": "action_pi_check",
+            "wired": True,
+            "method": "post",
+        }
+    if source_id == "cms.pbj_nurse_staffing" and "check_cms" in actions:
+        return {
+            "label": "Check CMS for newer nurse quarter",
+            "detail": "Compare CMS Primary quarter against local nurse CSVs.",
+            "endpoint": "action_nurse_check",
+            "wired": True,
+            "method": "post",
+        }
+    if active_id and not pending:
+        return {
+            "label": "Monitor release health",
+            "detail": f"ACTIVE {active_id} — no pending candidate. Refresh health from Sources.",
+            "endpoint": "sources",
+            "wired": True,
+            "read_only": True,
+        }
+    if snapshot and snapshot.get("status") == OpsStatus.PROCESSING_REQUIRED.value:
+        return {
+            "label": "Complete local processing",
+            "detail": snapshot.get("detail") or "Raw present; processed output missing.",
+            "endpoint": "source_detail",
+            "endpoint_args": {"source_id": source_id},
+            "wired": True,
+            "read_only": True,
+        }
+    return {
+        "label": "Inspect dataset diagnostics",
+        "detail": "No automated next action is wired for this dataset stage.",
+        "endpoint": "source_detail",
+        "endpoint_args": {"source_id": source_id},
+        "wired": True,
+        "read_only": True,
+    }
+
+
+def build_sff_lifecycle_steps(
+    *,
+    control_row: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Read-only SFF lifecycle sequence for operator detail (pilot)."""
+    active = (control_row or {}).get("active") or {}
+    pending = (control_row or {}).get("pending") or {}
+    active_id = active.get("active_release_id")
+    pending_state = str(pending.get("state") or "").upper()
+    pending_id = pending.get("release_id")
+    validation = _validation_status_from_control(control_row)
+    validated = validation == "PASS" or pending_state == "VALIDATED"
+
+    def step(
+        step_id: str,
+        label: str,
+        *,
+        state: str,
+        detail: str,
+        action: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "id": step_id,
+            "label": label,
+            "state": state,
+            "detail": detail,
+            "action": action,
+        }
+
+    steps: list[dict[str, Any]] = []
+    steps.append(
+        step(
+            "check_cms",
+            "Check CMS",
+            state="not_wired",
+            detail="No SFF posting check action is wired in Data Ops UI yet.",
+        )
+    )
+
+    acquire_state = "completed" if active_id or pending_id else "upcoming"
+    if pending_state in {"ACQUIRED", "VALIDATED"} and not active_id:
+        acquire_state = "completed"
+    steps.append(
+        step(
+            "acquire_pdf",
+            "Acquire PDF",
+            state=acquire_state,
+            detail="Acquisition uses sff_release.stage_pdf (CLI) — not exposed as a UI button in this pass.",
+        )
+    )
+
+    validate_state = "completed" if validated or active_id else ("current" if pending_state == "ACQUIRED" else "upcoming")
+    steps.append(
+        step(
+            "validate",
+            "Validate",
+            state=validate_state,
+            detail=f"Structural validation {'PASS' if (validated or active_id) else 'pending'} via sff_release.validate_rows.",
+        )
+    )
+
+    if active_id:
+        review_state = "completed"
+        promote_state = "completed"
+    elif pending_state == "VALIDATED":
+        review_state = "completed"
+        promote_state = "current"
+    elif pending_state == "ACQUIRED":
+        review_state = "current"
+        promote_state = "blocked"
+    else:
+        review_state = "upcoming"
+        promote_state = "upcoming"
+
+    steps.append(
+        step(
+            "review",
+            "Review",
+            state=review_state,
+            detail="Human review of pending candidate before promotion.",
+            action={
+                "label": "Open Release Review",
+                "endpoint": "release_review",
+                "wired": True,
+                "read_only": True,
+            }
+            if pending_state in {"ACQUIRED", "VALIDATED"}
+            else None,
+        )
+    )
+    steps.append(
+        step(
+            "make_active",
+            "Make ACTIVE",
+            state=promote_state,
+            detail=(
+                f"ACTIVE {active_id} — promotion is explicit and already recorded."
+                if active_id
+                else "Explicit promotion only — no auto-promote from this page."
+            ),
+        )
+    )
+    steps.append(
+        step(
+            "pbj_build",
+            "PBJ build",
+            state="not_wired" if active_id else "upcoming",
+            detail="Facility package refresh/build is separate from SFF ingest.",
+            action={
+                "label": "Dashboard Builder",
+                "endpoint": "dashboard_builder",
+                "wired": True,
+                "read_only": True,
+            },
+        )
+    )
+    steps.append(
+        step(
+            "public_staging",
+            "Public staging",
+            state="not_wired",
+            detail="NOT YET WIRED — no public staging path from Data Ops.",
+        )
+    )
+    steps.append(
+        step(
+            "publish",
+            "Publish",
+            state="not_wired",
+            detail="NOT YET WIRED — publication remains explicit and separate from ACTIVE.",
+        )
+    )
+    return steps
+
+
+def build_source_operator_workflow(
+    source_id: str,
+    *,
+    record: dict[str, Any] | None,
+    snapshot: dict[str, Any] | None,
+    control_row: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Operator-facing workflow summary from existing control plane + probe overlay."""
+    from release_control_plane import CAPABILITY_LABELS
+
+    active = (control_row or {}).get("active") or {}
+    pending = (control_row or {}).get("pending") or {}
+    impact = (control_row or {}).get("impact") or {}
+    downstream = [
+        CAPABILITY_LABELS.get(item, item)
+        for item in (impact.get("would_mark_stale") or [])
+    ]
+    zweli_status = None
+    if snapshot:
+        zweli_status = snapshot.get("zweli_status")
+    elif isinstance(pending.get("metadata"), dict):
+        zweli_status = pending.get("metadata", {}).get("zweli_status")
+
+    workflow = {
+        "source_id": source_id,
+        "active_release_id": active.get("active_release_id"),
+        "active_status": active.get("status") or ("ACTIVE" if active.get("active_release_id") else None),
+        "pending_release_id": pending.get("release_id"),
+        "pending_state": pending.get("state"),
+        "validation_status": _validation_status_from_control(control_row)
+        or (snapshot or {}).get("validation_status"),
+        "health": (control_row or {}).get("health"),
+        "health_detail": (control_row or {}).get("health_detail"),
+        "zweli_status": zweli_status,
+        "downstream_capabilities": downstream,
+        "next_action": _next_operator_action(
+            source_id, record=record, snapshot=snapshot, control_row=control_row
+        ),
+        "lifecycle_steps": None,
+    }
+    if source_id == "cms.sff_pdf_list":
+        workflow["lifecycle_steps"] = build_sff_lifecycle_steps(control_row=control_row)
+    return workflow
 
 
 def check_provider_info_cms(
@@ -820,7 +1385,7 @@ def check_provider_info_cms(
     local = acq.latest_local_provider_info(root)
     snap = probe_source("cms.provider_info", check_cms=True, fetch_json=fetch_json, root=root)
     if newer:
-        from release_control_plane import ReleaseState, record_candidate
+        from release_control_plane import ReleaseState, control_plane_root, record_candidate
 
         label = str(cms.data_vintage_label or "").strip()
         release_match = re.fullmatch(r"([A-Za-z]{3,9})\s+(20\d{2})", label)
@@ -834,7 +1399,7 @@ def check_provider_info_cms(
         record_candidate(
             "cms.provider_info", canonical_release_id, ReleaseState.DETECTED,
             metadata={"publisher_label": label, "publisher_modified": cms.modified, "publisher_released": cms.released},
-            root=Path(__file__).resolve().parent,
+            root=control_plane_root(root),
         )
     return {
         "action": "check_cms",
@@ -880,13 +1445,13 @@ def acquire_provider_info(
         root=root,
     )
     if not dry_run and snap.canonical_source_path and snap.release_id:
-        from release_control_plane import ReleaseState, record_candidate
+        from release_control_plane import ReleaseState, control_plane_root, record_candidate
 
         record_candidate(
             "cms.provider_info", snap.release_id, ReleaseState.ACQUIRED,
             source_path=snap.canonical_source_path,
             metadata={"structural_status": snap.structural_status, "zweli_status": snap.zweli_status},
-            root=Path(__file__).resolve().parent,
+            root=control_plane_root(root),
         )
     return {
         "action": "acquire_process",
@@ -911,12 +1476,12 @@ def check_nurse_cms(
     )
     dry = nurse_acq.acquire_and_process(root=root, fetch_json=fetch_json, dry_run=True)
     if newer:
-        from release_control_plane import ReleaseState, record_candidate
+        from release_control_plane import ReleaseState, control_plane_root, record_candidate
 
         record_candidate(
             "cms.pbj_nurse_staffing", cms.quarter_label, ReleaseState.DETECTED,
             metadata={"publisher_dataset_id": cms.dataset_id},
-            root=Path(__file__).resolve().parent,
+            root=control_plane_root(root),
         )
     return {
         "action": "check_cms",
@@ -963,13 +1528,13 @@ def acquire_nurse(
         root=root,
     )
     if not dry_run and snap.canonical_source_path and snap.release_id:
-        from release_control_plane import ReleaseState, record_candidate
+        from release_control_plane import ReleaseState, control_plane_root, record_candidate
 
         record_candidate(
             "cms.pbj_nurse_staffing", snap.release_id, ReleaseState.ACQUIRED,
             source_path=snap.canonical_source_path,
             metadata={"structural_status": snap.structural_status},
-            root=Path(__file__).resolve().parent,
+            root=control_plane_root(root),
         )
     return {
         "action": "acquire_process",
@@ -1082,7 +1647,7 @@ def approve_release_authoritative(
 ) -> Any:
     """Approve using server-resolved Zweli state only (form status ignored)."""
     from data_ops_approval import ApprovalError, approve_release
-    from release_control_plane import ReleaseState, promote_candidate, record_candidate
+    from release_control_plane import ReleaseState, control_plane_root, promote_candidate, record_candidate
 
     state = resolve_zweli_state_for_release(source_id, release_id, root=root)
     snap = probe_source(source_id, check_cms=False, root=root, run_zweli=False)
@@ -1097,7 +1662,7 @@ def approve_release_authoritative(
         note=note,
         audit_path=audit_path,
     )
-    control_root = Path(__file__).resolve().parent
+    control_root = control_plane_root(root)
     record_candidate(
         source_id,
         release_id,

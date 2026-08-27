@@ -71,7 +71,7 @@ def test_probe_all_sources_runtime_unavailable(tmp_path: Path):
     assert by_id["cms.provider_info"].actions_enabled == ["check_cms", "acquire_process"]
     assert by_id["cms.pbj_nurse_staffing"].actions_enabled == ["check_cms", "acquire_process"]
     assert by_id["cms.health_citations"].cms_dataset_id == "r5ix-sfxw"
-    assert by_id["cms.sff_pdf_list"].automation_maturity == "unmodeled"
+    assert by_id["cms.sff_pdf_list"].automation_maturity == "partially_automated"
 
 
 def test_probe_provider_info_cms_newer(tmp_path: Path):
@@ -152,7 +152,11 @@ def test_not_run_cannot_be_approved(tmp_path: Path):
         )
 
 
-def test_probe_aug_without_july_is_not_run(tmp_path: Path):
+def test_probe_aug_without_july_is_not_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Expected prior unavailable in isolated runtime → Zweli NOT_RUN (not REQUIRES_REVIEW)."""
+    import active_release_registry as arr
+
+    monkeypatch.setattr(arr, "get_active_release", lambda *_a, **_k: None)
     pi = tmp_path / "provider_info"
     norm = tmp_path / "provider_info_normalized"
     pi.mkdir()
@@ -283,6 +287,230 @@ def test_recommended_next_nurse():
     assert "first_broken_layer" in nxt
 
 
+def _write_control_plane_state(
+    root: Path,
+    *,
+    active: dict[str, dict[str, object]] | None = None,
+    pending: dict[str, dict[str, object]] | None = None,
+) -> None:
+    """Write authoritative state/ registry files for overlay tests."""
+    import release_control_plane as rcp
+
+    state_dir = rcp._state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    if active is not None:
+        datasets = {}
+        for dataset_id, spec in active.items():
+            release_id = str(spec.get("release_id") or spec.get("active_release_id") or "")
+            meta = dict(spec.get("metadata") or {})
+            if spec.get("zweli_status") is not None:
+                meta.setdefault("zweli_status", spec.get("zweli_status"))
+            datasets[dataset_id] = {
+                "dataset_id": dataset_id,
+                "active_release_id": release_id,
+                "status": str(spec.get("status") or "ACTIVE"),
+                "metadata": meta,
+            }
+        (state_dir / "active_releases.json").write_text(
+            json.dumps({"schema_version": 1, "updated_at": "2026-08-27T00:00:00+00:00", "datasets": datasets}),
+            encoding="utf-8",
+        )
+    if pending is not None:
+        datasets = {}
+        for dataset_id, spec in pending.items():
+            meta = dict(spec.get("metadata") or {})
+            if spec.get("zweli_status") is not None:
+                meta.setdefault("zweli_status", spec.get("zweli_status"))
+            datasets[dataset_id] = {
+                "dataset_id": dataset_id,
+                "release_id": str(spec.get("release_id") or ""),
+                "state": str(spec.get("state") or "ACQUIRED"),
+                "metadata": meta,
+                "validation": dict(spec.get("validation") or {}),
+            }
+        (state_dir / "release_candidates.json").write_text(
+            json.dumps({"schema_version": 1, "updated_at": "2026-08-27T00:00:00+00:00", "datasets": datasets}),
+            encoding="utf-8",
+        )
+
+
+def test_control_plane_overlay_sff_active(tmp_path: Path):
+    _write_control_plane_state(
+        tmp_path,
+        active={
+            "cms.sff_pdf_list": {"release_id": "2026-08", "status": "ACTIVE"},
+        },
+    )
+    import release_control_plane as rcp
+
+    control = rcp.control_panel_payload(tmp_path)
+    snap = ops.probe_source("cms.sff_pdf_list", check_cms=False, root=tmp_path, run_zweli=False)
+    assert snap.status in {"NOT_AVAILABLE_IN_THIS_RUNTIME", "UNKNOWN"}
+    assert "NOT AVAILABLE" in snap.raw_available
+    overlaid = ops.overlay_control_plane_on_snapshot(snap, control, root=tmp_path)
+    assert overlaid["active_release_id"] == "2026-08"
+    assert overlaid["active_release_status"] == "ACTIVE"
+    assert overlaid["status"] != "NOT_AVAILABLE_IN_THIS_RUNTIME"
+    assert overlaid["display_status"] == "ACTIVE"
+    assert overlaid["raw_available"] == "2026-08"
+
+
+def test_control_plane_overlay_snf_all_owners(tmp_path: Path):
+    _write_control_plane_state(
+        tmp_path,
+        active={
+            "cms.snf_all_owners": {"release_id": "2026-07-17", "status": "ACTIVE"},
+        },
+        pending={
+            "cms.snf_all_owners": {
+                "release_id": "2026-07-31",
+                "state": "ACQUIRED",
+                "validation": {"status": "PASS"},
+            }
+        },
+    )
+    import release_control_plane as rcp
+
+    control = rcp.control_panel_payload(tmp_path)
+    overlaid = ops.overlay_control_plane_on_snapshot(
+        ops.probe_source("cms.snf_all_owners", check_cms=False, root=tmp_path, run_zweli=False),
+        control,
+        root=tmp_path,
+    )
+    assert overlaid["active_release_id"] == "2026-07-17"
+    assert overlaid["pending_release_id"] == "2026-07-31"
+    assert overlaid["pending_release_state"] == "ACQUIRED"
+    assert overlaid["status"] != "NOT_AVAILABLE_IN_THIS_RUNTIME"
+
+
+def test_control_plane_overlay_snf_enrollments(tmp_path: Path):
+    _write_control_plane_state(
+        tmp_path,
+        active={
+            "cms.snf_enrollments": {"release_id": "2026-07-17", "status": "ACTIVE"},
+        },
+        pending={
+            "cms.snf_enrollments": {
+                "release_id": "2026-07-31",
+                "state": "ACQUIRED",
+                "validation": {"status": "PASS"},
+            }
+        },
+    )
+    import release_control_plane as rcp
+
+    control = rcp.control_panel_payload(tmp_path)
+    overlaid = ops.overlay_control_plane_on_snapshot(
+        ops.probe_source("cms.snf_enrollments", check_cms=False, root=tmp_path, run_zweli=False),
+        control,
+        root=tmp_path,
+    )
+    assert overlaid["active_release_id"] == "2026-07-17"
+    assert overlaid["pending_release_id"] == "2026-07-31"
+    assert overlaid["pending_release_state"] == "ACQUIRED"
+    assert overlaid["status"] != "NOT_AVAILABLE_IN_THIS_RUNTIME"
+
+
+def test_control_plane_overlay_provider_info_active_pending_not_run(tmp_path: Path):
+    _write_control_plane_state(
+        tmp_path,
+        active={
+            "cms.provider_info": {
+                "release_id": "2026-07",
+                "status": "ACTIVE",
+                "zweli_status": "NOT_RUN",
+            },
+        },
+        pending={
+            "cms.provider_info": {
+                "release_id": "2026-08",
+                "state": "ACQUIRED",
+                "zweli_status": "NOT_RUN",
+            }
+        },
+    )
+    import release_control_plane as rcp
+
+    control = rcp.control_panel_payload(tmp_path)
+    overlaid = ops.overlay_control_plane_on_snapshot(
+        ops.probe_source("cms.provider_info", check_cms=False, root=tmp_path, run_zweli=False),
+        control,
+        root=tmp_path,
+    )
+    assert overlaid["active_release_id"] == "2026-07"
+    assert overlaid["pending_release_id"] == "2026-08"
+    assert overlaid["pending_release_state"] == "ACQUIRED"
+    assert overlaid["zweli_status"] == "NOT_RUN"
+
+
+def test_release_review_includes_governed_pending_not_approvable(tmp_path: Path):
+    _write_control_plane_state(
+        tmp_path,
+        active={
+            "cms.snf_all_owners": {"release_id": "2026-07-17", "status": "ACTIVE"},
+            "cms.provider_info": {
+                "release_id": "2026-07",
+                "status": "ACTIVE",
+                "zweli_status": "NOT_RUN",
+            },
+        },
+        pending={
+            "cms.snf_all_owners": {
+                "release_id": "2026-07-31",
+                "state": "ACQUIRED",
+            },
+            "cms.provider_info": {
+                "release_id": "2026-08",
+                "state": "ACQUIRED",
+                "zweli_status": "NOT_RUN",
+            },
+        },
+    )
+    import release_control_plane as rcp
+
+    control = rcp.control_panel_payload(tmp_path)
+    items = ops.release_review_items(check_cms=False, root=tmp_path, control=control)
+    by_key = {(i["source_id"], i["release_id"]): i for i in items}
+    owners = by_key[("cms.snf_all_owners", "2026-07-31")]
+    provider = by_key[("cms.provider_info", "2026-08")]
+    assert owners["governed"] is True
+    assert owners["approvable"] is False
+    assert provider["governed"] is True
+    assert provider["approvable"] is False
+    assert provider["zweli_status"] == "NOT_RUN"
+
+
+def test_promote_candidate_permitted_requires_validated():
+    assert ops.promote_candidate_permitted({"state": "VALIDATED"}) is True
+    assert ops.promote_candidate_permitted({"state": "ACQUIRED"}) is False
+
+
+def _write_provider_info_release(
+    root: Path,
+    *,
+    year: int,
+    month: int,
+    prefix: str = "300",
+) -> Path:
+    """Minimal local Provider Info raw (+ norm) for approval/canonical-source tests."""
+    pi = root / "provider_info"
+    norm = root / "provider_info_normalized"
+    pi.mkdir(parents=True, exist_ok=True)
+    norm.mkdir(parents=True, exist_ok=True)
+    month_names = (
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    )
+    label = f"{month_names[month - 1]}{year}"
+    month_label = f"{year:04d}-{month:02d}-01"
+    raw = pi / f"NH_ProviderInfo_{label}.csv"
+    raw.write_bytes(_nh_csv_bytes(1200, month_label, prefix))
+    (norm / f"ProviderInfoNorm_{year}_{month:02d}.csv").write_bytes(
+        _nh_csv_bytes(1200, month_label, prefix)
+    )
+    return raw
+
+
 def _write_zweli_report(root: Path, release_id: str, state: str) -> Path:
     man = root / "provider_info" / "_manifests" / release_id
     man.mkdir(parents=True, exist_ok=True)
@@ -311,6 +539,7 @@ def test_forged_form_pass_cannot_approve_blocked(
     monkeypatch.setenv("PBJ_DATA_OPS_SECRET", "test-secret")
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
+    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
     _write_zweli_report(tmp_path, "2026-08", "BLOCKED")
     audit = tmp_path / "provider_info" / "_manifests" / "_data_ops_audit.jsonl"
 
@@ -344,7 +573,29 @@ def test_forged_form_pass_cannot_approve_blocked(
     assert not approval.has_approval("cms.provider_info", "2026-08", audit)
 
 
-def test_authoritative_requires_review_and_pass(tmp_path: Path):
+def test_authoritative_promotion_writes_isolated_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
+    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    audit = tmp_path / "audit.jsonl"
+    _write_zweli_report(tmp_path, "2026-08", "PASS")
+    ops.approve_release_authoritative(
+        "cms.provider_info", "2026-08", root=tmp_path, audit_path=audit
+    )
+    import json
+    from active_release_registry import load_registry
+
+    isolated = json.loads(
+        (tmp_path / "state" / "active_releases.json").read_text(encoding="utf-8")
+    )
+    active = isolated["datasets"]["cms.provider_info"]["active_release_id"]
+    assert active == "2026-08"
+
+
+def test_authoritative_requires_review_and_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
+    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
     audit = tmp_path / "audit.jsonl"
     _write_zweli_report(tmp_path, "2026-08", "REQUIRES_REVIEW")
     with pytest.raises(approval.ApprovalError, match="acknowledgement"):
@@ -359,6 +610,7 @@ def test_authoritative_requires_review_and_pass(tmp_path: Path):
     )
     assert entry.action == "approve"
 
+    _write_provider_info_release(tmp_path, year=2026, month=9, prefix="301")
     _write_zweli_report(tmp_path, "2026-09", "PASS")
     entry2 = ops.approve_release_authoritative(
         "cms.provider_info", "2026-09", root=tmp_path, audit_path=audit
@@ -423,3 +675,55 @@ def test_v2_safety_still_blocks_without_ref_or_non_v2(tmp_path: Path):
     assert st.can_generate_refresh is False
     assert dash.DashboardActionBlocker.UNSAFE_PACKAGE_PATH.value in st.blockers
     assert dash.DashboardActionBlocker.NO_V2_REFERENCE.value in st.blockers
+
+
+def test_format_do_timestamp_humanizes_iso():
+    assert ops.format_do_timestamp("2026-08-27T12:51:31.031613+00:00") == "Aug 27, 8:51 AM ET"
+    assert ops.format_do_timestamp(None) == "—"
+    assert ops.format_do_timestamp("not-a-date") == "not-a-date"
+
+
+def test_build_sff_lifecycle_active_read_only():
+    control_row = {
+        "active": {"active_release_id": "2026-08", "status": "ACTIVE"},
+        "pending": None,
+    }
+    steps = ops.build_sff_lifecycle_steps(control_row=control_row)
+    labels = [s["label"] for s in steps]
+    assert labels == [
+        "Check CMS",
+        "Acquire PDF",
+        "Validate",
+        "Review",
+        "Make ACTIVE",
+        "PBJ build",
+        "Public staging",
+        "Publish",
+    ]
+    make_active = next(s for s in steps if s["id"] == "make_active")
+    assert make_active["state"] == "completed"
+    publish = next(s for s in steps if s["id"] == "publish")
+    assert publish["state"] == "not_wired"
+    pbj = next(s for s in steps if s["id"] == "pbj_build")
+    assert pbj["action"]["endpoint"] == "dashboard_builder"
+
+
+def test_build_source_operator_workflow_uses_control_plane():
+    control_row = {
+        "active": {"active_release_id": "2026-07"},
+        "pending": {"release_id": "2026-08", "state": "ACQUIRED"},
+        "health": "PASS",
+        "health_detail": "ok",
+        "impact": {"would_mark_stale": ["facility_dashboard"]},
+    }
+    wf = ops.build_source_operator_workflow(
+        "cms.provider_info",
+        record={"actions_enabled": ["check_cms"]},
+        snapshot={"validation_status": "PASS", "zweli_status": "NOT_RUN"},
+        control_row=control_row,
+    )
+    assert wf["active_release_id"] == "2026-07"
+    assert wf["pending_state"] == "ACQUIRED"
+    assert wf["next_action"]["endpoint"] == "release_review"
+    assert wf["lifecycle_steps"] is None
+

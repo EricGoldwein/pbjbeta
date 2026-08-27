@@ -33,7 +33,7 @@
     </details>
     {% endif %}
     <div class="do-actions">
-      {% if item.zweli_status == 'REQUIRES_REVIEW' and not item.acknowledged %}
+      {% if item.zweli_status == 'REQUIRES_REVIEW' and not item.acknowledged and not item.governed %}
       <form method="post" action="{{ url_for('action_acknowledge') }}" class="do-form-inline">
         <input type="hidden" name="source_id" value="{{ item.source_id }}">
         <input type="hidden" name="release_id" value="{{ item.release_id or '' }}">
@@ -41,7 +41,7 @@
         <button class="do-btn" type="submit">Acknowledge review</button>
       </form>
       {% endif %}
-      {% if item.reason == 'ready_for_approval' or item.acknowledged %}
+      {% if item.approvable %}
       <form method="post" action="{{ url_for('action_approve') }}" class="do-form-inline">
         <input type="hidden" name="source_id" value="{{ item.source_id }}">
         <input type="hidden" name="release_id" value="{{ item.release_id or '' }}">
@@ -49,6 +49,8 @@
         <input class="do-input" type="text" name="note" placeholder="Approval note">
         <button class="do-btn do-btn-primary" type="submit" {% if item.zweli_status == 'BLOCKED' %}disabled title="BLOCKED cannot be approved"{% endif %}>Approve</button>
       </form>
+      {% elif item.governed %}
+      <p class="do-muted do-small">Governed pending — not approvable until lifecycle permits (VALIDATED + Zweli gates for Provider Info).</p>
       {% endif %}
       {% if item.zweli_status == 'BLOCKED' %}
       <p class="do-flash-error">BLOCKED — cannot approve in V0</p>

@@ -76,7 +76,17 @@ CAPABILITY_LABELS = {
 
 
 def _state_dir(root: Path | None = None) -> Path:
-    return (root or Path(__file__).resolve().parent) / "state"
+    return control_plane_root(root) / "state"
+
+
+def control_plane_root(data_root: Path | None = None) -> Path:
+    """Repository root whose state/ subtree holds release registries."""
+    configured = (os.environ.get("PBJ_ACTIVE_RELEASE_REGISTRY") or "").strip()
+    if configured:
+        return Path(configured).resolve().parent.parent
+    if data_root is not None:
+        return data_root.resolve()
+    return Path(__file__).resolve().parent
 
 
 def candidates_path(root: Path | None = None) -> Path:

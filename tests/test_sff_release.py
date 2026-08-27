@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from active_release_registry import load_registry
 from manual_staging import MACPAC, stage_upload
 from release_control_plane import DEPENDENCY_GRAPH, load_candidates, what_would_change
 from sff_release import _rows_from_pdf, validate_rows
@@ -37,12 +38,13 @@ def test_sff_staleness_scope_isolated():
 
 
 def test_manual_upload_validates_but_never_promotes(tmp_path):
-    (tmp_path / "state").mkdir()
     payload = "State,Total_Estimated_Staffing_Requirements,Min_Staffing,Max_Staffing,Value_Type,Is_Federal_Minimum,Display_Text\nNY,3.5,3,4,hprd,N,Example\n"
     result = stage_upload(MACPAC, "test-v1", "standards.csv", io.BytesIO(payload.encode()), root=tmp_path)
     assert result["validation"]["status"] == "PASS"
-    assert load_candidates(tmp_path)["datasets"][MACPAC]["state"] == "VALIDATED"
-    assert not (tmp_path / "state" / "active_releases.json").exists()
+    candidate = load_candidates(tmp_path)["datasets"][MACPAC]
+    assert candidate["state"] == "VALIDATED"
+    assert candidate["state"] != "ACTIVE"
+    assert MACPAC not in load_registry(root=tmp_path).get("datasets", {})
 
 
 def test_upload_rejects_unapproved_dataset(tmp_path):
