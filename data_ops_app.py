@@ -37,11 +37,14 @@ from cms_data_ops import (  # noqa: E402
     acquire_nurse,
     acquire_provider_info,
     approve_release_authoritative,
+    build_needs_attention_queue,
+    build_release_availability_context,
     build_source_operator_workflow,
     check_nurse_cms,
     check_provider_info_cms,
     derived_signals_payload,
     format_do_timestamp,
+    format_release_month_label,
     minimal_record_for_dataset,
     overlay_control_plane_on_snapshot,
     probe_all_sources,
@@ -79,6 +82,8 @@ COOKIE_NAME = "pbj_data_ops_auth"
 def _source_detail_context(source_id: str) -> dict | None:
     rec = get_source(source_id)
     control = control_panel_payload()
+    release_checks = load_check_state()
+    check_by_dataset = {row["dataset_id"]: row for row in release_checks.get("datasets", [])}
     control_row = next((row for row in control["datasets"] if row["dataset_id"] == source_id), None)
     if rec is None and control_row is None:
         return None
@@ -88,17 +93,26 @@ def _source_detail_context(source_id: str) -> dict | None:
     )
     snapshot = overlay_control_plane_on_snapshot(snap, control) if snap else None
     record = rec.to_dict() if rec is not None else minimal_record_for_dataset(source_id)
+    availability = build_release_availability_context(
+        source_id,
+        control_row=control_row,
+        check_row=check_by_dataset.get(source_id),
+        snapshot=snapshot,
+        record=record,
+    )
     workflow = build_source_operator_workflow(
         source_id,
         record=record,
         snapshot=snapshot,
         control_row=control_row,
+        release_availability=availability,
     )
     return {
         "record": record,
         "snapshot": snapshot,
         "control_row": control_row,
         "workflow": workflow,
+        "release_availability": availability,
     }
 
 
@@ -166,6 +180,10 @@ def create_app() -> Flask:
     def _do_datetime_filter(value: str | None) -> str:
         return format_do_timestamp(value)
 
+    @app.template_filter("do_release_label")
+    def _do_release_label_filter(value: str | None) -> str:
+        return format_release_month_label(value) or "—"
+
     @app.get("/login")
     def login():
         if not app.config["DATA_OPS_AUTH_CONFIGURED"]:
@@ -214,6 +232,11 @@ def create_app() -> Flask:
         release_checks = load_check_state()
         check_by_dataset = {row["dataset_id"]: row for row in release_checks.get("datasets", [])}
         snaps = snapshots_with_control_plane(check_cms=check_cms, control=control)
+        needs_attention = build_needs_attention_queue(
+            control=control,
+            check_by_dataset=check_by_dataset,
+            snapshots=snaps,
+        )
         return render_template(
             "data_ops/sources.html",
             snapshots=snaps,
@@ -223,6 +246,7 @@ def create_app() -> Flask:
             active_releases=load_registry().get("datasets", {}),
             control=control,
             check_by_dataset=check_by_dataset,
+            needs_attention=needs_attention,
             releases_checked_at=release_checks.get("checked_at"),
         )
 

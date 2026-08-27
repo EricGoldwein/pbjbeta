@@ -25,12 +25,25 @@
       <dd>
         {% if workflow.active_release_id %}
         <span class="do-release-cell">
-          <span class="do-mono">{{ workflow.active_release_id }}</span>
+          <span>{% if workflow.release_availability and workflow.release_availability.active_release_label %}{{ workflow.release_availability.active_release_label }}{% else %}<span class="do-mono">{{ workflow.active_release_id }}</span>{% endif %}</span>
           <span class="do-badge do-badge-active">ACTIVE</span>
         </span>
         {% else %}<span class="do-muted">—</span>{% endif %}
       </dd>
     </div>
+    {% if workflow.release_availability %}
+    <div>
+      <dt>CMS latest</dt>
+      <dd>
+        {% if workflow.release_availability.publisher_latest_label %}
+        {{ workflow.release_availability.publisher_latest_label }}
+        {% if workflow.release_availability.new_release_available %}
+        <span class="do-badge do-badge-attention do-badge-inline">New release available</span>
+        {% endif %}
+        {% else %}<span class="do-muted">—</span>{% endif %}
+      </dd>
+    </div>
+    {% endif %}
     <div>
       <dt>Pending</dt>
       <dd>

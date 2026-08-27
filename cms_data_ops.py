@@ -642,16 +642,19 @@ def _probe_health_citations(record: CmsSourceRecord, root: Path) -> SourceOpsSna
     cit = cms_data_paths.citations_dir(root)
     # Facility citation builder consumes this exact source family, not descriptions.
     candidates = list(cit.glob("NH_HealthCitations_*.csv")) if cit.is_dir() else []
+
     def _citation_key(path: Path) -> tuple[int, int]:
         m = re.search(r"_([A-Za-z]{3})(\d{4})\.csv$", path.name)
         return (int(m.group(2)), _MONTH_NAME_TO_NUM.get(m.group(1).lower(), 0)) if m else (0, 0)
+
     standalone = max(candidates, key=_citation_key) if candidates else None
     if standalone:
+        release_id = _release_id_from_citation_basename(standalone.name)
         _apply_raw_ref(
-            snap, local_file_ref("citations", standalone, release_id=standalone.name)
+            snap, local_file_ref("citations", standalone, release_id=release_id or standalone.name)
         )
-        snap.pbjapp_latest = standalone.name
-        snap.release_id = standalone.name
+        snap.pbjapp_latest = format_release_month_label(release_id) or standalone.name
+        snap.release_id = release_id or standalone.name
         snap.local_raw_present = True
         snap.status = OpsStatus.LOCAL_RAW_ONLY.value
         snap.detail = (
@@ -1117,21 +1120,361 @@ def _validation_status_from_control(control_row: dict[str, Any] | None) -> str |
     return None
 
 
+def format_release_month_label(release_id: str | None) -> str | None:
+    """Turn ``2026-08`` into ``Aug 2026`` for operator-facing copy."""
+    if not release_id:
+        return None
+    match = re.fullmatch(r"(\d{4})-(\d{2})", str(release_id).strip())
+    if not match:
+        return str(release_id)
+    year, month = int(match.group(1)), int(match.group(2))
+    if month < 1 or month > 12:
+        return str(release_id)
+    abbr = (
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    )[month - 1]
+    return f"{abbr} {year}"
+
+
+def _release_id_from_citation_basename(name: str) -> str | None:
+    match = re.search(r"_([A-Za-z]{3})(\d{4})\.csv$", name or "", re.I)
+    if not match:
+        return None
+    month = _MONTH_NAME_TO_NUM.get(match.group(1).lower()[:3])
+    if not month:
+        return None
+    return f"{int(match.group(2)):04d}-{month:02d}"
+
+
+def build_release_availability_context(
+    source_id: str,
+    *,
+    control_row: dict[str, Any] | None,
+    check_row: dict[str, Any] | None = None,
+    snapshot: dict[str, Any] | None = None,
+    record: dict[str, Any] | None = None,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Reusable operator copy: ACTIVE vs publisher/latest vs pending."""
+    from release_source_catalog import SOURCES, UpdateMechanism
+
+    root = root or cms_data_paths.repo_root()
+    active = (control_row or {}).get("active") or {}
+    pending = (control_row or {}).get("pending") or {}
+    active_id = active.get("active_release_id")
+    pending_id = pending.get("release_id")
+    pending_state = pending.get("state")
+    catalog = next((item for item in SOURCES if item.dataset_id == source_id), None)
+
+    publisher_latest_id: str | None = None
+    new_available = False
+    availability_source = "none"
+
+    if catalog and catalog.mechanism == UpdateMechanism.DERIVED:
+        from release_check import derived_state
+
+        derived = derived_state(source_id, catalog.upstream, root=root)
+        new_available = bool(derived.get("new_release_available"))
+        upstream_active = derived.get("upstream_active") or {}
+        if catalog.upstream:
+            publisher_latest_id = upstream_active.get(catalog.upstream[0])
+        availability_source = "derived_upstream"
+    elif check_row is not None:
+        new_available = check_row.get("new_release_available") is True
+        publisher_latest_id = check_row.get("release_id") or check_row.get("pending_release")
+        availability_source = "release_check"
+    if snapshot:
+        pub = snapshot.get("publisher_latest") or snapshot.get("cms_latest")
+        if pub and not publisher_latest_id:
+            label_match = re.fullmatch(r"([A-Za-z]{3,9})\s+(20\d{2})", str(pub).strip())
+            if label_match:
+                month = _MONTH_NAME_TO_NUM.get(label_match.group(1).lower()[:3])
+                if month:
+                    publisher_latest_id = f"{label_match.group(2)}-{month:02d}"
+            else:
+                publisher_latest_id = str(pub)
+            availability_source = "cms_probe"
+
+    local_release_id = None
+    if snapshot:
+        raw_release = snapshot.get("release_id")
+        if raw_release and re.fullmatch(r"\d{4}-\d{2}", str(raw_release)):
+            local_release_id = str(raw_release)
+        elif raw_release:
+            local_release_id = _release_id_from_citation_basename(str(raw_release))
+
+    active_label = format_release_month_label(active_id)
+    publisher_label = format_release_month_label(publisher_latest_id)
+    if publisher_label is None and publisher_latest_id:
+        publisher_label = str(publisher_latest_id)
+
+    summary = "Current"
+    if new_available and active_id and publisher_latest_id and active_id != publisher_latest_id:
+        summary = "New release available"
+    elif new_available and not active_id:
+        summary = "Release missing"
+    elif pending_id and pending_state not in (None, "ACTIVE"):
+        summary = f"Pending {pending_state.lower()}"
+
+    return {
+        "source_id": source_id,
+        "human_name": (record or {}).get("human_name") or source_id,
+        "active_release_id": active_id,
+        "active_release_label": active_label,
+        "publisher_latest_release_id": publisher_latest_id,
+        "publisher_latest_label": publisher_label,
+        "pending_release_id": pending_id,
+        "pending_state": pending_state,
+        "local_release_id": local_release_id,
+        "new_release_available": new_available,
+        "availability_summary": summary,
+        "availability_source": availability_source,
+    }
+
+
+def build_needs_attention_queue(
+    *,
+    control: dict[str, Any],
+    check_by_dataset: dict[str, dict[str, Any]],
+    snapshots: list[dict[str, Any]] | None = None,
+    root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Primary operator queue: datasets with an actionable newer release."""
+    from release_source_catalog import SOURCES
+
+    snap_by_id = {item.get("source_id"): item for item in (snapshots or []) if item.get("source_id")}
+    catalog_by_id = {item.dataset_id: item for item in SOURCES}
+    items: list[dict[str, Any]] = []
+    for row in control.get("datasets") or []:
+        dataset_id = row.get("dataset_id")
+        if not dataset_id:
+            continue
+        check_row = check_by_dataset.get(dataset_id) or {}
+        record = get_source(dataset_id)
+        record_dict = record.to_dict() if record else minimal_record_for_dataset(dataset_id)
+        availability = build_release_availability_context(
+            dataset_id,
+            control_row=row,
+            check_row=check_row,
+            snapshot=snap_by_id.get(dataset_id),
+            record=record_dict,
+            root=root,
+        )
+        pending = row.get("pending")
+        pending_state = str((pending or {}).get("state") or "").upper()
+        health = str(row.get("health") or "").upper()
+        needs = (
+            availability.get("new_release_available")
+            or pending
+            or health not in {"PASS", "CURRENT", ""}
+            or pending_state in {"ACQUIRED", "VALIDATED", "DETECTED"}
+        )
+        if not needs:
+            continue
+        workflow = build_source_operator_workflow(
+            dataset_id,
+            record=record_dict,
+            snapshot=snap_by_id.get(dataset_id),
+            control_row=row,
+            release_availability=availability,
+        )
+        items.append(
+            {
+                **availability,
+                "health": row.get("health"),
+                "next_action": workflow.get("next_action"),
+                "mechanism": (catalog_by_id.get(dataset_id).mechanism.value if catalog_by_id.get(dataset_id) else None),
+            }
+        )
+    items.sort(
+        key=lambda item: (
+            0 if item.get("new_release_available") else 1,
+            item.get("human_name") or item.get("source_id") or "",
+        )
+    )
+    paired = _ownership_pair_attention_item(control, check_by_dataset, snap_by_id, root=root)
+    if paired:
+        items = [paired] + [
+            i
+            for i in items
+            if i.get("source_id") not in {"cms.snf_all_owners", "cms.snf_enrollments"}
+        ]
+        items.sort(
+            key=lambda item: (
+                0 if item.get("new_release_available") else 1,
+                item.get("human_name") or item.get("source_id") or "",
+            )
+        )
+    return [_finalize_attention_item(item) for item in items]
+
+
+def _ownership_pair_attention_item(
+    control: dict[str, Any],
+    check_by_dataset: dict[str, dict[str, Any]],
+    snap_by_id: dict[str, dict[str, Any]],
+    *,
+    root: Path | None,
+) -> dict[str, Any] | None:
+    """Single queue row for SNF owners + enrollments when a pair needs review."""
+    from ownership_pairing import ENROLLMENTS, OWNERS, pairing_status
+
+    pair = pairing_status(root)
+    pending = pair.get("pending") or {}
+    if not pending.get("owners_release") and not pending.get("enrollment_release"):
+        return None
+    owners_row = next((r for r in control.get("datasets") or [] if r.get("dataset_id") == OWNERS), None)
+    enroll_row = next((r for r in control.get("datasets") or [] if r.get("dataset_id") == ENROLLMENTS), None)
+    release_id = pending.get("owners_release") or pending.get("enrollment_release")
+    release_label = format_release_month_label(release_id) if release_id and len(str(release_id)) == 10 else release_id
+    if release_label and str(release_id).count("-") == 2:
+        # 2026-07-31 → Jul 31, 2026 style for ownership drops
+        parts = str(release_id).split("-")
+        if len(parts) == 3:
+            month = int(parts[1])
+            abbr = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[month - 1]
+            release_label = f"{abbr} {int(parts[2])}"
+    owners_state = str(pending.get("owners_state") or "").upper()
+    concise_state = f"{release_label} acquired" if owners_state == "ACQUIRED" else f"{release_label} pending"
+    next_action = {
+        "label": "Review pair",
+        "detail": "Owners and enrollment releases must promote together.",
+        "endpoint": "release_review",
+        "wired": True,
+        "read_only": pair.get("review_state") != "READY FOR REVIEW",
+    }
+    record = {
+        "human_name": "SNF Owners / Enrollments",
+        "source_id": "cms.snf_ownership_pair",
+        "acquisition_implementation": "generic CMS CSV adapter",
+    }
+    return _finalize_attention_item(
+        {
+            "source_id": "cms.snf_ownership_pair",
+            "human_name": "SNF Owners / Enrollments",
+            "active_release_id": (pair.get("active") or {}).get("owners_release"),
+            "active_release_label": format_release_month_label((pair.get("active") or {}).get("owners_release")),
+            "publisher_latest_release_id": release_id,
+            "publisher_latest_label": release_label,
+            "pending_release_id": release_id,
+            "pending_state": owners_state or pending.get("enrollment_state"),
+            "local_release_id": None,
+            "new_release_available": pair.get("review_state") == "READY FOR REVIEW",
+            "availability_summary": concise_state,
+            "availability_source": "ownership_pairing",
+            "health": (owners_row or enroll_row or {}).get("health"),
+            "next_action": next_action,
+            "mechanism": "external recurring release",
+            "concise_state": concise_state,
+            "release_line": release_label or str(release_id or "—"),
+            "panel_source_id": OWNERS,
+        }
+    )
+
+
+def _finalize_attention_item(item: dict[str, Any]) -> dict[str, Any]:
+    """Add action-first display fields for Sources queue cards."""
+    if item.get("concise_state"):
+        return item
+    pending_state = str(item.get("pending_state") or "").upper()
+    pending_id = item.get("pending_release_id")
+    active_label = item.get("active_release_label") or item.get("active_release_id")
+    publisher_label = item.get("publisher_latest_label") or item.get("publisher_latest_release_id")
+    concise = item.get("availability_summary") or "—"
+    release_line = active_label or publisher_label or "—"
+    if item.get("new_release_available") and publisher_label:
+        concise = f"{publisher_label} available"
+        release_line = publisher_label
+    elif pending_state == "ACQUIRED" and pending_id:
+        if str(pending_id).count("-") == 2:
+            parts = str(pending_id).split("-")
+            month = int(parts[1])
+            abbr = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[month - 1]
+            release_line = f"{abbr} {int(parts[2])}"
+        else:
+            release_line = format_release_month_label(pending_id) or str(pending_id)
+        concise = f"{release_line} acquired"
+    elif active_label and not item.get("new_release_available") and not pending_id:
+        concise = f"{active_label} active"
+        release_line = active_label
+    elif pending_state and pending_id:
+        concise = f"{pending_id} {pending_state.lower()}"
+        release_line = format_release_month_label(pending_id) or str(pending_id)
+    item = dict(item)
+    item["concise_state"] = concise
+    item["release_line"] = release_line
+    item.setdefault("panel_source_id", item.get("source_id"))
+    return item
+
+
 def _next_operator_action(
     source_id: str,
     *,
     record: dict[str, Any] | None,
     snapshot: dict[str, Any] | None,
     control_row: dict[str, Any] | None,
+    release_availability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     pending = (control_row or {}).get("pending") or {}
     pending_state = str(pending.get("state") or "").upper()
     active_id = ((control_row or {}).get("active") or {}).get("active_release_id")
     actions = list((record or {}).get("actions_enabled") or [])
 
-    if pending_state == "ACQUIRED":
+    if release_availability is None:
+        release_availability = build_release_availability_context(
+            source_id,
+            control_row=control_row,
+            snapshot=snapshot,
+            record=record,
+        )
+
+    if source_id in {"cms.health_citations", "cms.nh_ownership"} and release_availability.get(
+        "new_release_available"
+    ):
+        target_label = release_availability.get("publisher_latest_label") or "next release"
+        wired = bool((record or {}).get("acquisition_implementation"))
         return {
-            "label": "Review pending release",
+            "label": f"Acquire {target_label}" if wired else f"Acquire {target_label}",
+            "detail": (
+                f"ACTIVE {release_availability.get('active_release_label') or active_id or '—'}; "
+                f"CMS latest {target_label}. "
+                + (
+                    "Use the wired acquisition path when available."
+                    if wired
+                    else "Acquisition lifecycle is not wired in Data Ops yet."
+                )
+            ),
+            "endpoint": "source_detail",
+            "endpoint_args": {"source_id": source_id},
+            "wired": wired,
+            "read_only": not wired,
+            "not_wired_label": None if wired else "Not yet wired",
+        }
+
+    if pending_state == "ACQUIRED" and source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
+        return {
+            "label": "Review pair",
+            "detail": "Owners and enrollment releases must promote together.",
+            "endpoint": "release_review",
+            "wired": True,
+            "read_only": True,
+        }
+    if source_id == "cms.sff_pdf_list" and active_id and not pending:
+        active_label = format_release_month_label(active_id) or active_id
+        return {
+            "label": "Check CMS",
+            "detail": f"ACTIVE {active_label}. SFF posting check is not wired in Data Ops UI yet.",
+            "endpoint": "source_detail",
+            "endpoint_args": {"source_id": source_id},
+            "wired": False,
+            "read_only": True,
+            "not_wired_label": "Not yet wired",
+        }
+
+    if pending_state == "ACQUIRED":
+        release_label = format_release_month_label(pending.get("release_id")) or pending.get("release_id")
+        return {
+            "label": f"Review {release_label or 'pending release'}",
             "detail": f"Pending {pending.get('release_id')} is ACQUIRED — review in Release Review before promotion.",
             "endpoint": "release_review",
             "wired": True,
@@ -1336,6 +1679,7 @@ def build_source_operator_workflow(
     record: dict[str, Any] | None,
     snapshot: dict[str, Any] | None,
     control_row: dict[str, Any] | None,
+    release_availability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Operator-facing workflow summary from existing control plane + probe overlay."""
     from release_control_plane import CAPABILITY_LABELS
@@ -1353,6 +1697,14 @@ def build_source_operator_workflow(
     elif isinstance(pending.get("metadata"), dict):
         zweli_status = pending.get("metadata", {}).get("zweli_status")
 
+    if release_availability is None:
+        release_availability = build_release_availability_context(
+            source_id,
+            control_row=control_row,
+            snapshot=snapshot,
+            record=record,
+        )
+
     workflow = {
         "source_id": source_id,
         "active_release_id": active.get("active_release_id"),
@@ -1365,8 +1717,13 @@ def build_source_operator_workflow(
         "health_detail": (control_row or {}).get("health_detail"),
         "zweli_status": zweli_status,
         "downstream_capabilities": downstream,
+        "release_availability": release_availability,
         "next_action": _next_operator_action(
-            source_id, record=record, snapshot=snapshot, control_row=control_row
+            source_id,
+            record=record,
+            snapshot=snapshot,
+            control_row=control_row,
+            release_availability=release_availability,
         ),
         "lifecycle_steps": None,
     }

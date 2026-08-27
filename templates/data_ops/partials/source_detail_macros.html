@@ -10,3 +10,16 @@
   {% endif %}
 {% endif %}
 {% endmacro %}
+
+{% macro render_attention_primary_action(action) %}
+{% if action %}
+  {% if action.wired and not action.get('read_only') %}
+    {{ render_workflow_action(action) }}
+  {% elif action.wired and action.get('read_only') %}
+  <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for(action.endpoint, **(action.get('endpoint_args') or {})) }}">{{ action.label }}</a>
+  {% else %}
+  <span class="do-attention-unwired">{{ action.not_wired_label or 'Not yet wired' }}</span>
+  <span class="do-muted do-tiny do-attention-unwired-hint">{{ action.label }}</span>
+  {% endif %}
+{% endif %}
+{% endmacro %}

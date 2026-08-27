@@ -1,7 +1,29 @@
 {% extends "data_ops/base.html" %}
+{% from 'data_ops/partials/source_detail_macros.html' import render_workflow_action, render_attention_primary_action %}
 {% block title %}Sources{% endblock %}
 {% block content %}
-<section class="do-section do-section-primary do-section-flush-top">
+{% if needs_attention %}
+<section class="do-section do-section-attention do-section-flush-top">
+  <div class="do-release-toolbar">
+    <h1 class="do-release-title">Needs attention</h1>
+  </div>
+  <ul class="do-attention-list">
+    {% for item in needs_attention %}
+    <li class="do-attention-row">
+      <button type="button" class="do-attention-main" data-do-source-panel="{{ url_for('source_detail_panel', source_id=item.panel_source_id or item.source_id) }}" aria-haspopup="dialog">
+        <span class="do-attention-dataset">{{ item.human_name }}</span>
+        <span class="do-attention-meta">{{ item.release_line }} · {{ item.concise_state }}</span>
+      </button>
+      <div class="do-attention-action">
+        {{ render_attention_primary_action(item.next_action) }}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="do-section do-section-primary{% if not needs_attention %} do-section-flush-top{% endif %}">
   <div class="do-release-toolbar">
     <h1 class="do-release-title">Active releases</h1>
     <div class="do-toolbar-controls" data-do-release-filters>
@@ -25,7 +47,7 @@
           <th>Active</th>
           <th>Pending</th>
           <th>Mechanism</th>
-          <th>New?</th>
+          <th>CMS latest</th>
           <th>Checked</th>
           <th>Status</th>
         </tr>
@@ -66,7 +88,11 @@
             {% else %}<span class="do-muted">—</span>{% endif %}
           </td>
           <td class="do-small">{{ check.get('mechanism', '—') }}</td>
-          <td class="do-small">{{ 'YES' if check.get('new_release_available') == true else ('NO' if check.get('new_release_available') == false else '—') }}</td>
+          <td class="do-small">
+            {% set pub_id = check.get('publisher_latest_release_id') or check.get('release_id') or check.get('pending_release') %}
+            {{ pub_id | do_release_label if pub_id else '—' }}
+            {% if check.get('new_release_available') == true %}<span class="do-badge do-badge-attention do-badge-inline">new</span>{% endif %}
+          </td>
           <td class="do-mono do-small" {% if checked_raw %}title="{{ checked_raw }}"{% endif %}>{{ checked_raw | do_datetime if checked_raw else '—' }}</td>
           <td>
             <span class="do-badge do-badge-health-{{ health|lower|replace(' ', '-') }}">{{ row.health }}</span>

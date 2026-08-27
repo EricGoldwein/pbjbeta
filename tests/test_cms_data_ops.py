@@ -826,3 +826,119 @@ def test_build_source_operator_workflow_uses_control_plane():
     assert wf["next_action"]["endpoint"] == "release_review"
     assert wf["lifecycle_steps"] is None
 
+
+def test_format_release_month_label():
+    assert ops.format_release_month_label("2026-08") == "Aug 2026"
+    assert ops.format_release_month_label("2026-07") == "Jul 2026"
+    assert ops.format_release_month_label(None) is None
+
+
+def test_health_citations_release_availability_from_upstream(tmp_path: Path):
+    import json
+    from active_release_registry import registry_path
+
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    active = {
+        "schema_version": 1,
+        "datasets": {
+            "cms.provider_info": {
+                "active_release_id": "2026-08",
+                "status": "ACTIVE",
+                "hash": "abc",
+            },
+            "cms.health_citations": {
+                "active_release_id": "2026-07",
+                "status": "ACTIVE",
+                "hash": "def",
+                "metadata": {"upstream_releases": {"cms.provider_info": "2026-07"}},
+            },
+        },
+    }
+    (state / "active_releases.json").write_text(json.dumps(active), encoding="utf-8")
+    (state / "release_candidates.json").write_text(
+        json.dumps({"schema_version": 1, "datasets": {}}), encoding="utf-8"
+    )
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        import active_release_registry as arr
+
+        monkeypatch.setattr(arr, "registry_path", lambda _root=None: state / "active_releases.json")
+
+        control_row = {
+            "active": active["datasets"]["cms.health_citations"],
+            "pending": None,
+            "health": "UNKNOWN",
+            "impact": {"would_mark_stale": ["facility.citations"]},
+        }
+        record = {"human_name": "Health Citations", "acquisition_implementation": None}
+        availability = ops.build_release_availability_context(
+            "cms.health_citations",
+            control_row=control_row,
+            record=record,
+            root=tmp_path,
+        )
+        assert availability["active_release_label"] == "Jul 2026"
+        assert availability["publisher_latest_label"] == "Aug 2026"
+        assert availability["new_release_available"] is True
+        assert availability["availability_summary"] == "New release available"
+
+        wf = ops.build_source_operator_workflow(
+            "cms.health_citations",
+            record=record,
+            snapshot={"release_id": "2026-08"},
+            control_row=control_row,
+            release_availability=availability,
+        )
+        assert "Acquire Aug 2026" in wf["next_action"]["label"]
+        assert wf["next_action"]["wired"] is False
+        assert wf["next_action"].get("not_wired_label") == "Not yet wired"
+    finally:
+        monkeypatch.undo()
+
+
+def test_ownership_pair_attention_item(tmp_path: Path):
+    import json
+    from active_release_registry import registry_path
+
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    active = {
+        "schema_version": 1,
+        "datasets": {
+            "cms.snf_all_owners": {"active_release_id": "2026-07-17", "status": "ACTIVE"},
+            "cms.snf_enrollments": {"active_release_id": "2026-07-17", "status": "ACTIVE"},
+        },
+    }
+    pending = {
+        "schema_version": 1,
+        "datasets": {
+            "cms.snf_all_owners": {
+                "release_id": "2026-07-31",
+                "state": "ACQUIRED",
+                "validation": {"status": "PASS"},
+            },
+            "cms.snf_enrollments": {
+                "release_id": "2026-07-31",
+                "state": "ACQUIRED",
+                "validation": {"status": "PASS"},
+            },
+        },
+    }
+    (state / "active_releases.json").write_text(json.dumps(active), encoding="utf-8")
+    (state / "release_candidates.json").write_text(json.dumps(pending), encoding="utf-8")
+    import active_release_registry as arr
+    import release_control_plane as rcp
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(arr, "registry_path", lambda _root=None: state / "active_releases.json")
+        monkeypatch.setattr(rcp, "candidates_path", lambda _root=None: state / "release_candidates.json")
+        control = rcp.control_panel_payload(tmp_path)
+        items = ops.build_needs_attention_queue(control=control, check_by_dataset={}, snapshots=[])
+        pair = next(i for i in items if i["source_id"] == "cms.snf_ownership_pair")
+        assert "Jul 31" in pair["concise_state"]
+        assert pair["next_action"]["label"] == "Review pair"
+    finally:
+        monkeypatch.undo()
+

@@ -33,9 +33,13 @@ def derived_state(dataset_id: str, upstream: tuple[str, ...], *, root: Path = RO
     current = {key: (active.get(key) or {}).get("active_release_id") for key in upstream}
     unknown = not recorded
     stale = any(not value or recorded.get(key) != value for key, value in current.items())
+    publisher_latest_release_id = None
+    if upstream:
+        publisher_latest_release_id = current.get(upstream[0])
     return {
         "status": "UNKNOWN" if unknown else ("STALE" if stale else "CURRENT"),
         "new_release_available": stale,
+        "publisher_latest_release_id": publisher_latest_release_id,
         "upstream_active": current,
         "upstream_recorded": recorded,
     }
