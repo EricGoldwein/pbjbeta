@@ -1,0 +1,128 @@
+{% from 'data_ops/partials/source_detail_macros.html' import render_attention_primary_action, render_pair_primary_action %}
+
+{% if panel_mode == 'modal' %}
+<header class="do-panel-head">
+  <div>
+    <h2 class="do-panel-title" id="do-source-panel-title">{{ human_name }}</h2>
+    <p class="do-mono do-muted do-small">Paired release · {{ release_label or release_id }}</p>
+  </div>
+  <button type="button" class="do-btn do-btn-compact do-btn-ghost" data-do-modal-close aria-label="Close">Close</button>
+</header>
+{% endif %}
+
+<section class="do-operator-ref do-section do-section-primary">
+  <div class="do-operator-ref-head">
+    <h3 class="do-section-title-sm">Pair status</h3>
+    <span class="do-badge do-badge-{{ status_tone }}">{{ status_label }}</span>
+  </div>
+
+  <dl class="do-dl do-dl-compact do-operator-ref-summary">
+    <div>
+      <dt>ACTIVE pair</dt>
+      <dd>{% if active_label and active_label != '—' %}{{ active_label }}{% else %}<span class="do-muted">—</span>{% endif %}</dd>
+    </div>
+    <div>
+      <dt>Candidate pair</dt>
+      <dd>{{ release_label or release_id }}</dd>
+    </div>
+    <div>
+      <dt>Pair alignment</dt>
+      <dd><span class="do-badge do-badge-{{ 'active' if pair_alignment == 'ALIGNED' else 'attention' }}">{{ pair_alignment }}</span></dd>
+    </div>
+    <div>
+      <dt>CMS publisher</dt>
+      <dd><span class="do-badge do-badge-{{ 'active' if publisher_alignment == 'ALIGNED' else 'attention' }}">{{ publisher_alignment }}</span></dd>
+    </div>
+    <div>
+      <dt>Next action</dt>
+      <dd class="do-operator-next-label">{{ next_action.label }}</dd>
+    </div>
+  </dl>
+
+  {% if blocking_reasons %}
+  <ul class="do-list-compact do-muted do-small">
+    {% for reason in blocking_reasons %}
+    <li>{{ reason }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="do-next-action do-next-action-compact">
+    <p class="do-muted do-small">{{ next_action.detail }}</p>
+    <div class="do-actions do-actions-inline">
+      {{ render_pair_primary_action(next_action) }}
+    </div>
+  </div>
+</section>
+
+{% macro member_row(member) %}
+<tr>
+  <td>
+    <strong>{{ member.human_name }}</strong>
+    <div class="do-mono do-tiny do-muted">{{ member.source_id }}</div>
+  </td>
+  <td class="do-mono do-small">{{ member.candidate_release_label or member.candidate_release_id or '—' }}</td>
+  <td><span class="do-badge do-badge-{{ (member.candidate_state or '')|lower }}">{{ member.candidate_state or '—' }}</span></td>
+  <td><span class="do-badge do-badge-val-{{ (member.validation_status or 'none')|lower }}">{{ member.validation_status or '—' }}</span></td>
+  <td class="do-small">
+    {% if member.publisher_release_label %}{{ member.publisher_release_label }}{% else %}<span class="do-muted">—</span>{% endif %}
+    {% if member.publisher_filename %}
+    <div class="do-mono do-tiny do-muted">{{ member.publisher_filename }}</div>
+    {% endif %}
+    {% if member.publisher_error %}
+    <div class="do-muted do-tiny">{{ member.publisher_error }}</div>
+    {% endif %}
+  </td>
+  <td>
+    {% if member.publisher_matches_candidate %}
+    <span class="do-badge do-badge-active">Verified</span>
+    {% elif member.publisher_error %}
+    <span class="do-badge do-badge-attention">Lookup failed</span>
+    {% elif member.publisher_release_id is not none %}
+    <span class="do-badge do-badge-attention">Mismatch</span>
+    {% else %}
+    <span class="do-muted">—</span>
+    {% endif %}
+  </td>
+</tr>
+{% endmacro %}
+
+<section class="do-section">
+  <h3 class="do-section-title-sm">Pair members</h3>
+  <div class="do-table-wrap do-table-wrap-compact">
+    <table class="do-table do-table-compact">
+      <thead>
+        <tr>
+          <th>Dataset</th>
+          <th>Candidate</th>
+          <th>State</th>
+          <th>Validation</th>
+          <th>CMS latest</th>
+          <th>Identity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ member_row(owners) }}
+        {{ member_row(enrollments) }}
+      </tbody>
+    </table>
+  </div>
+  {% if not cms_queried %}
+  <p class="do-muted do-small">CMS publisher identity not queried (check_cms=0).</p>
+  {% endif %}
+</section>
+
+<details class="do-collapse-panel">
+  <summary>Provenance &amp; details</summary>
+  {% for member in [owners, enrollments] %}
+  <h4 class="do-subhead">{{ member.human_name }}</h4>
+  <dl class="do-dl do-dl-wide do-dl-compact">
+    <div><dt>ACTIVE</dt><dd class="do-mono do-small">{{ member.active_release_id or '—' }}</dd></div>
+    <div><dt>Candidate artifact</dt><dd class="do-mono do-small">{{ member.candidate_path or '—' }}</dd></div>
+    <div><dt>SHA-256</dt><dd class="do-mono do-small">{{ member.candidate_hash or '—' }}</dd></div>
+    <div><dt>CMS dataset id</dt><dd class="do-mono do-small">{{ member.cms_dataset_id or '—' }}</dd></div>
+    <div><dt>CMS resource updated</dt><dd class="do-mono do-small">{{ member.publisher_last_updated or '—' }}</dd></div>
+    <div><dt>CMS download</dt><dd class="do-mono do-small">{{ member.publisher_url or '—' }}</dd></div>
+  </dl>
+  {% endfor %}
+</details>

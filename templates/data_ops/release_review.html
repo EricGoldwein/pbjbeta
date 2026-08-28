@@ -1,67 +1,192 @@
 {% extends "data_ops/base.html" %}
+
 {% block title %}Release Review{% endblock %}
+
 {% block content %}
+
 <section class="do-page-head">
+
   <h1>Release Review</h1>
+
+  {% if focus_source_id %}
+
+  <p class="do-muted do-small">Focused review · <span class="do-mono">{{ focus_source_id }}</span>{% if focus_release_id %} · {{ focus_release_id | do_release_label }}{% endif %}</p>
+
+  {% endif %}
+
 </section>
 
-{% if not items %}
-<p class="do-muted">No items requiring attention right now.</p>
+
+
+{% if focus_source_id and not items %}
+
+<p class="do-muted">No review decision pending for this release. <a href="{{ url_for('release_review') }}">View all review items</a></p>
+
+{% elif not items %}
+
+<p class="do-muted">No items requiring review right now.</p>
+
 {% endif %}
 
+
+
 <div class="do-review-list">
+
 {% for item in items %}
-  <article class="do-review-item">
-    <header>
-      <strong>{{ item.human_name }}</strong>
-      <span class="do-badge">{{ item.reason }}</span>
-      <span class="do-badge do-zweli-{{ item.zweli_status|lower|replace('_','-') }}">{{ item.zweli_status }}</span>
+
+  <article class="do-review-item do-review-item-compact" id="review-{{ item.source_id }}-{{ item.release_id or 'none' }}">
+
+    <header class="do-review-item-head">
+
+      <div>
+
+        <strong class="do-review-dataset">{{ item.human_name }}</strong>
+
+        <div class="do-review-release">{{ item.release_label or (item.release_id | do_release_label if item.release_id else '—') }}</div>
+
+      </div>
+
+      <span class="do-badge do-badge-attention">{{ item.human_state }}</span>
+
     </header>
-    <p class="do-mono do-small">{{ item.source_id }} · release {{ item.release_id or '—' }}</p>
-    <p>{{ item.detail }}</p>
-    {% if item.zweli_report and item.zweli_report.findings %}
-    <details class="do-details">
-      <summary>Evidence ({{ item.zweli_report.findings|length }} findings)</summary>
-      <ul class="do-findings">
-        {% for f in item.zweli_report.findings %}
-        <li>
-          <span class="do-mono">{{ f.check_id }}</span> · {{ f.severity }} · {{ f.metric_field }}
-          <div>{{ f.explanation }}</div>
-        </li>
-        {% endfor %}
-      </ul>
-    </details>
+
+    {% if item.evidence_lines %}
+
+    <p class="do-review-evidence do-small">{{ item.evidence_lines | join(' · ') }}</p>
+
     {% endif %}
-    <div class="do-actions">
-      {% if item.zweli_status == 'REQUIRES_REVIEW' and not item.acknowledged and not item.governed %}
-      <form method="post" action="{{ url_for('action_acknowledge') }}" class="do-form-inline">
-        <input type="hidden" name="source_id" value="{{ item.source_id }}">
-        <input type="hidden" name="release_id" value="{{ item.release_id or '' }}">
-        <input class="do-input" type="text" name="note" placeholder="Note (optional)">
-        <button class="do-btn" type="submit">Acknowledge review</button>
-      </form>
-      {% endif %}
+
+    <div class="do-actions do-actions-inline">
+
       {% if item.approvable %}
-      <form method="post" action="{{ url_for('action_approve') }}" class="do-form-inline">
+
+      <form method="post" action="{{ url_for('action_approve') }}" class="do-inline">
+
         <input type="hidden" name="source_id" value="{{ item.source_id }}">
+
         <input type="hidden" name="release_id" value="{{ item.release_id or '' }}">
-        <input type="hidden" name="zweli_status" value="{{ item.zweli_status }}">
-        <input class="do-input" type="text" name="note" placeholder="Approval note">
-        <button class="do-btn do-btn-primary" type="submit" {% if item.zweli_status == 'BLOCKED' %}disabled title="BLOCKED cannot be approved"{% endif %}>Approve</button>
+
+        <button class="do-btn do-btn-primary" type="submit">{{ item.primary_action_label or ('Activate ' ~ (item.release_label or item.release_id)) }}</button>
+
       </form>
-      {% elif item.governed %}
-      <p class="do-muted do-small">Governed pending — not approvable until lifecycle permits (VALIDATED + Zweli gates for Provider Info).</p>
+
+      {% elif item.primary_action_kind == 'acknowledge' and item.zweli_status == 'REQUIRES_REVIEW' and not item.acknowledged %}
+
+      <form method="post" action="{{ url_for('action_acknowledge') }}" class="do-inline">
+
+        <input type="hidden" name="source_id" value="{{ item.source_id }}">
+
+        <input type="hidden" name="release_id" value="{{ item.release_id or '' }}">
+
+        <button class="do-btn" type="submit">{{ item.primary_action_label or 'Acknowledge findings' }}</button>
+
+      </form>
+
+      {% elif item.source_id != 'cms.snf_ownership_pair' %}
+
+      <a class="do-btn do-btn-ghost" href="{{ url_for('source_detail', source_id=item.source_id) }}">{{ item.primary_action_label or 'Inspect' }}</a>
+
+      {% else %}
+
+      <span class="do-muted do-small">{{ item.primary_action_label or 'Review pair' }}</span>
+
       {% endif %}
-      {% if item.zweli_status == 'BLOCKED' %}
-      <p class="do-flash-error">BLOCKED — cannot approve in V0</p>
-      {% endif %}
+
+      <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for('source_detail_panel', source_id=item.source_id if item.source_id != 'cms.snf_ownership_pair' else 'cms.snf_all_owners') }}">View provenance</a>
+
     </div>
+
+    {% if item.zweli_applicable and item.zweli_report and item.zweli_report.findings %}
+
+    <details class="do-details do-details-compact">
+
+      <summary>Quality findings ({{ item.zweli_report.findings|length }})</summary>
+
+      <ul class="do-findings">
+
+        {% for f in item.zweli_report.findings %}
+
+        <li>{{ f.explanation or f.metric_field }}</li>
+
+        {% endfor %}
+
+      </ul>
+
+    </details>
+
+    {% endif %}
+
+    {% if item.review_provenance %}
+    <details class="do-details do-details-compact">
+      <summary>Provenance</summary>
+      <dl class="do-dl do-dl-compact">
+        <div><dt>Candidate artifact</dt><dd class="do-mono do-tiny">{{ item.review_provenance.candidate_artifact_path | default('—', true) }}</dd></div>
+        <div><dt>Candidate SHA-256</dt><dd class="do-mono do-tiny">{{ item.review_provenance.candidate_sha256 or '—' }}</dd></div>
+        {% if item.review_provenance.active_release_id %}
+        <div><dt>Currently ACTIVE</dt><dd>{{ item.review_provenance.active_release_id | do_release_label }}</dd></div>
+        {% endif %}
+        <div><dt>CMS publication</dt><dd class="do-mono do-tiny">{{ item.review_provenance.cms_publication_date or '—' }}</dd></div>
+      </dl>
+    </details>
+    {% elif item.provenance %}
+
+    <details class="do-details do-details-compact">
+
+      <summary>Provenance</summary>
+
+      <dl class="do-dl do-dl-compact">
+
+        <div><dt>SHA-256</dt><dd class="do-mono do-tiny">{{ item.provenance.sha256 or '—' }}</dd></div>
+
+        <div><dt>CMS publication</dt><dd class="do-mono do-tiny">{{ item.provenance.cms_publication_date or '—' }}</dd></div>
+
+        <div><dt>Artifact</dt><dd class="do-mono do-tiny">{{ item.provenance.canonical_artifact_path or '—' }}</dd></div>
+
+      </dl>
+
+    </details>
+
+    {% endif %}
+
   </article>
+
 {% endfor %}
+
 </div>
 
-<details class="do-details">
-  <summary>Audit trail (recent)</summary>
-  <pre class="do-pre">{{ audit | tojson(indent=2) }}</pre>
+
+
+{% if focus_source_id %}
+
+<p class="do-muted do-tiny"><a href="{{ url_for('release_review') }}">Show all review items</a> · <a href="{{ url_for('sources') }}">Back to Sources</a></p>
+
+{% endif %}
+
+
+
+<details class="do-details do-details-compact">
+
+  <summary>Audit trail</summary>
+
+  {% if audit %}
+
+  <ul class="do-list-compact">
+
+    {% for entry in audit %}
+
+    <li>{{ entry.timestamp | do_datetime }} · {{ entry.action | replace('_', ' ') }} · {{ entry.source_id }} {{ entry.release_id }}{% if entry.note %} — {{ entry.note }}{% endif %}</li>
+
+    {% endfor %}
+
+  </ul>
+
+  {% else %}
+
+  <p class="do-muted do-small">No audit entries yet.</p>
+
+  {% endif %}
+
 </details>
+
 {% endblock %}
+

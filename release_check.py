@@ -31,14 +31,18 @@ def derived_state(dataset_id: str, upstream: tuple[str, ...], *, root: Path = RO
         return {"status": "MISSING", "new_release_available": True}
     recorded = ((target.get("metadata") or {}).get("upstream_releases") or {})
     current = {key: (active.get(key) or {}).get("active_release_id") for key in upstream}
-    unknown = not recorded
-    stale = any(not value or recorded.get(key) != value for key, value in current.items())
+    provenance_missing = not bool(recorded)
+    if provenance_missing:
+        stale = False
+    else:
+        stale = any(not value or recorded.get(key) != value for key, value in current.items())
     publisher_latest_release_id = None
     if upstream:
         publisher_latest_release_id = current.get(upstream[0])
     return {
-        "status": "UNKNOWN" if unknown else ("STALE" if stale else "CURRENT"),
+        "status": "UNKNOWN" if provenance_missing else ("STALE" if stale else "CURRENT"),
         "new_release_available": stale,
+        "provenance_missing": provenance_missing,
         "publisher_latest_release_id": publisher_latest_release_id,
         "upstream_active": current,
         "upstream_recorded": recorded,
@@ -118,13 +122,52 @@ def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
     def nurse(acquire: bool) -> dict[str, Any]:
         check = check_nurse_cms()
         active_id = ((load_registry(registry_path(ROOT)).get("datasets") or {}).get("cms.pbj_nurse_staffing") or {}).get("active_release_id")
-        if active_id == check["cms"]["quarter_label"]:
-            return {"status": "CURRENT", "new_release_available": False}
+        quarter_label = check["cms"]["quarter_label"]
+        if active_id == quarter_label:
+            return {
+                "status": "CURRENT",
+                "new_release_available": False,
+                "release_id": quarter_label,
+                "publisher_latest_release_id": quarter_label,
+            }
         if not check["cms_is_newer"]:
-            return {"status": "CURRENT", "new_release_available": False}
+            return {
+                "status": "CURRENT",
+                "new_release_available": False,
+                "release_id": quarter_label,
+                "publisher_latest_release_id": quarter_label,
+            }
         result = acquire_nurse() if acquire else None
         state = ((load_candidates(ROOT).get("datasets") or {}).get("cms.pbj_nurse_staffing") or {}).get("state")
         return {"status": state or "DETECTED", "new_release_available": True, "release_id": check["cms"]["quarter_label"], "acquisition": (result or {}).get("acquire_report")}
+
+    def health_citations(acquire: bool) -> dict[str, Any]:
+        from health_citations_acquire import check_health_citations_cms
+
+        check = check_health_citations_cms(root=cms_data_paths.repo_root())
+        active_id = check.get("active_release_id")
+        cms_release = (check.get("cms") or {}).get("release_id")
+        if active_id and cms_release and str(active_id) == str(cms_release):
+            return {
+                "status": "CURRENT",
+                "new_release_available": False,
+                "release_id": cms_release,
+                "publisher_latest_release_id": cms_release,
+            }
+        if not check.get("cms_is_newer"):
+            return {
+                "status": "CURRENT",
+                "new_release_available": False,
+                "release_id": cms_release,
+                "publisher_latest_release_id": cms_release,
+            }
+        state = ((load_candidates(ROOT).get("datasets") or {}).get("cms.health_citations") or {}).get("state")
+        return {
+            "status": state or "DETECTED",
+            "new_release_available": True,
+            "release_id": cms_release,
+            "publisher_latest_release_id": cms_release,
+        }
 
     pbj_root = cms_data_paths.repo_root()
     generic = {
@@ -144,7 +187,12 @@ def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
             result["status"] = "VALIDATED"
         return result
 
-    handlers = {"cms.provider_info": provider, "cms.pbj_nurse_staffing": nurse, "cms.pbj_non_nurse_staffing": nonnurse}
+    handlers = {
+        "cms.provider_info": provider,
+        "cms.pbj_nurse_staffing": nurse,
+        "cms.pbj_non_nurse_staffing": nonnurse,
+        "cms.health_citations": health_citations,
+    }
     handlers.update({key: (lambda acquire, feed=feed: run_feed(feed, acquire, root=ROOT)) for key, feed in generic.items() if key != "cms.pbj_non_nurse_staffing"})
     return handlers
 

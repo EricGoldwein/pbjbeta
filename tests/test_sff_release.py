@@ -8,7 +8,14 @@ import pytest
 from active_release_registry import load_registry
 from manual_staging import MACPAC, stage_upload
 from release_control_plane import DEPENDENCY_GRAPH, load_candidates, what_would_change
-from sff_release import _rows_from_pdf, validate_rows
+from sff_release import (
+    OFFICIAL_AUGUST_2026_URL,
+    _rows_from_pdf,
+    check_sff_cms,
+    discover_latest_cms_sff_posting,
+    parse_sff_posting_updated_label,
+    validate_rows,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +42,59 @@ def test_sff_staleness_scope_isolated():
     assert impact["would_mark_stale"] == ["facility.sff_status"]
     assert "facility.staffing" in impact["would_remain_current"]
     assert "facility.snf_owners" in impact["would_remain_current"]
+
+
+def test_parse_sff_posting_updated_label_from_local_pdf():
+    parsed = parse_sff_posting_updated_label(ACTUAL_PDF.read_bytes())
+    assert parsed is not None
+    assert parsed[0] == "2026-08"
+
+
+def test_discover_latest_cms_sff_posting_uses_updated_label(monkeypatch):
+    payload = ACTUAL_PDF.read_bytes()
+
+    def fake_fetch(url: str) -> bytes:
+        if url == OFFICIAL_AUGUST_2026_URL:
+            return payload
+        return b""
+
+    discovered = discover_latest_cms_sff_posting(
+        fetch_bytes=fake_fetch,
+        months_back=3,
+        anchor=__import__("datetime").datetime(2026, 8, 15, tzinfo=__import__("datetime").timezone.utc),
+    )
+    assert discovered["release_id"] == "2026-08"
+    assert discovered["source_url"] == OFFICIAL_AUGUST_2026_URL
+
+
+def test_check_sff_cms_current_when_active_matches(tmp_path, monkeypatch):
+    from active_release_registry import load_registry
+
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    active = {
+        "schema_version": 1,
+        "datasets": {
+            "cms.sff_pdf_list": {
+                "dataset_id": "cms.sff_pdf_list",
+                "active_release_id": "2026-08",
+                "status": "ACTIVE",
+            }
+        },
+    }
+    (state / "active_releases.json").write_text(__import__("json").dumps(active), encoding="utf-8")
+    (state / "release_candidates.json").write_text('{"schema_version":1,"datasets":{}}', encoding="utf-8")
+    monkeypatch.setattr("sff_release.registry_path", lambda _root=None: state / "active_releases.json")
+    payload = ACTUAL_PDF.read_bytes()
+
+    def fake_fetch(url: str) -> bytes:
+        if url == OFFICIAL_AUGUST_2026_URL:
+            return payload
+        return b""
+
+    result = check_sff_cms(fetch_bytes=fake_fetch, root=tmp_path)
+    assert result["cms_is_newer"] is False
+    assert result["cms"]["release_id"] == "2026-08"
 
 
 def test_manual_upload_validates_but_never_promotes(tmp_path):

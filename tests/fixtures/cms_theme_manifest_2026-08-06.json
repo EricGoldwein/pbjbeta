@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Provider Information (2026-07-29)",
+    "dataset_id": "4pq5-n9py",
+    "type": "individual",
+    "modified_date": "2026-07-29",
+    "access_level": "public",
+    "private": false,
+    "resources": [
+      {
+        "filename": "4pq5-n9py_2026-07-29_NH_ProviderInfo_Jul2026.csv",
+        "filesize": 9163390,
+        "mime_type": "text/csv"
+      }
+    ]
+  },
+  {
+    "name": "State US Averages (2026-07-29)",
+    "dataset_id": "xcdc-v8bm",
+    "type": "individual",
+    "modified_date": "2026-07-29",
+    "access_level": "public",
+    "private": false,
+    "resources": [
+      {
+        "filename": "xcdc-v8bm_2026-07-29_NH_StateUSAverages_Jul2026.csv",
+        "filesize": 22554,
+        "mime_type": "text/csv"
+      }
+    ]
+  }
+]

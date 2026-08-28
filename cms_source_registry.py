@@ -48,6 +48,7 @@ class SourceCadence(str, Enum):
 
 class CatalogMechanism(str, Enum):
     PROVIDER_DATA_METASTORE = "provider_data_metastore"
+    PROVIDER_DATA_THEME_ARCHIVE = "provider_data_theme_archive"
     DATA_CMS_GOV_DATASET_UUID = "data_cms_gov_dataset_uuid"
     LANDING_PAGE_ONLY = "landing_page_only"
     NONE_VERIFIED = "none_verified"
@@ -147,6 +148,22 @@ _CITATIONS_METASTORE = (
     "https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/"
     f"{CMS_ID_HEALTH_CITATIONS}?show-reference-ids=true"
 )
+
+# Nursing-home theme publication discovery (verified Aug 2026 audit).
+CMS_ORIGIN = "https://data.cms.gov"
+NH_THEME_ID = "nursing-homes"
+NH_THEME_ARCHIVE_INDEX = (
+    "https://data.cms.gov/provider-data/api/1/archive/aggregate/theme/nursing-homes/relative"
+)
+NH_THEME_DATASET_SOURCE_MAP: dict[str, str] = {
+    CMS_ID_PROVIDER_INFO: "cms.provider_info",
+    CMS_ID_HEALTH_CITATIONS: "cms.health_citations",
+    "y2hd-n93e": "cms.nh_ownership",
+}
+SOURCE_NH_THEME_DATASET_MAP: dict[str, str] = {
+    source_id: dataset_id for dataset_id, source_id in NH_THEME_DATASET_SOURCE_MAP.items()
+}
+THEME_PUBLICATION_SOURCES: frozenset[str] = frozenset(SOURCE_NH_THEME_DATASET_MAP)
 
 
 @dataclass(frozen=True)

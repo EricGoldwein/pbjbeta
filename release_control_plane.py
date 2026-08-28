@@ -74,6 +74,80 @@ CAPABILITY_LABELS = {
     "facility.sff_status": "SFF status",
 }
 
+CONSUMER_OPERATOR_LABELS: dict[str, str] = {
+    "premium facility bundles": "Facility provider bundles",
+    "premium facility citation tables": "Facility citation tables",
+    "PBJapp national combined; facility provider slices": "National + facility provider slices",
+    "public PBJ320.com Provider surfaces": "Public Provider pages (pbj-root)",
+    "benchmark pods; public state pages": "Benchmark pods & state pages",
+    "public /owners/* pages": "Public SNF owner pages",
+    "facility.citations": "Facility citation capability",
+    "facility.snf_owners": "SNF owners capability",
+    "ownership.enrollment_ccn_bridge": "Ownership CCN bridge",
+}
+
+# Derived artifact rebuild paths (national / publication consumers — not CMS sources).
+DERIVED_ARTIFACT_PIPELINES: dict[str, tuple[dict[str, str], ...]] = {
+    "cms.provider_info": (
+        {
+            "artifact": "provider_info_combined.csv",
+            "rebuild": "scripts/build_provider_info_combined.py",
+            "consumer": "PBJapp national combined; facility provider slices",
+        },
+        {
+            "artifact": "facility_*_provider_info_data.csv",
+            "rebuild": "facility packaging (registry-gated slice refresh)",
+            "consumer": "premium facility bundles",
+        },
+        {
+            "artifact": "pbj-root search / state aggregates",
+            "rebuild": "scripts/build_state_page_aggregates.py; generate_search_index.py (pbj-root)",
+            "consumer": "public PBJ320.com Provider surfaces",
+        },
+    ),
+    "cms.health_citations": (
+        {
+            "artifact": "facility_*_citations.csv",
+            "rebuild": "facility packaging (ACTIVE cms.health_citations gate)",
+            "consumer": "premium facility citation tables",
+        },
+    ),
+    "cms.pbj_nurse_staffing": (
+        {
+            "artifact": "state_quarterly_metrics.csv / national_quarterly_metrics.csv",
+            "rebuild": "generate_metrics.py / benchmark builders",
+            "consumer": "benchmark pods; public state pages",
+        },
+    ),
+    "cms.snf_all_owners": (
+        {
+            "artifact": "ownership indexes / SNF owner pages",
+            "rebuild": "scripts/build_snf_owners_index.py (pbj-root)",
+            "consumer": "public /owners/* pages",
+        },
+    ),
+}
+
+
+def stale_derived_consumers(root: Path | None = None) -> dict[str, list[str]]:
+    """Capabilities stale because a derived ACTIVE release lags its upstream CMS ACTIVE."""
+    active = load_registry(registry_path(root)).get("datasets", {})
+    stale: dict[str, list[str]] = {}
+    upstream_pairs = (("cms.provider_info", "cms.nh_ownership"),)
+    for upstream_id, derived_id in upstream_pairs:
+        upstream_release = (active.get(upstream_id) or {}).get("active_release_id")
+        derived_release = (active.get(derived_id) or {}).get("active_release_id")
+        if not upstream_release or not derived_release or upstream_release == derived_release:
+            continue
+        recorded = ((active.get(derived_id) or {}).get("metadata") or {}).get("upstream_releases") or {}
+        if recorded.get(upstream_id) == upstream_release:
+            continue
+        for capability in DEPENDENCY_GRAPH.get(derived_id, ()):
+            stale.setdefault(upstream_id, [])
+            if capability not in stale[upstream_id]:
+                stale[upstream_id].append(capability)
+    return stale
+
 
 def _state_dir(root: Path | None = None) -> Path:
     return control_plane_root(root) / "state"
@@ -126,6 +200,49 @@ def load_candidates(root: Path | None = None) -> dict[str, Any]:
     return payload
 
 
+def candidate_local_path(source_uri: str | None) -> Path | None:
+    """Resolve a file:// candidate URI to a local path (Windows-safe)."""
+    if not source_uri:
+        return None
+    raw = str(source_uri).strip()
+    if raw.startswith("file:///"):
+        raw = raw[8:]
+    elif raw.startswith("file://"):
+        raw = raw[7:]
+    from urllib.parse import unquote
+
+    decoded = unquote(raw)
+    if os.name == "nt" and decoded.startswith("/") and len(decoded) > 2 and decoded[2] == ":":
+        decoded = decoded[1:]
+    path = Path(decoded)
+    return path if path.is_file() else path
+
+
+def record_validated_pair(
+    records: dict[str, dict[str, Any]],
+    *,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Atomically write two VALIDATED candidate records. Does not promote ACTIVE."""
+    if not records:
+        raise ActiveReleaseError("validated pair requires candidate records")
+    now = datetime.now(timezone.utc).isoformat()
+    payload = load_candidates(root)
+    for dataset_id, record in records.items():
+        if str(record.get("state") or "") != ReleaseState.VALIDATED.value:
+            raise ActiveReleaseError(f"{dataset_id} is not VALIDATED")
+        validation = record.get("validation") if isinstance(record.get("validation"), dict) else {}
+        if validation.get("status") != "PASS":
+            raise ActiveReleaseError(f"{dataset_id} VALIDATED record requires validation.status=PASS")
+        source = candidate_local_path(record.get("source_uri"))
+        if source is None or not source.is_file():
+            raise ActiveReleaseError(f"{dataset_id} VALIDATED candidate requires an existing source file")
+        payload["datasets"][dataset_id] = dict(record)
+    payload["updated_at"] = now
+    _atomic_json(candidates_path(root), payload)
+    return payload
+
+
 def record_candidate(
     dataset_id: str,
     release_id: str,
@@ -161,6 +278,118 @@ def record_candidate(
     payload["updated_at"] = now
     _atomic_json(candidates_path(root), payload)
     return record
+
+
+def discard_candidate(
+    dataset_id: str,
+    *,
+    reason: str | None = None,
+    root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Remove a pending candidate record (does not touch ACTIVE registry)."""
+    payload = load_candidates(root)
+    removed = payload.get("datasets", {}).pop(dataset_id, None)
+    if removed is None:
+        return None
+    if reason:
+        meta = removed.get("metadata") if isinstance(removed.get("metadata"), dict) else {}
+        meta = dict(meta)
+        meta["discarded_reason"] = reason
+        meta["discarded_at"] = datetime.now(timezone.utc).isoformat()
+        removed["metadata"] = meta
+    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+    _atomic_json(candidates_path(root), payload)
+    return removed
+
+
+def _active_record_from_candidate(
+    dataset_id: str,
+    candidate: dict[str, Any],
+    *,
+    promoted_at: str,
+) -> dict[str, Any]:
+    """Build an ACTIVE registry row from a VALIDATED candidate (no I/O)."""
+    source = candidate_local_path(str(candidate.get("source_uri") or ""))
+    if source is None or not source.is_file():
+        raise ActiveReleaseError(f"{dataset_id} VALIDATED candidate requires a local source file")
+    validation = candidate.get("validation") if isinstance(candidate.get("validation"), dict) else {}
+    if validation.get("status") != "PASS":
+        raise ActiveReleaseError(f"{dataset_id} VALIDATED candidate requires validation.status=PASS")
+    validated_at = str(validation.get("validated_at") or promoted_at)
+    actual_hash = sha256_file(source)
+    if candidate.get("hash") and str(candidate.get("hash")).lower() != actual_hash:
+        raise ActiveReleaseError(f"{dataset_id} candidate hash does not match source file")
+    return {
+        "dataset_id": dataset_id,
+        "active_release_id": str(candidate["release_id"]),
+        "source_filename": source.name,
+        "source_uri": source.as_uri(),
+        "release_date": None,
+        "downloaded_at": candidate.get("downloaded_at"),
+        "validated_at": validated_at,
+        "hash": actual_hash,
+        "status": "ACTIVE",
+        "schema_version": 1,
+        "metadata": dict(candidate.get("metadata") or {}),
+        "promoted_at": promoted_at,
+    }
+
+
+def promote_active_pair(
+    dataset_ids: tuple[str, str],
+    *,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Atomically promote two VALIDATED candidates to ACTIVE (one write per registry file).
+
+    Restores the prior active_releases snapshot if the candidates write fails.
+    """
+    if len(dataset_ids) != 2 or len(set(dataset_ids)) != 2:
+        raise ActiveReleaseError("promote_active_pair requires two distinct dataset ids")
+    root = root or control_plane_root()
+    active_path = registry_path(root)
+    candidates_path_file = candidates_path(root)
+    candidates_payload = load_candidates(root)
+    active_payload = load_registry(active_path)
+    now = datetime.now(timezone.utc).isoformat()
+    release_ids: set[str] = set()
+    promoted_active: dict[str, dict[str, Any]] = {}
+
+    for dataset_id in dataset_ids:
+        candidate = (candidates_payload.get("datasets") or {}).get(dataset_id)
+        if not isinstance(candidate, dict) or candidate.get("state") != ReleaseState.VALIDATED.value:
+            raise ActiveReleaseError(f"{dataset_id} has no VALIDATED candidate to promote")
+        release_ids.add(str(candidate.get("release_id") or ""))
+        promoted_active[dataset_id] = _active_record_from_candidate(dataset_id, candidate, promoted_at=now)
+    if len(release_ids) != 1 or not release_ids.pop():
+        raise ActiveReleaseError("pair candidates must share one release_id")
+
+    for dataset_id in dataset_ids:
+        active_payload.setdefault("datasets", {})[dataset_id] = promoted_active[dataset_id]
+        cand = dict((candidates_payload.get("datasets") or {})[dataset_id])
+        prior_active = get_active_release(dataset_id, active_path)
+        cand["state"] = ReleaseState.ACTIVE.value
+        cand["promoted_at"] = now
+        cand["superseded_release_id"] = (prior_active or {}).get("active_release_id")
+        candidates_payload.setdefault("datasets", {})[dataset_id] = cand
+
+    active_payload["updated_at"] = now
+    candidates_payload["updated_at"] = now
+
+    active_backup = active_path.read_text(encoding="utf-8") if active_path.is_file() else None
+    try:
+        _atomic_json(active_path, active_payload)
+        _atomic_json(candidates_path_file, candidates_payload)
+    except Exception:
+        if active_backup is not None:
+            active_path.write_text(active_backup, encoding="utf-8")
+        raise
+
+    return {
+        "release_id": promoted_active[dataset_ids[0]]["active_release_id"],
+        "promoted_at": now,
+        "datasets": promoted_active,
+    }
 
 
 def promote_candidate(dataset_id: str, *, root: Path | None = None) -> dict[str, Any]:

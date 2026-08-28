@@ -132,7 +132,10 @@ def build_facility_citations_csv(
         if len(hit):
             parts.append(hit)
     if not parts:
-        return None
+        header_df = pd.read_csv(src, nrows=0, low_memory=False, dtype=str)
+        header_df.columns = [str(c).strip().replace("\ufeff", "") for c in header_df.columns]
+        header_df.to_csv(out_path, index=False)
+        return 0
     sub = pd.concat(parts, ignore_index=True)
     sub.to_csv(out_path, index=False)
     return int(len(sub))

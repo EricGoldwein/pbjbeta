@@ -10,6 +10,7 @@ import csv
 import json
 import re
 import tempfile
+import urllib.error
 import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
@@ -21,10 +22,155 @@ from release_control_plane import ReleaseState, record_candidate
 
 DATASET_ID = "cms.sff_pdf_list"
 OFFICIAL_AUGUST_2026_URL = "https://www.cms.gov/files/document/sff-posting-candidate-list-august-2026.pdf"
+SFF_POSTING_URL_TEMPLATE = "https://www.cms.gov/files/document/sff-posting-candidate-list-{month_slug}-{year}.pdf"
+SFF_POSTING_UPDATED_RE = re.compile(r"Updated\s+([A-Za-z]+)\s+(20\d{2})", re.I)
+_MONTH_SLUGS = (
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+)
+_MONTH_NAME_TO_NUM = {name: index for index, name in enumerate(_MONTH_SLUGS, start=1)}
 CATEGORIES = {"Table A": "CURRENT_SFF", "Table B": "GRADUATED", "Table C": "NO_LONGER_PARTICIPATING", "Table D": "SFF_CANDIDATE"}
 PBJ_TABLE_FILES = {"Table A": "sff_table_a.csv", "Table B": "sff_table_b.csv", "Table C": "sff_table_c.csv", "Table D": "sff_table_d.csv"}
 USPS = set("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU MP AS".split())
 CCN_RE = re.compile(r"^[0-9A-Z]{6}$")
+
+
+def sff_posting_url_candidates(*, months_back: int = 8, anchor: datetime | None = None) -> list[tuple[str, str]]:
+    """Return ``(url, url_release_id)`` pairs newest-first for recent CMS posting slugs."""
+    now = anchor or datetime.now(timezone.utc)
+    year, month = now.year, now.month
+    out: list[tuple[str, str]] = []
+    for _ in range(max(1, months_back)):
+        slug = _MONTH_SLUGS[month - 1]
+        url_release_id = f"{year}-{month:02d}"
+        url = SFF_POSTING_URL_TEMPLATE.format(month_slug=slug, year=year)
+        out.append((url, url_release_id))
+        month -= 1
+        if month < 1:
+            month = 12
+            year -= 1
+    return out
+
+
+def parse_sff_posting_updated_label(pdf_bytes: bytes) -> tuple[str, str] | None:
+    """Parse ``Updated August 2026`` from CMS SFF posting PDF bytes or metadata."""
+    for pattern in (
+        SFF_POSTING_UPDATED_RE,
+        re.compile(r"/Title\s*\([^)]*Updated\s+([A-Za-z]+)\s+(20\d{2})", re.I),
+    ):
+        match = pattern.search(pdf_bytes.decode("latin-1", errors="ignore"))
+        if not match:
+            continue
+        month_num = _MONTH_NAME_TO_NUM.get(match.group(1).lower())
+        if not month_num:
+            continue
+        year = int(match.group(2))
+        release_id = f"{year}-{month_num:02d}"
+        label = f"{match.group(1).title()} {year}"
+        return release_id, label
+    return None
+
+
+def _fetch_sff_posting_pdf(
+    url: str,
+    *,
+    fetch_bytes: Any | None = None,
+) -> tuple[int, bytes | None]:
+    if fetch_bytes is not None:
+        payload = fetch_bytes(url)
+        if not payload or not payload.startswith(b"%PDF-"):
+            return 404, None
+        return 200, payload
+    req = urllib.request.Request(url, headers={"User-Agent": "PBJ-data-ops/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            status = getattr(response, "status", 200) or 200
+            payload = response.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code in {403, 404, 410}:
+            return exc.code, None
+        raise
+    if status in {404, 410} or not payload.startswith(b"%PDF-"):
+        return 404, None
+    return status, payload
+
+
+def discover_latest_cms_sff_posting(
+    *,
+    fetch_bytes: Any | None = None,
+    months_back: int = 8,
+    anchor: datetime | None = None,
+) -> dict[str, Any]:
+    """Discover the newest CMS-posted SFF PDF by slug probe + ``Updated …`` label."""
+    discovered: list[dict[str, Any]] = []
+    for url, url_release_id in sff_posting_url_candidates(months_back=months_back, anchor=anchor):
+        status, payload = _fetch_sff_posting_pdf(url, fetch_bytes=fetch_bytes)
+        if status != 200 or not payload:
+            continue
+        parsed = parse_sff_posting_updated_label(payload)
+        if parsed:
+            release_id, posting_label = parsed
+        else:
+            release_id, posting_label = url_release_id, url_release_id
+        discovered.append(
+            {
+                "source_url": url,
+                "url_release_id": url_release_id,
+                "release_id": release_id,
+                "posting_label": posting_label,
+            }
+        )
+    if not discovered:
+        raise RuntimeError("no CMS SFF posting PDF discovered at monitored slug URLs")
+    discovered.sort(key=lambda row: (row["release_id"], row["url_release_id"]), reverse=True)
+    best = discovered[0]
+    return {
+        "release_id": best["release_id"],
+        "posting_label": best["posting_label"],
+        "source_url": best["source_url"],
+        "url_release_id": best["url_release_id"],
+        "candidates": discovered,
+    }
+
+
+def check_sff_cms(
+    *,
+    fetch_bytes: Any | None = None,
+    root: Path | None = None,
+    months_back: int = 8,
+) -> dict[str, Any]:
+    """Compare ACTIVE ``cms.sff_pdf_list`` against the newest CMS-posted SFF PDF."""
+    control_root = (root or Path(__file__).resolve().parent).resolve()
+    active = get_active_release(DATASET_ID, registry_path(control_root)) or {}
+    active_id = active.get("active_release_id")
+    cms = discover_latest_cms_sff_posting(fetch_bytes=fetch_bytes, months_back=months_back)
+    cms_release_id = str(cms["release_id"])
+    cms_is_newer = bool(active_id and cms_release_id != str(active_id))
+    if not active_id:
+        cms_is_newer = True
+    return {
+        "action": "check_cms",
+        "cms": {
+            "release_id": cms_release_id,
+            "posting_label": cms["posting_label"],
+            "source_url": cms["source_url"],
+            "url_release_id": cms["url_release_id"],
+            "candidates_found": len(cms.get("candidates") or []),
+        },
+        "active_release_id": active_id,
+        "cms_is_newer": cms_is_newer,
+        "status": "CURRENT" if active_id and not cms_is_newer else ("NEWER_AVAILABLE" if cms_is_newer else "UNKNOWN"),
+    }
 
 
 def _rows_from_pdf(pdf_path: Path) -> list[dict[str, str]]:

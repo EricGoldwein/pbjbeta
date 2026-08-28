@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from active_release_registry import load_registry, promote_release
@@ -21,6 +20,26 @@ def test_detect_validate_and_explicitly_promote(tmp_path: Path, monkeypatch) -> 
     assert load_registry(registry)["datasets"][feed.dataset_id]["active_release_id"] == "CY2026Q1"
     promote_candidate(feed.dataset_id, root=tmp_path)
     assert load_registry(registry)["datasets"][feed.dataset_id]["active_release_id"] == "CY2026Q2"
+
+
+def test_nurse_current_check_includes_publisher_release_id(monkeypatch) -> None:
+    from release_check import production_handlers
+
+    monkeypatch.setattr(
+        "cms_data_ops.check_nurse_cms",
+        lambda **_: {
+            "cms": {"quarter_label": "CY2026Q1"},
+            "cms_is_newer": False,
+        },
+    )
+    monkeypatch.setattr(
+        "active_release_registry.load_registry",
+        lambda _path=None: {"datasets": {"cms.pbj_nurse_staffing": {"active_release_id": "CY2026Q1"}}},
+    )
+    result = production_handlers()["cms.pbj_nurse_staffing"](False)
+    assert result["status"] == "CURRENT"
+    assert result["release_id"] == "CY2026Q1"
+    assert result["publisher_latest_release_id"] == "CY2026Q1"
 
 
 def test_schema_failure_preserves_active(tmp_path: Path, monkeypatch) -> None:

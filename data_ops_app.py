@@ -1,8 +1,9 @@
 """PBJ Data Ops — Flask control-plane entrypoint.
 
+  Local (canonical):  .\\scripts\\start_local_data_ops.ps1  →  http://127.0.0.1:8510/
+
   export PBJ_DATA_OPS_PASSWORD='…'
   export PBJ_DATA_OPS_SECRET='…'   # optional; session signing (separate from password)
-  python data_ops_app.py
 
 UI → this app → cms_data_ops / data_ops_* services → canonical pipelines.
 Does not deploy, does not write pbj-root, does not use Streamlit.
@@ -17,6 +18,7 @@ import secrets
 import sys
 from functools import wraps
 from pathlib import Path
+from typing import Any
 
 from flask import (
     Flask,
@@ -25,6 +27,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_from_directory,
     session,
     url_for,
 )
@@ -42,6 +45,7 @@ from cms_data_ops import (  # noqa: E402
     build_source_operator_workflow,
     check_nurse_cms,
     check_provider_info_cms,
+    check_sff_cms,
     derived_signals_payload,
     format_do_timestamp,
     format_release_month_label,
@@ -79,7 +83,19 @@ SECRET_ENV = "PBJ_DATA_OPS_SECRET"
 COOKIE_NAME = "pbj_data_ops_auth"
 
 
-def _source_detail_context(source_id: str) -> dict | None:
+def _pbj_favicon_path() -> Path | None:
+    configured = (os.environ.get("PBJ_REPO_ROOT") or "").strip()
+    if configured:
+        candidate = Path(configured).resolve() / "pbj_favicon.png"
+        if candidate.is_file():
+            return candidate
+    sibling = (_ROOT.parent / "PBJapp" / "pbj_favicon.png").resolve()
+    if sibling.is_file():
+        return sibling
+    return None
+
+
+def _source_detail_context(source_id: str, *, theme_publication: Any | None = None) -> dict | None:
     rec = get_source(source_id)
     control = control_panel_payload()
     release_checks = load_check_state()
@@ -88,10 +104,22 @@ def _source_detail_context(source_id: str) -> dict | None:
     if rec is None and control_row is None:
         return None
     snap = next(
-        (s for s in probe_all_sources(check_cms=True) if s.source_id == source_id),
+        (s for s in probe_all_sources(check_cms=True, theme_publication=theme_publication) if s.source_id == source_id),
         None,
     )
     snapshot = overlay_control_plane_on_snapshot(snap, control) if snap else None
+    if (
+        snapshot
+        and source_id == "cms.health_citations"
+        and theme_publication is not None
+        and snapshot.get("error")
+    ):
+        detail = str(snapshot.get("detail") or "")
+        if "probe failed" in detail.lower():
+            snapshot = dict(snapshot)
+            snapshot.pop("error", None)
+            if snapshot.get("active_release_id"):
+                snapshot["detail"] = "ACTIVE release governed; CMS discovery via theme publication."
     record = rec.to_dict() if rec is not None else minimal_record_for_dataset(source_id)
     availability = build_release_availability_context(
         source_id,
@@ -99,6 +127,7 @@ def _source_detail_context(source_id: str) -> dict | None:
         check_row=check_by_dataset.get(source_id),
         snapshot=snapshot,
         record=record,
+        theme_publication=theme_publication,
     )
     workflow = build_source_operator_workflow(
         source_id,
@@ -106,6 +135,7 @@ def _source_detail_context(source_id: str) -> dict | None:
         snapshot=snapshot,
         control_row=control_row,
         release_availability=availability,
+        theme_publication=theme_publication,
     )
     return {
         "record": record,
@@ -114,6 +144,14 @@ def _source_detail_context(source_id: str) -> dict | None:
         "workflow": workflow,
         "release_availability": availability,
     }
+
+
+def _theme_publication_for_ui(check_cms: bool):
+    if not check_cms:
+        return None
+    from cms_theme_publication import get_latest_nh_theme_publication
+
+    return get_latest_nh_theme_publication()
 
 
 def create_app() -> Flask:
@@ -162,6 +200,7 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_brand():
+        favicon_path = _pbj_favicon_path()
         return {
             "brand_assets": {
                 "instructions": False,
@@ -171,6 +210,7 @@ def create_app() -> Flask:
                 "fonts_via": "fonts.google.com CDN (local DM Sans/Mono unavailable)",
                 "mark": "PBJ320 CSS text mark (templates/partials/v2/brand_*)",
             },
+            "favicon_href": url_for("favicon_ico") if favicon_path else None,
             "next_automation": recommended_next_automation(),
             "do_datetime": format_do_timestamp,
             "source_labels": {r.source_id: r.human_name for r in get_registry()},
@@ -183,6 +223,13 @@ def create_app() -> Flask:
     @app.template_filter("do_release_label")
     def _do_release_label_filter(value: str | None) -> str:
         return format_release_month_label(value) or "—"
+
+    @app.get("/favicon.ico")
+    def favicon_ico():
+        favicon_path = _pbj_favicon_path()
+        if not favicon_path:
+            return ("", 404)
+        return send_from_directory(favicon_path.parent, favicon_path.name, mimetype="image/png")
 
     @app.get("/login")
     def login():
@@ -228,6 +275,7 @@ def create_app() -> Flask:
     @require_auth
     def sources():
         check_cms = request.args.get("check_cms", "1") != "0"
+        theme_publication = _theme_publication_for_ui(check_cms)
         control = control_panel_payload()
         release_checks = load_check_state()
         check_by_dataset = {row["dataset_id"]: row for row in release_checks.get("datasets", [])}
@@ -236,11 +284,29 @@ def create_app() -> Flask:
             control=control,
             check_by_dataset=check_by_dataset,
             snapshots=snaps,
+            theme_publication=theme_publication,
         )
+        availability_by_dataset: dict[str, dict] = {}
+        for row in control.get("datasets") or []:
+            dataset_id = row.get("dataset_id")
+            if not dataset_id:
+                continue
+            rec = get_source(dataset_id)
+            record_dict = rec.to_dict() if rec else minimal_record_for_dataset(dataset_id)
+            availability_by_dataset[dataset_id] = build_release_availability_context(
+                dataset_id,
+                control_row=row,
+                check_row=check_by_dataset.get(dataset_id),
+                snapshot=next((s for s in snaps if s.get("source_id") == dataset_id), None),
+                record=record_dict,
+                theme_publication=theme_publication,
+            )
         return render_template(
             "data_ops/sources.html",
             snapshots=snaps,
             check_cms=check_cms,
+            theme_publication=theme_publication,
+            availability_by_dataset=availability_by_dataset,
             signals=derived_signals_payload(),
             registry=[r.to_dict() for r in get_registry()],
             active_releases=load_registry().get("datasets", {}),
@@ -265,7 +331,20 @@ def create_app() -> Flask:
     @app.get("/sources/<source_id>")
     @require_auth
     def source_detail(source_id: str):
-        ctx = _source_detail_context(source_id)
+        from ownership_pairing import PAIR_SOURCE_ID, build_pair_operator_context
+
+        check_cms = request.args.get("check_cms", "1") != "0"
+        if source_id == PAIR_SOURCE_ID:
+            ctx = build_pair_operator_context(check_cms=check_cms)
+            if ctx is None:
+                flash("No pending ownership pair", "error")
+                return redirect(url_for("sources"))
+            ctx["panel_mode"] = "page"
+            return render_template("data_ops/partials/ownership_pair_panel.html", **ctx)
+        ctx = _source_detail_context(
+            source_id,
+            theme_publication=_theme_publication_for_ui(check_cms),
+        )
         if ctx is None:
             flash("Unknown source", "error")
             return redirect(url_for("sources"))
@@ -274,11 +353,109 @@ def create_app() -> Flask:
     @app.get("/sources/<source_id>/panel")
     @require_auth
     def source_detail_panel(source_id: str):
-        ctx = _source_detail_context(source_id)
+        from ownership_pairing import PAIR_SOURCE_ID, build_pair_operator_context
+
+        check_cms = request.args.get("check_cms", "1") != "0"
+        if source_id == PAIR_SOURCE_ID:
+            ctx = build_pair_operator_context(check_cms=check_cms)
+            if ctx is None:
+                return ("No pending ownership pair", 404)
+            ctx["panel_mode"] = "modal"
+            return render_template("data_ops/partials/ownership_pair_panel.html", **ctx)
+        ctx = _source_detail_context(
+            source_id,
+            theme_publication=_theme_publication_for_ui(check_cms),
+        )
         if ctx is None:
             return ("Unknown source", 404)
         ctx["panel_mode"] = "modal"
         return render_template("data_ops/partials/source_detail_panel.html", **ctx)
+
+    @app.post("/actions/ownership-pair/validate")
+    @require_auth
+    def action_ownership_pair_validate():
+        from ownership_pairing import PairValidationError, validate_ownership_pair
+
+        try:
+            result = validate_ownership_pair()
+            flash(f"Ownership pair {result.get('release_id')} validated", "ok")
+        except PairValidationError as exc:
+            flash(str(exc), "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Pair validation failed: {exc}", "error")
+        return redirect(url_for("sources"))
+
+    @app.post("/actions/ownership-pair/activate")
+    @require_auth
+    def action_ownership_pair_activate():
+        from ownership_pairing import PairPromotionUnavailable, promote_ownership_pair
+
+        try:
+            result = promote_ownership_pair()
+            flash(
+                f"Ownership pair {result.get('release_id')} activated · next: rebuild downstream",
+                "ok",
+            )
+        except PairPromotionUnavailable as exc:
+            flash(str(exc), "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Pair activation failed: {exc}", "error")
+        return redirect(url_for("sources"))
+
+    @app.post("/actions/citation-packages/rebuild")
+    @require_auth
+    def action_citation_packages_rebuild():
+        from citation_packages_rebuild import CitationPackagesRebuildError, rebuild_citation_packages
+
+        ccns = [c.strip() for c in request.form.getlist("ccn") if c.strip()]
+        try:
+            result = rebuild_citation_packages(ccns=ccns or None)
+            rebuilt = result.get("rebuilt") or []
+            failed = result.get("failed") or []
+            remaining = int(result.get("stale_remaining") or 0)
+            if failed:
+                flash(
+                    f"Citation rebuild: {len(rebuilt)} ok, {len(failed)} failed, {remaining} stale remaining",
+                    "error",
+                )
+            elif remaining:
+                flash(
+                    f"Citation rebuild: {len(rebuilt)} updated · {remaining} packages still stale",
+                    "error",
+                )
+            elif rebuilt:
+                flash(f"Citation packages rebuilt for {len(rebuilt)} facilit{'y' if len(rebuilt) == 1 else 'ies'}", "ok")
+            else:
+                flash("No stale citation packages to rebuild", "ok")
+        except CitationPackagesRebuildError as exc:
+            flash(str(exc), "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Citation package rebuild failed: {exc}", "error")
+        return redirect(url_for("sources"))
+
+    @app.post("/actions/ownership-downstream/rebuild")
+    @require_auth
+    def action_ownership_downstream_rebuild():
+        from ownership_downstream_rebuild import OwnershipRebuildError, rebuild_ownership_downstream
+
+        try:
+            result = rebuild_ownership_downstream()
+            remaining = result.get("stale_capabilities_remaining") or []
+            if remaining:
+                flash(
+                    f"Ownership rebuild finished with remaining stale: {', '.join(remaining)}",
+                    "error",
+                )
+            else:
+                flash(
+                    f"Ownership downstream rebuilt for {result.get('release_label') or result.get('release_id')}",
+                    "ok",
+                )
+        except OwnershipRebuildError as exc:
+            flash(str(exc), "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Ownership rebuild failed: {exc}", "error")
+        return redirect(url_for("sources"))
 
     @app.get("/api/control-plane/status")
     @require_auth
@@ -328,6 +505,33 @@ def create_app() -> Flask:
             flash(f"Acquire failed: {exc}", "error")
         return redirect(url_for("sources"))
 
+    @app.post("/actions/health-citations/validate")
+    @require_auth
+    def action_citations_validate():
+        release_id = (request.form.get("release_id") or request.args.get("release_id") or "").strip()
+        if not release_id:
+            flash("Missing release_id for Health Citations validation", "error")
+            return redirect(url_for("sources"))
+        try:
+            from health_citations_acquire import prepare_health_citations_validated_candidate
+
+            result = prepare_health_citations_validated_candidate(release_id)
+            candidate = (result.get("candidate") or {}).get("release_id") or release_id
+            flash(
+                f"Health Citations {candidate} validated — ready for activation review",
+                "ok",
+            )
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Validate failed: {exc}", "error")
+            return redirect(url_for("sources"))
+        return redirect(
+            url_for(
+                "release_review",
+                source_id="cms.health_citations",
+                release_id=release_id,
+            )
+        )
+
     @app.post("/actions/nurse/check")
     @require_auth
     def action_nurse_check():
@@ -346,6 +550,20 @@ def create_app() -> Flask:
         except Exception as exc:  # noqa: BLE001
             flash(f"Nurse check failed: {exc}", "error")
         return redirect(url_for("sources"))
+
+    @app.post("/actions/sff/check")
+    @require_auth
+    def action_sff_check():
+        try:
+            result = check_sff_cms()
+            cms = result.get("cms") or {}
+            flash(
+                f"SFF CMS {cms.get('posting_label') or cms.get('release_id')} · newer={result.get('cms_is_newer')}",
+                "ok",
+            )
+        except Exception as exc:  # noqa: BLE001
+            flash(f"SFF check failed: {exc}", "error")
+        return redirect(request.form.get("next") or url_for("sources"))
 
     @app.post("/actions/nurse/acquire")
     @require_auth
@@ -368,16 +586,53 @@ def create_app() -> Flask:
             flash(f"Nurse acquire failed: {exc}", "error")
         return redirect(url_for("sources"))
 
+    @app.post("/actions/nurse/dismiss-candidate")
+    @require_auth
+    def action_nurse_dismiss_candidate():
+        from operator_freshness import audit_nurse_staffing_candidate_state
+        from release_control_plane import control_panel_payload, discard_candidate
+
+        control = control_panel_payload()
+        row = next(
+            (r for r in control.get("datasets") or [] if r.get("dataset_id") == "cms.pbj_nurse_staffing"),
+            None,
+        )
+        audit = audit_nurse_staffing_candidate_state(control_row=row)
+        if not audit.get("is_redundant_reacquisition"):
+            flash("Nurse candidate is not a safe redundant re-acquisition to dismiss.", "error")
+            return redirect(url_for("sources"))
+        removed = discard_candidate(
+            "cms.pbj_nurse_staffing",
+            reason=audit.get("kind") or "redundant_same_quarter_reacquisition",
+        )
+        if removed:
+            flash(f"Dismissed redundant CY2026Q1 re-acquisition candidate.", "ok")
+        else:
+            flash("No nurse candidate to dismiss.", "error")
+        return redirect(url_for("sources"))
+
     @app.get("/release-review")
     @require_auth
     def release_review():
+        check_cms = request.args.get("check_cms", "1") != "0"
+        focus_source_id = (request.args.get("source_id") or "").strip() or None
+        focus_release_id = (request.args.get("release_id") or "").strip() or None
+        theme_publication = _theme_publication_for_ui(check_cms)
         control = control_panel_payload()
-        items = release_review_items(check_cms=True, control=control)
+        items = release_review_items(
+            check_cms=check_cms,
+            control=control,
+            theme_publication=theme_publication,
+            focus_source_id=focus_source_id,
+            focus_release_id=focus_release_id,
+        )
         return render_template(
             "data_ops/release_review.html",
             items=items,
             audit=read_audit(limit=50),
             control=control,
+            focus_source_id=focus_source_id,
+            focus_release_id=focus_release_id,
         )
 
     @app.post("/actions/acknowledge")
@@ -391,24 +646,40 @@ def create_app() -> Flask:
             flash(f"Acknowledged {source_id} {release_id}", "ok")
         except Exception as exc:  # noqa: BLE001
             flash(str(exc), "error")
-        return redirect(url_for("release_review"))
+        return redirect(
+            url_for(
+                "release_review",
+                source_id=source_id or None,
+                release_id=release_id or None,
+            )
+        )
 
     @app.post("/actions/approve")
     @require_auth
     def action_approve():
+        from release_review_policy import assert_promotion_eligible, post_activation_operator_target
+
         source_id = (request.form.get("source_id") or "").strip()
         release_id = (request.form.get("release_id") or "").strip()
         note = (request.form.get("note") or "").strip()
-        # Form may display Zweli status but must never be authoritative.
         _ = request.form.get("zweli_status")
         try:
+            assert_promotion_eligible(source_id, release_id)
             approve_release_authoritative(source_id, release_id, note=note)
-            flash(f"Approved {source_id} {release_id}", "ok")
+            target = post_activation_operator_target(source_id, release_id=release_id)
+            flash(target["flash"], "ok")
+            return redirect(url_for(target["redirect_endpoint"], **target["redirect_args"]))
         except ApprovalError as exc:
             flash(str(exc), "error")
         except Exception as exc:  # noqa: BLE001
             flash(str(exc), "error")
-        return redirect(url_for("release_review"))
+        return redirect(
+            url_for(
+                "release_review",
+                source_id=source_id or None,
+                release_id=release_id or None,
+            )
+        )
 
     @app.get("/dashboard-builder")
     @require_auth
@@ -509,6 +780,8 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    url = f"http://127.0.0.1:{port}/"
+    print(f"Data Ops listening: {url}", flush=True)
     app.run(host="127.0.0.1", port=port, debug=False)
     return 0
 

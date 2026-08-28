@@ -1,8 +1,11 @@
 {% macro render_workflow_action(action) %}
 {% if action and action.wired %}
   {% set args = action.get('endpoint_args') or {} %}
-  {% if action.get('method') == 'post' and not action.get('read_only') %}
+  {% if action.get('method') == 'post' %}
   <form class="do-inline" method="post" action="{{ url_for(action.endpoint, **args) }}">
+    {% if action.get('return_to') %}
+    <input type="hidden" name="next" value="{{ action.return_to }}">
+    {% endif %}
     <button class="do-btn do-btn-compact do-btn-primary" type="submit">{{ action.label }}</button>
   </form>
   {% else %}
@@ -11,10 +14,38 @@
 {% endif %}
 {% endmacro %}
 
+{% macro render_pair_primary_action(action) %}
+{% if action %}
+  {% if action.get('submit_wired') and action.get('submit_endpoint') %}
+  <form class="do-inline" method="post" action="{{ url_for(action.submit_endpoint) }}">
+    <button class="do-btn do-btn-compact do-btn-primary" type="submit">{{ action.label }}</button>
+  </form>
+  {% elif action.get('kind') == 'activate_pair' and not action.get('submit_wired') %}
+  <span class="do-attention-unwired">Not yet wired</span>
+  <span class="do-muted do-tiny do-attention-unwired-hint">{{ action.label }}</span>
+  {% else %}
+  <span class="do-muted do-small">{{ action.label }}</span>
+  {% endif %}
+{% endif %}
+{% endmacro %}
+
 {% macro render_attention_primary_action(action) %}
 {% if action %}
-  {% if action.wired and not action.get('read_only') %}
+  {% if action.get('opens_panel') or action.get('action_kind') == 'open_panel' %}
+  <button type="button" class="do-btn do-btn-compact do-btn-primary" data-do-source-panel="{{ url_for('source_detail_panel', **(action.get('endpoint_args') or {})) }}">{{ action.label }}</button>
+  {% elif action.wired and action.get('method') == 'post' and not action.get('read_only') %}
+  <form class="do-inline" method="post" action="{{ url_for(action.endpoint, **(action.get('endpoint_args') or {})) }}">
+    <button class="do-btn do-btn-compact do-btn-primary" type="submit">{{ action.label }}</button>
+  </form>
+  {% elif action.wired and not action.get('read_only') %}
     {{ render_workflow_action(action) }}
+  {% elif action.wired and action.get('read_only') and action.get('method') == 'post' %}
+  <form class="do-inline" method="post" action="{{ url_for(action.endpoint, **(action.get('endpoint_args') or {})) }}">
+    {% if action.get('return_to') %}
+    <input type="hidden" name="next" value="{{ action.return_to }}">
+    {% endif %}
+    <button class="do-btn do-btn-compact do-btn-primary" type="submit">{{ action.label }}</button>
+  </form>
   {% elif action.wired and action.get('read_only') %}
   <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for(action.endpoint, **(action.get('endpoint_args') or {})) }}">{{ action.label }}</a>
   {% else %}

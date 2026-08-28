@@ -1,4 +1,4 @@
-{% from 'data_ops/partials/source_detail_macros.html' import render_workflow_action %}
+{% from 'data_ops/partials/source_detail_macros.html' import render_workflow_action, render_attention_primary_action %}
 
 {% if panel_mode == 'modal' %}
 <header class="do-panel-head">
@@ -10,8 +10,79 @@
 </header>
 {% endif %}
 
-{% if workflow %}
+{% if workflow and workflow.freshness_layers and record.source_id in ['cms.health_citations', 'cms.snf_all_owners', 'cms.snf_enrollments'] %}
+<section class="do-operator-ref do-section do-section-primary">
+  <div class="do-operator-ref-head">
+    <h3 class="do-section-title-sm">At a glance</h3>
+    {% if workflow.operator_reference %}
+    <span class="do-badge do-badge-{{ workflow.operator_reference.status_tone }}">{{ workflow.operator_reference.status_label }}</span>
+    {% endif %}
+  </div>
+
+  <ul class="do-freshness-layers">
+    {% for layer in workflow.freshness_layers %}
+    <li class="do-freshness-layer do-freshness-{{ layer.status }}">
+      <div class="do-freshness-layer-head">
+        <span class="do-freshness-layer-label">{{ layer.label }}</span>
+        <span class="do-badge do-badge-{{ 'active' if layer.status == 'current' else 'attention' }}">{{ layer.status_label }}</span>
+      </div>
+      <p class="do-muted do-small do-freshness-layer-detail">{{ layer.detail }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <div class="do-next-action do-next-action-compact">
+    <h4 class="do-subhead">Next action</h4>
+    <p class="do-next-action-label">{{ workflow.next_action.label }}</p>
+    <p class="do-muted do-small">{{ workflow.next_action.detail }}</p>
+    <div class="do-actions do-actions-inline">
+      {{ render_attention_primary_action(workflow.next_action) }}
+      {% if workflow.operator_reference and workflow.operator_reference.show_release_review %}
+      <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for('release_review', **(workflow.next_action.endpoint_args or {'source_id': record.source_id})) }}">Release Review</a>
+      {% endif %}
+    </div>
+    {% if workflow.next_action.not_wired_label %}
+    <p class="do-muted do-tiny">{{ workflow.next_action.not_wired_label }}</p>
+    {% endif %}
+  </div>
+</section>
+
+{% set pf = workflow.provenance_freshness if workflow else none %}
+{% if pf %}
+<details class="do-collapse-panel">
+  <summary>Provenance &amp; details</summary>
+  <dl class="do-dl do-dl-wide do-dl-compact">
+    <div><dt>Publication date</dt><dd class="do-mono do-small">{{ pf.cms_publication_date or '—' }}</dd></div>
+    <div><dt>Processing modified</dt><dd class="do-mono do-small">{{ pf.processing_modified_date or '—' }}</dd></div>
+    <div><dt>Canonical artifact</dt><dd class="do-mono do-small do-provenance-path">{{ pf.canonical_artifact_path or '—' }}</dd></div>
+    <div><dt>SHA-256</dt><dd class="do-mono do-small do-provenance-hash">{{ pf.sha256 or '—' }}</dd></div>
+    <div><dt>Validated</dt><dd {% if pf.validated_at %}title="{{ pf.validated_at }}"{% endif %}>{{ pf.validated_at | do_datetime if pf.validated_at else '—' }}</dd></div>
+    <div><dt>Activated</dt><dd {% if pf.activated_at %}title="{{ pf.activated_at }}"{% endif %}>{{ pf.activated_at | do_datetime if pf.activated_at else '—' }}</dd></div>
+  </dl>
+  {% if pf.downstream_artifacts %}
+  <table class="do-table do-table-compact">
+    <thead><tr><th>Output</th><th>Freshness</th><th>Rebuild path</th></tr></thead>
+    <tbody>
+      {% for row in pf.downstream_artifacts %}
+      <tr>
+        <td class="do-small">{{ row.operator_label or row.consumer or row.artifact }}</td>
+        <td><span class="do-badge do-badge-{{ 'attention' if row.freshness == 'STALE' else 'active' }}">{{ row.freshness }}</span></td>
+        <td class="do-small do-muted do-provenance-path">{{ row.rebuild or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</details>
+{% endif %}
+
+{% elif workflow %}
 <section class="do-workflow-panel{% if panel_mode != 'modal' %} do-section do-section-primary{% endif %}">
+  {% if workflow.candidate_audit and workflow.candidate_audit.same_quarter %}
+  <div class="do-callout do-callout-attention">
+    <p class="do-small"><strong>Same quarter, two records.</strong> {{ workflow.candidate_audit.summary }}</p>
+  </div>
+  {% endif %}
   <div class="do-workflow-head">
     <h3 class="do-section-title-sm">{% if panel_mode == 'modal' %}Workflow{% else %}Operator workflow{% endif %}</h3>
     {% if snapshot %}
@@ -72,14 +143,14 @@
         {% else %}—{% endif %}
       </dd>
     </div>
+    {% if workflow.zweli_status %}
     <div>
       <dt>Zweli</dt>
       <dd>
-        {% if workflow.zweli_status %}
         <span class="do-badge do-zweli-{{ workflow.zweli_status|lower|replace('_','-') }}">{{ workflow.zweli_status }}</span>
-        {% else %}<span class="do-muted">—</span>{% endif %}
       </dd>
     </div>
+    {% endif %}
     <div>
       <dt>Downstream</dt>
       <dd>
@@ -98,7 +169,9 @@
     <p class="do-muted do-small">{{ workflow.next_action.detail }}</p>
     <div class="do-actions do-actions-inline">
       {{ render_workflow_action(workflow.next_action) }}
-      <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for('release_review') }}">Release Review</a>
+      {% if workflow.operator_reference and workflow.operator_reference.show_release_review %}
+      <a class="do-btn do-btn-compact do-btn-ghost" href="{% if workflow.pending_state == 'VALIDATED' and workflow.pending_release_id %}{{ url_for('release_review', source_id=record.source_id, release_id=workflow.pending_release_id) }}{% else %}{{ url_for('release_review') }}{% endif %}">Release Review</a>
+      {% endif %}
     </div>
   </div>
 
@@ -127,28 +200,75 @@
 {% endif %}
 
 {% if record.source_id == 'cms.provider_info' and panel_mode != 'modal' %}
-<section class="do-section do-section-actions">
-  <h2 class="do-section-title-sm">Provider Information actions</h2>
-  <div class="do-actions">
+<details class="do-collapse-panel">
+  <summary>Advanced actions · Provider Information</summary>
+  <div class="do-actions do-actions-inline">
     <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
     <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
+    <form method="post" action="{{ url_for('action_pi_acquire') }}">
+      <input type="hidden" name="dry_run" value="1">
+      <button class="do-btn do-btn-compact do-btn-ghost" type="submit">Dry-run</button>
+    </form>
   </div>
-</section>
+  {% if session.get('last_pi_action') %}
+  <pre class="do-pre do-pre-compact">{{ session.get('last_pi_action') | tojson(indent=2) }}</pre>
+  {% endif %}
+</details>
 {% elif record.source_id == 'cms.pbj_nurse_staffing' and panel_mode != 'modal' %}
-<section class="do-section do-section-actions">
-  <h2 class="do-section-title-sm">PBJ nurse staffing actions</h2>
-  <div class="do-actions">
+<details class="do-collapse-panel">
+  <summary>Advanced actions · PBJ nurse staffing</summary>
+  <div class="do-actions do-actions-inline">
     <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
     <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
+    <form method="post" action="{{ url_for('action_nurse_acquire') }}">
+      <input type="hidden" name="dry_run" value="1">
+      <button class="do-btn do-btn-compact do-btn-ghost" type="submit">Dry-run</button>
+    </form>
   </div>
-</section>
+  {% if session.get('last_nurse_action') %}
+  <pre class="do-pre do-pre-compact">{{ session.get('last_nurse_action') | tojson(indent=2) }}</pre>
+  {% endif %}
+</details>
 {% endif %}
 
-{% if snapshot and snapshot.detail %}
+{% if snapshot and snapshot.detail and record.source_id != 'cms.health_citations' %}
 <p class="do-muted do-small">{{ snapshot.detail }}</p>
 {% endif %}
 
-{% if control_row %}
+{% if control_row and record.source_id != 'cms.health_citations' %}
+<details class="do-collapse-panel">
+  <summary>Provenance &amp; freshness</summary>
+  {% set pf = workflow.provenance_freshness if workflow else none %}
+  {% if pf %}
+  <dl class="do-dl do-dl-wide do-dl-compact">
+    <div><dt>Publisher</dt><dd>{{ pf.publisher }}</dd></div>
+    <div><dt>CMS publication</dt><dd class="do-mono do-small">{{ pf.cms_publication_id or '—' }}{% if pf.cms_publication_date %} · {{ pf.cms_publication_date }}{% endif %}</dd></div>
+    <div><dt>Processing modified</dt><dd class="do-mono do-small">{{ pf.processing_modified_date or '—' }}</dd></div>
+    <div><dt>Product release</dt><dd class="do-mono do-small">{{ pf.product_release_id or '—' }}</dd></div>
+    <div><dt>CMS dataset id</dt><dd class="do-mono do-small">{{ pf.cms_dataset_id or '—' }}</dd></div>
+    <div><dt>Canonical artifact</dt><dd class="do-mono do-small do-provenance-path">{{ pf.canonical_artifact_path or '—' }}</dd></div>
+    <div><dt>SHA-256</dt><dd class="do-mono do-small do-provenance-hash">{{ pf.sha256 or '—' }}</dd></div>
+    <div><dt>Acquired</dt><dd {% if pf.acquired_at %}title="{{ pf.acquired_at }}"{% endif %}>{{ pf.acquired_at | do_datetime if pf.acquired_at else '—' }}</dd></div>
+    <div><dt>Validated</dt><dd {% if pf.validated_at %}title="{{ pf.validated_at }}"{% endif %}>{{ pf.validated_at | do_datetime if pf.validated_at else '—' }}</dd></div>
+    <div><dt>Activated</dt><dd {% if pf.activated_at %}title="{{ pf.activated_at }}"{% endif %}>{{ pf.activated_at | do_datetime if pf.activated_at else '—' }}</dd></div>
+  </dl>
+  {% if pf.downstream_artifacts %}
+  <table class="do-table do-table-compact">
+    <thead><tr><th>Downstream</th><th>Freshness</th></tr></thead>
+    <tbody>
+      {% for row in pf.downstream_artifacts %}
+      <tr>
+        <td class="do-small">{{ row.consumer or row.artifact }}</td>
+        <td><span class="do-badge do-badge-{{ 'attention' if row.freshness == 'STALE' else 'active' }}">{{ row.freshness }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% else %}
+  <p class="do-muted do-small">No provenance contract available for this source.</p>
+  {% endif %}
+</details>
 <details class="do-collapse-panel">
   <summary>Release control metadata</summary>
   <dl class="do-dl do-dl-wide do-dl-compact">
@@ -172,13 +292,15 @@
     <div><dt>Normalized resolver</dt><dd class="do-mono do-small">{{ record.normalized_artifact_resolver }}</dd></div>
     <div><dt>Acquisition</dt><dd class="do-mono do-small">{{ record.acquisition_implementation or '—' }}</dd></div>
     <div><dt>Structural validator</dt><dd class="do-mono do-small">{{ record.structural_validator or '—' }}</dd></div>
-    <div><dt>Zweli profile</dt><dd class="do-mono do-small">{{ record.zweli_quality_profile or '—' }}</dd></div>
+    {% if record.zweli_quality_profile %}
+    <div><dt>Zweli profile</dt><dd class="do-mono do-small">{{ record.zweli_quality_profile }}</dd></div>
+    {% endif %}
     <div><dt>ID provenance</dt><dd>{{ record.cms_dataset_id_provenance or '—' }}</dd></div>
     <div><dt>Notes</dt><dd>{{ record.automation_notes or '—' }}</dd></div>
   </dl>
 </details>
 
-{% if snapshot and snapshot.zweli_report %}
+{% if snapshot and snapshot.zweli_report and record.source_id != 'cms.health_citations' %}
 <details class="do-details do-details-compact">
   <summary>Zweli findings</summary>
   <pre class="do-pre do-pre-compact">{{ snapshot.zweli_report | tojson(indent=2) }}</pre>

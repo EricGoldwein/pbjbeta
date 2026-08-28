@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Health Deficiencies (2026-08-01)",
+    "dataset_id": "r5ix-sfxw",
+    "type": "individual",
+    "modified_date": "2026-08-01",
+    "access_level": "public",
+    "private": false,
+    "resources": [
+      {
+        "filename": "r5ix-sfxw_2026-08-01_NH_HealthCitations_Aug2026.csv",
+        "filesize": 165336194,
+        "mime_type": "text/csv"
+      }
+    ]
+  },
+  {
+    "name": "Provider Information (2026-08-01)",
+    "dataset_id": "4pq5-n9py",
+    "type": "individual",
+    "modified_date": "2026-08-01",
+    "access_level": "public",
+    "private": false,
+    "resources": [
+      {
+        "filename": "4pq5-n9py_2026-08-01_NH_ProviderInfo_Aug2026.csv",
+        "filesize": 9163390,
+        "mime_type": "text/csv"
+      }
+    ]
+  },
+  {
+    "name": "Ownership (2026-08-01)",
+    "dataset_id": "y2hd-n93e",
+    "type": "individual",
+    "modified_date": "2026-08-01",
+    "access_level": "public",
+    "private": false,
+    "resources": [
+      {
+        "filename": "y2hd-n93e_2026-08-01_NH_Ownership_Aug2026.csv",
+        "filesize": 57251685,
+        "mime_type": "text/csv"
+      }
+    ]
+  }
+]

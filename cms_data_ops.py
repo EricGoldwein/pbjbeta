@@ -40,7 +40,7 @@ from data_ops_access import (  # noqa: E402
     local_file_ref,
 )
 from data_ops_approval import has_acknowledgement, has_approval, read_audit  # noqa: E402
-from active_release_registry import sha256_file  # noqa: E402
+from active_release_registry import get_active_release, registry_path, sha256_file  # noqa: E402
 from data_ops_zweli import (  # noqa: E402
     BaselineAvailability,
     ZweliReport,
@@ -637,10 +637,16 @@ def _probe_unmodeled(record: CmsSourceRecord, detail: str) -> SourceOpsSnapshot:
     return snap
 
 
-def _probe_health_citations(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
+def _probe_health_citations(
+    record: CmsSourceRecord,
+    root: Path,
+    *,
+    check_cms: bool = False,
+    fetch_json: FetchJson | None = None,
+    theme_publication: Any | None = None,
+) -> SourceOpsSnapshot:
     snap = _base_snap(record)
     cit = cms_data_paths.citations_dir(root)
-    # Facility citation builder consumes this exact source family, not descriptions.
     candidates = list(cit.glob("NH_HealthCitations_*.csv")) if cit.is_dir() else []
 
     def _citation_key(path: Path) -> tuple[int, int]:
@@ -657,10 +663,7 @@ def _probe_health_citations(record: CmsSourceRecord, root: Path) -> SourceOpsSna
         snap.release_id = release_id or standalone.name
         snap.local_raw_present = True
         snap.status = OpsStatus.LOCAL_RAW_ONLY.value
-        snap.detail = (
-            "Citation CSV present in Citations/. Distinct dataset r5ix-sfxw — "
-            "co-extracted NH_HealthCitations_* from PI zip is a different path."
-        )
+        snap.detail = "Citation CSV cached locally (immutable evidence after acquisition)."
         snap.last_successful_local_processing = _mtime_iso(standalone)
     else:
         _apply_raw_ref(
@@ -668,6 +671,108 @@ def _probe_health_citations(record: CmsSourceRecord, root: Path) -> SourceOpsSna
         )
         snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
         snap.detail = "Health Citations dataset not accessible in this runtime"
+    if check_cms:
+        if theme_publication is None:
+            try:
+                from cms_theme_publication import get_latest_nh_theme_publication
+
+                theme_publication = get_latest_nh_theme_publication(fetch_json=fetch_json)
+            except Exception:
+                theme_publication = None
+        try:
+            from health_citations_acquire import check_health_citations_cms
+
+            check = check_health_citations_cms(
+                fetch_json=fetch_json,
+                root=root,
+                theme_publication=theme_publication,
+            )
+            cms = check["cms"]
+            snap.publisher_latest = cms["data_vintage_label"]
+            snap.cms_latest = cms["data_vintage_label"]
+            if check.get("bundle_provenance_ok"):
+                snap.detail = check.get("bundle_detail") or snap.detail
+            if check.get("cms_is_newer"):
+                snap.status = OpsStatus.CMS_NEWER.value
+            elif snap.local_raw_present and check.get("local_artifact_ready"):
+                snap.status = OpsStatus.LOCAL_RAW_ONLY.value
+            elif check.get("active_release_id") and not check.get("cms_is_newer"):
+                snap.status = OpsStatus.CURRENT.value
+        except Exception as exc:  # noqa: BLE001
+            if theme_publication is not None:
+                from active_release_registry import get_active_release, registry_path
+                from cms_theme_publication import publication_availability_for_source
+
+                active_release_id = (get_active_release("cms.health_citations", registry_path()) or {}).get(
+                    "active_release_id"
+                )
+                theme_fields = publication_availability_for_source(
+                    "cms.health_citations",
+                    active_release_id=active_release_id,
+                    publication=theme_publication,
+                ) or {}
+                pub_id = theme_fields.get("publisher_latest_release_id")
+                if pub_id:
+                    label = format_release_month_label(pub_id) or pub_id
+                    snap.publisher_latest = label
+                    snap.cms_latest = label
+                    if active_release_id == pub_id:
+                        snap.status = OpsStatus.CURRENT.value
+                        snap.detail = "CMS latest matches ACTIVE release (theme publication discovery)."
+                else:
+                    snap.error = str(exc)
+                    snap.detail = f"CMS Health Citations probe failed: {exc}"
+            else:
+                snap.error = str(exc)
+                snap.detail = f"CMS Health Citations probe failed: {exc}"
+    return snap
+
+
+def _probe_sff_pdf_list(
+    record: CmsSourceRecord,
+    root: Path,
+    *,
+    check_cms: bool = False,
+) -> SourceOpsSnapshot:
+    snap = _base_snap(record)
+    control_root = Path(__file__).resolve().parent
+    active = get_active_release("cms.sff_pdf_list", registry_path(control_root)) or {}
+    active_id = active.get("active_release_id")
+    if active_id:
+        staged_pdf = control_root / "sff" / "releases" / active_id / f"cms_sff_posting_{active_id}.pdf"
+        if staged_pdf.is_file():
+            _apply_raw_ref(snap, local_file_ref("sff", staged_pdf, release_id=active_id))
+            snap.local_raw_present = True
+            snap.release_id = active_id
+            snap.pbjapp_latest = format_release_month_label(active_id) or active_id
+            snap.status = OpsStatus.LOCAL_RAW_ONLY.value
+            snap.detail = "Staged SFF posting PDF present for ACTIVE release."
+            snap.last_successful_local_processing = _mtime_iso(staged_pdf)
+        else:
+            snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+            snap.detail = f"ACTIVE {active_id} — staged PDF not present in this runtime."
+    else:
+        snap.status = OpsStatus.NOT_AVAILABLE_IN_THIS_RUNTIME.value
+        snap.detail = "No ACTIVE SFF posting release."
+    if check_cms:
+        try:
+            from sff_release import check_sff_cms
+
+            check = check_sff_cms(root=control_root)
+            cms = check["cms"]
+            snap.publisher_latest = cms.get("posting_label")
+            snap.cms_latest = cms.get("posting_label")
+            if check.get("cms_is_newer"):
+                snap.status = OpsStatus.CMS_NEWER.value
+                snap.detail = (
+                    f"CMS posting {cms.get('posting_label')} is newer than ACTIVE {active_id or '—'}."
+                )
+            elif active_id and not check.get("cms_is_newer"):
+                snap.status = OpsStatus.CURRENT.value
+                snap.detail = f"CMS posting matches ACTIVE {format_release_month_label(active_id) or active_id}."
+        except Exception as exc:  # noqa: BLE001 — probe must not crash callers
+            snap.error = str(exc)
+            snap.detail = f"CMS SFF posting probe failed: {exc}"
     return snap
 
 
@@ -678,6 +783,7 @@ def probe_source(
     fetch_json: FetchJson | None = None,
     root: Path | None = None,
     run_zweli: bool = True,
+    theme_publication: Any | None = None,
 ) -> SourceOpsSnapshot:
     root = root or cms_data_paths.repo_root()
     record = get_source(source_id)
@@ -736,12 +842,15 @@ def probe_source(
     if family == SourceFamily.CHAIN_PERFORMANCE:
         return _probe_chain(record, root)
     if family == SourceFamily.HEALTH_CITATIONS:
-        return _probe_health_citations(record, root)
-    if family == SourceFamily.SFF_PDF_LIST:
-        return _probe_unmodeled(
+        return _probe_health_citations(
             record,
-            "SFF PDF/list publication UNMODELED — distinct from signal.sff_status on Provider Info",
+            root,
+            check_cms=check_cms,
+            fetch_json=fetch_json,
+            theme_publication=theme_publication,
         )
+    if family == SourceFamily.SFF_PDF_LIST:
+        return _probe_sff_pdf_list(record, root, check_cms=check_cms)
     return _probe_unmodeled(record, "Unhandled source family")
 
 
@@ -751,6 +860,7 @@ def probe_all_sources(
     fetch_json: FetchJson | None = None,
     root: Path | None = None,
     run_zweli: bool = True,
+    theme_publication: Any | None = None,
 ) -> list[SourceOpsSnapshot]:
     return [
         probe_source(
@@ -759,6 +869,7 @@ def probe_all_sources(
             fetch_json=fetch_json,
             root=root,
             run_zweli=run_zweli,
+            theme_publication=theme_publication,
         )
         for r in get_registry()
     ]
@@ -868,7 +979,15 @@ def overlay_control_plane_on_snapshot(
                     f"({active.get('status')}); legacy probe unavailable in runtime"
                 )
         elif active.get("status") == "ACTIVE":
-            data["status"] = OpsStatus.CURRENT.value
+            pending_same = (
+                pending
+                and str(pending.get("release_id") or "") == str(active.get("release_id") or "")
+                and str(pending.get("state") or "").upper() == "ACQUIRED"
+            )
+            if pending_same:
+                data["status"] = "PENDING VALIDATION"
+            else:
+                data["status"] = OpsStatus.CURRENT.value
 
     if pending:
         data["pending_release_id"] = pending.get("release_id")
@@ -879,11 +998,26 @@ def overlay_control_plane_on_snapshot(
             data["zweli_status"] = pending.get("zweli_status")
             data["quality_reviewed"] = pending.get("zweli_status")
 
-    data["display_status"] = (
-        data.get("active_release_status")
-        if active and data.get("active_release_status")
-        else data.get("status")
+    pending_same_active = (
+        pending
+        and active
+        and str(pending.get("release_id") or "") == str(active.get("release_id") or "")
+        and str(pending.get("state") or "").upper() == "ACQUIRED"
     )
+    if pending_same_active:
+        data["display_status"] = "PENDING VALIDATION"
+    else:
+        data["display_status"] = (
+            data.get("active_release_status")
+            if active and data.get("active_release_status")
+            else data.get("status")
+        )
+    rec = get_source(source_id)
+    zweli_applicable = bool(rec and rec.zweli_quality_profile)
+    data["zweli_applicable"] = zweli_applicable
+    if not zweli_applicable:
+        data["zweli_status"] = None
+        data["quality_reviewed"] = None
     return data
 
 
@@ -911,6 +1045,8 @@ def snapshots_with_control_plane(
 
 
 def _legacy_release_review_item(s: SourceOpsSnapshot) -> Optional[dict[str, Any]]:
+    from release_review_policy import zweli_applies
+
     reason = None
     if s.status == OpsStatus.CMS_NEWER.value:
         reason = "new_source_release"
@@ -929,16 +1065,23 @@ def _legacy_release_review_item(s: SourceOpsSnapshot) -> Optional[dict[str, Any]
     if not reason:
         return None
     release_id = s.release_id or s.pbjapp_latest
+    zweli_applicable = zweli_applies(s.source_id)
     return {
         "reason": reason,
         "source_id": s.source_id,
         "human_name": s.human_name,
         "release_id": release_id,
+        "release_label": format_release_month_label(release_id) if release_id else None,
+        "human_state": reason.replace("_", " ").title(),
+        "primary_action_label": "Approve" if reason == "ready_for_approval" else "Review",
+        "primary_action_kind": "activate" if reason == "ready_for_approval" else "review",
         "status": s.status,
-        "zweli_status": s.zweli_status,
+        "zweli_applicable": zweli_applicable,
+        "zweli_status": s.zweli_status if zweli_applicable else None,
         "structural_status": s.structural_status,
         "detail": s.detail,
-        "zweli_report": s.zweli_report,
+        "evidence_lines": [s.detail] if s.detail else [],
+        "zweli_report": s.zweli_report if zweli_applicable else None,
         "acknowledged": bool(release_id and has_acknowledgement(s.source_id, release_id)),
         "approvable": reason == "ready_for_approval"
         or (
@@ -954,73 +1097,19 @@ def _governed_candidate_review_item(
     *,
     snap: Optional[SourceOpsSnapshot],
     root: Path | None,
+    active_release_id: str | None = None,
+    theme_publication: Any | None = None,
 ) -> Optional[dict[str, Any]]:
-    state = (candidate.get("state") or "").upper()
-    requires_review = bool(candidate.get("requires_review"))
-    if not requires_review and state not in {
-        "ACQUIRED",
-        "VALIDATED",
-        "STRUCTURAL_FAIL",
-        "ZWELI_REQUIRES_REVIEW",
-        "ZWELI_BLOCKED",
-        "READY",
-    }:
-        return None
+    from release_review_policy import evaluate_governed_candidate_review
 
-    source_id = candidate["source_id"]
-    release_id = candidate["release_id"]
-    zweli_status = candidate.get("zweli_status")
-    if zweli_status is None and snap is not None:
-        zweli_status = snap.zweli_status
-    zweli_status = zweli_status or ZweliState.NOT_RUN.value
-
-    reason = "governed_pending_acquired"
-    if state == "VALIDATED":
-        reason = "governed_pending_validated"
-    elif state in {"STRUCTURAL_FAIL", "ERROR"}:
-        reason = "governed_structural_error"
-    elif state == "ZWELI_REQUIRES_REVIEW" or zweli_status == ZweliState.REQUIRES_REVIEW.value:
-        reason = "governed_zweli_requires_review"
-    elif state == "ZWELI_BLOCKED" or zweli_status == ZweliState.BLOCKED.value:
-        reason = "governed_zweli_blocked"
-
-    if snap is not None and snap.release_id == release_id and snap.zweli_status:
-        zweli_status = snap.zweli_status
-
-    approvable = False
-    if source_id == "cms.provider_info" and promote_candidate_permitted(candidate):
-        if zweli_status in {ZweliState.PASS.value, ZweliState.NOT_RUN.value}:
-            approvable = True
-        elif zweli_status == ZweliState.REQUIRES_REVIEW.value and has_acknowledgement(
-            source_id, release_id
-        ):
-            approvable = True
-
-    detail = candidate.get("detail") or (
-        f"Governed pending release {release_id} ({state}) awaiting operator review"
+    snap_dict = snap.to_dict() if snap is not None else None
+    return evaluate_governed_candidate_review(
+        candidate,
+        snap=snap_dict,
+        active_release_id=active_release_id,
+        root=root,
+        theme_publication=theme_publication,
     )
-    zweli_report = None
-    if snap is not None and snap.zweli_report and snap.release_id == release_id:
-        zweli_report = snap.zweli_report
-    elif source_id == "cms.provider_info":
-        zweli_report = load_zweli_report_for_release(source_id, release_id, root=root)
-
-    return {
-        "reason": reason,
-        "source_id": source_id,
-        "human_name": (snap.human_name if snap else source_id),
-        "release_id": release_id,
-        "status": state,
-        "pending_state": state,
-        "validation_status": candidate.get("validation_status"),
-        "zweli_status": zweli_status,
-        "structural_status": snap.structural_status if snap else "NOT_RUN",
-        "detail": detail,
-        "zweli_report": zweli_report,
-        "acknowledged": has_acknowledgement(source_id, release_id),
-        "approvable": approvable,
-        "governed": True,
-    }
 
 
 def release_review_items(
@@ -1029,8 +1118,19 @@ def release_review_items(
     check_cms: bool = True,
     root: Path | None = None,
     control: dict[str, Any] | None = None,
+    theme_publication: Any | None = None,
+    focus_source_id: str | None = None,
+    focus_release_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Items needing human attention for Release Review UI."""
+    """Items needing genuine human review decisions for Release Review UI."""
+    from release_review_policy import (
+        PAIR_SOURCE_ID,
+        build_ownership_pair_review_item,
+        filter_release_review_focus,
+        zweli_applies,
+    )
+    from ownership_pairing import ENROLLMENTS, OWNERS
+
     root = root or cms_data_paths.repo_root()
     if control is None:
         from release_control_plane import control_panel_payload
@@ -1039,22 +1139,41 @@ def release_review_items(
     payload = _control_plane_ui_view(control)
     snaps = snapshots or probe_all_sources(check_cms=check_cms, root=root)
     by_id = {s.source_id: s for s in snaps}
+    active_by_source = payload.get("active") or {}
     items: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
 
-    for s in snaps:
-        item = _legacy_release_review_item(s)
-        if item:
-            key = (item["source_id"], str(item.get("release_id") or ""))
-            if key not in seen:
-                seen.add(key)
-                items.append(item)
+    pair_item = build_ownership_pair_review_item(root=root, control=control)
+    if pair_item:
+        key = (pair_item["source_id"], str(pair_item.get("release_id") or ""))
+        seen.add(key)
+        items.append(pair_item)
 
-    for candidate in payload.get("candidates") or []:
-        if not isinstance(candidate, dict):
+    for row in control.get("datasets") or []:
+        dataset_id = row.get("dataset_id")
+        pending = row.get("pending")
+        if not dataset_id or not pending:
             continue
-        snap = by_id.get(candidate.get("source_id", ""))
-        item = _governed_candidate_review_item(candidate, snap=snap, root=root)
+        candidate = {
+            "source_id": dataset_id,
+            "release_id": pending.get("release_id"),
+            "state": pending.get("state"),
+            "validation_status": (pending.get("validation") or {}).get("status"),
+            "zweli_status": pending.get("zweli_status"),
+            "validation": pending.get("validation"),
+            "metadata": pending.get("metadata"),
+        }
+        if dataset_id in {OWNERS, ENROLLMENTS} and pair_item:
+            continue
+        active_release_id = ((row.get("active") or {}).get("active_release_id"))
+        snap = by_id.get(dataset_id)
+        item = _governed_candidate_review_item(
+            candidate,
+            snap=snap,
+            root=root,
+            active_release_id=active_release_id,
+            theme_publication=theme_publication,
+        )
         if not item:
             continue
         key = (item["source_id"], str(item.get("release_id") or ""))
@@ -1063,7 +1182,41 @@ def release_review_items(
         seen.add(key)
         items.append(item)
 
-    return items
+    governed_sources = {item["source_id"] for item in items if item.get("governed")}
+    for s in snaps:
+        if s.source_id in governed_sources:
+            continue
+        if s.source_id in {OWNERS, ENROLLMENTS} and pair_item:
+            continue
+        active = active_by_source.get(s.source_id) or {}
+        if active.get("status") == "ACTIVE" and not (payload.get("pending_by_source") or {}).get(
+            s.source_id
+        ):
+            continue
+        item = _legacy_release_review_item(s)
+        if not item:
+            continue
+        if not item.get("zweli_applicable", True) and item.get("zweli_status") == ZweliState.NOT_RUN.value:
+            if item.get("reason") not in {"structural_error", "processing_failure"}:
+                continue
+        key = (item["source_id"], str(item.get("release_id") or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(item)
+
+    items.sort(
+        key=lambda item: (
+            0 if item.get("approvable") else 1,
+            0 if item.get("source_id") == PAIR_SOURCE_ID else 1,
+            item.get("human_name") or item.get("source_id") or "",
+        )
+    )
+    return filter_release_review_focus(
+        items,
+        source_id=focus_source_id,
+        release_id=focus_release_id,
+    )
 
 
 def format_do_timestamp(value: str | None, *, suffix: str = " ET") -> str:
@@ -1155,8 +1308,11 @@ def build_release_availability_context(
     snapshot: dict[str, Any] | None = None,
     record: dict[str, Any] | None = None,
     root: Path | None = None,
+    theme_publication: Any | None = None,
 ) -> dict[str, Any]:
     """Reusable operator copy: ACTIVE vs publisher/latest vs pending."""
+    from cms_source_registry import THEME_PUBLICATION_SOURCES
+    from cms_theme_publication import publication_availability_for_source
     from release_source_catalog import SOURCES, UpdateMechanism
 
     root = root or cms_data_paths.repo_root()
@@ -1170,8 +1326,20 @@ def build_release_availability_context(
     publisher_latest_id: str | None = None
     new_available = False
     availability_source = "none"
+    theme_fields: dict[str, Any] = {}
 
-    if catalog and catalog.mechanism == UpdateMechanism.DERIVED:
+    if source_id in THEME_PUBLICATION_SOURCES and theme_publication is not None:
+        theme_fields = publication_availability_for_source(
+            source_id,
+            active_release_id=active_id,
+            publication=theme_publication,
+        ) or {}
+        if theme_fields:
+            publisher_latest_id = theme_fields.get("publisher_latest_release_id")
+            new_available = bool(theme_fields.get("new_release_available"))
+            availability_source = theme_fields.get("availability_source") or "theme_publication"
+
+    if availability_source == "none" and catalog and catalog.mechanism == UpdateMechanism.DERIVED:
         from release_check import derived_state
 
         derived = derived_state(source_id, catalog.upstream, root=root)
@@ -1180,13 +1348,24 @@ def build_release_availability_context(
         if catalog.upstream:
             publisher_latest_id = upstream_active.get(catalog.upstream[0])
         availability_source = "derived_upstream"
-    elif check_row is not None:
+        theme_fields = {**theme_fields, "derived_upstream_status": derived.get("status")}
+    elif availability_source == "none" and check_row is not None:
         new_available = check_row.get("new_release_available") is True
         publisher_latest_id = check_row.get("release_id") or check_row.get("pending_release")
         availability_source = "release_check"
-    if snapshot:
+
+    if active_id and publisher_latest_id and str(active_id) == str(publisher_latest_id):
+        new_available = False
+    if (
+        pending_id
+        and pending_state not in (None, "ACTIVE")
+        and active_id
+        and str(pending_id) == str(active_id)
+    ):
+        new_available = False
+    if publisher_latest_id is None and snapshot:
         pub = snapshot.get("publisher_latest") or snapshot.get("cms_latest")
-        if pub and not publisher_latest_id:
+        if pub:
             label_match = re.fullmatch(r"([A-Za-z]{3,9})\s+(20\d{2})", str(pub).strip())
             if label_match:
                 month = _MONTH_NAME_TO_NUM.get(label_match.group(1).lower()[:3])
@@ -1194,7 +1373,8 @@ def build_release_availability_context(
                     publisher_latest_id = f"{label_match.group(2)}-{month:02d}"
             else:
                 publisher_latest_id = str(pub)
-            availability_source = "cms_probe"
+            if availability_source == "none":
+                availability_source = "cms_probe"
 
     local_release_id = None
     if snapshot:
@@ -1215,9 +1395,32 @@ def build_release_availability_context(
     elif new_available and not active_id:
         summary = "Release missing"
     elif pending_id and pending_state not in (None, "ACTIVE"):
-        summary = f"Pending {pending_state.lower()}"
+        if active_id and str(pending_id) == str(active_id) and pending_state == "ACQUIRED":
+            summary = "Pending validation"
+        else:
+            summary = f"Pending {pending_state.lower()}"
+    elif active_id and publisher_latest_id and str(active_id) == str(publisher_latest_id):
+        summary = "Current"
 
-    return {
+    bundle_provenance_ok = False
+    local_artifact_ready = bool(local_release_id)
+    if source_id == "cms.health_citations" and publisher_latest_id:
+        target_release = publisher_latest_id
+        local_artifact_ready = bool(
+            (snapshot or {}).get("local_raw_present")
+            or citations_artifact_exists(target_release, root=root)
+            or (local_release_id and local_release_id >= target_release)
+        )
+        if local_artifact_ready:
+            try:
+                from health_citations_acquire import verify_bundle_provenance
+
+                verify_bundle_provenance(target_release, root=root)
+                bundle_provenance_ok = True
+            except Exception:
+                bundle_provenance_ok = False
+
+    result = {
         "source_id": source_id,
         "human_name": (record or {}).get("human_name") or source_id,
         "active_release_id": active_id,
@@ -1227,10 +1430,50 @@ def build_release_availability_context(
         "pending_release_id": pending_id,
         "pending_state": pending_state,
         "local_release_id": local_release_id,
+        "local_artifact_ready": local_artifact_ready,
+        "bundle_provenance_ok": bundle_provenance_ok,
         "new_release_available": new_available,
         "availability_summary": summary,
         "availability_source": availability_source,
+        "cms_publication_id": theme_fields.get("cms_publication_id"),
+        "cms_publication_date": theme_fields.get("cms_publication_date"),
+        "processing_modified_date": theme_fields.get("processing_modified_date"),
+        "product_release_id": theme_fields.get("product_release_id") or publisher_latest_id,
+        "cms_dataset_id": theme_fields.get("cms_dataset_id"),
+        "in_latest_publication": theme_fields.get("in_latest_publication"),
+        "unchanged_in_latest_publication": theme_fields.get("unchanged_in_latest_publication")
+        if theme_fields.get("unchanged_in_latest_publication") is not None
+        else bool(
+            active_id
+            and publisher_latest_id
+            and str(active_id) == str(publisher_latest_id)
+            and not pending_id
+        ),
     }
+    if catalog and catalog.mechanism == UpdateMechanism.DERIVED:
+        upstream_active = {}
+        if availability_source == "derived_upstream":
+            from release_check import derived_state
+
+            derived = derived_state(source_id, catalog.upstream, root=root)
+            upstream_active = derived.get("upstream_active") or {}
+            result["derived_upstream_status"] = derived.get("status")
+            result["provenance_missing"] = derived.get("provenance_missing")
+        result["upstream_active"] = upstream_active
+        from operator_freshness import inventory_fields_for_source
+
+        result.update(inventory_fields_for_source(source_id, availability=result, check_row=check_row))
+    elif catalog:
+        from operator_freshness import inventory_fields_for_source
+
+        result.update(inventory_fields_for_source(source_id, availability=result, check_row=check_row))
+    return result
+
+
+def citations_artifact_exists(release_id: str, *, root: Path | None = None) -> bool:
+    from health_citations_acquire import citations_artifact_path
+
+    return citations_artifact_path(release_id, root=root).is_file()
 
 
 def build_needs_attention_queue(
@@ -1239,16 +1482,21 @@ def build_needs_attention_queue(
     check_by_dataset: dict[str, dict[str, Any]],
     snapshots: list[dict[str, Any]] | None = None,
     root: Path | None = None,
+    theme_publication: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Primary operator queue: datasets with an actionable newer release."""
-    from release_source_catalog import SOURCES
+    from release_source_catalog import SOURCES, UpdateMechanism
+    from release_control_plane import stale_derived_consumers
 
     snap_by_id = {item.get("source_id"): item for item in (snapshots or []) if item.get("source_id")}
     catalog_by_id = {item.dataset_id: item for item in SOURCES}
+    stale_map = stale_derived_consumers(root)
     items: list[dict[str, Any]] = []
     for row in control.get("datasets") or []:
         dataset_id = row.get("dataset_id")
         if not dataset_id:
+            continue
+        if dataset_id.startswith("pbj.benchmarks.") or dataset_id == "pbj.peer_distribution":
             continue
         check_row = check_by_dataset.get(dataset_id) or {}
         record = get_source(dataset_id)
@@ -1260,33 +1508,70 @@ def build_needs_attention_queue(
             snapshot=snap_by_id.get(dataset_id),
             record=record_dict,
             root=root,
+            theme_publication=theme_publication,
         )
+        if dataset_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
+            pending = row.get("pending")
+            if not pending and not availability.get("new_release_available"):
+                continue
         pending = row.get("pending")
         pending_state = str((pending or {}).get("state") or "").upper()
         health = str(row.get("health") or "").upper()
-        needs = (
-            availability.get("new_release_available")
-            or pending
-            or health not in {"PASS", "CURRENT", ""}
-            or pending_state in {"ACQUIRED", "VALIDATED", "DETECTED"}
-        )
-        if not needs:
-            continue
+        from provenance_freshness import downstream_stale_capabilities_for_source
+
+        stale_caps = downstream_stale_capabilities_for_source(dataset_id, root=root)
+        downstream_stale = bool(stale_caps)
         workflow = build_source_operator_workflow(
             dataset_id,
             record=record_dict,
             snapshot=snap_by_id.get(dataset_id),
             control_row=row,
             release_availability=availability,
+            theme_publication=theme_publication,
+            root=root,
         )
-        items.append(
-            {
-                **availability,
-                "health": row.get("health"),
-                "next_action": workflow.get("next_action"),
-                "mechanism": (catalog_by_id.get(dataset_id).mechanism.value if catalog_by_id.get(dataset_id) else None),
-            }
+        next_action = workflow.get("next_action") or {}
+        needs = (
+            availability.get("new_release_available")
+            or pending
+            or downstream_stale
+            or health not in {"PASS", "CURRENT", ""}
+            or pending_state in {"ACQUIRED", "VALIDATED", "DETECTED"}
         )
+        if not needs:
+            continue
+        if dataset_id == "cms.health_citations":
+            consumer_only_stale = (
+                bool(stale_caps)
+                and not availability.get("new_release_available")
+                and not pending
+                and set(stale_caps) <= {"facility.citations"}
+            )
+            if consumer_only_stale:
+                continue
+        if (
+            not availability.get("new_release_available")
+            and not pending
+            and not downstream_stale
+            and health in {"PASS", "CURRENT", ""}
+            and next_action.get("label") in {"Monitor release health", "Inspect dataset diagnostics"}
+        ):
+            continue
+        item_payload = {
+            **availability,
+            "health": row.get("health"),
+            "downstream_stale": downstream_stale,
+            "next_action": next_action,
+            "mechanism": (catalog_by_id.get(dataset_id).mechanism.value if catalog_by_id.get(dataset_id) else None),
+        }
+        if dataset_id == "cms.pbj_nurse_staffing":
+            from operator_freshness import audit_nurse_staffing_candidate_state
+
+            item_payload["candidate_audit"] = audit_nurse_staffing_candidate_state(
+                control_row=row,
+                root=root,
+            )
+        items.append(item_payload)
     items.sort(
         key=lambda item: (
             0 if item.get("new_release_available") else 1,
@@ -1294,18 +1579,29 @@ def build_needs_attention_queue(
         )
     )
     paired = _ownership_pair_attention_item(control, check_by_dataset, snap_by_id, root=root)
+    downstream = _ownership_downstream_attention_item(root=root)
+    citations = _citation_packages_attention_item(root=root)
+    prefix: list[dict[str, Any]] = []
     if paired:
-        items = [paired] + [
-            i
-            for i in items
-            if i.get("source_id") not in {"cms.snf_all_owners", "cms.snf_enrollments"}
-        ]
-        items.sort(
+        prefix.append(paired)
+    if downstream:
+        prefix.append(downstream)
+    if citations:
+        prefix.append(citations)
+    if prefix:
+        skip = {"cms.snf_all_owners", "cms.snf_enrollments", "cms.health_citations"}
+        if downstream:
+            skip.add("ownership.downstream")
+        if citations:
+            skip.add("consumer.citation_packages")
+        others = [i for i in items if i.get("source_id") not in skip]
+        others.sort(
             key=lambda item: (
                 0 if item.get("new_release_available") else 1,
                 item.get("human_name") or item.get("source_id") or "",
             )
         )
+        items = prefix + others
     return [_finalize_attention_item(item) for item in items]
 
 
@@ -1317,7 +1613,7 @@ def _ownership_pair_attention_item(
     root: Path | None,
 ) -> dict[str, Any] | None:
     """Single queue row for SNF owners + enrollments when a pair needs review."""
-    from ownership_pairing import ENROLLMENTS, OWNERS, pairing_status
+    from ownership_pairing import ENROLLMENTS, OWNERS, PAIR_SOURCE_ID, pair_lifecycle_action, pairing_status
 
     pair = pairing_status(root)
     pending = pair.get("pending") or {}
@@ -1326,36 +1622,36 @@ def _ownership_pair_attention_item(
     owners_row = next((r for r in control.get("datasets") or [] if r.get("dataset_id") == OWNERS), None)
     enroll_row = next((r for r in control.get("datasets") or [] if r.get("dataset_id") == ENROLLMENTS), None)
     release_id = pending.get("owners_release") or pending.get("enrollment_release")
-    release_label = format_release_month_label(release_id) if release_id and len(str(release_id)) == 10 else release_id
-    if release_label and str(release_id).count("-") == 2:
-        # 2026-07-31 → Jul 31, 2026 style for ownership drops
-        parts = str(release_id).split("-")
-        if len(parts) == 3:
-            month = int(parts[1])
-            abbr = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[month - 1]
-            release_label = f"{abbr} {int(parts[2])}"
+    from ownership_pairing import format_ownership_release_label
+
+    release_label = format_ownership_release_label(release_id)
     owners_state = str(pending.get("owners_state") or "").upper()
-    concise_state = f"{release_label} acquired" if owners_state == "ACQUIRED" else f"{release_label} pending"
+    enrollment_state = str(pending.get("enrollment_state") or "").upper()
+    action = pair_lifecycle_action(pair)
+    if owners_state == "VALIDATED" and enrollment_state == "VALIDATED":
+        concise_state = f"{release_label} validated"
+    elif owners_state == "ACQUIRED" or enrollment_state == "ACQUIRED":
+        concise_state = f"{release_label} acquired"
+    else:
+        concise_state = f"{release_label} pending"
     next_action = {
-        "label": "Review pair",
-        "detail": "Owners and enrollment releases must promote together.",
-        "endpoint": "release_review",
+        **action,
+        "endpoint": "source_detail_panel",
+        "endpoint_args": {"source_id": PAIR_SOURCE_ID},
+        "page_endpoint": "source_detail",
+        "page_endpoint_args": {"source_id": PAIR_SOURCE_ID},
+        "opens_panel": True,
         "wired": True,
-        "read_only": pair.get("review_state") != "READY FOR REVIEW",
-    }
-    record = {
-        "human_name": "SNF Owners / Enrollments",
-        "source_id": "cms.snf_ownership_pair",
-        "acquisition_implementation": "generic CMS CSV adapter",
+        "read_only": True,
     }
     return _finalize_attention_item(
         {
-            "source_id": "cms.snf_ownership_pair",
+            "source_id": PAIR_SOURCE_ID,
             "human_name": "SNF Owners / Enrollments",
             "active_release_id": (pair.get("active") or {}).get("owners_release"),
-            "active_release_label": format_release_month_label((pair.get("active") or {}).get("owners_release")),
-            "publisher_latest_release_id": release_id,
-            "publisher_latest_label": release_label,
+            "active_release_label": format_ownership_release_label((pair.get("active") or {}).get("owners_release")),
+            "publisher_latest_release_id": None,
+            "publisher_latest_label": None,
             "pending_release_id": release_id,
             "pending_state": owners_state or pending.get("enrollment_state"),
             "local_release_id": None,
@@ -1367,7 +1663,92 @@ def _ownership_pair_attention_item(
             "mechanism": "external recurring release",
             "concise_state": concise_state,
             "release_line": release_label or str(release_id or "—"),
-            "panel_source_id": OWNERS,
+            "panel_source_id": PAIR_SOURCE_ID,
+        }
+    )
+
+
+def _citation_packages_attention_item(*, root: Path | None) -> dict[str, Any] | None:
+    from operator_freshness import count_stale_citation_packages
+
+    stale_count, checked = count_stale_citation_packages(root=root)
+    if stale_count <= 0:
+        return None
+    return _finalize_attention_item(
+        {
+            "source_id": "consumer.citation_packages",
+            "human_name": "Citation packages",
+            "active_release_id": None,
+            "active_release_label": None,
+            "publisher_latest_release_id": None,
+            "publisher_latest_label": None,
+            "pending_release_id": None,
+            "pending_state": None,
+            "local_release_id": None,
+            "new_release_available": False,
+            "availability_summary": f"{stale_count} stale",
+            "availability_source": "citation_package_gate",
+            "health": None,
+            "downstream_stale": True,
+            "next_action": {
+                "label": "Rebuild facility packages",
+                "detail": (
+                    f"{stale_count} of {checked} facility citation tables lag the ACTIVE national "
+                    "Health Citations file — refresh local facility slices (no CMS re-download or deploy)."
+                ),
+                "endpoint": "action_citation_packages_rebuild",
+                "wired": True,
+                "method": "post",
+                "read_only": False,
+            },
+            "mechanism": "consumer packaging",
+            "concise_state": f"{stale_count} stale",
+            "release_line": f"{checked} checked",
+            "panel_source_id": "cms.health_citations",
+        }
+    )
+
+
+def _ownership_downstream_attention_item(*, root: Path | None) -> dict[str, Any] | None:
+    from ownership_downstream_rebuild import OWNERSHIP_DOWNSTREAM_SOURCE_ID, audit_ownership_downstream_stale
+
+    audit = audit_ownership_downstream_stale(root=root)
+    if not audit.get("is_stale"):
+        return None
+    release_label = audit.get("release_label") or audit.get("release_id") or "—"
+    caps = audit.get("stale_capabilities") or []
+    cap_text = ", ".join(caps[:2]) + ("…" if len(caps) > 2 else "")
+    return _finalize_attention_item(
+        {
+            "source_id": OWNERSHIP_DOWNSTREAM_SOURCE_ID,
+            "human_name": "Ownership data",
+            "active_release_id": audit.get("release_id"),
+            "active_release_label": release_label,
+            "publisher_latest_release_id": audit.get("release_id"),
+            "publisher_latest_label": release_label,
+            "pending_release_id": None,
+            "pending_state": None,
+            "local_release_id": None,
+            "new_release_available": False,
+            "availability_summary": "downstream stale",
+            "availability_source": "ownership_downstream_rebuild",
+            "health": None,
+            "downstream_stale": True,
+            "next_action": {
+                "label": "Rebuild downstream",
+                "detail": (
+                    f"Ownership pair {release_label} is ACTIVE; derived outputs lag "
+                    f"({cap_text or 'bridge/policy'})."
+                ),
+                "endpoint": "action_ownership_downstream_rebuild",
+                "wired": True,
+                "method": "post",
+                "read_only": False,
+            },
+            "mechanism": "derived from ACTIVE ownership pair",
+            "concise_state": "downstream stale",
+            "release_line": release_label,
+            "panel_source_id": "cms.snf_all_owners",
         }
     )
 
@@ -1382,21 +1763,35 @@ def _finalize_attention_item(item: dict[str, Any]) -> dict[str, Any]:
     publisher_label = item.get("publisher_latest_label") or item.get("publisher_latest_release_id")
     concise = item.get("availability_summary") or "—"
     release_line = active_label or publisher_label or "—"
-    if item.get("new_release_available") and publisher_label:
-        concise = f"{publisher_label} available"
-        release_line = publisher_label
+    audit = item.get("candidate_audit") or {}
+    if audit.get("same_quarter") and audit.get("is_redundant_reacquisition"):
+        release_line = format_release_month_label(pending_id) or str(pending_id or release_line)
+        concise = "re-acquired same quarter"
     elif pending_state == "ACQUIRED" and pending_id:
-        if str(pending_id).count("-") == 2:
+        if str(pending_id) == str(item.get("active_release_id") or ""):
+            release_line = format_release_month_label(pending_id) or str(pending_id)
+            concise = f"{release_line} · pending validation"
+        elif str(pending_id).count("-") == 2:
             parts = str(pending_id).split("-")
             month = int(parts[1])
             abbr = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")[month - 1]
             release_line = f"{abbr} {int(parts[2])}"
+            concise = f"{release_line} acquired"
         else:
             release_line = format_release_month_label(pending_id) or str(pending_id)
-        concise = f"{release_line} acquired"
+            concise = f"{release_line} acquired"
+    elif item.get("new_release_available") and publisher_label:
+        concise = f"{publisher_label} available"
+        release_line = publisher_label
     elif active_label and not item.get("new_release_available") and not pending_id:
         concise = f"{active_label} active"
         release_line = active_label
+    elif item.get("downstream_stale") and active_label:
+        concise = "downstream stale"
+        release_line = active_label
+    elif pending_state == "VALIDATED" and pending_id:
+        concise = f"{format_release_month_label(pending_id) or pending_id} ready to promote"
+        release_line = format_release_month_label(pending_id) or str(pending_id)
     elif pending_state and pending_id:
         concise = f"{pending_id} {pending_state.lower()}"
         release_line = format_release_month_label(pending_id) or str(pending_id)
@@ -1405,6 +1800,56 @@ def _finalize_attention_item(item: dict[str, Any]) -> dict[str, Any]:
     item["release_line"] = release_line
     item.setdefault("panel_source_id", item.get("source_id"))
     return item
+
+
+def _hc_rebuild_orchestration_hint() -> str:
+    from release_control_plane import DERIVED_ARTIFACT_PIPELINES
+
+    pipes = DERIVED_ARTIFACT_PIPELINES.get("cms.health_citations", ())
+    if not pipes:
+        return "facility packaging (ACTIVE cms.health_citations gate)"
+    return "; ".join(str(pipe.get("rebuild") or pipe.get("artifact")) for pipe in pipes)
+
+
+def build_operator_reference_summary(
+    source_id: str,
+    *,
+    workflow: dict[str, Any],
+) -> dict[str, Any]:
+    """Compact operator headline for post-activation source detail (Health Citations reference)."""
+    from release_review_policy import zweli_applies
+
+    release_availability = workflow.get("release_availability") or {}
+    provenance = workflow.get("provenance_freshness") or {}
+    downstream_rows = provenance.get("downstream_artifacts") or []
+    downstream_stale = [row for row in downstream_rows if row.get("freshness") == "STALE"]
+    pending_state = str(workflow.get("pending_state") or "").upper()
+    new_release = bool(release_availability.get("new_release_available"))
+
+    if new_release or pending_state in {"ACQUIRED", "VALIDATED", "DETECTED"}:
+        status_label = "NEEDS ATTENTION"
+        status_tone = "attention"
+    elif downstream_stale:
+        status_label = "NEEDS ATTENTION"
+        status_tone = "attention"
+    else:
+        status_label = "Up to date"
+        status_tone = "current"
+
+    return {
+        "status_label": status_label,
+        "status_tone": status_tone,
+        "active_label": release_availability.get("active_release_label")
+        or format_release_month_label(workflow.get("active_release_id")),
+        "cms_latest_label": release_availability.get("publisher_latest_label"),
+        "downstream_stale": downstream_stale,
+        "downstream_current": [row for row in downstream_rows if row.get("freshness") == "CURRENT"],
+        "show_release_review": pending_state == "VALIDATED",
+        "show_zweli": zweli_applies(source_id) and bool(workflow.get("zweli_status")),
+        "rebuild_orchestration_hint": _hc_rebuild_orchestration_hint()
+        if source_id == "cms.health_citations"
+        else None,
+    }
 
 
 def _next_operator_action(
@@ -1428,42 +1873,122 @@ def _next_operator_action(
             record=record,
         )
 
-    if source_id in {"cms.health_citations", "cms.nh_ownership"} and release_availability.get(
-        "new_release_available"
-    ):
-        target_label = release_availability.get("publisher_latest_label") or "next release"
-        wired = bool((record or {}).get("acquisition_implementation"))
-        return {
-            "label": f"Acquire {target_label}" if wired else f"Acquire {target_label}",
-            "detail": (
-                f"ACTIVE {release_availability.get('active_release_label') or active_id or '—'}; "
-                f"CMS latest {target_label}. "
-                + (
-                    "Use the wired acquisition path when available."
-                    if wired
-                    else "Acquisition lifecycle is not wired in Data Ops yet."
-                )
-            ),
-            "endpoint": "source_detail",
-            "endpoint_args": {"source_id": source_id},
-            "wired": wired,
-            "read_only": not wired,
-            "not_wired_label": None if wired else "Not yet wired",
-        }
+    from release_control_plane import stale_derived_consumers
+    from provenance_freshness import downstream_stale_capabilities_for_source
 
-    if pending_state == "ACQUIRED" and source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
-        return {
-            "label": "Review pair",
-            "detail": "Owners and enrollment releases must promote together.",
-            "endpoint": "release_review",
-            "wired": True,
-            "read_only": True,
-        }
-    if source_id == "cms.sff_pdf_list" and active_id and not pending:
+    stale_map = stale_derived_consumers()
+    downstream_stale = downstream_stale_capabilities_for_source(source_id)
+
+    if source_id == "cms.health_citations":
+        target_label = release_availability.get("publisher_latest_label") or "next release"
+        pub_id = release_availability.get("publisher_latest_release_id")
         active_label = format_release_month_label(active_id) or active_id
+        pub_label = release_availability.get("publisher_latest_label") or active_label
+        if pending_state == "VALIDATED":
+            release_label = format_release_month_label(pending.get("release_id")) or pending.get("release_id")
+            from release_review_policy import release_review_query
+
+            return {
+                "label": f"Activate {release_label}",
+                "detail": f"{release_label} is VALIDATED — explicit human activation in Release Review.",
+                "endpoint": "release_review",
+                "endpoint_args": release_review_query(source_id, pending.get("release_id")),
+                "wired": True,
+                "read_only": True,
+            }
+        if pending_state == "ACQUIRED":
+            release_label = format_release_month_label(pending.get("release_id")) or pending.get("release_id")
+            return {
+                "label": f"Validate {release_label}",
+                "detail": "Bundle artifact acquired — run structural validation before promotion.",
+                "endpoint": "action_citations_validate",
+                "endpoint_args": {"release_id": pending.get("release_id")},
+                "wired": True,
+                "method": "post",
+            }
+        if active_id and not pending and not release_availability.get("new_release_available"):
+            if downstream_stale:
+                stale_labels = []
+                for cap in downstream_stale:
+                    from release_control_plane import CONSUMER_OPERATOR_LABELS
+
+                    stale_labels.append(CONSUMER_OPERATOR_LABELS.get(cap, cap))
+                return {
+                    "label": "Rebuild facility packages",
+                    "detail": (
+                        f"Health Citations · {active_label} active · CMS latest {pub_label}. "
+                        f"National file is current; facility citation tables are stale "
+                        f"({', '.join(stale_labels[:2])}{'…' if len(stale_labels) > 2 else ''}). "
+                        "Rebuilds local facility citation slices from ACTIVE national file — no deploy."
+                    ),
+                    "endpoint": "action_citation_packages_rebuild",
+                    "wired": True,
+                    "method": "post",
+                    "read_only": False,
+                }
+            return {
+                "label": "Check CMS",
+                "detail": f"Up to date · {active_label} active · CMS latest {pub_label}",
+                "endpoint": "source_detail",
+                "endpoint_args": {"source_id": source_id},
+                "wired": True,
+                "method": "get",
+                "read_only": True,
+            }
+        if release_availability.get("new_release_available"):
+            if release_availability.get("bundle_provenance_ok") and release_availability.get("local_artifact_ready"):
+                return {
+                    "label": f"Validate {target_label}",
+                    "detail": (
+                        f"CMS latest {target_label}; local artifact matches Provider Info bundle manifest. "
+                        "Adopt and validate without re-download."
+                    ),
+                    "endpoint": "action_citations_validate",
+                    "endpoint_args": {"release_id": pub_id},
+                    "wired": True,
+                    "method": "post",
+                }
+            return {
+                "label": f"Acquire {target_label}",
+                "detail": f"CMS latest {target_label}; download from official CMS endpoint required.",
+                "endpoint": "source_detail",
+                "endpoint_args": {"source_id": source_id},
+                "wired": False,
+                "read_only": True,
+                "not_wired_label": "Not yet wired",
+            }
+
+    if source_id == "cms.provider_info" and active_id and not pending:
+        active_label = format_release_month_label(active_id) or active_id
+        pub_label = release_availability.get("publisher_latest_label")
+        if not release_availability.get("new_release_available") and stale_map.get(source_id):
+            return {
+                "label": "Rebuild downstream",
+                "detail": (
+                    f"Provider Information · {active_label} active · CMS latest {pub_label or active_label}. "
+                    f"Derived consumers stale ({', '.join(stale_map[source_id][:3])}{'…' if len(stale_map[source_id]) > 3 else ''})."
+                ),
+                "endpoint": "source_detail",
+                "endpoint_args": {"source_id": source_id},
+                "wired": False,
+                "read_only": True,
+                "not_wired_label": "Not yet wired",
+            }
+        if not release_availability.get("new_release_available"):
+            return {
+                "label": "Check CMS",
+                "detail": f"Up to date · {active_label} active · CMS latest {pub_label or active_label}",
+                "endpoint": "action_pi_check",
+                "wired": True,
+                "method": "post",
+                "read_only": False,
+            }
+
+    if source_id == "cms.nh_ownership" and release_availability.get("new_release_available"):
+        target_label = release_availability.get("publisher_latest_label") or "next release"
         return {
-            "label": "Check CMS",
-            "detail": f"ACTIVE {active_label}. SFF posting check is not wired in Data Ops UI yet.",
+            "label": f"Acquire {target_label}",
+            "detail": f"CMS latest {target_label}; acquisition lifecycle not wired in Data Ops yet.",
             "endpoint": "source_detail",
             "endpoint_args": {"source_id": source_id},
             "wired": False,
@@ -1471,16 +1996,132 @@ def _next_operator_action(
             "not_wired_label": "Not yet wired",
         }
 
+    if pending_state in {"ACQUIRED", "VALIDATED"} and source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
+        from ownership_pairing import PAIR_SOURCE_ID, pair_lifecycle_action, pairing_status
+
+        action = pair_lifecycle_action(pairing_status())
+        return {
+            "label": action.get("label") or "Validate pair",
+            "detail": action.get("detail") or "Owners and enrollment releases must move together.",
+            "endpoint": action.get("endpoint") or "source_detail_panel",
+            "endpoint_args": action.get("endpoint_args") or {"source_id": PAIR_SOURCE_ID},
+            "wired": True,
+            "read_only": True,
+            "opens_panel": True,
+            "page_endpoint": "source_detail",
+            "page_endpoint_args": {"source_id": PAIR_SOURCE_ID},
+        }
+    if source_id in {"cms.snf_all_owners", "cms.snf_enrollments"} and active_id and not pending:
+        from ownership_downstream_rebuild import audit_ownership_downstream_stale
+
+        audit = audit_ownership_downstream_stale()
+        active_label = format_release_month_label(active_id) or active_id
+        pub_label = (release_availability or {}).get("publisher_latest_label") or active_label
+        if audit.get("is_stale"):
+            caps = audit.get("stale_capabilities") or []
+            return {
+                "label": "Rebuild downstream",
+                "detail": (
+                    f"Ownership · {active_label} active · CMS latest {pub_label}. "
+                    f"Derived outputs stale ({', '.join(caps[:2])}{'…' if len(caps) > 2 else ''})."
+                ),
+                "endpoint": "action_ownership_downstream_rebuild",
+                "wired": True,
+                "method": "post",
+                "read_only": False,
+            }
+        if not release_availability.get("new_release_available"):
+            return {
+                "label": "Check CMS",
+                "detail": f"Up to date · {active_label} active · CMS latest {pub_label}",
+                "endpoint": "source_detail",
+                "endpoint_args": {"source_id": source_id},
+                "wired": True,
+                "method": "get",
+                "read_only": True,
+            }
+    if source_id == "cms.sff_pdf_list" and active_id and not pending:
+        active_label = format_release_month_label(active_id) or active_id
+        pub_label = (release_availability or {}).get("publisher_latest_label")
+        if pub_label and not release_availability.get("new_release_available"):
+            return {
+                "label": "Check CMS",
+                "detail": f"Up to date · ACTIVE {active_label} · CMS latest {pub_label}",
+                "endpoint": "action_sff_check",
+                "wired": True,
+                "method": "post",
+                "read_only": True,
+                "return_to": "/sources",
+            }
+        if pub_label and release_availability.get("new_release_available"):
+            return {
+                "label": "Check CMS",
+                "detail": f"New CMS posting · {pub_label}",
+                "endpoint": "action_sff_check",
+                "wired": True,
+                "method": "post",
+                "read_only": True,
+                "return_to": "/sources",
+            }
+        return {
+            "label": "Check CMS",
+            "detail": f"ACTIVE {active_label} — compare against CMS SFF posting.",
+            "endpoint": "action_sff_check",
+            "wired": True,
+            "method": "post",
+            "read_only": True,
+            "return_to": "/sources",
+        }
+
     if pending_state == "ACQUIRED":
         release_label = format_release_month_label(pending.get("release_id")) or pending.get("release_id")
+        if source_id == "cms.pbj_nurse_staffing":
+            from operator_freshness import audit_nurse_staffing_candidate_state
+
+            audit = audit_nurse_staffing_candidate_state(control_row=control_row)
+            if audit.get("is_redundant_reacquisition"):
+                return {
+                    "label": "Dismiss re-acquisition",
+                    "detail": audit.get("summary") or "Redundant same-quarter candidate.",
+                    "endpoint": "action_nurse_dismiss_candidate",
+                    "wired": True,
+                    "method": "post",
+                    "read_only": False,
+                }
+            if active_id and str(pending.get("release_id") or "") == str(active_id):
+                return {
+                    "label": "Validate re-acquisition",
+                    "detail": audit.get("summary") or (
+                        f"Same quarter {release_label} — validation workflow not wired in Data Ops yet."
+                    ),
+                    "endpoint": "source_detail",
+                    "endpoint_args": {"source_id": source_id},
+                    "wired": False,
+                    "read_only": True,
+                    "not_wired_label": "Validation not wired",
+                }
+            return {
+                "label": f"Validate {release_label or 'pending release'}",
+                "detail": f"Pending {pending.get('release_id')} is ACQUIRED — run structural validation before review.",
+                "endpoint": "source_detail",
+                "endpoint_args": {"source_id": source_id},
+                "wired": False,
+                "read_only": True,
+                "not_wired_label": "Not yet wired",
+            }
+        from release_review_policy import release_review_query
+
         return {
             "label": f"Review {release_label or 'pending release'}",
-            "detail": f"Pending {pending.get('release_id')} is ACQUIRED — review in Release Review before promotion.",
-            "endpoint": "release_review",
+            "detail": f"Pending {pending.get('release_id')} is ACQUIRED — validate on Sources before activation review.",
+            "endpoint": "source_detail",
+            "endpoint_args": {"source_id": source_id},
             "wired": True,
             "read_only": True,
         }
     if pending_state == "VALIDATED" and source_id == "cms.provider_info":
+        from release_review_policy import release_review_query
+
         approvable = promote_candidate_permitted(
             {
                 "state": pending_state,
@@ -1488,10 +2129,12 @@ def _next_operator_action(
                 "release_id": pending.get("release_id"),
             }
         )
+        release_label = format_release_month_label(pending.get("release_id")) or pending.get("release_id")
         return {
-            "label": "Approve for promotion" if approvable else "Complete Zweli / acknowledgement gates",
+            "label": f"Activate {release_label}" if approvable else "Complete quality gates",
             "detail": "VALIDATED candidate — promotion stays explicit via Release Review.",
             "endpoint": "release_review",
+            "endpoint_args": release_review_query(source_id, pending.get("release_id")),
             "wired": True,
             "read_only": not approvable,
         }
@@ -1511,13 +2154,37 @@ def _next_operator_action(
             "wired": True,
             "method": "post",
         }
-    if active_id and not pending:
+    if active_id and not pending and source_id not in {"cms.sff_pdf_list"}:
+        active_label = format_release_month_label(active_id) or active_id
+        pub_label = (release_availability or {}).get("publisher_latest_label")
+        if pub_label and not release_availability.get("new_release_available"):
+            return {
+                "label": "Check CMS",
+                "detail": f"Up to date · CMS latest {pub_label}",
+                "endpoint": f"action_{source_id.split('.')[-1]}_check" if source_id == "cms.provider_info" else "source_detail",
+                "endpoint_args": {"source_id": source_id} if source_id != "cms.provider_info" else {},
+                "wired": source_id in {"cms.provider_info", "cms.pbj_nurse_staffing"},
+                "method": "post" if source_id in {"cms.provider_info", "cms.pbj_nurse_staffing"} else None,
+                "read_only": source_id not in {"cms.provider_info", "cms.pbj_nurse_staffing"},
+            }
+        if pub_label and release_availability.get("new_release_available"):
+            return {
+                "label": "Check CMS",
+                "detail": f"New release · {pub_label}",
+                "endpoint": "action_pi_check" if source_id == "cms.provider_info" else "source_detail",
+                "endpoint_args": {"source_id": source_id} if source_id != "cms.provider_info" else {},
+                "wired": source_id == "cms.provider_info",
+                "method": "post" if source_id == "cms.provider_info" else None,
+                "read_only": source_id != "cms.provider_info",
+            }
         return {
-            "label": "Monitor release health",
-            "detail": f"ACTIVE {active_id} — no pending candidate. Refresh health from Sources.",
-            "endpoint": "sources",
-            "wired": True,
-            "read_only": True,
+            "label": "Check CMS",
+            "detail": f"ACTIVE {active_label} — compare against CMS publication index.",
+            "endpoint": "action_pi_check" if source_id == "cms.provider_info" else "source_detail",
+            "endpoint_args": {"source_id": source_id} if source_id != "cms.provider_info" else {},
+            "wired": source_id in {"cms.provider_info", "cms.pbj_nurse_staffing", "cms.health_citations"},
+            "method": "post" if source_id in {"cms.provider_info", "cms.pbj_nurse_staffing"} else None,
+            "read_only": source_id not in {"cms.provider_info", "cms.pbj_nurse_staffing", "cms.health_citations"},
         }
     if snapshot and snapshot.get("status") == OpsStatus.PROCESSING_REQUIRED.value:
         return {
@@ -1572,8 +2239,12 @@ def build_sff_lifecycle_steps(
         step(
             "check_cms",
             "Check CMS",
-            state="not_wired",
-            detail="No SFF posting check action is wired in Data Ops UI yet.",
+            state="current" if active_id else "upcoming",
+            detail=(
+                f"Compare CMS SFF posting against ACTIVE {active_id}."
+                if active_id
+                else "Discover the latest CMS-posted SFF PDF before acquisition."
+            ),
         )
     )
 
@@ -1680,22 +2351,33 @@ def build_source_operator_workflow(
     snapshot: dict[str, Any] | None,
     control_row: dict[str, Any] | None,
     release_availability: dict[str, Any] | None = None,
+    theme_publication: Any | None = None,
+    root: Path | None = None,
 ) -> dict[str, Any]:
     """Operator-facing workflow summary from existing control plane + probe overlay."""
+    from provenance_freshness import build_source_provenance_freshness, downstream_stale_capabilities_for_source
     from release_control_plane import CAPABILITY_LABELS
+    from release_review_policy import zweli_applies
+
+    root = root or cms_data_paths.repo_root()
 
     active = (control_row or {}).get("active") or {}
     pending = (control_row or {}).get("pending") or {}
     impact = (control_row or {}).get("impact") or {}
+    stale_caps = downstream_stale_capabilities_for_source(source_id, root=root)
     downstream = [
+        CAPABILITY_LABELS.get(item, item)
+        for item in stale_caps
+    ] or [
         CAPABILITY_LABELS.get(item, item)
         for item in (impact.get("would_mark_stale") or [])
     ]
     zweli_status = None
-    if snapshot:
-        zweli_status = snapshot.get("zweli_status")
-    elif isinstance(pending.get("metadata"), dict):
-        zweli_status = pending.get("metadata", {}).get("zweli_status")
+    if zweli_applies(source_id):
+        if snapshot:
+            zweli_status = snapshot.get("zweli_status")
+        elif isinstance(pending.get("metadata"), dict):
+            zweli_status = pending.get("metadata", {}).get("zweli_status")
 
     if release_availability is None:
         release_availability = build_release_availability_context(
@@ -1703,7 +2385,15 @@ def build_source_operator_workflow(
             control_row=control_row,
             snapshot=snapshot,
             record=record,
+            root=root,
+            theme_publication=theme_publication,
         )
+
+    provenance_freshness = build_source_provenance_freshness(
+        source_id,
+        root=root,
+        theme_publication=theme_publication,
+    )
 
     workflow = {
         "source_id": source_id,
@@ -1718,6 +2408,7 @@ def build_source_operator_workflow(
         "zweli_status": zweli_status,
         "downstream_capabilities": downstream,
         "release_availability": release_availability,
+        "provenance_freshness": provenance_freshness,
         "next_action": _next_operator_action(
             source_id,
             record=record,
@@ -1727,6 +2418,12 @@ def build_source_operator_workflow(
         ),
         "lifecycle_steps": None,
     }
+    workflow["operator_reference"] = build_operator_reference_summary(source_id, workflow=workflow)
+    from operator_freshness import audit_nurse_staffing_candidate_state, build_freshness_layers
+
+    if source_id == "cms.pbj_nurse_staffing":
+        workflow["candidate_audit"] = audit_nurse_staffing_candidate_state(control_row=control_row, root=root)
+    workflow["freshness_layers"] = build_freshness_layers(source_id, workflow=workflow, root=root)
     if source_id == "cms.sff_pdf_list":
         workflow["lifecycle_steps"] = build_sff_lifecycle_steps(control_row=control_row)
     return workflow
@@ -1857,6 +2554,37 @@ def check_nurse_cms(
         ),
         "cms_is_newer": newer,
         "dry_run": dry,
+        "snapshot": snap.to_dict(),
+    }
+
+
+def check_sff_cms(
+    *,
+    fetch_bytes: Callable[[str], bytes] | None = None,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    from sff_release import check_sff_cms as _check
+
+    control_root = Path(__file__).resolve().parent
+    result = _check(fetch_bytes=fetch_bytes, root=control_root)
+    snap = probe_source("cms.sff_pdf_list", check_cms=False, root=root or cms_data_paths.repo_root())
+    if result.get("cms_is_newer"):
+        from release_control_plane import ReleaseState, control_plane_root, record_candidate
+
+        cms_release = str((result.get("cms") or {}).get("release_id") or "")
+        if cms_release:
+            record_candidate(
+                "cms.sff_pdf_list",
+                cms_release,
+                ReleaseState.DETECTED,
+                metadata={
+                    "publisher_label": (result.get("cms") or {}).get("posting_label"),
+                    "source_url": (result.get("cms") or {}).get("source_url"),
+                },
+                root=control_plane_root(root),
+            )
+    return {
+        **result,
         "snapshot": snap.to_dict(),
     }
 
@@ -2071,17 +2799,30 @@ def approve_release_authoritative(
     """Approve using server-resolved Zweli state only (form status ignored)."""
     from data_ops_approval import ApprovalError, approve_release
     from release_control_plane import ReleaseState, control_plane_root, promote_candidate, record_candidate
+    from release_review_policy import (
+        load_governed_candidate,
+        structural_status_from_candidate,
+        zweli_applies,
+    )
 
-    state = resolve_zweli_state_for_release(source_id, release_id, root=root)
-    snap = probe_source(source_id, check_cms=False, root=root, run_zweli=False)
-    if snap.release_id != release_id:
+    root = root or cms_data_paths.repo_root()
+    release_id = (release_id or "").strip()
+    source_id = (source_id or "").strip()
+    pending = load_governed_candidate(source_id, release_id, root=root)
+    if not pending or str(pending.get("state") or "").upper() != "VALIDATED":
+        raise ApprovalError(f"No VALIDATED candidate {source_id} {release_id} for activation")
+
+    structural = structural_status_from_candidate(pending)
+    if structural != "PASS":
         raise ApprovalError(
-            f"release {source_id} {release_id} has no matching canonical local source"
+            f"structural validation must pass before approval ({structural})"
         )
-    if (snap.structural_status or "").upper() not in {"PASS", "UNKNOWN"}:
-        raise ApprovalError(
-            f"structural validation must pass before approval ({snap.structural_status})"
-        )
+
+    if zweli_applies(source_id):
+        state = resolve_zweli_state_for_release(source_id, release_id, root=root)
+    else:
+        state = ZweliState.NOT_RUN
+
     if source_id == "cms.provider_info":
         bundle = build_provider_info_promotion_bundle(release_id)
         source_path = bundle["source_path"]
@@ -2089,12 +2830,30 @@ def approve_release_authoritative(
         promotion_metadata["zweli_state"] = state.value
         promotion_metadata["approval_note"] = note
     else:
-        if not snap.canonical_source_path:
+        source_uri = pending.get("source_uri")
+        if not source_uri:
             raise ApprovalError(
-                f"release {source_id} {release_id} has no matching canonical local source"
+                f"release {source_id} {release_id} has no candidate source_uri"
             )
-        source_path = snap.canonical_source_path
-        promotion_metadata = {"zweli_state": state.value, "approval_note": note}
+        local = str(source_uri).replace("file:///", "").replace("file://", "")
+        source_path = Path(local)
+        if not source_path.is_file():
+            raise ApprovalError(
+                f"release {source_id} {release_id} candidate artifact missing: {source_path}"
+            )
+        promotion_metadata = {
+            "zweli_state": state.value,
+            "approval_note": note,
+            "structural_status": structural,
+        }
+        if isinstance(pending.get("metadata"), dict):
+            promotion_metadata.update(
+                {
+                    k: v
+                    for k, v in pending["metadata"].items()
+                    if k not in promotion_metadata
+                }
+            )
     entry = approve_release(
         source_id,
         release_id,
@@ -2103,12 +2862,16 @@ def approve_release_authoritative(
         audit_path=audit_path,
     )
     control_root = control_plane_root(root)
+    validation = pending.get("validation") if isinstance(pending.get("validation"), dict) else {}
     record_candidate(
         source_id,
         release_id,
         ReleaseState.VALIDATED,
         source_path=source_path,
-        validation={"status": "PASS", "validated_at": entry.timestamp},
+        validation={
+            "status": "PASS",
+            "validated_at": validation.get("validated_at") or entry.timestamp,
+        },
         metadata=promotion_metadata,
         root=control_root,
     )

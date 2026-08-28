@@ -47,7 +47,7 @@
           <th>Active</th>
           <th>Pending</th>
           <th>Mechanism</th>
-          <th>CMS latest</th>
+          <th>Publisher</th>
           <th>Checked</th>
           <th>Status</th>
         </tr>
@@ -89,9 +89,30 @@
           </td>
           <td class="do-small">{{ check.get('mechanism', '—') }}</td>
           <td class="do-small">
-            {% set pub_id = check.get('publisher_latest_release_id') or check.get('release_id') or check.get('pending_release') %}
+            {% set avail = availability_by_dataset.get(row.dataset_id) %}
+            {% if avail and avail.get('inventory_axis') == 'upstream' %}
+            <span class="do-muted do-tiny">Built from</span>
+            {{ avail.inventory_value }}
+            {% if avail.inventory_status == 'STALE' %}
+            <span class="do-badge do-badge-attention do-badge-inline">stale</span>
+            {% elif avail.inventory_status == 'UNKNOWN' %}
+            <span class="do-muted do-tiny">· provenance missing</span>
+            {% elif avail.inventory_status == 'CURRENT' %}
+            <span class="do-muted do-tiny">· current</span>
+            {% endif %}
+            {% else %}
+            {% set pub_id = (avail.publisher_latest_release_id if avail else none) or check.get('publisher_latest_release_id') or check.get('release_id') or check.get('pending_release') %}
             {{ pub_id | do_release_label if pub_id else '—' }}
-            {% if check.get('new_release_available') == true %}<span class="do-badge do-badge-attention do-badge-inline">new</span>{% endif %}
+            {% if pending and pending.release_id == active_id and pending_state == 'ACQUIRED' %}
+            <span class="do-muted do-tiny">· re-acquired</span>
+            {% elif avail and avail.get('unchanged_in_latest_publication') %}
+            <span class="do-muted do-tiny">· unchanged</span>
+            {% elif avail and avail.get('new_release_available') %}
+            <span class="do-badge do-badge-attention do-badge-inline">available</span>
+            {% elif check.get('new_release_available') == true and not (active_id and pub_id and active_id == pub_id) %}
+            <span class="do-badge do-badge-attention do-badge-inline">available</span>
+            {% endif %}
+            {% endif %}
           </td>
           <td class="do-mono do-small" {% if checked_raw %}title="{{ checked_raw }}"{% endif %}>{{ checked_raw | do_datetime if checked_raw else '—' }}</td>
           <td>
@@ -201,59 +222,12 @@
         <div><dt>Pending</dt><dd class="do-mono">{% if s.pending_release_id %}{{ s.pending_release_id }} / {{ s.pending_release_state or '—' }}{% else %}—{% endif %}</dd></div>
         <div><dt>Zweli</dt><dd><span class="do-badge do-zweli-{{ s.zweli_status|lower|replace('_','-') }}">{{ s.zweli_status }}</span></dd></div>
       </dl>
-      {% if s.source_id == 'cms.provider_info' %}
-      <div class="do-actions">
-        <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
-        <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire</button></form>
-      </div>
-      {% elif s.source_id == 'cms.pbj_nurse_staffing' %}
-      <div class="do-actions">
-        <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
-        <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire</button></form>
-      </div>
+      {% if s.source_id == 'cms.provider_info' or s.source_id == 'cms.pbj_nurse_staffing' %}
+      <p class="do-muted do-tiny">Advanced actions live on the source detail page.</p>
       {% endif %}
     </article>
     {% endfor %}
   </div>
-</details>
-
-<section class="do-section do-section-actions">
-  <h2 class="do-section-title-sm">Provider Information actions</h2>
-  <div class="do-actions">
-    <form method="post" action="{{ url_for('action_pi_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
-    <form method="post" action="{{ url_for('action_pi_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
-    <form method="post" action="{{ url_for('action_pi_acquire') }}">
-      <input type="hidden" name="dry_run" value="1">
-      <button class="do-btn do-btn-compact do-btn-ghost" type="submit">Dry-run</button>
-    </form>
-  </div>
-  {% if session.get('last_pi_action') %}
-  <pre class="do-pre do-pre-compact">{{ session.get('last_pi_action') | tojson(indent=2) }}</pre>
-  {% endif %}
-</section>
-
-<section class="do-section do-section-actions">
-  <h2 class="do-section-title-sm">PBJ nurse staffing actions</h2>
-  <div class="do-actions">
-    <form method="post" action="{{ url_for('action_nurse_check') }}"><button class="do-btn do-btn-compact" type="submit">Check CMS</button></form>
-    <form method="post" action="{{ url_for('action_nurse_acquire') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Acquire / Process</button></form>
-    <form method="post" action="{{ url_for('action_pi_acquire') }}">
-      <input type="hidden" name="dry_run" value="1">
-      <button class="do-btn do-btn-compact do-btn-ghost" type="submit">Dry-run</button>
-    </form>
-  </div>
-  {% if session.get('last_nurse_action') %}
-  <pre class="do-pre do-pre-compact">{{ session.get('last_nurse_action') | tojson(indent=2) }}</pre>
-  {% endif %}
-</section>
-
-<details class="do-details do-details-compact">
-  <summary>Derived signals</summary>
-  <ul class="do-list-compact">
-    {% for sig in signals %}
-    <li><span class="do-mono">{{ sig.signal_id }}</span> — {{ sig.human_name }} ← {{ sig.upstream_source_ids|join(', ') }}</li>
-    {% endfor %}
-  </ul>
 </details>
 
 <div class="do-modal" id="do-source-modal" hidden>

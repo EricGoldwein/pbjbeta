@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Data Ops{% endblock %} · PBJ320</title>
+  {% if favicon_href %}<link rel="icon" type="image/png" href="{{ favicon_href }}">{% endif %}
   {# Local DM Sans / DM Mono and 320 wordmark assets unavailable in this environment.
      CDN hooks for DM Sans + DM Mono; PBJ320 text mark from brand macros. #}
   <link rel="preconnect" href="https://fonts.googleapis.com">

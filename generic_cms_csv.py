@@ -60,6 +60,11 @@ def detect(feed: CsvFeed, *, fetch_json: Callable[[str], Any] | None = None) -> 
     return {"release_id": _release_id(row, filename), "filename": filename, "url": url, "row": row}
 
 
+def validate_local_csv(path: Path, groups: tuple[tuple[str, ...], ...]) -> dict[str, Any]:
+    """Public schema/hash check used by pair validation and acquire."""
+    return _validate(path, groups)
+
+
 def _validate(path: Path, groups: tuple[tuple[str, ...], ...]) -> dict[str, Any]:
     if not path.is_file() or path.stat().st_size == 0:
         raise RuntimeError("downloaded CSV is missing or empty")

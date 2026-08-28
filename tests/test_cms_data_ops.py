@@ -328,6 +328,10 @@ def _write_control_plane_state(
                 "metadata": meta,
                 "validation": dict(spec.get("validation") or {}),
             }
+            if spec.get("source_uri") is not None:
+                datasets[dataset_id]["source_uri"] = spec.get("source_uri")
+            if spec.get("hash") is not None:
+                datasets[dataset_id]["hash"] = spec.get("hash")
         (state_dir / "release_candidates.json").write_text(
             json.dumps({"schema_version": 1, "updated_at": "2026-08-27T00:00:00+00:00", "datasets": datasets}),
             encoding="utf-8",
@@ -459,6 +463,10 @@ def test_release_review_includes_governed_pending_not_approvable(tmp_path: Path)
                 "release_id": "2026-07-31",
                 "state": "ACQUIRED",
             },
+            "cms.snf_enrollments": {
+                "release_id": "2026-07-31",
+                "state": "ACQUIRED",
+            },
             "cms.provider_info": {
                 "release_id": "2026-08",
                 "state": "ACQUIRED",
@@ -470,14 +478,12 @@ def test_release_review_includes_governed_pending_not_approvable(tmp_path: Path)
 
     control = rcp.control_panel_payload(tmp_path)
     items = ops.release_review_items(check_cms=False, root=tmp_path, control=control)
-    by_key = {(i["source_id"], i["release_id"]): i for i in items}
-    owners = by_key[("cms.snf_all_owners", "2026-07-31")]
-    provider = by_key[("cms.provider_info", "2026-08")]
-    assert owners["governed"] is True
-    assert owners["approvable"] is False
-    assert provider["governed"] is True
-    assert provider["approvable"] is False
-    assert provider["zweli_status"] == "NOT_RUN"
+    source_ids = {item["source_id"] for item in items}
+    assert "cms.provider_info" not in source_ids
+    assert "cms.snf_all_owners" not in source_ids
+    assert "cms.snf_ownership_pair" in source_ids
+    pair = next(i for i in items if i["source_id"] == "cms.snf_ownership_pair")
+    assert pair["approvable"] is False
 
 
 def test_release_review_validated_not_run_is_approvable(tmp_path: Path):
@@ -512,7 +518,7 @@ def test_authoritative_not_run_can_promote(
 ):
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
-    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    _seed_pi_validated_candidate(tmp_path, year=2026, month=8)
     audit = tmp_path / "audit.jsonl"
     entry = ops.approve_release_authoritative(
         "cms.provider_info",
@@ -530,17 +536,8 @@ def test_authoritative_structural_fail_blocks(
 
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
-    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    _seed_pi_validated_candidate(tmp_path, year=2026, month=8, validation_status="FAIL")
     audit = tmp_path / "audit.jsonl"
-    real_probe = ops.probe_source
-
-    def _probe(*args, run_zweli=False, **kwargs):
-        snap = real_probe(*args, run_zweli=run_zweli, **kwargs)
-        if not run_zweli:
-            return dataclasses.replace(snap, structural_status="FAIL")
-        return snap
-
-    monkeypatch.setattr(ops, "probe_source", _probe)
     with pytest.raises(approval.ApprovalError, match="structural validation"):
         ops.approve_release_authoritative(
             "cms.provider_info",
@@ -605,6 +602,35 @@ def _write_provider_info_release(
     return raw
 
 
+def _seed_pi_validated_candidate(
+    root: Path,
+    *,
+    year: int = 2026,
+    month: int = 8,
+    validation_status: str = "PASS",
+) -> str:
+    _write_provider_info_release(root, year=year, month=month, prefix="300")
+    release_id = f"{year:04d}-{month:02d}"
+    norm = root / "provider_info_normalized" / f"ProviderInfoNorm_{year}_{month:02d}.csv"
+    _write_control_plane_state(
+        root,
+        pending={
+            "cms.provider_info": {
+                "release_id": release_id,
+                "state": "VALIDATED",
+                "validation": {
+                    "status": validation_status,
+                    "validated_at": "2026-08-27T00:00:00+00:00",
+                },
+                "metadata": {"structural_status": validation_status},
+                "source_uri": norm.as_uri(),
+                "hash": "test-hash",
+            }
+        },
+    )
+    return release_id
+
+
 def _write_zweli_report(root: Path, release_id: str, state: str) -> Path:
     man = root / "provider_info" / "_manifests" / release_id
     man.mkdir(parents=True, exist_ok=True)
@@ -633,7 +659,7 @@ def test_forged_form_pass_cannot_approve_blocked(
     monkeypatch.setenv("PBJ_DATA_OPS_SECRET", "test-secret")
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
-    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    _seed_pi_validated_candidate(tmp_path, year=2026, month=8)
     _write_zweli_report(tmp_path, "2026-08", "BLOCKED")
     audit = tmp_path / "provider_info" / "_manifests" / "_data_ops_audit.jsonl"
 
@@ -672,7 +698,7 @@ def test_authoritative_promotion_writes_isolated_registry(
 ):
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
-    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    _seed_pi_validated_candidate(tmp_path, year=2026, month=8)
     audit = tmp_path / "audit.jsonl"
     _write_zweli_report(tmp_path, "2026-08", "PASS")
     ops.approve_release_authoritative(
@@ -694,7 +720,7 @@ def test_authoritative_promotion_writes_isolated_registry(
 def test_authoritative_requires_review_and_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
-    _write_provider_info_release(tmp_path, year=2026, month=8, prefix="300")
+    _seed_pi_validated_candidate(tmp_path, year=2026, month=8)
     audit = tmp_path / "audit.jsonl"
     _write_zweli_report(tmp_path, "2026-08", "REQUIRES_REVIEW")
     with pytest.raises(approval.ApprovalError, match="acknowledgement"):
@@ -710,6 +736,7 @@ def test_authoritative_requires_review_and_pass(tmp_path: Path, monkeypatch: pyt
     assert entry.action == "approve"
 
     _write_provider_info_release(tmp_path, year=2026, month=9, prefix="301")
+    _seed_pi_validated_candidate(tmp_path, year=2026, month=9)
     _write_zweli_report(tmp_path, "2026-09", "PASS")
     entry2 = ops.approve_release_authoritative(
         "cms.provider_info", "2026-09", root=tmp_path, audit_path=audit
@@ -719,7 +746,7 @@ def test_authoritative_requires_review_and_pass(tmp_path: Path, monkeypatch: pyt
 
 def test_stale_missing_zweli_fails_closed(tmp_path: Path):
     audit = tmp_path / "audit.jsonl"
-    with pytest.raises(approval.ApprovalError, match="fail closed|NOT_RUN|missing"):
+    with pytest.raises(approval.ApprovalError, match="VALIDATED candidate"):
         ops.approve_release_authoritative(
             "cms.provider_info", "2099-01", root=tmp_path, audit_path=audit
         )
@@ -799,6 +826,9 @@ def test_build_sff_lifecycle_active_read_only():
         "Public staging",
         "Publish",
     ]
+    check_cms = next(s for s in steps if s["id"] == "check_cms")
+    assert check_cms["state"] != "not_wired"
+    assert check_cms.get("action") is None
     make_active = next(s for s in steps if s["id"] == "make_active")
     assert make_active["state"] == "completed"
     publish = next(s for s in steps if s["id"] == "publish")
@@ -833,9 +863,8 @@ def test_format_release_month_label():
     assert ops.format_release_month_label(None) is None
 
 
-def test_health_citations_release_availability_from_upstream(tmp_path: Path):
+def test_health_citations_release_availability_independent_of_provider_info(tmp_path: Path):
     import json
-    from active_release_registry import registry_path
 
     state = tmp_path / "state"
     state.mkdir(exist_ok=True)
@@ -848,10 +877,9 @@ def test_health_citations_release_availability_from_upstream(tmp_path: Path):
                 "hash": "abc",
             },
             "cms.health_citations": {
-                "active_release_id": "2026-07",
+                "active_release_id": "2026-08",
                 "status": "ACTIVE",
                 "hash": "def",
-                "metadata": {"upstream_releases": {"cms.provider_info": "2026-07"}},
             },
         },
     }
@@ -862,13 +890,31 @@ def test_health_citations_release_availability_from_upstream(tmp_path: Path):
     monkeypatch = pytest.MonkeyPatch()
     try:
         import active_release_registry as arr
+        from cms_theme_publication import resolve_theme_publication
 
         monkeypatch.setattr(arr, "registry_path", lambda _root=None: state / "active_releases.json")
+
+        fixtures = Path(__file__).parent / "fixtures"
+        manifest = json.loads((fixtures / "cms_theme_manifest_2026-08-26.json").read_text(encoding="utf-8"))
+        publication = resolve_theme_publication(
+            archive_index=[
+                {
+                    "type": "theme",
+                    "date": "2026-08-26",
+                    "id": "nh-aug26",
+                    "url": "/provider-data/dataset-archives/theme/nursing-homes/nursing-homes_2026-08-26.zip",
+                    "name": "nursing-homes_2026-08-26",
+                    "theme": "nursing-homes",
+                    "size": 1,
+                }
+            ],
+            manifest=manifest,
+        )
 
         control_row = {
             "active": active["datasets"]["cms.health_citations"],
             "pending": None,
-            "health": "UNKNOWN",
+            "health": "PASS",
             "impact": {"would_mark_stale": ["facility.citations"]},
         }
         record = {"human_name": "Health Citations", "acquisition_implementation": None}
@@ -877,22 +923,16 @@ def test_health_citations_release_availability_from_upstream(tmp_path: Path):
             control_row=control_row,
             record=record,
             root=tmp_path,
+            theme_publication=publication,
         )
-        assert availability["active_release_label"] == "Jul 2026"
+        assert availability["active_release_label"] == "Aug 2026"
         assert availability["publisher_latest_label"] == "Aug 2026"
-        assert availability["new_release_available"] is True
-        assert availability["availability_summary"] == "New release available"
-
-        wf = ops.build_source_operator_workflow(
-            "cms.health_citations",
-            record=record,
-            snapshot={"release_id": "2026-08"},
-            control_row=control_row,
-            release_availability=availability,
-        )
-        assert "Acquire Aug 2026" in wf["next_action"]["label"]
-        assert wf["next_action"]["wired"] is False
-        assert wf["next_action"].get("not_wired_label") == "Not yet wired"
+        assert availability["new_release_available"] is False
+        assert availability["availability_source"] == "theme_publication"
+        assert availability["inventory_axis"] == "cms"
+        assert availability["inventory_label"] == "CMS latest"
+        assert availability["inventory_status"] is None
+        assert availability.get("upstream_active") is None
     finally:
         monkeypatch.undo()
 
@@ -938,7 +978,52 @@ def test_ownership_pair_attention_item(tmp_path: Path):
         items = ops.build_needs_attention_queue(control=control, check_by_dataset={}, snapshots=[])
         pair = next(i for i in items if i["source_id"] == "cms.snf_ownership_pair")
         assert "Jul 31" in pair["concise_state"]
-        assert pair["next_action"]["label"] == "Review pair"
+        assert pair["next_action"]["label"] == "Validate pair"
+        assert pair["next_action"].get("opens_panel") is True
+        assert pair["panel_source_id"] == "cms.snf_ownership_pair"
     finally:
         monkeypatch.undo()
+
+
+def test_probe_health_citations_theme_first_suppresses_metastore_failure(monkeypatch):
+    from cms_source_registry import get_source
+    from cms_theme_publication import resolve_theme_publication
+    from pathlib import Path
+
+    fixtures = Path(__file__).parent / "fixtures"
+    manifest = json.loads((fixtures / "cms_theme_manifest_2026-08-26.json").read_text(encoding="utf-8"))
+    publication = resolve_theme_publication(
+        archive_index=[
+            {
+                "type": "theme",
+                "date": "2026-08-26",
+                "id": "nh-aug26",
+                "url": "/provider-data/dataset-archives/theme/nursing-homes/nursing-homes_2026-08-26.zip",
+                "name": "nursing-homes_2026-08-26",
+                "theme": "nursing-homes",
+                "size": 1,
+            }
+        ],
+        manifest=manifest,
+    )
+
+    def _fail_metastore(*_args, **_kwargs):
+        raise RuntimeError("could not derive Health Citations vintage label from CMS metastore")
+
+    monkeypatch.setattr(
+        "health_citations_acquire.resolve_cms_health_citations_release",
+        _fail_metastore,
+    )
+
+    record = get_source("cms.health_citations")
+    snap = ops._probe_health_citations(
+        record,
+        cms_data_paths.repo_root(),
+        check_cms=True,
+        theme_publication=publication,
+    )
+    assert snap.publisher_latest == "Aug 2026"
+    assert snap.cms_latest == "Aug 2026"
+    assert snap.error is None
+    assert "probe failed" not in (snap.detail or "").lower()
 
