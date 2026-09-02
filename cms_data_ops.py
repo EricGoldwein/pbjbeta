@@ -1859,6 +1859,7 @@ def _next_operator_action(
     snapshot: dict[str, Any] | None,
     control_row: dict[str, Any] | None,
     release_availability: dict[str, Any] | None = None,
+    root: Path | None = None,
 ) -> dict[str, Any]:
     pending = (control_row or {}).get("pending") or {}
     pending_state = str(pending.get("state") or "").upper()
@@ -1871,13 +1872,14 @@ def _next_operator_action(
             control_row=control_row,
             snapshot=snapshot,
             record=record,
+            root=root,
         )
 
     from release_control_plane import stale_derived_consumers
     from provenance_freshness import downstream_stale_capabilities_for_source
 
-    stale_map = stale_derived_consumers()
-    downstream_stale = downstream_stale_capabilities_for_source(source_id)
+    stale_map = stale_derived_consumers(root)
+    downstream_stale = downstream_stale_capabilities_for_source(source_id, root=root)
 
     if source_id == "cms.health_citations":
         target_label = release_availability.get("publisher_latest_label") or "next release"
@@ -1961,6 +1963,95 @@ def _next_operator_action(
     if source_id == "cms.provider_info" and active_id and not pending:
         active_label = format_release_month_label(active_id) or active_id
         pub_label = release_availability.get("publisher_latest_label")
+        from pbj320_stage_provider_info import (
+            audit_provider_info_pbj320_destination,
+            evaluate_pi_stage_publish_eligibility,
+            load_stage_manifest,
+        )
+
+        dest_audit = audit_provider_info_pbj320_destination(root=root)
+        stage_manifest = load_stage_manifest(active_id, root=root)
+        publish_eligibility = evaluate_pi_stage_publish_eligibility(stage_manifest, root=root)
+        if dest_audit.get("canonical_current") and not publish_eligibility.get("publishable"):
+            if stage_manifest and str(stage_manifest.get("status") or "") == "STAGED":
+                stale_detail = str(publish_eligibility.get("detail") or "rebuild required")
+                return {
+                    "label": "Stage again against current production",
+                    "detail": (
+                        f"Provider Information · {active_label} · existing Stage manifest is out of date "
+                        f"({stale_detail}). Rebuild against current origin/master baseline."
+                    ),
+                    "endpoint": "action_pi_stage_pbj320",
+                    "wired": True,
+                    "method": "post",
+                    "read_only": False,
+                    "busy_submit": True,
+                    "busy_label": "Staging Provider Information…",
+                    "busy_detail": (
+                        "Isolated baseline worktree + PI overlay; captures publication_base_sha and "
+                        "shared-destination fingerprints."
+                    ),
+                }
+            pending_files = 4
+            return {
+                "label": "Stage for PBJ320",
+                "detail": (
+                    f"Provider Information · {active_label} ACTIVE · "
+                    f"prepare {pending_files} pbj-root destination artifacts (working tree only; no publish)."
+                ),
+                "endpoint": "action_pi_stage_pbj320",
+                "wired": True,
+                "method": "post",
+                "read_only": False,
+                "busy_submit": True,
+                "busy_label": "Staging Provider Information…",
+                "busy_detail": (
+                    "Running validation and build gates (Norm sync, combined rebuild, "
+                    "pre-publication checks). This may take several minutes."
+                ),
+            }
+        if publish_eligibility.get("publishable"):
+            from pbj320_publish_provider_info import load_publication_record
+
+            pub = load_publication_record(active_id, root=root)
+            if pub and pub.get("production_verified"):
+                return {
+                    "label": "Production verified",
+                    "detail": (
+                        f"Provider Information {active_label} verified on production · "
+                        f"commit {str(pub.get('commit_sha') or '')[:12]}…"
+                    ),
+                    "endpoint": "pi_stage_manifest",
+                    "endpoint_args": {"release_id": active_id},
+                    "wired": True,
+                    "method": "get",
+                    "read_only": True,
+                }
+            if pub and pub.get("push_succeeded"):
+                return {
+                    "label": "Verify production",
+                    "detail": (
+                        f"Provider Information {active_label} pushed · commit "
+                        f"{str(pub.get('commit_sha') or '')[:12]}… · run read-only production checks."
+                    ),
+                    "endpoint": "pi_stage_manifest",
+                    "endpoint_args": {"release_id": active_id},
+                    "wired": True,
+                    "method": "get",
+                    "read_only": True,
+                }
+            return {
+                "label": "Publish to PBJ320",
+                "detail": (
+                    f"Provider Information · {active_label} STAGED · "
+                    f"review manifest and confirm selective commit to pbj-root."
+                ),
+                "endpoint": "pi_stage_manifest",
+                "endpoint_args": {"release_id": active_id},
+                "wired": True,
+                "method": "get",
+                "read_only": True,
+            }
         if not release_availability.get("new_release_available") and stale_map.get(source_id):
             return {
                 "label": "Rebuild downstream",
@@ -2415,6 +2506,7 @@ def build_source_operator_workflow(
             snapshot=snapshot,
             control_row=control_row,
             release_availability=release_availability,
+            root=root,
         ),
         "lifecycle_steps": None,
     }
@@ -2424,6 +2516,12 @@ def build_source_operator_workflow(
     if source_id == "cms.pbj_nurse_staffing":
         workflow["candidate_audit"] = audit_nurse_staffing_candidate_state(control_row=control_row, root=root)
     workflow["freshness_layers"] = build_freshness_layers(source_id, workflow=workflow, root=root)
+    if source_id == "cms.provider_info":
+        from pbj320_stage_provider_info import audit_provider_info_pbj320_destination, load_stage_manifest
+
+        active_id = str(active.get("active_release_id") or "")
+        workflow["pbj320_stage_audit"] = audit_provider_info_pbj320_destination(root=root)
+        workflow["pbj320_stage_manifest"] = load_stage_manifest(active_id, root=root) if active_id else None
     if source_id == "cms.sff_pdf_list":
         workflow["lifecycle_steps"] = build_sff_lifecycle_steps(control_row=control_row)
     return workflow

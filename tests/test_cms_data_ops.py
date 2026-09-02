@@ -857,6 +857,92 @@ def test_build_source_operator_workflow_uses_control_plane():
     assert wf["lifecycle_steps"] is None
 
 
+def test_needs_attention_provider_info_operator_action_passes_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: /sources queue builds PI next_action without NameError on root."""
+    audit_calls: list[dict] = []
+
+    def _fake_audit(*, root=None, pbj_root=None, pbjapp_root=None):
+        audit_calls.append({"root": root, "pbj_root": pbj_root})
+        return {
+            "source_id": "cms.provider_info",
+            "active_release_id": "2026-08",
+            "canonical_current": True,
+            "destination_staged": False,
+        }
+
+    monkeypatch.setattr(
+        "pbj320_stage_provider_info.audit_provider_info_pbj320_destination",
+        _fake_audit,
+    )
+    monkeypatch.setattr(
+        ops,
+        "_ownership_downstream_attention_item",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(ops, "_citation_packages_attention_item", lambda **kwargs: None)
+
+    control = {
+        "datasets": [
+            {
+                "dataset_id": "cms.provider_info",
+                "active": {"active_release_id": "2026-08", "status": "ACTIVE"},
+                "pending": None,
+                "health": "PASS",
+            },
+            {
+                "dataset_id": "cms.pbj_nurse_staffing",
+                "active": {"active_release_id": "CY2026Q1", "status": "ACTIVE"},
+                "pending": None,
+                "health": "PASS",
+            },
+        ]
+    }
+    check_by_dataset = {
+        "cms.provider_info": {
+            "dataset_id": "cms.provider_info",
+            "status": "CURRENT",
+            "new_release_available": False,
+        },
+        "cms.pbj_nurse_staffing": {
+            "dataset_id": "cms.pbj_nurse_staffing",
+            "status": "CURRENT",
+            "new_release_available": False,
+        },
+    }
+    snapshots = [
+        {"source_id": "cms.provider_info", "validation_status": "PASS"},
+        {"source_id": "cms.pbj_nurse_staffing", "validation_status": "PASS"},
+    ]
+
+    # Same call chain as GET /sources → build_needs_attention_queue(...)
+    ops.build_needs_attention_queue(
+        control=control,
+        check_by_dataset=check_by_dataset,
+        snapshots=snapshots,
+        root=tmp_path,
+    )
+
+    wf = ops.build_source_operator_workflow(
+        "cms.provider_info",
+        record={"actions_enabled": ["check_cms"]},
+        snapshot={"validation_status": "PASS"},
+        control_row=control["datasets"][0],
+        release_availability={
+            "new_release_available": False,
+            "publisher_latest_label": "Aug 2026",
+            "active_release_label": "Aug 2026",
+        },
+        root=tmp_path,
+    )
+    assert wf["next_action"]["label"] == "Stage for PBJ320"
+    assert wf["next_action"].get("busy_submit") is True
+    assert "Staging Provider Information" in (wf["next_action"].get("busy_label") or "")
+    assert audit_calls
+    assert audit_calls[0]["root"] == tmp_path
+
+
 def test_format_release_month_label():
     assert ops.format_release_month_label("2026-08") == "Aug 2026"
     assert ops.format_release_month_label("2026-07") == "Jul 2026"

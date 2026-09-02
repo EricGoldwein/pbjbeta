@@ -1,0 +1,247 @@
+{% extends "data_ops/base.html" %}
+{% block title %}PBJ320 Stage · Provider Information {{ release_id }}{% endblock %}
+{% block content %}
+<section class="do-page-head do-page-head-compact">
+  <div>
+    <h1>PBJ320 Stage manifest</h1>
+    <p class="do-mono do-muted do-small">cms.provider_info · {{ release_id }} · {{ manifest.status }}</p>
+  </div>
+  <p class="do-back-link"><a href="{{ url_for('source_detail', source_id='cms.provider_info') }}">← Provider Information</a></p>
+  {% if manifest.status == 'STAGED' and stage_publishable %}
+  <form class="do-inline do-busy-form" method="post" action="{{ url_for('action_pi_refresh_stage_manifest') }}"
+    data-do-busy-form
+    data-do-busy-label="Refreshing manifest…"
+    data-do-busy-detail="Re-reading on-disk pbj-root destinations and git baseline. No file writes.">
+    <button class="do-btn do-btn-compact do-btn-ghost" type="submit" data-do-busy-submit>Refresh staged manifest</button>
+    <p class="do-muted do-small do-busy-status" data-do-busy-status hidden aria-live="polite"></p>
+  </form>
+  {% endif %}
+</section>
+
+<section class="do-section do-section-primary">
+  {% if stage_stale %}
+  <div class="do-callout do-callout-attention">
+    <p class="do-small">
+      <strong>Stage candidate out of date.</strong>
+      This manifest predates the baseline+overlay publication model
+      {% if stage_stale_detail %}({{ stage_stale_detail }}){% endif %}
+      and cannot be published as-is.
+      Rebuild against the current <span class="do-mono">origin/master</span> production baseline
+      to capture <span class="do-mono">publication_base_sha</span>, shared-destination input fingerprints,
+      and a production-relative diff.
+    </p>
+    <form class="do-inline do-busy-form" method="post" action="{{ url_for('action_pi_stage_pbj320') }}"
+      data-do-busy-form
+      data-do-busy-label="Staging Provider Information…"
+      data-do-busy-detail="Isolated baseline worktree + PI overlay; no Publish.">
+      <button class="do-btn do-btn-primary do-btn-compact" type="submit" data-do-busy-submit>Stage again against current production</button>
+    </form>
+  </div>
+  {% endif %}
+  {% if manifest.manifest_refreshed %}
+  <div class="do-callout do-callout-ok">
+    <p class="do-small">{{ manifest.manifest_refresh_note }}</p>
+  </div>
+  {% endif %}
+  {% if pub_summary %}
+  <div class="do-callout do-callout-{{ pub_summary.callout_class }}">
+    <p class="do-small">
+      <strong>{{ pub_summary.headline }}</strong> {{ pub_summary.detail }}
+    </p>
+    {% if pub_summary.trail %}
+    <p class="do-muted do-tiny do-mono">{{ pub_summary.trail }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <dl class="do-dl do-dl-wide">
+    <div><dt>ACTIVE release</dt><dd class="do-mono">{{ manifest.active_release_id }}</dd></div>
+    <div><dt>Publication base</dt><dd class="do-mono do-tiny">{{ manifest.publication_base_sha[:16] if manifest.publication_base_sha else '—' }}…</dd></div>
+    <div><dt>Stage timestamp</dt><dd>{{ manifest.stage_timestamp | do_datetime if manifest.stage_timestamp else '—' }}</dd></div>
+    {% if manifest.manifest_refreshed_at %}
+    <div><dt>Manifest refreshed</dt><dd>{{ manifest.manifest_refreshed_at | do_datetime }} <span class="do-muted do-small">(metadata only)</span></dd></div>
+    {% endif %}
+    <div><dt>pbj-root</dt><dd class="do-mono do-small">{{ manifest.pbj_root }}</dd></div>
+    <div><dt>Canonical SHA</dt><dd class="do-mono do-small">{{ manifest.canonical.sha256 if manifest.canonical else '—' }}</dd></div>
+  </dl>
+
+  <h3 class="do-subhead">Destination layers</h3>
+  <ul class="do-freshness-layers">
+    {% for key, value in (display_layers or manifest.destination_layers or {})|dictsort %}
+    <li class="do-freshness-layer"><span class="do-freshness-layer-label">{{ key }}</span> <span class="do-badge">{{ value }}</span></li>
+    {% endfor %}
+  </ul>
+
+  <h3 class="do-subhead">Commit destinations ({{ (manifest.files_added or [])|length + (manifest.files_modified or [])|length }})</h3>
+  <p class="do-muted do-small">
+    {% if publish_review and publish_review.review %}
+    Paths copied from stage artifact cache into an isolated publication worktree at
+    <span class="do-mono">origin/{{ publish_review.review.publish_branch }}</span> — your dev checkout is not switched.
+    {% elif manifest.publication_base_branch %}
+    Production-relative diff vs <span class="do-mono">origin/{{ manifest.publication_base_branch }}</span>
+    at publication base SHA.
+    {% else %}
+    Commit destinations from this Stage run. Publication base SHA not recorded — re-Stage against current production.
+    {% endif %}
+  </p>
+  {% if manifest.files_added %}
+  <p class="do-small"><strong>Add:</strong> <span class="do-mono">{{ manifest.files_added | join(', ') }}</span></p>
+  {% endif %}
+  {% if manifest.files_modified %}
+  <p class="do-small"><strong>Modify:</strong> <span class="do-mono">{{ manifest.files_modified | join(', ') }}</span></p>
+  {% endif %}
+  {% if not manifest.files_added and not manifest.files_modified %}
+  <p class="do-muted do-small">No commit-destination byte changes on this Stage run.</p>
+  {% endif %}
+
+  {% if manifest.validation_artifacts %}
+  <h3 class="do-subhead">Validation-only (gitignored)</h3>
+  <p class="do-muted do-small">Local parity snapshot for gates — not for commit.</p>
+  <p class="do-small do-mono">{{ manifest.validation_artifacts | join(', ') }}</p>
+  {% endif %}
+
+  <h3 class="do-subhead">Destination artifacts ({{ (manifest.artifacts or [])|length }})</h3>
+  <table class="do-table do-table-compact">
+    <thead>
+      <tr><th>Path</th><th>Class</th><th>Git before</th><th>Action</th><th>Material</th><th>Baseline SHA</th><th>Proposed SHA</th></tr>
+    </thead>
+    <tbody>
+      {% for row in manifest.artifacts or [] %}
+      <tr>
+        <td class="do-mono do-small">{{ row.path }}</td>
+        <td class="do-small">{{ row.publication_class or ('Commit' if row.publication_class == 'commit_destination' else 'Validation') }}</td>
+        <td class="do-small">{{ row.git_state_before or '—' }}</td>
+        <td class="do-small">{{ row.publication_action or '—' }}</td>
+        <td class="do-small">{{ 'yes' if row.material_change else 'no' }}</td>
+        <td class="do-mono do-tiny">{{ (row.old_sha256 or '—')[:12] }}{% if row.old_sha256 %}…{% endif %}</td>
+        <td class="do-mono do-tiny">{{ (row.proposed_sha256 or '—')[:12] }}{% if row.proposed_sha256 %}…{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3 class="do-subhead">Affected consumers</h3>
+  <ul class="do-small">
+    {% for consumer in manifest.affected_consumers or [] %}
+    <li>{{ consumer }}</li>
+    {% endfor %}
+  </ul>
+
+  <h3 class="do-subhead">Validation gates</h3>
+  <table class="do-table do-table-compact">
+    <thead><tr><th>Command</th><th>Result</th></tr></thead>
+    <tbody>
+      {% for gate in manifest.validation_gates or [] %}
+      <tr>
+        <td class="do-mono do-tiny">{{ gate.command }}</td>
+        <td><span class="do-badge do-badge-{{ 'active' if gate.passed else 'attention' }}">{{ 'PASS' if gate.passed else 'FAIL' }}</span> {{ gate.summary }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if manifest.search_index_cache_note %}
+  <p class="do-muted do-small">{{ manifest.search_index_cache_note }}</p>
+  {% endif %}
+
+  <p class="do-muted do-small">{{ manifest.next_human_step }}</p>
+  <p class="do-muted do-tiny do-mono">Publish: review below — not automatic from this page load</p>
+</section>
+
+<section class="do-section" id="publish">
+  <h2 class="do-section-title-sm">Publish to PBJ320</h2>
+  {% if publication and publication.production_verified %}
+  <div class="do-callout do-callout-ok">
+    <p class="do-small"><strong>Production verified.</strong> Commit <span class="do-mono">{{ publication.commit_sha[:12] }}…</span> · pushed {{ publication.push_remote }}/{{ publication.push_branch }} · verified {{ publication.production_verified_at | do_datetime if publication.production_verified_at else '—' }}</p>
+  </div>
+  {% elif publication and publication.push_succeeded %}
+  <div class="do-callout do-callout-ok">
+    <p class="do-small"><strong>Published.</strong> Commit <span class="do-mono">{% if publication.commit_sha %}{{ publication.commit_sha[:12] }}…{% else %}—{% endif %}</span> pushed to <span class="do-mono">{{ publication.push_remote }}/{{ publication.push_branch }}</span>. Run production verification to confirm live artifacts.</p>
+  </div>
+  <form class="do-busy-form" method="post" action="{{ url_for('action_pi_verify_production') }}"
+    data-do-busy-form
+    data-do-busy-label="Verifying production…"
+    data-do-busy-detail="Read-only HTTP checks against live PBJ320 production.">
+    <input type="hidden" name="release_id" value="{{ release_id }}">
+    <button class="do-btn do-btn-primary" type="submit" data-do-busy-submit>Verify production</button>
+    <p class="do-muted do-small do-busy-status" data-do-busy-status hidden aria-live="polite"></p>
+  </form>
+  {% if publication.production_verification_checks %}
+  <h3 class="do-subhead">Verification checks</h3>
+  <table class="do-table do-table-compact">
+    <thead><tr><th>Check</th><th>Target</th><th>Result</th></tr></thead>
+    <tbody>
+      {% for row in publication.production_verification_checks %}
+      <tr>
+        <td class="do-small">{{ row.check_id }}</td>
+        <td class="do-mono do-tiny">{{ row.target }}</td>
+        <td><span class="do-badge do-badge-{{ 'active' if row.result == 'PASS' else 'attention' }}">{{ row.result }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% elif publish_review and publish_review.review %}
+  <p class="do-small">Provider Information <span class="do-mono">{{ publish_review.release_id }}</span> · <strong>{{ publish_review.review.commit_file_count }} files</strong> will be committed · validation gates PASS</p>
+  <dl class="do-dl do-dl-wide">
+    <div><dt>Source release</dt><dd class="do-mono">{{ publish_review.release_id }}</dd></div>
+    <div><dt>Stage manifest SHA</dt><dd class="do-mono do-tiny">{{ publish_review.review.manifest_sha256[:16] }}…</dd></div>
+    <div><dt>Publish base</dt><dd class="do-mono do-tiny">{{ publish_review.review.publish_base_sha[:16] }}…</dd></div>
+    <div><dt>Dev pbj-root</dt><dd class="do-mono do-small">{{ publish_review.review.dev_pbj_root }} <span class="do-muted">(unchanged)</span></dd></div>
+    <div><dt>Push target</dt><dd class="do-mono">{{ publish_review.review.publish_remote }}/{{ publish_review.review.publish_branch }}</dd></div>
+  </dl>
+  {% if publish_review.search_index_cache_note %}
+  <p class="do-muted do-small">{{ publish_review.search_index_cache_note }}</p>
+  {% endif %}
+  <p class="do-small"><strong>Commit paths:</strong></p>
+  <ul class="do-small do-mono">
+    {% for path in publish_review.review.commit_paths %}
+    <li>{{ path }}</li>
+    {% endfor %}
+  </ul>
+  <p class="do-muted do-small">Validation-only (never commit): {{ publish_review.review.validation_only_paths | join(', ') }}</p>
+  <p class="do-muted do-small">Publish copies manifest bytes into a clean worktree at origin/{{ publish_review.review.publish_branch }}, validates, commits, and fast-forward pushes. Render build follows on {{ publish_review.review.publish_branch }}.</p>
+  <form class="do-busy-form" method="post" action="{{ url_for('action_pi_publish_pbj320') }}"
+    data-do-busy-form
+    data-do-busy-label="Publishing Provider Information…"
+    data-do-busy-detail="Isolated worktree: validate, selective git add, commit, fast-forward push to origin/{{ publish_review.review.publish_branch }}.">
+    <input type="hidden" name="release_id" value="{{ publish_review.release_id }}">
+    <input type="hidden" name="publish_base_sha" value="{{ publish_review.review.publish_base_sha }}">
+    <label class="do-small"><input type="checkbox" name="confirm" value="1" required> I confirm Publish to PBJ320 for Provider Information {{ publish_review.release_id }}</label>
+    <div class="do-actions do-actions-inline">
+      <button class="do-btn do-btn-primary" type="submit" data-do-busy-submit>Publish to PBJ320</button>
+    </div>
+    <p class="do-muted do-small do-busy-status" data-do-busy-status hidden aria-live="polite"></p>
+  </form>
+  {% elif stage_stale %}
+  <div class="do-callout do-callout-attention">
+    <p class="do-small"><strong>Publish unavailable.</strong> {{ stage_stale_detail or 'Stage manifest is out of date.' }}</p>
+    <p class="do-muted do-small">Publish requires a schema v2 Stage with <span class="do-mono">publication_base_sha</span> and a valid artifact cache.</p>
+  </div>
+  <form class="do-busy-form" method="post" action="{{ url_for('action_pi_stage_pbj320') }}"
+    data-do-busy-form
+    data-do-busy-label="Staging Provider Information…"
+    data-do-busy-detail="Rebuild against current origin/master baseline.">
+    <button class="do-btn do-btn-primary" type="submit" data-do-busy-submit>Stage again against current production</button>
+    <p class="do-muted do-small do-busy-status" data-do-busy-status hidden aria-live="polite"></p>
+  </form>
+  {% elif publish_blocked %}
+  <p class="do-flash-error do-small">Publish blocked: {{ publish_blocked }}</p>
+  {% else %}
+  <p class="do-muted do-small">Publish review unavailable.</p>
+  {% endif %}
+  {% if publication and publication.production_verification_targets %}
+  <h3 class="do-subhead">Next: Verify production</h3>
+  <ul class="do-small">
+    {% for target in publication.production_verification_targets %}
+    <li><strong>{{ target.check }}</strong> — {{ target.description }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<details class="do-collapse-panel">
+  <summary>Full manifest JSON</summary>
+  <pre class="do-pre">{{ manifest | tojson(indent=2) }}</pre>
+</details>
+{% endblock %}

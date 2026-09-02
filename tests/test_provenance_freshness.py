@@ -286,3 +286,81 @@ def test_health_citations_post_activation_next_action_rebuild_when_stale(tmp_pat
     assert wf["next_action"]["wired"] is True
     assert wf["next_action"]["endpoint"] == "action_citation_packages_rebuild"
     assert "no deploy" in wf["next_action"]["detail"].lower()
+
+
+def test_provider_info_pbj_root_destination_not_current_before_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import active_release_registry as arr
+    import release_control_plane as rcp
+
+    pbjapp, pbj_root, control = _write_pi_release_for_provenance(tmp_path)
+    pbj_root.mkdir()
+    monkeypatch.setattr(arr, "registry_path", lambda _root=None: control / "state" / "active_releases.json")
+    monkeypatch.setattr(rcp, "control_plane_root", lambda _root=None: control)
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(pbjapp))
+    monkeypatch.setenv("PBJ_ROOT", str(pbj_root))
+
+    contract = build_source_provenance_freshness("cms.provider_info", root=control)
+    pbj_row = next(
+        row
+        for row in contract["downstream_artifacts"]
+        if row.get("consumer") == "public PBJ320.com Provider surfaces"
+    )
+    assert pbj_row["operator_label"] == "Public Provider pages (pbj-root destination)"
+    assert pbj_row["freshness"] == "NOT_STAGED"
+
+
+def _write_pi_release_for_provenance(tmp_path: Path) -> tuple[Path, Path, Path]:
+    from active_release_registry import sha256_file
+
+    pbjapp = tmp_path / "pbjapp"
+    norm_dir = pbjapp / "provider_info_normalized"
+    pi_dir = pbjapp / "provider_info"
+    norm_dir.mkdir(parents=True)
+    pi_dir.mkdir(parents=True)
+    release_id = "2026-08"
+    norm_name = "ProviderInfoNorm_2026_08.csv"
+    nh_name = "NH_ProviderInfo_Aug2026.csv"
+    header = "ccn,processing_date,PROVNAME,STATE\n"
+    norm_path = norm_dir / norm_name
+    norm_path.write_text(header + "015009,2026-08-01,TEST FACILITY,AL\n", encoding="utf-8")
+    nh_path = pi_dir / nh_name
+    nh_path.write_text(header + "015009,2026-08-01,TEST FACILITY,AL\n", encoding="utf-8")
+    manifest_dir = pi_dir / "_manifests" / release_id
+    manifest_dir.mkdir(parents=True)
+    handoff = {
+        "release_key": release_id,
+        "pbj_root_sync": {
+            "destination_file": f"provider_info/{norm_name}",
+            "sha256": sha256_file(norm_path),
+        },
+        "pbj_root_nh_snapshot_sync": {
+            "destination_file": f"provider_info/{nh_name}",
+            "sha256": sha256_file(nh_path),
+        },
+    }
+    (manifest_dir / "pbj_root_handoff.json").write_text(json.dumps(handoff), encoding="utf-8")
+
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    active = {
+        "schema_version": 1,
+        "datasets": {
+            "cms.provider_info": {
+                "dataset_id": "cms.provider_info",
+                "active_release_id": release_id,
+                "status": "ACTIVE",
+                "source_filename": norm_name,
+                "source_uri": norm_path.as_uri(),
+                "hash": sha256_file(norm_path),
+                "validated_at": "2026-08-28T00:00:00+00:00",
+                "metadata": {},
+            }
+        },
+    }
+    (state / "active_releases.json").write_text(json.dumps(active), encoding="utf-8")
+    (state / "release_candidates.json").write_text(
+        json.dumps({"schema_version": 1, "datasets": {}}), encoding="utf-8"
+    )
+    return pbjapp, tmp_path / "pbj-root", tmp_path

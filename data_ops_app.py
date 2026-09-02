@@ -505,6 +505,183 @@ def create_app() -> Flask:
             flash(f"Acquire failed: {exc}", "error")
         return redirect(url_for("sources"))
 
+    @app.post("/actions/provider-info/stage-pbj320")
+    @require_auth
+    def action_pi_stage_pbj320():
+        from pbj320_stage_provider_info import ProviderInfoStageError, stage_provider_info_for_pbj320
+
+        try:
+            result = stage_provider_info_for_pbj320()
+            status = str(result.get("status") or "")
+            manifest = result.get("manifest") or {}
+            if status == "NO_MATERIAL_DIFF":
+                flash(
+                    f"PBJ320 Stage: no material diff — destination already matches staged manifest for {result.get('active_release_id')}",
+                    "ok",
+                )
+            else:
+                changed = int(result.get("artifacts_changed") or len(manifest.get("artifacts") or []))
+                idempotent = bool(manifest.get("idempotent_no_material_diff"))
+                detail = "no file changes" if idempotent else f"{changed} destination artifact(s) updated"
+                flash(
+                    f"PBJ320 Stage complete · Provider Information {result.get('active_release_id')} · "
+                    f"{detail} · gates PASS",
+                    "ok",
+                )
+            return redirect(
+                url_for(
+                    "pi_stage_manifest",
+                    release_id=str(result.get("active_release_id") or ""),
+                )
+            )
+        except ProviderInfoStageError as exc:
+            flash(f"PBJ320 Stage failed: {exc}", "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"PBJ320 Stage failed: {exc}", "error")
+        return redirect(url_for("source_detail", source_id="cms.provider_info"))
+
+    @app.post("/actions/provider-info/refresh-stage-manifest")
+    @require_auth
+    def action_pi_refresh_stage_manifest():
+        from pbj320_stage_provider_info import ProviderInfoStageError, refresh_provider_info_stage_manifest
+
+        try:
+            result = refresh_provider_info_stage_manifest()
+            flash(
+                f"PBJ320 Stage manifest refreshed for {result.get('active_release_id')} "
+                f"(on-disk destinations unchanged)",
+                "ok",
+            )
+            return redirect(
+                url_for(
+                    "pi_stage_manifest",
+                    release_id=str(result.get("active_release_id") or ""),
+                )
+            )
+        except ProviderInfoStageError as exc:
+            flash(f"PBJ320 Stage manifest refresh failed: {exc}", "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"PBJ320 Stage manifest refresh failed: {exc}", "error")
+        return redirect(url_for("source_detail", source_id="cms.provider_info"))
+
+    @app.get("/provider-info/stage-manifest/<release_id>")
+    @require_auth
+    def pi_stage_manifest(release_id: str):
+        import cms_data_paths
+        from pbj320_publication_contract import (
+            merge_destination_layers_for_display,
+            publication_state_summary,
+        )
+        from pbj320_publish_provider_info import (
+            ProviderInfoPublishError,
+            build_publish_review_context,
+            load_publication_record,
+        )
+        from pbj320_stage_provider_info import (
+            load_stage_manifest,
+            pi_stage_manifest_publishable,
+            pi_stage_manifest_stale_detail,
+        )
+
+        control_root = cms_data_paths.repo_root()
+        manifest = load_stage_manifest(release_id.strip(), root=control_root)
+        if manifest is None:
+            flash(f"No stage manifest for {release_id}", "error")
+            return redirect(url_for("source_detail", source_id="cms.provider_info"))
+        stage_publishable = pi_stage_manifest_publishable(manifest, root=control_root)
+        stage_stale = (
+            str(manifest.get("status") or "") == "STAGED" and not stage_publishable
+        )
+        stage_stale_detail = pi_stage_manifest_stale_detail(manifest, root=control_root)
+        publish_review = None
+        publish_blocked: str | None = None
+        if stage_publishable:
+            try:
+                publish_review = build_publish_review_context(
+                    release_id=release_id.strip(), root=control_root
+                )
+            except ProviderInfoPublishError as exc:
+                publish_blocked = str(exc)
+        publication = load_publication_record(release_id.strip(), root=control_root)
+        display_layers = merge_destination_layers_for_display(manifest, publication)
+        pub_summary = publication_state_summary(display_layers, publication)
+        return render_template(
+            "data_ops/pi_stage_manifest.html",
+            manifest=manifest,
+            release_id=release_id.strip(),
+            publish_review=publish_review,
+            publish_blocked=publish_blocked,
+            publication=publication,
+            stage_publishable=stage_publishable,
+            stage_stale=stage_stale,
+            stage_stale_detail=stage_stale_detail,
+            display_layers=display_layers,
+            pub_summary=pub_summary,
+        )
+
+    @app.post("/actions/provider-info/verify-production")
+    @require_auth
+    def action_pi_verify_production():
+        from pbj320_verify_production import ProviderInfoVerifyError, verify_provider_info_production
+
+        release_id = (request.form.get("release_id") or "").strip() or "2026-08"
+        dry_run = (request.form.get("dry_run") or "").strip().lower() in {"1", "true", "yes", "on"}
+        try:
+            result = verify_provider_info_production(release_id, dry_run=dry_run)
+            if result.get("all_pass"):
+                flash(
+                    f"Production verification PASS · Provider Information {release_id} · "
+                    f"{len(result.get('checks') or [])} checks",
+                    "ok",
+                )
+            else:
+                failed = [c for c in (result.get("checks") or []) if c.get("result") != "PASS"]
+                flash(
+                    f"Production verification incomplete · {len(failed)} check(s) failed",
+                    "error",
+                )
+        except ProviderInfoVerifyError as exc:
+            flash(f"Production verification failed: {exc}", "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Production verification failed: {exc}", "error")
+        return redirect(url_for("pi_stage_manifest", release_id=release_id))
+
+    @app.post("/actions/provider-info/publish-pbj320")
+    @require_auth
+    def action_pi_publish_pbj320():
+        from pbj320_publish_provider_info import ProviderInfoPublishError, publish_provider_info_for_pbj320
+
+        release_id = (request.form.get("release_id") or "").strip()
+        publish_base_sha = (request.form.get("publish_base_sha") or "").strip() or None
+        confirm = (request.form.get("confirm") or "").strip().lower() in {"1", "true", "yes", "on"}
+        if not confirm:
+            flash("Publish refused: explicit confirmation required", "error")
+            return redirect(url_for("pi_stage_manifest", release_id=release_id or "2026-08"))
+        try:
+            result = publish_provider_info_for_pbj320(
+                release_id=release_id or None,
+                confirm=True,
+                push=True,
+                publish_base_sha=publish_base_sha,
+            )
+            if result.get("push_succeeded"):
+                flash(
+                    f"PBJ320 Publish complete · Provider Information {result.get('release_id')} · "
+                    f"commit {str(result.get('commit_sha') or '')[:12]}… pushed · deploy UNKNOWN",
+                    "ok",
+                )
+            else:
+                flash(
+                    f"PBJ320 Publish committed locally · {result.get('release_id')} · push did not succeed",
+                    "error",
+                )
+            return redirect(url_for("pi_stage_manifest", release_id=str(result.get("release_id") or release_id)))
+        except ProviderInfoPublishError as exc:
+            flash(f"PBJ320 Publish failed: {exc}", "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"PBJ320 Publish failed: {exc}", "error")
+        return redirect(url_for("pi_stage_manifest", release_id=release_id or "2026-08"))
+
     @app.post("/actions/health-citations/validate")
     @require_auth
     def action_citations_validate():

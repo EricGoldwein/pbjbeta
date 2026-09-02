@@ -257,6 +257,41 @@ def build_freshness_layers(
                     "checked_count": checked,
                 }
             )
+    elif source_id == "cms.provider_info":
+        from pbj320_stage_provider_info import audit_provider_info_pbj320_destination, load_stage_manifest
+
+        audit = audit_provider_info_pbj320_destination(root=root)
+        canonical_current = bool(audit.get("canonical_current"))
+        layers.append(
+            {
+                "key": "canonical",
+                "label": "Canonical data",
+                "status": "current" if canonical_current else "attention",
+                "status_label": "Current" if canonical_current else "Missing",
+                "detail": (
+                    f"ProviderInfoNorm ACTIVE {audit.get('active_release_id') or '—'}"
+                    if canonical_current
+                    else (audit.get("stage_detail") or "Canonical artifact missing or hash mismatch")
+                ),
+            }
+        )
+        staged = bool(audit.get("destination_staged"))
+        release_id = str(audit.get("active_release_id") or "")
+        manifest = load_stage_manifest(release_id, root=root) if release_id else None
+        artifact_count = len((manifest or {}).get("artifacts") or [])
+        layers.append(
+            {
+                "key": "pbj320_destination",
+                "label": "PBJ320 destination",
+                "status": "current" if staged else "attention",
+                "status_label": "STAGED" if staged else "Not staged",
+                "detail": (
+                    f"Local pbj-root working tree · {artifact_count} artifacts · production deploy UNKNOWN"
+                    if staged
+                    else "Stage for PBJ320 to prepare pbj-root handoff (not published)"
+                ),
+            }
+        )
     elif source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
         from ownership_downstream_rebuild import audit_ownership_downstream_stale
 

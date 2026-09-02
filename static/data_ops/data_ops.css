@@ -430,6 +430,9 @@ body.do-modal-open { overflow: hidden; }
 }
 .do-btn:hover { border-color: #b6c0cc; }
 .do-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.do-busy-form.is-busy .do-btn-primary:disabled { opacity: 0.72; cursor: wait; }
+.do-busy-form .do-busy-status { margin: 0.35rem 0 0; max-width: 36rem; }
+.do-busy-form.is-busy .do-busy-status { display: block; }
 .do-btn-primary {
   background: var(--do-accent);
   border-color: var(--do-accent);

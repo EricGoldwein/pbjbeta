@@ -10,7 +10,7 @@
 </header>
 {% endif %}
 
-{% if workflow and workflow.freshness_layers and record.source_id in ['cms.health_citations', 'cms.snf_all_owners', 'cms.snf_enrollments'] %}
+{% if workflow and workflow.freshness_layers and record.source_id in ['cms.health_citations', 'cms.snf_all_owners', 'cms.snf_enrollments', 'cms.provider_info'] %}
 <section class="do-operator-ref do-section do-section-primary">
   <div class="do-operator-ref-head">
     <h3 class="do-section-title-sm">At a glance</h3>
@@ -66,7 +66,7 @@
       {% for row in pf.downstream_artifacts %}
       <tr>
         <td class="do-small">{{ row.operator_label or row.consumer or row.artifact }}</td>
-        <td><span class="do-badge do-badge-{{ 'attention' if row.freshness == 'STALE' else 'active' }}">{{ row.freshness }}</span></td>
+        <td><span class="do-badge do-badge-{{ 'attention' if row.freshness in ['STALE', 'NOT_STAGED'] else 'active' }}">{{ row.freshness }}</span></td>
         <td class="do-small do-muted do-provenance-path">{{ row.rebuild or '—' }}</td>
       </tr>
       {% endfor %}
@@ -259,7 +259,7 @@
       {% for row in pf.downstream_artifacts %}
       <tr>
         <td class="do-small">{{ row.consumer or row.artifact }}</td>
-        <td><span class="do-badge do-badge-{{ 'attention' if row.freshness == 'STALE' else 'active' }}">{{ row.freshness }}</span></td>
+        <td><span class="do-badge do-badge-{{ 'attention' if row.freshness in ['STALE', 'NOT_STAGED'] else 'active' }}">{{ row.freshness }}</span></td>
       </tr>
       {% endfor %}
     </tbody>
