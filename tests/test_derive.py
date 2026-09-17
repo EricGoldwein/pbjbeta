@@ -102,7 +102,7 @@ def test_full_graduation_scenario_july_to_august():
     events = derive_graduation_events(obs_by_pub)
     assert len(events) == 1
     assert events[0]["event_date"] == "2026-07-16"
-    assert events[0]["publication_id"] == "2026-08"  # observed in the August posting
+    assert events[0]["first_observed_publication_id"] == "2026-08"  # observed in the August posting
     # The event's date is independent of which snapshot first surfaced it.
     assert events[0]["event_date"] != "2026-08"
 
@@ -137,6 +137,61 @@ def test_gapless_adjacent_pair_does_derive_interval_and_change_free_when_stable(
     assert interval["start_publication_id"] == "2023-11"
     assert interval["end_publication_id"] == "2023-12"
     assert interval["months_counter_consistency"] == "consistent"
+
+
+def test_repeated_graduation_observations_collapse_to_one_canonical_event():
+    # Reproduces the confirmed real pattern: CMS's Table B/C re-lists a
+    # graduated/terminated facility, with the identical stated date, across
+    # many consecutive monthly postings. One raw row per publication must
+    # collapse to one canonical event, not one timeline event per posting.
+    ccn = "035166"
+    obs_by_pub = {
+        pub_id: [_obs(pub_id, ccn, "GRADUATED", table="Table B", status_date="11/30/2021", status_kind="graduation")]
+        for pub_id in ("2023-03", "2023-04", "2023-05", "2023-06")
+    }
+    events = derive_graduation_events(obs_by_pub)
+    assert len(events) == 1
+    event = events[0]
+    assert event["event_date"] == "2021-11-30"
+    assert event["observation_count"] == 4
+    assert event["first_observed_publication_id"] == "2023-03"
+    assert event["last_observed_publication_id"] == "2023-06"
+    assert event["supporting_publication_ids"] == "2023-03;2023-04;2023-05;2023-06"
+    assert len(event["supporting_observation_ids"].split(";")) == 4
+
+
+def test_different_ccns_or_dates_remain_distinct_canonical_events():
+    obs_by_pub = {
+        "2026-07": [_obs("2026-07", "045421", "GRADUATED", table="Table B", status_date="07/16/2026", status_kind="graduation")],
+        "2026-08": [
+            _obs("2026-08", "045421", "GRADUATED", table="Table B", status_date="07/16/2026", status_kind="graduation"),
+            _obs("2026-08", "265258", "GRADUATED", table="Table B", status_date="07/21/2026", status_kind="graduation"),
+        ],
+    }
+    events = derive_graduation_events(obs_by_pub)
+    assert len(events) == 2  # distinct CCNs, not merged
+    dates = {e["ccn"]: e["event_date"] for e in events}
+    assert dates == {"045421": "2026-07-16", "265258": "2026-07-21"}
+
+
+def test_genuine_date_correction_produces_two_canonical_events_not_silently_merged():
+    # Confirmed real: CCN 675799's graduation date is stated as 10/12/2023 in
+    # publications through 2024-07, then permanently as 11/15/2023 from
+    # 2024-08 onward -- a probable CMS date correction. Canonical identity is
+    # (ccn, event_kind, event_date) exactly as specified, so this correctly
+    # yields two distinct events rather than one merged/guessed-at event.
+    ccn = "675799"
+    obs_by_pub = {
+        "2024-01": [_obs("2024-01", ccn, "GRADUATED", table="Table B", status_date="10/12/2023", status_kind="graduation")],
+        "2024-07": [_obs("2024-07", ccn, "GRADUATED", table="Table B", status_date="10/12/2023", status_kind="graduation")],
+        "2024-08": [_obs("2024-08", ccn, "GRADUATED", table="Table B", status_date="11/15/2023", status_kind="graduation")],
+        "2024-09": [_obs("2024-09", ccn, "GRADUATED", table="Table B", status_date="11/15/2023", status_kind="graduation")],
+    }
+    events = derive_graduation_events(obs_by_pub)
+    ccn_events = [e for e in events if e["ccn"] == ccn]
+    assert len(ccn_events) == 2
+    dates = sorted(e["event_date"] for e in ccn_events)
+    assert dates == ["2023-10-12", "2023-11-15"]
 
 
 def test_fail_status_publication_excluded_from_derivation():

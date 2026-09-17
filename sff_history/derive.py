@@ -50,8 +50,11 @@ GRADUATION_EVENT_FIELDS = [
     "event_kind",
     "event_date",
     "event_date_raw",
-    "publication_id",
-    "observation_id",
+    "first_observed_publication_id",
+    "last_observed_publication_id",
+    "observation_count",
+    "supporting_publication_ids",
+    "supporting_observation_ids",
 ]
 
 INTERVAL_FIELDS = [
@@ -78,24 +81,54 @@ def derive_graduation_events(observations_by_pub: dict[str, list[Observation]]) 
     """EXPLICIT_SOURCE_EVENT rows: only when CMS's own row carries a parseable
     graduation/termination date. A category change detected merely by
     comparing two snapshots gets no date here — see derive_changes.
+
+    CMS's Graduated (Table B) and No-Longer-Participating (Table C) tables
+    are not "recently graduated" rolling lists — a facility can be re-listed,
+    with the identical stated date, across dozens of consecutive monthly
+    postings (confirmed: one CCN carries the same graduation date across 26
+    consecutive publications spanning nearly two years). One raw row per
+    publication is therefore evidence *supporting* one real-world event, not
+    a separate event. Canonical event identity is ``(ccn, event_kind,
+    event_date)`` — every raw row sharing that key collapses into one output
+    row, with the full set of corroborating publications/observations kept
+    as provenance rather than discarded.
+
+    A CCN can legitimately carry two *different* dates for the same
+    event_kind (a handful of confirmed cases in this archive: CMS revised a
+    previously-stated date once, then held the corrected date stable in
+    every later posting). Because the date differs, that correctly produces
+    two canonical events here rather than being silently merged — this
+    module does not attempt to infer which of two differing CMS-published
+    dates was "correct."
     """
-    events: list[dict[str, Any]] = []
+    groups: dict[tuple[str, str, str], list[tuple[str, Observation]]] = {}
     for publication_id, observations in observations_by_pub.items():
         for obs in observations:
             if not obs.explicit_status_date_kind or not obs.explicit_status_date:
                 continue
-            iso = _explicit_iso_date(obs.explicit_status_date)
-            events.append(
-                {
-                    "event_id": f"event:{obs.observation_id}",
-                    "ccn": obs.ccn,
-                    "event_kind": obs.explicit_status_date_kind.upper(),
-                    "event_date": iso or "",
-                    "event_date_raw": obs.explicit_status_date,
-                    "publication_id": publication_id,
-                    "observation_id": obs.observation_id,
-                }
-            )
+            key = (obs.ccn, obs.explicit_status_date_kind, obs.explicit_status_date)
+            groups.setdefault(key, []).append((publication_id, obs))
+
+    events: list[dict[str, Any]] = []
+    for (ccn, kind, raw_date), items in groups.items():
+        items.sort(key=lambda pair: pair[0])
+        supporting_publication_ids = sorted({pub_id for pub_id, _ in items})
+        supporting_observation_ids = sorted({obs.observation_id for _, obs in items})
+        iso = _explicit_iso_date(raw_date)
+        events.append(
+            {
+                "event_id": f"event:{ccn}:{kind}:{raw_date.replace('/', '-')}",
+                "ccn": ccn,
+                "event_kind": kind.upper(),
+                "event_date": iso or "",
+                "event_date_raw": raw_date,
+                "first_observed_publication_id": supporting_publication_ids[0],
+                "last_observed_publication_id": supporting_publication_ids[-1],
+                "observation_count": len(items),
+                "supporting_publication_ids": ";".join(supporting_publication_ids),
+                "supporting_observation_ids": ";".join(supporting_observation_ids),
+            }
+        )
     return events
 
 

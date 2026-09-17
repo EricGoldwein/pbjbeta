@@ -18,12 +18,13 @@ from pathlib import Path
 from typing import Any
 
 from .coverage import build_coverage, coverage_to_rows
-from .derive import derive_changes, derive_graduation_events, derive_intervals
+from .derive import CHANGE_FIELDS, GRADUATION_EVENT_FIELDS, INTERVAL_FIELDS, derive_changes, derive_graduation_events, derive_intervals
 from .observations import OBSERVATION_FIELDS, Observation, build_observations, validate_observations
 from .paths import discover_publication_sources, output_dir, provider_info_normalized_csv
 from .provider_info_check import RECONCILIATION_FIELDS, load_provider_info_ccn_status, reconcile
 from .publications import PUBLICATION_FIELDS, Publication, build_publication
 from .schema import ERA_3B, PARSER_VERSION
+from .timeline import TIMELINE_EVENT_FIELDS, build_timeline_events
 
 
 def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> str:
@@ -102,24 +103,17 @@ def build_canonical_dataset(*, out_dir: Path | None = None) -> dict[str, Any]:
         )
     reconciliation_rows.sort(key=lambda r: (r["publication_id"], r["ccn"]))
 
+    timeline_events = build_timeline_events(publications, observations_by_pub, changes, events, coverage_rows)
+    timeline_events.sort(key=lambda r: r["timeline_event_id"])
+
     file_hashes: dict[str, str] = {}
     file_hashes["publications.csv"] = _write_csv(target / "publications.csv", PUBLICATION_FIELDS, publication_rows)
     file_hashes["observations.csv"] = _write_csv(target / "observations.csv", OBSERVATION_FIELDS, observation_rows)
-    file_hashes["derived_changes.csv"] = _write_csv(
-        target / "derived_changes.csv",
-        ["change_id", "ccn", "from_publication_id", "to_publication_id", "change_kind", "from_categories", "to_categories", "gapless", "derived_from_observation_ids", "asserted_date", "method"],
-        changes,
-    )
+    file_hashes["derived_changes.csv"] = _write_csv(target / "derived_changes.csv", CHANGE_FIELDS, changes)
     file_hashes["derived_graduation_events.csv"] = _write_csv(
-        target / "derived_graduation_events.csv",
-        ["event_id", "ccn", "event_kind", "event_date", "event_date_raw", "publication_id", "observation_id"],
-        events,
+        target / "derived_graduation_events.csv", GRADUATION_EVENT_FIELDS, events
     )
-    file_hashes["derived_intervals.csv"] = _write_csv(
-        target / "derived_intervals.csv",
-        ["interval_id", "ccn", "normalized_category", "start_publication_id", "end_publication_id", "publication_ids", "months_counter_consistency", "derived_from_observation_ids"],
-        intervals,
-    )
+    file_hashes["derived_intervals.csv"] = _write_csv(target / "derived_intervals.csv", INTERVAL_FIELDS, intervals)
     file_hashes["publication_coverage.csv"] = _write_csv(
         target / "publication_coverage.csv",
         ["year_month", "present", "publication_id", "validation_status", "gap_before"],
@@ -128,6 +122,7 @@ def build_canonical_dataset(*, out_dir: Path | None = None) -> dict[str, Any]:
     file_hashes["reconciliation_provider_info.csv"] = _write_csv(
         target / "reconciliation_provider_info.csv", RECONCILIATION_FIELDS, reconciliation_rows
     )
+    file_hashes["timeline_events.csv"] = _write_csv(target / "timeline_events.csv", TIMELINE_EVENT_FIELDS, timeline_events)
 
     manifest = {
         "built_at": datetime.now(timezone.utc).isoformat(),
@@ -141,6 +136,7 @@ def build_canonical_dataset(*, out_dir: Path | None = None) -> dict[str, Any]:
         "derived_graduation_event_count": len(events),
         "derived_interval_count": len(intervals),
         "reconciliation_row_count": len(reconciliation_rows),
+        "timeline_event_count": len(timeline_events),
         "publication_ids": [p.publication_id for p in publications],
         "failed_publications": [
             {"publication_id": p.publication_id, "source_filename": p.source_filename, "errors": p.validation_errors}
