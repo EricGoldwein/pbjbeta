@@ -38,6 +38,12 @@ ENV/
 !requirements.txt
 !pages/*.py
 
+# SFF history canonical data layer (Phase 1) — source and tests
+!sff_history/
+!sff_history/**/*.py
+!tests/
+!tests/**/*.py
+
 # Keep only essential data files
 *.csv
 !national_quarterly_metrics.csv
