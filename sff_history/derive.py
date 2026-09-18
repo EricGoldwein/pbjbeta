@@ -2,7 +2,7 @@
 
 Reads Layer 1 (publications) and Layer 2 (observations) only. Never writes
 back to either — a bug or re-derivation here must be recoverable by
-recomputation alone. Three fact tables, matching the corrected canonical
+recomputation alone. Four fact tables, matching the corrected canonical
 model in SFF_ARCHIVE_AUDIT.md S12:
 
 - ``derived_changes``     — OBSERVED_CHANGE: a category-membership difference
@@ -15,6 +15,11 @@ model in SFF_ARCHIVE_AUDIT.md S12:
 - ``derived_intervals``   — DERIVED_INTERVAL: a contiguous run (>=2
   publications) of adjacent, gapless snapshots showing one CCN holding the
   same normalized category throughout.
+- ``derived_survey_events`` — CMS's own stated Table A survey result
+  ("Most Recent Inspection" + "Met Survey Criteria"), deduplicated the same
+  way as graduation events. See ``derive_survey_events`` for the CMS
+  two-consecutive-qualifying-survey graduation rule this deliberately does
+  NOT calculate progress toward.
 """
 
 from __future__ import annotations
@@ -67,6 +72,30 @@ INTERVAL_FIELDS = [
     "months_counter_consistency",
     "derived_from_observation_ids",
 ]
+
+SURVEY_EVENT_FIELDS = [
+    "survey_event_id",
+    "ccn",
+    "survey_outcome",
+    "most_recent_inspection_raw",
+    "met_survey_criteria_raw",
+    "first_observed_publication_id",
+    "last_observed_publication_id",
+    "observation_count",
+    "supporting_publication_ids",
+    "supporting_observation_ids",
+]
+
+# CMS program rule (retained here for future phases; not calculated by this
+# phase): graduation from Current SFF status requires two consecutive
+# qualifying ("Met") standard health surveys. derive_survey_events() records
+# each distinct CMS-published survey result on its own -- it deliberately
+# does not count, sequence, or assert progress toward this threshold ("1 of
+# 2" / "2 of 2"). Any future phase implementing that must derive it from
+# derived_survey_events rows for a given CCN, in publication order, checking
+# each pair of consecutive MET_LATEST_SURVEY events shares no intervening
+# NOT_MET_LATEST_SURVEY -- not attempted here.
+GRADUATION_REQUIRES_CONSECUTIVE_QUALIFYING_SURVEYS = 2
 
 
 def _explicit_iso_date(raw: str) -> str | None:
@@ -251,3 +280,73 @@ def _months_counter_consistency(obs_sequence: list[list[Observation]], ccn: str,
         if next_val != prev_val + 1:
             return "inconsistent"
     return "consistent" if pairs_checked else "not_checked"
+
+
+def derive_survey_events(observations_by_pub: dict[str, list[Observation]]) -> list[dict[str, Any]]:
+    """Canonical Table A survey-result facts, deduplicated the same way as
+    ``derive_graduation_events`` — CMS restates the same "Most Recent
+    Inspection" / "Met Survey Criteria" pair across every monthly posting a
+    facility remains Current SFF between actual surveys; one raw row per
+    publication is evidence supporting one real survey result, not a
+    separate one.
+
+    Three raw-value-preserving outcomes, straight from CMS's own two Table A
+    fields (never inferred from anything else):
+
+    - both fields blank -> ``NEW_AWAITING_FIRST_SURVEY``
+    - ``met_survey_criteria == "Met"`` -> ``MET_LATEST_SURVEY``
+    - ``met_survey_criteria == "Not Met"`` -> ``NOT_MET_LATEST_SURVEY``
+
+    Canonical identity is ``(ccn, most_recent_inspection, met_survey_criteria)``
+    — a genuinely later, distinct survey (a different CMS-published
+    inspection date) always produces its own separate event, never merged
+    with an earlier one. This module never counts or sequences results
+    toward CMS's 2-consecutive-qualifying-survey graduation rule (see
+    ``GRADUATION_REQUIRES_CONSECUTIVE_QUALIFYING_SURVEYS``); it only ever
+    records what CMS published.
+
+    Known limitation, accepted for this phase: ``NEW_AWAITING_FIRST_SURVEY``
+    has no date to disambiguate on, so two genuinely separate "awaiting
+    first survey" episodes for the same CCN (e.g. graduating, later
+    returning to the program, and again awaiting a first survey) would
+    collapse into one canonical event spanning both. This is a known,
+    accepted simplification, not a silent data loss — every contributing
+    raw observation is still listed in ``supporting_observation_ids``.
+    """
+    groups: dict[tuple[str, str, str, str], list[tuple[str, Observation]]] = {}
+    for publication_id, observations in observations_by_pub.items():
+        for obs in observations:
+            if obs.normalized_category != "CURRENT_SFF":
+                continue
+            inspection, criteria = obs.most_recent_inspection, obs.met_survey_criteria
+            if not inspection and not criteria:
+                outcome = "NEW_AWAITING_FIRST_SURVEY"
+            elif criteria == "Met":
+                outcome = "MET_LATEST_SURVEY"
+            elif criteria == "Not Met":
+                outcome = "NOT_MET_LATEST_SURVEY"
+            else:
+                continue  # not a recognized survey state; never guessed at
+            key = (obs.ccn, outcome, inspection, criteria)
+            groups.setdefault(key, []).append((publication_id, obs))
+
+    events: list[dict[str, Any]] = []
+    for (ccn, outcome, inspection, criteria), items in groups.items():
+        items.sort(key=lambda pair: pair[0])
+        supporting_publication_ids = sorted({pub_id for pub_id, _ in items})
+        supporting_observation_ids = sorted({obs.observation_id for _, obs in items})
+        events.append(
+            {
+                "survey_event_id": f"survey:{ccn}:{outcome}:{(inspection or 'none').replace('/', '-')}",
+                "ccn": ccn,
+                "survey_outcome": outcome,
+                "most_recent_inspection_raw": inspection,
+                "met_survey_criteria_raw": criteria,
+                "first_observed_publication_id": supporting_publication_ids[0],
+                "last_observed_publication_id": supporting_publication_ids[-1],
+                "observation_count": len(items),
+                "supporting_publication_ids": ";".join(supporting_publication_ids),
+                "supporting_observation_ids": ";".join(supporting_observation_ids),
+            }
+        )
+    return events

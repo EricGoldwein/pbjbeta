@@ -1,4 +1,4 @@
-from sff_history.derive import derive_changes, derive_graduation_events, derive_intervals
+from sff_history.derive import derive_changes, derive_graduation_events, derive_intervals, derive_survey_events
 from sff_history.observations import Observation
 from sff_history.publications import Publication
 
@@ -25,7 +25,7 @@ def _pub(publication_id: str, *, status: str = "PASS") -> Publication:
     )
 
 
-def _obs(publication_id: str, ccn: str, category: str, *, table: str, seq: int = 0, months: str = "1", status_date: str = "", status_kind=None) -> Observation:
+def _obs(publication_id: str, ccn: str, category: str, *, table: str, seq: int = 0, months: str = "1", status_date: str = "", status_kind=None, inspection: str = "", criteria: str = "") -> Observation:
     return Observation(
         observation_id=f"{publication_id}:{table}:{ccn}:{seq}",
         publication_id=publication_id,
@@ -39,8 +39,8 @@ def _obs(publication_id: str, ccn: str, category: str, *, table: str, seq: int =
         state="AL",
         zip="35004",
         phone="205-555-0100",
-        most_recent_inspection="",
-        met_survey_criteria="",
+        most_recent_inspection=inspection,
+        met_survey_criteria=criteria,
         months_in_status=months,
         months_field_label="Months as an SFF",
         explicit_status_date=status_date,
@@ -208,3 +208,90 @@ def test_fail_status_publication_excluded_from_derivation():
     # but observations for a FAIL publication are never built by the real
     # pipeline in the first place (see build.py), so this function is only
     # ever called with PASS-sourced observations in practice.
+
+
+def test_survey_new_awaiting_first_survey_blank_fields():
+    ccn = "015009"
+    obs_by_pub = {
+        pub_id: [_obs(pub_id, ccn, "CURRENT_SFF", table="Table A", inspection="", criteria="")]
+        for pub_id in ("2024-04", "2024-05", "2024-06")
+    }
+    events = derive_survey_events(obs_by_pub)
+    assert len(events) == 1
+    event = events[0]
+    assert event["survey_outcome"] == "NEW_AWAITING_FIRST_SURVEY"
+    assert event["most_recent_inspection_raw"] == ""
+    assert event["met_survey_criteria_raw"] == ""
+    assert event["observation_count"] == 3  # restated 3 times, collapsed to one canonical fact
+
+
+def test_survey_met_and_not_met_use_raw_cms_values():
+    ccn = "015009"
+    obs_by_pub = {
+        "2024-04": [_obs("2024-04", ccn, "CURRENT_SFF", table="Table A", inspection="03/15/2024", criteria="Met")],
+        "2024-07": [_obs("2024-07", ccn, "CURRENT_SFF", table="Table A", inspection="06/20/2024", criteria="Not Met")],
+    }
+    events = derive_survey_events(obs_by_pub)
+    assert len(events) == 2
+    by_outcome = {e["survey_outcome"]: e for e in events}
+    assert by_outcome["MET_LATEST_SURVEY"]["most_recent_inspection_raw"] == "03/15/2024"
+    assert by_outcome["MET_LATEST_SURVEY"]["met_survey_criteria_raw"] == "Met"
+    assert by_outcome["NOT_MET_LATEST_SURVEY"]["most_recent_inspection_raw"] == "06/20/2024"
+    assert by_outcome["NOT_MET_LATEST_SURVEY"]["met_survey_criteria_raw"] == "Not Met"
+
+
+def test_survey_repeated_monthly_restatement_of_same_result_collapses_to_one_event():
+    # A facility can remain CURRENT_SFF for many months with the same
+    # "Most Recent Inspection" date until its next actual survey -- this
+    # must not turn into one timeline event per restating publication.
+    ccn = "015009"
+    obs_by_pub = {
+        pub_id: [_obs(pub_id, ccn, "CURRENT_SFF", table="Table A", inspection="03/15/2024", criteria="Met")]
+        for pub_id in ("2024-04", "2024-05", "2024-06", "2024-07", "2024-08")
+    }
+    events = derive_survey_events(obs_by_pub)
+    assert len(events) == 1
+    event = events[0]
+    assert event["observation_count"] == 5
+    assert event["first_observed_publication_id"] == "2024-04"
+    assert event["last_observed_publication_id"] == "2024-08"
+
+
+def test_survey_distinct_inspection_dates_are_not_merged_into_one_survey():
+    # A genuinely later, distinct survey (a different CMS-published
+    # inspection date) must never be inferred as "the same survey restated"
+    # -- each distinct date is its own canonical event.
+    ccn = "015009"
+    obs_by_pub = {
+        "2024-04": [_obs("2024-04", ccn, "CURRENT_SFF", table="Table A", inspection="03/15/2024", criteria="Not Met")],
+        "2024-05": [_obs("2024-05", ccn, "CURRENT_SFF", table="Table A", inspection="03/15/2024", criteria="Not Met")],
+        "2024-09": [_obs("2024-09", ccn, "CURRENT_SFF", table="Table A", inspection="08/10/2024", criteria="Met")],
+    }
+    events = derive_survey_events(obs_by_pub)
+    assert len(events) == 2
+    dates = sorted(e["most_recent_inspection_raw"] for e in events)
+    assert dates == ["03/15/2024", "08/10/2024"]
+
+
+def test_survey_events_only_derived_from_current_sff_table_a_rows():
+    ccn = "015009"
+    obs_by_pub = {
+        "2024-04": [_obs("2024-04", ccn, "SFF_CANDIDATE", table="Table D", months="2")],
+    }
+    assert derive_survey_events(obs_by_pub) == []
+
+
+def test_survey_events_never_calculate_or_assert_two_of_two_progress():
+    # Structural guarantee: derive_survey_events's output rows carry no
+    # progress-count field at all -- there is nothing for a caller to
+    # (mis)read as "1 of 2" / "2 of 2".
+    ccn = "015009"
+    obs_by_pub = {
+        "2024-04": [_obs("2024-04", ccn, "CURRENT_SFF", table="Table A", inspection="03/15/2024", criteria="Met")],
+        "2024-09": [_obs("2024-09", ccn, "CURRENT_SFF", table="Table A", inspection="08/10/2024", criteria="Met")],
+    }
+    events = derive_survey_events(obs_by_pub)
+    assert len(events) == 2
+    for event in events:
+        assert "progress" not in {k.lower() for k in event}
+        assert not any("of 2" in str(v) for v in event.values())

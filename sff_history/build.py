@@ -18,7 +18,16 @@ from pathlib import Path
 from typing import Any
 
 from .coverage import build_coverage, coverage_to_rows
-from .derive import CHANGE_FIELDS, GRADUATION_EVENT_FIELDS, INTERVAL_FIELDS, derive_changes, derive_graduation_events, derive_intervals
+from .derive import (
+    CHANGE_FIELDS,
+    GRADUATION_EVENT_FIELDS,
+    INTERVAL_FIELDS,
+    SURVEY_EVENT_FIELDS,
+    derive_changes,
+    derive_graduation_events,
+    derive_intervals,
+    derive_survey_events,
+)
 from .observations import OBSERVATION_FIELDS, Observation, build_observations, validate_observations
 from .paths import discover_publication_sources, output_dir, provider_info_normalized_csv
 from .provider_info_check import RECONCILIATION_FIELDS, load_provider_info_ccn_status, reconcile
@@ -82,6 +91,8 @@ def build_canonical_dataset(*, out_dir: Path | None = None) -> dict[str, Any]:
     events.sort(key=lambda r: r["event_id"])
     intervals = derive_intervals(publications, observations_by_pub)
     intervals.sort(key=lambda r: r["interval_id"])
+    survey_events = derive_survey_events(observations_by_pub)
+    survey_events.sort(key=lambda r: r["survey_event_id"])
 
     pass_publications = [p for p in publications if p.validation_status == "PASS"]
     if pass_publications:
@@ -103,7 +114,7 @@ def build_canonical_dataset(*, out_dir: Path | None = None) -> dict[str, Any]:
         )
     reconciliation_rows.sort(key=lambda r: (r["publication_id"], r["ccn"]))
 
-    timeline_events = build_timeline_events(publications, observations_by_pub, changes, events, coverage_rows)
+    timeline_events = build_timeline_events(publications, observations_by_pub, changes, events, survey_events, coverage_rows)
     timeline_events.sort(key=lambda r: r["timeline_event_id"])
 
     file_hashes: dict[str, str] = {}
@@ -114,6 +125,9 @@ def build_canonical_dataset(*, out_dir: Path | None = None) -> dict[str, Any]:
         target / "derived_graduation_events.csv", GRADUATION_EVENT_FIELDS, events
     )
     file_hashes["derived_intervals.csv"] = _write_csv(target / "derived_intervals.csv", INTERVAL_FIELDS, intervals)
+    file_hashes["derived_survey_events.csv"] = _write_csv(
+        target / "derived_survey_events.csv", SURVEY_EVENT_FIELDS, survey_events
+    )
     file_hashes["publication_coverage.csv"] = _write_csv(
         target / "publication_coverage.csv",
         ["year_month", "present", "publication_id", "validation_status", "gap_before"],
@@ -135,6 +149,7 @@ def build_canonical_dataset(*, out_dir: Path | None = None) -> dict[str, Any]:
         "derived_change_count": len(changes),
         "derived_graduation_event_count": len(events),
         "derived_interval_count": len(intervals),
+        "derived_survey_event_count": len(survey_events),
         "reconciliation_row_count": len(reconciliation_rows),
         "timeline_event_count": len(timeline_events),
         "publication_ids": [p.publication_id for p in publications],
