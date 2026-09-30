@@ -254,6 +254,21 @@ def main() -> int:
         print("FAIL templates/superdynamic_dashboard_v2.html missing at repo root")
         fails += 1
 
+    from premium_source_contract import validate_bundle_sources
+
+    source_results = validate_bundle_sources(deploy, ccn)
+    by_capability: dict[str, list[tuple[bool, str]]] = {}
+    for capability, passed, reason in source_results:
+        by_capability.setdefault(capability, []).append((passed, reason))
+    for capability, rows in by_capability.items():
+        passed = all(ok for ok, _ in rows)
+        print(f"{'OK  ' if passed else 'FAIL'} {capability} ACTIVE-release provenance")
+        if not passed:
+            for ok, reason in rows:
+                if not ok:
+                    print(f"     {reason}")
+        fails += 0 if passed else 1
+
     if args.check_vercel_env:
         ok, msg = _check_vercel_password(ccn, args.password.strip())
         print(msg)

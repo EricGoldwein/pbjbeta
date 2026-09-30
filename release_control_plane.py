@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 from datetime import datetime, timezone
 from enum import Enum
@@ -223,7 +224,7 @@ def record_validated_pair(
     *,
     root: Path | None = None,
 ) -> dict[str, Any]:
-    """Atomically write two VALIDATED candidate records. Does not promote ACTIVE."""
+    """Atomically write one or more pair-validated candidate records. Does not promote ACTIVE."""
     if not records:
         raise ActiveReleaseError("validated pair requires candidate records")
     now = datetime.now(timezone.utc).isoformat()
@@ -406,21 +407,77 @@ def promote_candidate(dataset_id: str, *, root: Path | None = None) -> dict[str,
     raw = unquote(parsed.path)
     if os.name == "nt" and raw.startswith("/") and len(raw) > 2 and raw[2] == ":":
         raw = raw[1:]
+    source = Path(raw)
+    if sha256_file(source) != str(candidate.get("hash") or ""):
+        raise ActiveReleaseError(f"{dataset_id} candidate hash does not match staged artifact")
+
     previous = get_active_release(dataset_id, registry_path(root))
-    record = promote_release(
-        dataset_id,
-        str(candidate["release_id"]),
-        Path(raw),
-        validated_at=str((candidate.get("validation") or {}).get("validated_at") or datetime.now(timezone.utc).isoformat()),
-        metadata=dict(candidate.get("metadata") or {}),
-        path=registry_path(root),
+    promotion_source = source
+    backup: Path | None = None
+    staged_copy: Path | None = None
+    served_target_path: Path | None = None
+    active_registry_backup = (
+        registry_path(root).read_text(encoding="utf-8")
+        if registry_path(root).is_file()
+        else None
     )
-    candidate["state"] = ReleaseState.ACTIVE.value
-    candidate["promoted_at"] = record["promoted_at"]
-    candidate["superseded_release_id"] = previous.get("active_release_id") if previous else None
-    candidates["updated_at"] = record["promoted_at"]
-    _atomic_json(candidates_path(root), candidates)
-    return record
+    try:
+        from derived_provenance import GOVERNED_DERIVATIVES
+
+        if dataset_id in GOVERNED_DERIVATIVES:
+            served_uri = str((candidate.get("metadata") or {}).get("served_target_uri") or "")
+            served_target = candidate_local_path(served_uri)
+            if served_target is None or not served_target.is_file():
+                raise ActiveReleaseError(
+                    f"{dataset_id} promotion requires an existing local ACTIVE consumption path"
+                )
+            if served_target.resolve() == source.resolve():
+                raise ActiveReleaseError(
+                    f"{dataset_id} candidate must be staged separately from the served ACTIVE artifact"
+                )
+            served_target_path = served_target
+            backup_fd, backup_name = tempfile.mkstemp(
+                prefix=f".{served_target.name}.", suffix=".backup", dir=served_target.parent
+            )
+            os.close(backup_fd)
+            backup = Path(backup_name)
+            shutil.copy2(served_target, backup)
+            copy_fd, copy_name = tempfile.mkstemp(
+                prefix=f".{served_target.name}.", suffix=".candidate", dir=served_target.parent
+            )
+            os.close(copy_fd)
+            staged_copy = Path(copy_name)
+            shutil.copy2(source, staged_copy)
+            if sha256_file(staged_copy) != str(candidate["hash"]):
+                raise ActiveReleaseError(f"{dataset_id} staged promotion copy failed hash verification")
+            os.replace(staged_copy, served_target)
+            promotion_source = served_target
+
+        record = promote_release(
+            dataset_id,
+            str(candidate["release_id"]),
+            promotion_source,
+            validated_at=str((candidate.get("validation") or {}).get("validated_at") or datetime.now(timezone.utc).isoformat()),
+            metadata=dict(candidate.get("metadata") or {}),
+            path=registry_path(root),
+        )
+        candidate["state"] = ReleaseState.ACTIVE.value
+        candidate["promoted_at"] = record["promoted_at"]
+        candidate["superseded_release_id"] = previous.get("active_release_id") if previous else None
+        candidates["updated_at"] = record["promoted_at"]
+        _atomic_json(candidates_path(root), candidates)
+        return record
+    except Exception:
+        if backup is not None and served_target_path is not None:
+            if backup.is_file():
+                os.replace(backup, served_target_path)
+        if active_registry_backup is not None:
+            _atomic_json(registry_path(root), json.loads(active_registry_backup))
+        raise
+    finally:
+        for temporary in (backup, staged_copy):
+            if temporary is not None and temporary.exists():
+                temporary.unlink()
 
 
 def what_would_change(dataset_id: str) -> dict[str, Any]:

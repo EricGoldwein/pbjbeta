@@ -22,8 +22,8 @@
       <dd>{% if active_label and active_label != '—' %}{{ active_label }}{% else %}<span class="do-muted">—</span>{% endif %}</dd>
     </div>
     <div>
-      <dt>Candidate pair</dt>
-      <dd>{{ release_label or release_id }}</dd>
+      <dt>Candidate release</dt>
+      <dd>{{ release_label or release_id }} <span class="do-badge do-badge-attention do-badge-inline">{{ change_kind }}</span></dd>
     </div>
     <div>
       <dt>Pair alignment</dt>
@@ -36,6 +36,10 @@
     <div>
       <dt>Next action</dt>
       <dd class="do-operator-next-label">{{ next_action.label }}</dd>
+    </div>
+    <div>
+      <dt>Downstream if approved</dt>
+      <dd>{{ downstream_impact|join(', ') if downstream_impact else 'No governed stale impact' }}</dd>
     </div>
   </dl>
 
@@ -50,7 +54,11 @@
   <div class="do-next-action do-next-action-compact">
     <p class="do-muted do-small">{{ next_action.detail }}</p>
     <div class="do-actions do-actions-inline">
+      {% if next_action.kind != 'activate_pair' %}
       {{ render_pair_primary_action(next_action) }}
+      {% else %}
+      <span class="do-muted do-small">Review the evidence and preview below before approval.</span>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -61,7 +69,10 @@
     <strong>{{ member.human_name }}</strong>
     <div class="do-mono do-tiny do-muted">{{ member.source_id }}</div>
   </td>
-  <td class="do-mono do-small">{{ member.candidate_release_label or member.candidate_release_id or '—' }}</td>
+  <td class="do-small">
+    <span class="do-mono">{{ member.candidate_release_label or member.candidate_release_id or '—' }}</span>
+    <div class="do-tiny do-muted">{{ member.change_kind }}{% if member.pair_role == 'UNCHANGED_ACTIVE' %} partner{% endif %}</div>
+  </td>
   <td><span class="do-badge do-badge-{{ (member.candidate_state or '')|lower }}">{{ member.candidate_state or '—' }}</span></td>
   <td><span class="do-badge do-badge-val-{{ (member.validation_status or 'none')|lower }}">{{ member.validation_status or '—' }}</span></td>
   <td class="do-small">
@@ -94,7 +105,7 @@
       <thead>
         <tr>
           <th>Dataset</th>
-          <th>Candidate</th>
+          <th>Artifact</th>
           <th>State</th>
           <th>Validation</th>
           <th>CMS latest</th>
@@ -112,17 +123,51 @@
   {% endif %}
 </section>
 
-<details class="do-collapse-panel">
+<details class="do-collapse-panel" open>
   <summary>Provenance &amp; details</summary>
   {% for member in [owners, enrollments] %}
   <h4 class="do-subhead">{{ member.human_name }}</h4>
   <dl class="do-dl do-dl-wide do-dl-compact">
-    <div><dt>ACTIVE</dt><dd class="do-mono do-small">{{ member.active_release_id or '—' }}</dd></div>
+    <div><dt>ACTIVE release</dt><dd class="do-mono do-small">{{ member.active_release_id or '—' }}</dd></div>
+    <div><dt>ACTIVE artifact</dt><dd class="do-mono do-small">{{ member.active_filename or '—' }}</dd></div>
+    <div><dt>ACTIVE rows</dt><dd class="do-mono do-small">{{ member.active_row_count if member.active_row_count is not none else '—' }}</dd></div>
+    <div><dt>ACTIVE SHA-256</dt><dd class="do-mono do-small">{{ member.active_hash or '—' }}</dd></div>
     <div><dt>Candidate artifact</dt><dd class="do-mono do-small">{{ member.candidate_path or '—' }}</dd></div>
-    <div><dt>SHA-256</dt><dd class="do-mono do-small">{{ member.candidate_hash or '—' }}</dd></div>
+    <div><dt>Candidate rows</dt><dd class="do-mono do-small">{{ member.candidate_row_count if member.candidate_row_count is not none else '—' }}</dd></div>
+    <div><dt>Candidate SHA-256</dt><dd class="do-mono do-small">{{ member.candidate_hash or '—' }}</dd></div>
     <div><dt>CMS dataset id</dt><dd class="do-mono do-small">{{ member.cms_dataset_id or '—' }}</dd></div>
+    <div><dt>CMS version UUID</dt><dd class="do-mono do-small">{{ member.publisher_version_id or '—' }}</dd></div>
+    <div><dt>CMS version</dt><dd class="do-mono do-small">{{ member.publisher_version_label or '—' }}{% if member.publisher_version_modified %} · {{ member.publisher_version_modified }}{% endif %}</dd></div>
+    <div><dt>CMS file UUID</dt><dd class="do-mono do-small">{{ member.publisher_file_uuid or '—' }}</dd></div>
     <div><dt>CMS resource updated</dt><dd class="do-mono do-small">{{ member.publisher_last_updated or '—' }}</dd></div>
     <div><dt>CMS download</dt><dd class="do-mono do-small">{{ member.publisher_url or '—' }}</dd></div>
   </dl>
   {% endfor %}
 </details>
+
+{% for member in [owners, enrollments] %}
+{% if member.pair_role == 'CANDIDATE' and member.preview %}
+<section class="do-section">
+  <h3 class="do-section-title-sm">{{ member.human_name }} preview</h3>
+  <p class="do-muted do-small">First {{ member.preview|length }} rows only · {{ member.candidate_row_count }} total rows</p>
+  <div class="do-table-wrap do-table-wrap-compact">
+    <table class="do-table do-table-compact">
+      <thead><tr>{% for column in member.preview_columns %}<th>{{ column }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in member.preview %}
+        <tr>{% for column in member.preview_columns %}<td class="do-small">{{ row[column] }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endfor %}
+
+{% if next_action.kind == 'activate_pair' %}
+<section class="do-section do-section-primary">
+  <h3 class="do-section-title-sm">Approval</h3>
+  <p class="do-muted do-small">This changes ACTIVE only. Rebuild downstream, packaging, and deployment remain separate operator steps.</p>
+  <div class="do-actions do-actions-inline">{{ render_pair_primary_action(next_action) }}</div>
+</section>
+{% endif %}

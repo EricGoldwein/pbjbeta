@@ -14,6 +14,8 @@ from data_ops_app import create_app
 from release_control_plane import control_panel_payload
 import cms_data_ops as ops
 
+pytestmark = pytest.mark.live
+
 
 def test_live_focused_health_citations_review_html(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("PBJ_ACTIVE_RELEASE_REGISTRY", str(ROOT / "state" / "active_releases.json"))
@@ -149,7 +151,7 @@ def test_live_ownership_pair_modal_and_sources_cleanup(monkeypatch: pytest.Monke
     assert panel.status_code == 200
     assert "Pair status" in html
     assert "Jul 31" in html
-    assert "Activate pair" in html
+    assert "Make SNF All Owners ACTIVE" in html
     assert "Ready to activate" in html
     assert "SNF All Owners" in html
     assert "SNF Enrollments" in html

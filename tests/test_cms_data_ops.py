@@ -103,6 +103,95 @@ def test_check_and_acquire_delegate_to_63(tmp_path: Path):
     assert acq_result["acquire_report"]["status"] == "CURRENT"
 
 
+def test_provider_check_records_distinct_nh_ownership_derivative(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from cms_theme_publication import ThemeManifestMember, ThemePublication
+
+    monkeypatch.delenv("PBJ_ACTIVE_RELEASE_REGISTRY", raising=False)
+    pi = tmp_path / "provider_info"
+    pi.mkdir()
+    (pi / "NH_ProviderInfo_Aug2026.csv").write_bytes(
+        _nh_csv_bytes(1200, "2026-08-01", "300")
+    )
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    (state / "active_releases.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "updated_at": None,
+                "datasets": {
+                    "cms.provider_info": {
+                        "dataset_id": "cms.provider_info",
+                        "active_release_id": "2026-08",
+                        "status": "ACTIVE",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    members = {
+        "cms.provider_info": ThemeManifestMember(
+            dataset_id="4pq5-n9py",
+            source_id="cms.provider_info",
+            name="Provider Information",
+            modified_date="2026-09-01",
+            product_release_id="2026-09",
+            filename="NH_ProviderInfo_Sep2026.csv",
+            filesize=100,
+            mime_type="text/csv",
+        ),
+        "cms.nh_ownership": ThemeManifestMember(
+            dataset_id="y2hd-n93e",
+            source_id="cms.nh_ownership",
+            name="Ownership",
+            modified_date="2026-09-01",
+            product_release_id="2026-09",
+            filename="NH_Ownership_Sep2026.csv",
+            filesize=200,
+            mime_type="text/csv",
+        ),
+    }
+    publication = ThemePublication(
+        publication_id="nh-sep30",
+        publication_date="2026-09-30",
+        theme="nursing-homes",
+        archive_name="nursing-homes_2026-09-30",
+        download_url="https://data.cms.gov/provider-data/nursing-homes_2026-09-30.zip",
+        archive_size_bytes=300,
+        members_by_source=members,
+        members_by_dataset={member.dataset_id: member for member in members.values()},
+    )
+    monkeypatch.setattr(
+        "cms_theme_publication.get_latest_nh_theme_publication",
+        lambda **_kwargs: publication,
+    )
+
+    result = ops.check_provider_info_cms(
+        fetch_json=lambda _url: _metastore("NH_ProviderInfo_Sep2026.csv"),
+        root=tmp_path,
+    )
+
+    candidates = json.loads((state / "release_candidates.json").read_text(encoding="utf-8"))[
+        "datasets"
+    ]
+    provider = candidates["cms.provider_info"]
+    ownership = candidates["cms.nh_ownership"]
+    source_set = {item["source_id"]: item for item in provider["metadata"]["source_set"]}
+    assert source_set["cms.nh_ownership"]["cms_dataset_id"] == "y2hd-n93e"
+    assert source_set["cms.nh_ownership"]["manifest_filename"] == "NH_Ownership_Sep2026.csv"
+    assert ownership["release_id"] == "2026-09"
+    assert ownership["state"] == "DETECTED"
+    assert ownership["metadata"]["candidate_kind"] == "DERIVED"
+    assert ownership["metadata"]["upstream_source_id"] == "cms.provider_info"
+    assert ownership["metadata"]["cms_dataset_id"] == "y2hd-n93e"
+    assert "cms.snf_all_owners" not in candidates
+    assert result["nh_ownership"]["new_release_available"] is True
+
+
 def test_structural_and_zweli_are_separate():
     cur = zweli.ProviderInfoMetrics("2026-08", 1000, 1000)
     base = zweli.ProviderInfoMetrics("2026-07", 1000, 1000)
@@ -349,8 +438,7 @@ def test_control_plane_overlay_sff_active(tmp_path: Path):
 
     control = rcp.control_panel_payload(tmp_path)
     snap = ops.probe_source("cms.sff_pdf_list", check_cms=False, root=tmp_path, run_zweli=False)
-    assert snap.status in {"NOT_AVAILABLE_IN_THIS_RUNTIME", "UNKNOWN"}
-    assert "NOT AVAILABLE" in snap.raw_available
+    assert snap.status in {"NOT_AVAILABLE_IN_THIS_RUNTIME", "UNKNOWN", "LOCAL_RAW_ONLY"}
     overlaid = ops.overlay_control_plane_on_snapshot(snap, control, root=tmp_path)
     assert overlaid["active_release_id"] == "2026-08"
     assert overlaid["active_release_status"] == "ACTIVE"
@@ -486,7 +574,7 @@ def test_release_review_includes_governed_pending_not_approvable(tmp_path: Path)
     assert pair["approvable"] is False
 
 
-def test_release_review_validated_not_run_is_approvable(tmp_path: Path):
+def test_release_review_validated_not_run_requires_derivatives(tmp_path: Path):
     _write_control_plane_state(
         tmp_path,
         active={
@@ -509,13 +597,16 @@ def test_release_review_validated_not_run_is_approvable(tmp_path: Path):
     control = rcp.control_panel_payload(tmp_path)
     items = ops.release_review_items(check_cms=False, root=tmp_path, control=control)
     provider = next(i for i in items if i["source_id"] == "cms.provider_info")
-    assert provider["approvable"] is True
+    assert provider["approvable"] is False
+    assert provider["primary_action_kind"] == "blocked"
     assert provider["zweli_status"] == "NOT_RUN"
 
 
 def test_authoritative_not_run_can_promote(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
+    # Exercise optional Zweli independently; activation safety has dedicated tests.
+    monkeypatch.setattr("derived_provenance.assert_activation_derivatives_ready", lambda *args, **kwargs: None)
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
     _seed_pi_validated_candidate(tmp_path, year=2026, month=8)
@@ -655,6 +746,7 @@ def test_forged_form_pass_cannot_approve_blocked(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Browser-submitted zweli_status=PASS must not override server BLOCKED."""
+    monkeypatch.setattr("derived_provenance.assert_activation_derivatives_ready", lambda *args, **kwargs: None)
     monkeypatch.setenv("PBJ_DATA_OPS_PASSWORD", "test-ops-pw")
     monkeypatch.setenv("PBJ_DATA_OPS_SECRET", "test-secret")
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
@@ -696,6 +788,7 @@ def test_forged_form_pass_cannot_approve_blocked(
 def test_authoritative_promotion_writes_isolated_registry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
+    monkeypatch.setattr("derived_provenance.assert_activation_derivatives_ready", lambda *args, **kwargs: None)
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
     _seed_pi_validated_candidate(tmp_path, year=2026, month=8)
@@ -718,6 +811,7 @@ def test_authoritative_promotion_writes_isolated_registry(
 
 
 def test_authoritative_requires_review_and_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("derived_provenance.assert_activation_derivatives_ready", lambda *args, **kwargs: None)
     monkeypatch.setenv("PBJ_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(cms_data_paths, "repo_root", lambda: tmp_path)
     _seed_pi_validated_candidate(tmp_path, year=2026, month=8)
@@ -818,7 +912,7 @@ def test_build_sff_lifecycle_active_read_only():
     labels = [s["label"] for s in steps]
     assert labels == [
         "Check CMS",
-        "Acquire PDF",
+        "Stage detected SFF PDF",
         "Validate",
         "Review",
         "Make ACTIVE",
@@ -837,6 +931,18 @@ def test_build_sff_lifecycle_active_read_only():
     assert pbj["action"]["endpoint"] == "dashboard_builder"
 
 
+def test_build_sff_lifecycle_detected_exposes_governed_stage_action():
+    control_row = {
+        "active": {"active_release_id": "2026-08", "status": "ACTIVE"},
+        "pending": {"release_id": "2026-09", "state": "DETECTED"},
+    }
+    steps = ops.build_sff_lifecycle_steps(control_row=control_row)
+    acquire = next(step for step in steps if step["id"] == "acquire_pdf")
+    assert acquire["state"] == "current"
+    assert acquire["action"]["endpoint"] == "action_sff_stage_detected"
+    assert acquire["action"]["method"] == "post"
+
+
 def test_build_source_operator_workflow_uses_control_plane():
     control_row = {
         "active": {"active_release_id": "2026-07"},
@@ -853,7 +959,7 @@ def test_build_source_operator_workflow_uses_control_plane():
     )
     assert wf["active_release_id"] == "2026-07"
     assert wf["pending_state"] == "ACQUIRED"
-    assert wf["next_action"]["endpoint"] == "release_review"
+    assert wf["next_action"]["endpoint"] == "source_detail"
     assert wf["lifecycle_steps"] is None
 
 
@@ -882,6 +988,7 @@ def test_needs_attention_provider_info_operator_action_passes_root(
         lambda **kwargs: None,
     )
     monkeypatch.setattr(ops, "_citation_packages_attention_item", lambda **kwargs: None)
+    monkeypatch.setattr(ops, "_provider_quarter_mapping_attention_item", lambda **kwargs: None, raising=False)
 
     control = {
         "datasets": [

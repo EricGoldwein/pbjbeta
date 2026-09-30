@@ -40,33 +40,44 @@ def validate_quarterly_metrics_structure(facility_metrics, state_metrics, nation
     
     return warnings
 
-def generate_lite_metrics():
-    """Generate lite metrics from quarterly metrics files (regenerates all quarters from source)."""
+def generate_lite_metrics(*, input_dir=None, output_dir=None, control_root=None):
+    """Generate a governed peer candidate without overwriting served files."""
+    from derived_provenance import pending_build_directory, pending_upstream_provenance
+
+    candidate_root = pending_build_directory(
+        "cms.pbj_nurse_staffing", root=control_root
+    )
+    input_root = Path(input_dir).resolve() if input_dir is not None else candidate_root
+    output_root = Path(output_dir).resolve() if output_dir is not None else candidate_root
+    output_root.mkdir(parents=True, exist_ok=True)
+    upstream_overrides = pending_upstream_provenance(
+        "cms.pbj_nurse_staffing", root=control_root
+    )
     print("="*70)
     print("Generating Lite Metrics from Quarterly Metrics")
     print("="*70)
     
     # Check if quarterly metrics files exist
-    if not os.path.exists('facility_quarterly_metrics.csv'):
+    if not (input_root / 'facility_quarterly_metrics.csv').is_file():
         print("ERROR: facility_quarterly_metrics.csv not found!")
         print("Please run generate_metrics.py first.")
         return
     
-    if not os.path.exists('state_quarterly_metrics.csv'):
+    if not (input_root / 'state_quarterly_metrics.csv').is_file():
         print("ERROR: state_quarterly_metrics.csv not found!")
         print("Please run generate_metrics.py first.")
         return
     
-    if not os.path.exists('national_quarterly_metrics.csv'):
+    if not (input_root / 'national_quarterly_metrics.csv').is_file():
         print("ERROR: national_quarterly_metrics.csv not found!")
         print("Please run generate_metrics.py first.")
         return
     
     print("\nLoading quarterly metrics files...")
     # Read the existing metrics files
-    facility_metrics = pd.read_csv('facility_quarterly_metrics.csv', low_memory=False)
-    state_metrics = pd.read_csv('state_quarterly_metrics.csv', low_memory=False)
-    national_metrics_df = pd.read_csv('national_quarterly_metrics.csv', low_memory=False)
+    facility_metrics = pd.read_csv(input_root / 'facility_quarterly_metrics.csv', low_memory=False)
+    state_metrics = pd.read_csv(input_root / 'state_quarterly_metrics.csv', low_memory=False)
+    national_metrics_df = pd.read_csv(input_root / 'national_quarterly_metrics.csv', low_memory=False)
     
     print(f"  Loaded {len(facility_metrics):,} facility records")
     print(f"  Loaded {len(state_metrics):,} state records")
@@ -204,16 +215,27 @@ def generate_lite_metrics():
     ]
     
     # Save the lite metrics files to root directory
-    facility_lite_output.to_csv('facility_lite_metrics.csv', index=False)
-    state_lite.to_csv('state_lite_metrics.csv', index=False)
-    national_lite.to_csv('national_lite_metrics.csv', index=False)
+    facility_lite_output.to_csv(output_root / 'facility_lite_metrics.csv', index=False)
+    state_lite.to_csv(output_root / 'state_lite_metrics.csv', index=False)
+    national_lite.to_csv(output_root / 'national_lite_metrics.csv', index=False)
     
     # Also save to pbj_lite directory (dashboard checks this first)
-    pbj_lite_dir = Path('pbj_lite')
-    pbj_lite_dir.mkdir(exist_ok=True)
+    pbj_lite_dir = output_root / 'pbj_lite'
+    pbj_lite_dir.mkdir(parents=True, exist_ok=True)
     facility_lite_output.to_csv(pbj_lite_dir / 'facility_lite_metrics.csv', index=False)
     state_lite.to_csv(pbj_lite_dir / 'state_lite_metrics.csv', index=False)
     national_lite.to_csv(pbj_lite_dir / 'national_lite_metrics.csv', index=False)
+
+    # Peer distribution is the governed facility-lite artifact. Capture exact
+    # ACTIVE nurse provenance without changing the numerical output.
+    from derived_provenance import record_validated_derived_candidate
+    record_validated_derived_candidate(
+        "pbj.peer_distribution",
+        pbj_lite_dir / "facility_lite_metrics.csv",
+        builder="lite_report.py",
+        root=control_root,
+        upstream_overrides=upstream_overrides,
+    )
     
     # Print summary
     print(f"\n{'='*70}")
@@ -242,6 +264,11 @@ def generate_lite_metrics():
     print(f"  - facility_lite_metrics.csv (root and pbj_lite/)")
     print(f"  - state_lite_metrics.csv (root and pbj_lite/)")
     print(f"  - national_lite_metrics.csv (root and pbj_lite/)")
+    print(f"  - governed candidate directory: {output_root}")
+    return {
+        "output_dir": output_root,
+        "peer": pbj_lite_dir / "facility_lite_metrics.csv",
+    }
 
 if __name__ == "__main__":
     generate_lite_metrics() 

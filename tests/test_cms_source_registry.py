@@ -70,7 +70,14 @@ def test_sff_pdf_distinct_from_provider_info_signal():
     sff = get_source("cms.sff_pdf_list")
     assert sff is not None
     assert SourceContainer.PDF in sff.containers
-    assert sff.automation_maturity == AutomationMaturity.UNMODELED
+    assert sff.automation_maturity == AutomationMaturity.PARTIALLY_AUTOMATED
+
+
+def test_nonnurse_registry_matches_production_release_adapter():
+    nonnurse = get_source("cms.pbj_non_nurse_staffing")
+    assert nonnurse is not None
+    assert nonnurse.automation_maturity == AutomationMaturity.PARTIALLY_AUTOMATED
+    assert "nonnurse_lifecycle.normalize_validate_candidate" in nonnurse.acquisition_implementation
     signals = get_derived_signals()
     assert any(s.signal_id == "signal.sff_status" for s in signals)
     sig = next(s for s in signals if s.signal_id == "signal.sff_status")

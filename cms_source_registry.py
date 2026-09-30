@@ -342,14 +342,19 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
         raw_artifact_resolver="cms_data_paths.nonnurse_raw_dir (NonNursecsv/)",
         normalized_artifact_resolver="cms_data_paths.standardized_nonnurse_dir",
         acquisition_implementation=(
-            "manage_cms_sources nonnurse ingest → ingest_cms_nonnurse_quarter.py (ABSENT)"
+            "release_check generic CMS CSV adapter → nonnurse_lifecycle.normalize_validate_candidate"
         ),
-        structural_validator="standardize_nonnursepbj_files.py",
+        structural_validator=(
+            "generic_cms_csv schema/hash check plus nonnurse_lifecycle complete-series validation"
+        ),
         zweli_quality_profile=None,
         downstream_consumers=("generate_non_nurse_*.py", "facility nonnurse slices"),
-        automation_maturity=AutomationMaturity.BROKEN_LEGACY,
-        automation_notes="Normalize exists; acquire CLI references missing script — do not restore in V0.",
-        evidence=("scripts/manage_cms_sources.py", "run_pipeline_update.py"),
+        automation_maturity=AutomationMaturity.PARTIALLY_AUTOMATED,
+        automation_notes=(
+            "Production release_check detects and acquires the CMS CSV, then normalizes and "
+            "validates the complete local historical series. Promotion and downstream rebuild stay explicit."
+        ),
+        evidence=("release_check.py", "generic_cms_csv.py", "nonnurse_lifecycle.py"),
     ),
     _rec(
         source_id="cms.pbj_employee_ein_detail",
@@ -380,7 +385,7 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
     ),
     _rec(
         source_id="cms.snf_all_owners",
-        human_name="SNF All Owners",
+        human_name="SNF All Owners (PECOS)",
         publisher=Publisher.CMS,
         source_family=SourceFamily.SNF_ALL_OWNERS,
         containers=(SourceContainer.CSV,),

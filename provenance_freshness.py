@@ -210,14 +210,19 @@ def build_source_provenance_freshness(
         stale_capabilities=stale_capabilities,
     )
     if source_id == "cms.provider_info":
-        from pbj320_stage_provider_info import audit_provider_info_pbj320_destination
+        from pbj320_stage_provider_info import ProviderInfoStageError, audit_provider_info_pbj320_destination
 
-        dest_audit = audit_provider_info_pbj320_destination(root=root)
+        try:
+            dest_audit = audit_provider_info_pbj320_destination(root=root)
+        except ProviderInfoStageError as exc:
+            dest_audit = {"destination_staged": False, "error": str(exc)}
         destination_staged = bool(dest_audit.get("destination_staged"))
         for row in downstream:
             if row.get("consumer") == "public PBJ320.com Provider surfaces":
                 row["operator_label"] = "Public Provider pages (pbj-root destination)"
-                row["freshness"] = "STAGED" if destination_staged else "NOT_STAGED"
+                row["freshness"] = "UNKNOWN" if dest_audit.get("error") else ("STAGED" if destination_staged else "NOT_STAGED")
+                if dest_audit.get("error"):
+                    row["detail"] = dest_audit["error"]
                 break
 
     product_release_id = (

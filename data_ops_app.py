@@ -328,6 +328,69 @@ def create_app() -> Flask:
             flash(f"Control-plane refresh failed: {exc}", "error")
         return redirect(url_for("sources", check_cms="0"))
 
+    @app.post("/actions/control-panel/check-releases")
+    @require_auth
+    def action_control_panel_check_releases():
+        from release_check import check_releases, production_handlers
+
+        try:
+            result = check_releases(
+                acquire=False,
+                external_handlers=production_handlers(),
+            )
+            rows = result.get("datasets") or []
+            external_rows = [
+                row
+                for row in rows
+                if row.get("mechanism") == "external recurring release"
+            ]
+            newer = sum(
+                1 for row in external_rows if row.get("new_release_available") is True
+            )
+            failures = sum(
+                1
+                for row in external_rows
+                if str(row.get("status") or "").upper() in {"ERROR", "FAILED", "CHECK_UNAVAILABLE"}
+            )
+            current = sum(
+                1
+                for row in external_rows
+                if str(row.get("status") or "").upper() == "CURRENT"
+            )
+            other_attention = sum(
+                1
+                for row in rows
+                if row not in external_rows and row.get("new_release_available") is True
+            )
+            attention_suffix = (
+                f" · {other_attention} non-CMS attention" if other_attention else ""
+            )
+            flash(
+                "CMS release check finished"
+                f" · {current} current · {newer} newer · {failures} errors"
+                f"{attention_suffix}",
+                "error" if failures else "ok",
+            )
+        except Exception as exc:  # noqa: BLE001
+            flash(f"CMS release check failed: {exc}", "error")
+        return redirect(url_for("sources", check_cms="0"))
+
+    @app.post("/actions/sources/<source_id>/acquire")
+    @require_auth
+    def action_source_acquire(source_id: str):
+        from release_check import acquire_detected_source
+
+        try:
+            result = acquire_detected_source(source_id)
+            flash(
+                f"{source_id} {result.get('release_id') or ''} acquisition finished · "
+                f"{result.get('status') or 'candidate updated'}",
+                "ok",
+            )
+        except Exception as exc:  # noqa: BLE001
+            flash(f"{source_id} acquisition failed: {exc}", "error")
+        return redirect(url_for("source_detail", source_id=source_id, check_cms="0"))
+
     @app.get("/sources/<source_id>")
     @require_auth
     def source_detail(source_id: str):
@@ -340,7 +403,7 @@ def create_app() -> Flask:
                 flash("No pending ownership pair", "error")
                 return redirect(url_for("sources"))
             ctx["panel_mode"] = "page"
-            return render_template("data_ops/partials/ownership_pair_panel.html", **ctx)
+            return render_template("data_ops/ownership_pair_detail.html", **ctx)
         ctx = _source_detail_context(
             source_id,
             theme_publication=_theme_publication_for_ui(check_cms),
@@ -383,7 +446,7 @@ def create_app() -> Flask:
             flash(str(exc), "error")
         except Exception as exc:  # noqa: BLE001
             flash(f"Pair validation failed: {exc}", "error")
-        return redirect(url_for("sources"))
+        return redirect(url_for("source_detail", source_id="cms.snf_ownership_pair", check_cms="0"))
 
     @app.post("/actions/ownership-pair/activate")
     @require_auth
@@ -448,14 +511,14 @@ def create_app() -> Flask:
                 )
             else:
                 flash(
-                    f"Ownership downstream rebuilt for {result.get('release_label') or result.get('release_id')}",
+                    f"Ownership downstream rebuilt for {result.get('release_label') or result.get('release_id')} · inspect rebuilt state below",
                     "ok",
                 )
         except OwnershipRebuildError as exc:
             flash(str(exc), "error")
         except Exception as exc:  # noqa: BLE001
             flash(f"Ownership rebuild failed: {exc}", "error")
-        return redirect(url_for("sources"))
+        return redirect(url_for("source_detail", source_id="cms.snf_all_owners", check_cms="0"))
 
     @app.get("/api/control-plane/status")
     @require_auth
@@ -741,6 +804,22 @@ def create_app() -> Flask:
         except Exception as exc:  # noqa: BLE001
             flash(f"SFF check failed: {exc}", "error")
         return redirect(request.form.get("next") or url_for("sources"))
+
+    @app.post("/actions/sff/stage-detected")
+    @require_auth
+    def action_sff_stage_detected():
+        from sff_release import stage_detected_candidate
+
+        try:
+            result = stage_detected_candidate()
+            validation = result.get("validation") or {}
+            flash(
+                f"SFF {result.get('release_id')} staged · validation {validation.get('status')}",
+                "ok" if validation.get("status") == "PASS" else "error",
+            )
+        except Exception as exc:  # noqa: BLE001
+            flash(f"SFF staging failed: {exc}", "error")
+        return redirect(url_for("source_detail", source_id="cms.sff_pdf_list", check_cms="0"))
 
     @app.post("/actions/nurse/acquire")
     @require_auth

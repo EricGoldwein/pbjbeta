@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 from active_release_registry import load_registry, registry_path
 from release_control_plane import ReleaseState, load_candidates, record_candidate
-from release_source_catalog import SOURCES, UpdateMechanism
+from release_source_catalog import BY_ID, SOURCES, UpdateMechanism
 
 ROOT = Path(__file__).resolve().parent
 CHECK_STATE = ROOT / "state" / "release_checks.json"
@@ -29,23 +29,110 @@ def derived_state(dataset_id: str, upstream: tuple[str, ...], *, root: Path = RO
     target = active.get(dataset_id)
     if not target:
         return {"status": "MISSING", "new_release_available": True}
-    recorded = ((target.get("metadata") or {}).get("upstream_releases") or {})
-    current = {key: (active.get(key) or {}).get("active_release_id") for key in upstream}
-    provenance_missing = not bool(recorded)
-    if provenance_missing:
+    metadata = target.get("metadata") if isinstance(target.get("metadata"), dict) else {}
+    recorded_raw = metadata.get("upstream_provenance")
+    recorded = recorded_raw if isinstance(recorded_raw, dict) else {}
+    current = {
+        key: {
+            "release_id": (active.get(key) or {}).get("active_release_id"),
+            "source_hash": (active.get(key) or {}).get("hash"),
+        }
+        for key in upstream
+    }
+    provenance_missing = not isinstance(recorded_raw, dict) or any(
+        not isinstance(recorded.get(key), dict)
+        or not recorded[key].get("release_id")
+        or not recorded[key].get("source_hash")
+        for key in upstream
+    )
+    current_provenance_missing = any(
+        not item.get("release_id") or not item.get("source_hash")
+        for item in current.values()
+    )
+    output_hash = str(metadata.get("output_artifact_hash") or "")
+    active_output_hash = str(target.get("hash") or "")
+    output_provenance_missing = not output_hash or not active_output_hash
+    if provenance_missing or current_provenance_missing or output_provenance_missing:
         stale = False
     else:
-        stale = any(not value or recorded.get(key) != value for key, value in current.items())
+        stale = any(
+            not current[key]["release_id"]
+            or not current[key]["source_hash"]
+            or recorded[key].get("release_id") != current[key]["release_id"]
+            or recorded[key].get("source_hash") != current[key]["source_hash"]
+            for key in upstream
+        ) or output_hash != active_output_hash
+    unknown = (
+        provenance_missing
+        or current_provenance_missing
+        or output_provenance_missing
+    )
     publisher_latest_release_id = None
     if upstream:
-        publisher_latest_release_id = current.get(upstream[0])
+        publisher_latest_release_id = current.get(upstream[0], {}).get("release_id")
     return {
-        "status": "UNKNOWN" if provenance_missing else ("STALE" if stale else "CURRENT"),
+        "status": "UNKNOWN" if unknown else ("STALE" if stale else "CURRENT"),
         "new_release_available": stale,
-        "provenance_missing": provenance_missing,
+        "provenance_missing": unknown,
         "publisher_latest_release_id": publisher_latest_release_id,
-        "upstream_active": current,
-        "upstream_recorded": recorded,
+        "upstream_active": {
+            key: item.get("release_id") for key, item in current.items()
+        },
+        "upstream_active_provenance": current,
+        "upstream_recorded": {
+            key: item.get("release_id") if isinstance(item, dict) else None
+            for key, item in recorded.items()
+        },
+        "upstream_recorded_provenance": recorded,
+        "output_artifact_hash_recorded": output_hash or None,
+        "output_artifact_hash_active": active_output_hash or None,
+    }
+
+
+INDIVIDUAL_ACQUIRE_SOURCES = frozenset(
+    {
+        "cms.provider_info",
+        "cms.pbj_nurse_staffing",
+        "cms.pbj_non_nurse_staffing",
+        "cms.snf_all_owners",
+        "cms.snf_enrollments",
+    }
+)
+
+
+def acquire_detected_source(dataset_id: str, *, root: Path = ROOT) -> dict[str, Any]:
+    """Acquire one governed DETECTED source through its production handler."""
+    source = BY_ID.get(dataset_id)
+    if source is None or source.mechanism != UpdateMechanism.EXTERNAL_RECURRING:
+        raise ValueError(f"{dataset_id} is not a governed recurring CMS source")
+    if dataset_id not in INDIVIDUAL_ACQUIRE_SOURCES:
+        raise ValueError(f"{dataset_id} has no independent production acquisition handler")
+
+    candidate = (load_candidates(root).get("datasets") or {}).get(dataset_id) or {}
+    state = str(candidate.get("state") or "").upper()
+    active = (load_registry(registry_path(root)).get("datasets") or {}).get(dataset_id) or {}
+    active_release = active.get("active_release_id")
+    if state != ReleaseState.DETECTED.value:
+        raise RuntimeError(f"{dataset_id} must be DETECTED before acquisition; found {state or 'none'}")
+    if active_release and str(candidate.get("release_id") or "") == str(active_release):
+        from generic_cms_csv import compare_publisher_artifact_identity
+
+        metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
+        active_metadata = active.get("metadata") if isinstance(active.get("metadata"), dict) else {}
+        changes, _matches = compare_publisher_artifact_identity(active_metadata, metadata)
+        if not metadata.get("publisher_revision_changed") or not changes:
+            raise RuntimeError(
+                f"{dataset_id} DETECTED candidate matches ACTIVE release without a proven publisher revision"
+            )
+
+    handler = production_handlers().get(dataset_id)
+    if handler is None:
+        raise RuntimeError(f"{dataset_id} production acquisition handler is unavailable")
+    result = handler(True)
+    return {
+        "dataset_id": dataset_id,
+        "release_id": candidate.get("release_id"),
+        **result,
     }
 
 
@@ -99,7 +186,7 @@ def check_releases(
 def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
     """Adapters already proven in this repository; missing adapters stay explicit."""
     from cms_data_ops import acquire_nurse, acquire_provider_info, check_nurse_cms, check_provider_info_cms
-    from cms_source_registry import CMS_ID_PBJ_NON_NURSE, CMS_ID_SNF_ALL_OWNERS, CMS_ID_SNF_ENROLLMENTS
+    from cms_source_registry import CMS_ID_PBJ_NON_NURSE
     from generic_cms_csv import CsvFeed, run_feed
     from nonnurse_lifecycle import normalize_validate_candidate
     import cms_data_paths
@@ -172,8 +259,7 @@ def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
     pbj_root = cms_data_paths.repo_root()
     generic = {
         "cms.pbj_non_nurse_staffing": CsvFeed("cms.pbj_non_nurse_staffing", CMS_ID_PBJ_NON_NURSE, r"PBJ_dailynonnursestaffing_CY\d{4}Q[1-4]\.csv$", cms_data_paths.nonnurse_raw_dir(), (("PROVNUM", "CCN"), ("WorkDate", "work_date")), False),
-        "cms.snf_all_owners": CsvFeed("cms.snf_all_owners", CMS_ID_SNF_ALL_OWNERS, r"SNF.*Owners.*\.csv$", pbj_root / "ownership" / "_sources" / "cms_snf_all_owners" / "raw" / "downloaded", (("ENROLLMENT ID", "ENROLLMENT_ID"),), False),
-        "cms.snf_enrollments": CsvFeed("cms.snf_enrollments", CMS_ID_SNF_ENROLLMENTS, r"SNF.*Enroll.*\.csv$", pbj_root / "ownership" / "_sources" / "cms_snf_enrollments" / "raw" / "downloaded", (("ENROLLMENT ID", "ENROLLMENT_ID"), ("CCN", "CMS Certification Number (CCN)")), False),
+        **ownership_csv_feeds(pbj_root),
     }
     def nonnurse(acquire: bool) -> dict[str, Any]:
         result = run_feed(generic["cms.pbj_non_nurse_staffing"], acquire, root=ROOT)
@@ -195,6 +281,41 @@ def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
     }
     handlers.update({key: (lambda acquire, feed=feed: run_feed(feed, acquire, root=ROOT)) for key, feed in generic.items() if key != "cms.pbj_non_nurse_staffing"})
     return handlers
+
+
+def ownership_csv_feeds(pbj_root: Path) -> dict[str, Any]:
+    """SNF feeds that resolve a stable product page to its current dataset node."""
+    from cms_source_registry import CMS_ID_SNF_ALL_OWNERS, CMS_ID_SNF_ENROLLMENTS
+    from generic_cms_csv import CsvFeed
+
+    return {
+        "cms.snf_all_owners": CsvFeed(
+            "cms.snf_all_owners",
+            CMS_ID_SNF_ALL_OWNERS,
+            r"SNF.*Owners.*\.csv$",
+            pbj_root / "ownership" / "_sources" / "cms_snf_all_owners" / "raw" / "downloaded",
+            (("ENROLLMENT ID", "ENROLLMENT_ID"),),
+            False,
+            cms_product_path=(
+                "/provider-characteristics/hospitals-and-other-facilities/"
+                "skilled-nursing-facility-all-owners"
+            ),
+            cms_product_name="Skilled Nursing Facility All Owners",
+        ),
+        "cms.snf_enrollments": CsvFeed(
+            "cms.snf_enrollments",
+            CMS_ID_SNF_ENROLLMENTS,
+            r"SNF.*Enroll.*\.csv$",
+            pbj_root / "ownership" / "_sources" / "cms_snf_enrollments" / "raw" / "downloaded",
+            (("ENROLLMENT ID", "ENROLLMENT_ID"), ("CCN", "CMS Certification Number (CCN)")),
+            False,
+            cms_product_path=(
+                "/provider-characteristics/hospitals-and-other-facilities/"
+                "skilled-nursing-facility-enrollments"
+            ),
+            cms_product_name="Skilled Nursing Facility Enrollments",
+        ),
+    }
 
 
 def main() -> int:

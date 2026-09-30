@@ -3,6 +3,7 @@ import duckdb
 import os
 import glob
 import time
+from pathlib import Path
 
 def format_provnum(df):
     """Ensure PROVNUM is a 6-digit string with leading zeros."""
@@ -25,9 +26,21 @@ def format_provnum(df):
         return True
     return False
 
-def generate_metrics():
-    """Generate metrics at state and facility levels using DuckDB."""
+def generate_metrics(*, output_dir=None, control_root=None):
+    """Build governed metrics in versioned staging, never over served files."""
     start_time = time.time()
+
+    from derived_provenance import pending_build_directory, pending_upstream_provenance
+
+    output_root = (
+        Path(output_dir).resolve()
+        if output_dir is not None
+        else pending_build_directory("cms.pbj_nurse_staffing", root=control_root)
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    upstream_overrides = pending_upstream_provenance(
+        "cms.pbj_nurse_staffing", root=control_root
+    )
     
     try:
         # Connect to in-memory DuckDB with optimized settings
@@ -217,9 +230,30 @@ def generate_metrics():
         
         # Save to CSV files
         print("\nSaving data...")
-        facility_metrics.to_csv('facility_quarterly_metrics.csv', index=False)
-        state_metrics.to_csv('state_quarterly_metrics.csv', index=False)
-        national_metrics.to_csv('national_quarterly_metrics.csv', index=False)
+        facility_path = output_root / 'facility_quarterly_metrics.csv'
+        state_path = output_root / 'state_quarterly_metrics.csv'
+        national_path = output_root / 'national_quarterly_metrics.csv'
+        facility_metrics.to_csv(facility_path, index=False)
+        state_metrics.to_csv(state_path, index=False)
+        national_metrics.to_csv(national_path, index=False)
+
+        # Record governed candidates only after all numerical outputs exist.
+        # Promotion remains an explicit human action in Data Ops.
+        from derived_provenance import record_validated_derived_candidate
+        record_validated_derived_candidate(
+            "pbj.benchmarks.state",
+            state_path,
+            builder="generate_metrics.py",
+            root=control_root,
+            upstream_overrides=upstream_overrides,
+        )
+        record_validated_derived_candidate(
+            "pbj.benchmarks.national",
+            national_path,
+            builder="generate_metrics.py",
+            root=control_root,
+            upstream_overrides=upstream_overrides,
+        )
         
         # Print summary
         print("\nData Summary:")
@@ -243,6 +277,13 @@ def generate_metrics():
         
         end_time = time.time()
         print(f"\nTotal execution time: {end_time - start_time:.2f} seconds")
+        print(f"Governed candidate directory: {output_root}")
+        return {
+            "output_dir": output_root,
+            "facility": facility_path,
+            "state": state_path,
+            "national": national_path,
+        }
         
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -253,4 +294,4 @@ def generate_metrics():
             conn.close()
 
 if __name__ == '__main__':
-    generate_metrics() 
+    generate_metrics()

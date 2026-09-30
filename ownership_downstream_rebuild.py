@@ -18,7 +18,6 @@ from ownership_pairing import ENROLLMENTS, OWNERS, format_ownership_release_labe
 from release_control_plane import (
     DEPENDENCY_GRAPH,
     candidate_local_path,
-    facility_index_path,
     load_facility_index,
     refresh_facility_index,
 )
@@ -84,6 +83,82 @@ def _bridge_lookup_path(pbj_root: Path, release_id: str) -> Path:
     return pbj_root / BRIDGE_SUBDIR / f"release_{release_id}_lookup.json"
 
 
+def _facility_package_provenance_mismatches(
+    facility_index: dict[str, Any],
+    *,
+    owners_active: dict[str, Any],
+    enroll_active: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Read package manifests and fail closed on ownership provenance mismatches."""
+    expected = {
+        OWNERS: owners_active,
+        ENROLLMENTS: enroll_active,
+    }
+    mismatches: list[dict[str, Any]] = []
+    for ccn, facility in (facility_index.get("facilities") or {}).items():
+        manifest_raw = str(facility.get("manifest") or "").strip()
+        if not manifest_raw:
+            continue
+        manifest_path = Path(manifest_raw)
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            for dataset_id, active in expected.items():
+                mismatches.append(
+                    {
+                        "ccn": str(ccn),
+                        "artifact": "PACKAGE_MANIFEST.json",
+                        "dataset_id": dataset_id,
+                        "actual_release": None,
+                        "expected_release": active.get("active_release_id"),
+                        "actual_hash": None,
+                        "expected_hash": active.get("hash"),
+                        "reason": f"package manifest unreadable: {exc}",
+                    }
+                )
+            continue
+
+        provenance = manifest.get("source_release_provenance") or []
+        for dataset_id, active in expected.items():
+            entries = [
+                item
+                for item in provenance
+                if isinstance(item, dict) and item.get("source_dataset") == dataset_id
+            ]
+            if not entries:
+                mismatches.append(
+                    {
+                        "ccn": str(ccn),
+                        "artifact": "PACKAGE_MANIFEST.json",
+                        "dataset_id": dataset_id,
+                        "actual_release": None,
+                        "expected_release": active.get("active_release_id"),
+                        "actual_hash": None,
+                        "expected_hash": active.get("hash"),
+                        "reason": "package manifest has no provenance entry for ACTIVE source",
+                    }
+                )
+                continue
+            for item in entries:
+                release_ok = item.get("source_release") == active.get("active_release_id")
+                hash_ok = item.get("source_hash") == active.get("hash")
+                if release_ok and hash_ok:
+                    continue
+                mismatches.append(
+                    {
+                        "ccn": str(ccn),
+                        "artifact": item.get("artifact") or "(unknown artifact)",
+                        "dataset_id": dataset_id,
+                        "actual_release": item.get("source_release"),
+                        "expected_release": active.get("active_release_id"),
+                        "actual_hash": item.get("source_hash"),
+                        "expected_hash": active.get("hash"),
+                        "reason": "package source release/hash does not match ACTIVE",
+                    }
+                )
+    return mismatches
+
+
 def audit_ownership_downstream_stale(
     *,
     root: Path | None = None,
@@ -108,6 +183,24 @@ def audit_ownership_downstream_stale(
         reasons.append(
             f"ownership_release_policy active {policy_active} != registry ACTIVE {release_id}"
         )
+    policy_release = (policy.get("releases") or {}).get(release_id) or {}
+    policy_fingerprints = {
+        OWNERS: policy_release.get("ownership_source_sha256"),
+        ENROLLMENTS: policy_release.get("enrollment_source_sha256"),
+    }
+    evidence["policy_source_hashes"] = policy_fingerprints
+    for dataset_id, active_record in ((OWNERS, owners_active), (ENROLLMENTS, enroll_active)):
+        recorded_hash = str(policy_fingerprints.get(dataset_id) or "")
+        active_hash = str(active_record.get("hash") or "")
+        if recorded_hash == active_hash and recorded_hash:
+            continue
+        for cap in DEPENDENCY_GRAPH.get(dataset_id, ()):
+            if cap not in stale_caps:
+                stale_caps.append(cap)
+        reasons.append(
+            f"ownership_release_policy {dataset_id} hash {recorded_hash or 'missing'} "
+            f"!= registry ACTIVE {active_hash or 'missing'}"
+        )
 
     lookup_path = _bridge_lookup_path(pbj_root, release_id)
     evidence["bridge_lookup_path"] = str(lookup_path)
@@ -119,6 +212,29 @@ def audit_ownership_downstream_stale(
         reasons.append(f"missing bridge lookup for ACTIVE {release_id}")
 
     facility = load_facility_index(root)
+    package_mismatches = _facility_package_provenance_mismatches(
+        facility,
+        owners_active=owners_active,
+        enroll_active=enroll_active,
+    )
+    evidence["facility_package_provenance_mismatches"] = package_mismatches
+    for mismatch in package_mismatches:
+        dataset_id = str(mismatch.get("dataset_id") or "")
+        for cap in DEPENDENCY_GRAPH.get(dataset_id, (dataset_id,)):
+            if cap not in stale_caps:
+                stale_caps.append(cap)
+        reasons.append(
+            "facility {ccn} {artifact}: {dataset} provenance {actual_release}/{actual_hash} "
+            "!= ACTIVE {expected_release}/{expected_hash}".format(
+                ccn=mismatch.get("ccn"),
+                artifact=mismatch.get("artifact"),
+                dataset=dataset_id,
+                actual_release=mismatch.get("actual_release") or "missing",
+                actual_hash=mismatch.get("actual_hash") or "missing",
+                expected_release=mismatch.get("expected_release") or "missing",
+                expected_hash=mismatch.get("expected_hash") or "missing",
+            )
+        )
     ccn_caps: dict[str, str] = {}
     for _ccn, row in (facility.get("facilities") or {}).items():
         for cap, status in (row.get("capabilities") or {}).items():
@@ -287,27 +403,6 @@ def _run_build_release_lookup(pbj_root: Path, release_id: str) -> dict[str, Any]
     return {"stdout_tail": proc.stdout.strip()[-500:]}
 
 
-def _mark_ownership_capabilities_current(root: Path | None, release_id: str) -> None:
-    """Update cached facility index ownership capabilities after a successful rebuild."""
-    path = facility_index_path(root)
-    if not path.is_file():
-        return
-    payload = load_facility_index(root)
-    now = datetime.now(timezone.utc).isoformat()
-    for row in (payload.get("facilities") or {}).values():
-        caps = row.get("capabilities")
-        if not isinstance(caps, dict):
-            continue
-        for cap in ("facility.snf_owners", "ownership.enrollment_ccn_bridge"):
-            caps[cap] = "CURRENT"
-        if all(v == "CURRENT" for v in caps.values()):
-            row["status"] = "CURRENT"
-    payload["refreshed_at"] = now
-    payload["ownership_downstream_rebuilt_at"] = now
-    payload["ownership_active_release"] = release_id
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
 def rebuild_ownership_downstream(
     *,
     root: Path | None = None,
@@ -336,7 +431,6 @@ def rebuild_ownership_downstream(
     handoff = ensure_active_ownership_source_staged(pbj_root)
 
     refresh_facility_index(pbj_root, root=root, ccns=("335581",))
-    _mark_ownership_capabilities_current(root, release_id)
 
     post = audit_ownership_downstream_stale(root=root, pbj_root=pbj_root)
     return {

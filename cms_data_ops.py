@@ -758,7 +758,7 @@ def _probe_sff_pdf_list(
         try:
             from sff_release import check_sff_cms
 
-            check = check_sff_cms(root=control_root)
+            check = check_sff_cms(root=control_root, record_detection=False)
             cms = check["cms"]
             snap.publisher_latest = cms.get("posting_label")
             snap.cms_latest = cms.get("posting_label")
@@ -1628,7 +1628,11 @@ def _ownership_pair_attention_item(
     owners_state = str(pending.get("owners_state") or "").upper()
     enrollment_state = str(pending.get("enrollment_state") or "").upper()
     action = pair_lifecycle_action(pair)
-    if owners_state == "VALIDATED" and enrollment_state == "VALIDATED":
+    candidate_states = [
+        owners_state if source_id == OWNERS else enrollment_state
+        for source_id in pair.get("candidate_source_ids") or []
+    ]
+    if candidate_states and all(state == "VALIDATED" for state in candidate_states):
         concise_state = f"{release_label} validated"
     elif owners_state == "ACQUIRED" or enrollment_state == "ACQUIRED":
         concise_state = f"{release_label} acquired"
@@ -1636,6 +1640,7 @@ def _ownership_pair_attention_item(
         concise_state = f"{release_label} pending"
     next_action = {
         **action,
+        "label": "Review candidate" if action.get("kind") == "activate_pair" else action.get("label"),
         "endpoint": "source_detail_panel",
         "endpoint_args": {"source_id": PAIR_SOURCE_ID},
         "page_endpoint": "source_detail",
@@ -1647,7 +1652,7 @@ def _ownership_pair_attention_item(
     return _finalize_attention_item(
         {
             "source_id": PAIR_SOURCE_ID,
-            "human_name": "SNF Owners / Enrollments",
+            "human_name": "SNF All Owners (PECOS) / Enrollments",
             "active_release_id": (pair.get("active") or {}).get("owners_release"),
             "active_release_label": format_ownership_release_label((pair.get("active") or {}).get("owners_release")),
             "publisher_latest_release_id": None,
@@ -1710,9 +1715,16 @@ def _citation_packages_attention_item(*, root: Path | None) -> dict[str, Any] | 
 
 
 def _ownership_downstream_attention_item(*, root: Path | None) -> dict[str, Any] | None:
-    from ownership_downstream_rebuild import OWNERSHIP_DOWNSTREAM_SOURCE_ID, audit_ownership_downstream_stale
+    from ownership_downstream_rebuild import (
+        OWNERSHIP_DOWNSTREAM_SOURCE_ID,
+        OwnershipRebuildError,
+        audit_ownership_downstream_stale,
+    )
 
-    audit = audit_ownership_downstream_stale(root=root)
+    try:
+        audit = audit_ownership_downstream_stale(root=root)
+    except OwnershipRebuildError:
+        return None
     if not audit.get("is_stale"):
         return None
     release_label = audit.get("release_label") or audit.get("release_id") or "—"
@@ -1865,6 +1877,40 @@ def _next_operator_action(
     pending_state = str(pending.get("state") or "").upper()
     active_id = ((control_row or {}).get("active") or {}).get("active_release_id")
     actions = list((record or {}).get("actions_enabled") or [])
+
+    if (
+        pending_state == "DETECTED"
+        and (
+            pending.get("release_id") != active_id
+            or bool((pending.get("metadata") or {}).get("publisher_revision_changed"))
+        )
+        and source_id
+        in {
+            "cms.provider_info",
+            "cms.pbj_nurse_staffing",
+            "cms.pbj_non_nurse_staffing",
+            "cms.snf_all_owners",
+            "cms.snf_enrollments",
+        }
+    ):
+        release_label = format_release_month_label(pending.get("release_id")) or pending.get("release_id")
+        revision = bool((pending.get("metadata") or {}).get("publisher_revision_changed"))
+        return {
+            "label": f"Acquire revised {release_label}" if revision else f"Acquire {release_label}",
+            "detail": (
+                "Acquire the revised publisher artifact without overwriting ACTIVE; activation still requires review."
+                if revision
+                else "Acquire and process only this DETECTED source; activation still requires review."
+            ),
+            "endpoint": "action_source_acquire",
+            "endpoint_args": {"source_id": source_id},
+            "wired": True,
+            "method": "post",
+            "read_only": False,
+            "busy_submit": True,
+            "busy_label": f"Acquiring {release_label}…",
+            "busy_detail": "Using the existing production handler for this source only.",
+        }
 
     if release_availability is None:
         release_availability = build_release_availability_context(
@@ -2090,9 +2136,9 @@ def _next_operator_action(
     if pending_state in {"ACQUIRED", "VALIDATED"} and source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
         from ownership_pairing import PAIR_SOURCE_ID, pair_lifecycle_action, pairing_status
 
-        action = pair_lifecycle_action(pairing_status())
+        action = pair_lifecycle_action(pairing_status(root))
         return {
-            "label": action.get("label") or "Validate pair",
+            "label": "Review candidate" if action.get("kind") == "activate_pair" else (action.get("label") or "Validate pair"),
             "detail": action.get("detail") or "Owners and enrollment releases must move together.",
             "endpoint": action.get("endpoint") or "source_detail_panel",
             "endpoint_args": action.get("endpoint_args") or {"source_id": PAIR_SOURCE_ID},
@@ -2300,7 +2346,7 @@ def build_sff_lifecycle_steps(
     *,
     control_row: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
-    """Read-only SFF lifecycle sequence for operator detail (pilot)."""
+    """SFF lifecycle sequence, including governed staging of DETECTED candidates."""
     active = (control_row or {}).get("active") or {}
     pending = (control_row or {}).get("pending") or {}
     active_id = active.get("active_release_id")
@@ -2339,15 +2385,31 @@ def build_sff_lifecycle_steps(
         )
     )
 
-    acquire_state = "completed" if active_id or pending_id else "upcoming"
+    acquire_state = "current" if pending_state == "DETECTED" else ("completed" if active_id or pending_id else "upcoming")
     if pending_state in {"ACQUIRED", "VALIDATED"} and not active_id:
         acquire_state = "completed"
     steps.append(
         step(
             "acquire_pdf",
-            "Acquire PDF",
+            "Stage detected SFF PDF",
             state=acquire_state,
-            detail="Acquisition uses sff_release.stage_pdf (CLI) — not exposed as a UI button in this pass.",
+            detail=(
+                "Download the recorded cms.gov PDF, verify its embedded posting month, parse, normalize and validate."
+                if pending_state == "DETECTED"
+                else "Acquisition uses the governed sff_release.stage_pdf path."
+            ),
+            action={
+                "label": "Stage detected SFF PDF",
+                "endpoint": "action_sff_stage_detected",
+                "wired": True,
+                "method": "post",
+                "read_only": False,
+                "busy_submit": True,
+                "busy_label": "Staging SFF PDF…",
+                "busy_detail": "Downloading the recorded CMS PDF, parsing four tables and validating the candidate.",
+            }
+            if pending_state == "DETECTED"
+            else None,
         )
     )
 
@@ -2407,12 +2469,12 @@ def build_sff_lifecycle_steps(
             "pbj_build",
             "PBJ build",
             state="not_wired" if active_id else "upcoming",
-            detail="Facility package refresh/build is separate from SFF ingest.",
+            detail="Facility package build/deploy is explicit in Dashboard Builder.",
             action={
                 "label": "Dashboard Builder",
                 "endpoint": "dashboard_builder",
                 "wired": True,
-                "read_only": True,
+                "read_only": False,
             },
         )
     )
@@ -2517,10 +2579,13 @@ def build_source_operator_workflow(
         workflow["candidate_audit"] = audit_nurse_staffing_candidate_state(control_row=control_row, root=root)
     workflow["freshness_layers"] = build_freshness_layers(source_id, workflow=workflow, root=root)
     if source_id == "cms.provider_info":
-        from pbj320_stage_provider_info import audit_provider_info_pbj320_destination, load_stage_manifest
+        from pbj320_stage_provider_info import ProviderInfoStageError, audit_provider_info_pbj320_destination, load_stage_manifest
 
         active_id = str(active.get("active_release_id") or "")
-        workflow["pbj320_stage_audit"] = audit_provider_info_pbj320_destination(root=root)
+        try:
+            workflow["pbj320_stage_audit"] = audit_provider_info_pbj320_destination(root=root)
+        except ProviderInfoStageError as exc:
+            workflow["pbj320_stage_audit"] = {"destination_staged": False, "error": str(exc)}
         workflow["pbj320_stage_manifest"] = load_stage_manifest(active_id, root=root) if active_id else None
     if source_id == "cms.sff_pdf_list":
         workflow["lifecycle_steps"] = build_sff_lifecycle_steps(control_row=control_row)
@@ -2533,15 +2598,54 @@ def check_provider_info_cms(
     root: Path | None = None,
 ) -> dict[str, Any]:
     import cms_provider_info_acquire as acq
+    from active_release_registry import get_active_release, registry_path
+    from cms_theme_publication import get_latest_nh_theme_publication, publication_availability_for_source
+    from release_control_plane import ReleaseState, control_plane_root, record_candidate
 
     root = root or cms_data_paths.repo_root()
     cms = acq.resolve_cms_provider_info_release(fetch_json=fetch_json)
     newer = acq.cms_is_newer_than_local(cms, root)
     local = acq.latest_local_provider_info(root)
     snap = probe_source("cms.provider_info", check_cms=True, fetch_json=fetch_json, root=root)
-    if newer:
-        from release_control_plane import ReleaseState, control_plane_root, record_candidate
 
+    control_root = control_plane_root(root)
+    active_provider = get_active_release("cms.provider_info", registry_path(control_root)) or {}
+    active_ownership = get_active_release("cms.nh_ownership", registry_path(control_root)) or {}
+    provider_active_id = str(active_provider.get("active_release_id") or "") or None
+    ownership_active_id = (
+        str(active_ownership.get("active_release_id") or "")
+        or provider_active_id
+    )
+    theme_publication = get_latest_nh_theme_publication(
+        fetch_json=fetch_json,
+        force_refresh=True,
+    )
+    provider_theme = publication_availability_for_source(
+        "cms.provider_info",
+        active_release_id=provider_active_id,
+        publication=theme_publication,
+    )
+    ownership_theme = publication_availability_for_source(
+        "cms.nh_ownership",
+        active_release_id=ownership_active_id,
+        publication=theme_publication,
+    )
+    theme_source_set = [
+        {
+            "source_id": source_id,
+            "role": role,
+            "cms_dataset_id": (availability or {}).get("cms_dataset_id"),
+            "release_id": (availability or {}).get("product_release_id"),
+            "manifest_filename": (availability or {}).get("manifest_filename"),
+            "manifest_filesize": (availability or {}).get("manifest_filesize"),
+        }
+        for source_id, role, availability in (
+            ("cms.provider_info", "provider_info", provider_theme),
+            ("cms.nh_ownership", "nh_ownership", ownership_theme),
+        )
+        if availability and availability.get("in_latest_publication")
+    ]
+    if newer:
         label = str(cms.data_vintage_label or "").strip()
         release_match = re.fullmatch(r"([A-Za-z]{3,9})\s+(20\d{2})", label)
         if not release_match:
@@ -2553,8 +2657,40 @@ def check_provider_info_cms(
 
         record_candidate(
             "cms.provider_info", canonical_release_id, ReleaseState.DETECTED,
-            metadata={"publisher_label": label, "publisher_modified": cms.modified, "publisher_released": cms.released},
-            root=control_plane_root(root),
+            metadata={
+                "publisher_label": label,
+                "publisher_modified": cms.modified,
+                "publisher_released": cms.released,
+                "theme_publication_id": getattr(theme_publication, "publication_id", None),
+                "theme_publication_date": getattr(theme_publication, "publication_date", None),
+                "source_set": theme_source_set,
+            },
+            root=control_root,
+        )
+    if ownership_theme and ownership_theme.get("new_release_available"):
+        ownership_release_id = str(ownership_theme.get("product_release_id") or "")
+        if not ownership_release_id:
+            raise RuntimeError("CMS theme publication has no release identity for cms.nh_ownership")
+        provider_release_id = str(
+            (provider_theme or {}).get("product_release_id")
+            or getattr(cms, "data_vintage_label", "")
+            or ownership_release_id
+        )
+        record_candidate(
+            "cms.nh_ownership",
+            ownership_release_id,
+            ReleaseState.DETECTED,
+            metadata={
+                "candidate_kind": "DERIVED",
+                "upstream_source_id": "cms.provider_info",
+                "upstream_release_id": provider_release_id,
+                "cms_dataset_id": ownership_theme.get("cms_dataset_id"),
+                "theme_publication_id": ownership_theme.get("cms_publication_id"),
+                "theme_publication_date": ownership_theme.get("cms_publication_date"),
+                "manifest_filename": ownership_theme.get("manifest_filename"),
+                "manifest_filesize": ownership_theme.get("manifest_filesize"),
+            },
+            root=control_root,
         )
     return {
         "action": "check_cms",
@@ -2570,6 +2706,12 @@ def check_provider_info_cms(
             {"year": local[0], "month": local[1], "path": str(local[2])} if local else None
         ),
         "cms_is_newer": newer,
+        "theme_publication": {
+            "publication_id": getattr(theme_publication, "publication_id", None),
+            "publication_date": getattr(theme_publication, "publication_date", None),
+            "source_set": theme_source_set,
+        } if theme_publication is not None else None,
+        "nh_ownership": ownership_theme,
         "dry_run": acq.acquire_and_process(root=root, fetch_json=fetch_json, dry_run=True),
         "snapshot": snap.to_dict(),
     }
@@ -2666,21 +2808,6 @@ def check_sff_cms(
     control_root = Path(__file__).resolve().parent
     result = _check(fetch_bytes=fetch_bytes, root=control_root)
     snap = probe_source("cms.sff_pdf_list", check_cms=False, root=root or cms_data_paths.repo_root())
-    if result.get("cms_is_newer"):
-        from release_control_plane import ReleaseState, control_plane_root, record_candidate
-
-        cms_release = str((result.get("cms") or {}).get("release_id") or "")
-        if cms_release:
-            record_candidate(
-                "cms.sff_pdf_list",
-                cms_release,
-                ReleaseState.DETECTED,
-                metadata={
-                    "publisher_label": (result.get("cms") or {}).get("posting_label"),
-                    "source_url": (result.get("cms") or {}).get("source_url"),
-                },
-                root=control_plane_root(root),
-            )
     return {
         **result,
         "snapshot": snap.to_dict(),
@@ -2826,8 +2953,19 @@ def build_provider_info_promotion_bundle(
         raise ApprovalError(f"canonical NH Ownership missing: {ownership}")
     metadata: dict[str, Any] = {
         "source_set": [
-            {"role": "provider_info", "source_path": str(norm)},
-            {"role": "nh_ownership", "source_path": str(ownership)},
+            {
+                "role": "provider_info",
+                "source_id": "cms.provider_info",
+                "source_path": str(norm),
+                "hash": sha256_file(norm),
+            },
+            {
+                "role": "nh_ownership",
+                "source_id": "cms.nh_ownership",
+                "cms_dataset_id": "y2hd-n93e",
+                "source_path": str(ownership),
+                "hash": sha256_file(ownership),
+            },
         ],
     }
     if manifest.is_file():
@@ -2915,6 +3053,20 @@ def approve_release_authoritative(
         raise ApprovalError(
             f"structural validation must pass before approval ({structural})"
         )
+
+    # Fail before Zweli resolution, audit writes, source-path rebinding, or any
+    # ACTIVE registry mutation.  Provider/nurse candidates remain VALIDATED and
+    # reviewable when a required derivative cannot be regenerated safely.
+    if source_id in {"cms.provider_info", "cms.pbj_nurse_staffing"}:
+        from derived_provenance import (
+            DerivativeActivationBlocked,
+            assert_activation_derivatives_ready,
+        )
+
+        try:
+            assert_activation_derivatives_ready(source_id, root=root)
+        except DerivativeActivationBlocked as exc:
+            raise ApprovalError(str(exc)) from exc
 
     if zweli_applies(source_id):
         state = resolve_zweli_state_for_release(source_id, release_id, root=root)

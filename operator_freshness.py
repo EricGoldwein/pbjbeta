@@ -258,16 +258,19 @@ def build_freshness_layers(
                 }
             )
     elif source_id == "cms.provider_info":
-        from pbj320_stage_provider_info import audit_provider_info_pbj320_destination, load_stage_manifest
+        from pbj320_stage_provider_info import ProviderInfoStageError, audit_provider_info_pbj320_destination, load_stage_manifest
 
-        audit = audit_provider_info_pbj320_destination(root=root)
+        try:
+            audit = audit_provider_info_pbj320_destination(root=root)
+        except ProviderInfoStageError as exc:
+            audit = {"canonical_current": False, "destination_staged": False, "stage_detail": str(exc), "error": str(exc)}
         canonical_current = bool(audit.get("canonical_current"))
         layers.append(
             {
                 "key": "canonical",
                 "label": "Canonical data",
                 "status": "current" if canonical_current else "attention",
-                "status_label": "Current" if canonical_current else "Missing",
+                "status_label": "Unknown" if audit.get("error") else ("Current" if canonical_current else "Missing"),
                 "detail": (
                     f"ProviderInfoNorm ACTIVE {audit.get('active_release_id') or '—'}"
                     if canonical_current
@@ -284,7 +287,7 @@ def build_freshness_layers(
                 "key": "pbj320_destination",
                 "label": "PBJ320 destination",
                 "status": "current" if staged else "attention",
-                "status_label": "STAGED" if staged else "Not staged",
+                "status_label": "Unknown" if audit.get("error") else ("STAGED" if staged else "Not staged"),
                 "detail": (
                     f"Local pbj-root working tree · {artifact_count} artifacts · production deploy UNKNOWN"
                     if staged
@@ -293,16 +296,19 @@ def build_freshness_layers(
             }
         )
     elif source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
-        from ownership_downstream_rebuild import audit_ownership_downstream_stale
+        from ownership_downstream_rebuild import OwnershipRebuildError, audit_ownership_downstream_stale
 
-        audit = audit_ownership_downstream_stale(root=root)
+        try:
+            audit = audit_ownership_downstream_stale(root=root)
+        except OwnershipRebuildError as exc:
+            audit = {"is_stale": True, "blocking_reasons": [str(exc)], "error": str(exc)}
         canonical_current = not audit.get("is_stale")
         layers.append(
             {
                 "key": "canonical",
                 "label": "Ownership bridge & policy",
                 "status": "current" if canonical_current else "attention",
-                "status_label": "Current" if canonical_current else "Stale",
+                "status_label": "Unknown" if audit.get("error") else ("Current" if canonical_current else "Stale"),
                 "detail": (
                     f"Bridge lookup and policy at {audit.get('release_label') or audit.get('release_id')}"
                     if canonical_current

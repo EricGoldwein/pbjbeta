@@ -31,11 +31,20 @@
       <label class="do-check do-check-compact do-check-attention">
         <input type="checkbox" data-do-needs-attention-only> Needs attention
       </label>
-      <form method="post" action="{{ url_for('action_control_panel_refresh') }}">
-        <button class="do-btn do-btn-compact" type="submit">Refresh health</button>
-      </form>
+      <div class="do-source-action">
+        <form method="post" action="{{ url_for('action_control_panel_refresh') }}">
+          <button class="do-btn do-btn-compact" type="submit">Refresh active-file health</button>
+        </form>
+        <span class="do-muted do-tiny">Local files only · {{ control.source_health_checked_at | do_datetime if control.source_health_checked_at else 'not yet run' }}</span>
+      </div>
+      <div class="do-source-action">
+        <form method="post" action="{{ url_for('action_control_panel_check_releases') }}">
+          <button class="do-btn do-btn-compact do-btn-primary" type="submit">Check CMS releases</button>
+        </form>
+        <span class="do-muted do-tiny">Detect only · {{ releases_checked_at | do_datetime if releases_checked_at else 'not yet run' }}</span>
+      </div>
       <form class="do-inline" method="get" action="{{ url_for('sources') }}">
-        <label class="do-check do-check-compact"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Query CMS</label>
+        <label class="do-check do-check-compact"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Live diagnostic probes</label>
       </form>
     </div>
   </div>
@@ -48,8 +57,8 @@
           <th>Pending</th>
           <th>Mechanism</th>
           <th>Publisher</th>
-          <th>Checked</th>
-          <th>Status</th>
+          <th>CMS result</th>
+          <th>Active-file health</th>
         </tr>
       </thead>
       <tbody>
@@ -59,7 +68,6 @@
         {% set pending = row.pending %}
         {% set pending_state = (pending.state if pending else '')|upper %}
         {% set health = row.health|upper %}
-        {% set checked_raw = check.get('checked_at') %}
         {% set needs_attention = pending or health not in ['PASS', 'CURRENT'] or pending_state in ['ACQUIRED', 'VALIDATED', 'DETECTED'] %}
         <tr data-do-release-row data-dataset-id="{{ row.dataset_id }}" data-needs-attention="{{ '1' if needs_attention else '0' }}">
           <td class="do-cell-dataset">
@@ -114,7 +122,12 @@
             {% endif %}
             {% endif %}
           </td>
-          <td class="do-mono do-small" {% if checked_raw %}title="{{ checked_raw }}"{% endif %}>{{ checked_raw | do_datetime if checked_raw else '—' }}</td>
+          <td>
+            {% set check_status = check.get('status') %}
+            {% if check_status %}
+            <span class="do-badge do-badge-{{ check_status|lower|replace(' ', '-')|replace('/', '-') }}"{% if check.get('detail') %} title="{{ check.get('detail') }}"{% endif %}>{{ check_status }}</span>
+            {% else %}<span class="do-muted">—</span>{% endif %}
+          </td>
           <td>
             <span class="do-badge do-badge-health-{{ health|lower|replace(' ', '-') }}">{{ row.health }}</span>
           </td>
@@ -133,7 +146,6 @@
       </tbody>
     </table>
   </div>
-  <p class="do-muted do-tiny do-footnote">Release check: {% if releases_checked_at %}<span title="{{ releases_checked_at }}">{{ releases_checked_at | do_datetime }}</span>{% else %}not yet{% endif %}. Full validation in dataset view.</p>
 </section>
 
 <details class="do-collapse-panel">
@@ -147,7 +159,7 @@
       {% endfor %}
     </dl>
   {% else %}
-    <p class="do-muted do-small">No cached facility status. Refresh the control panel.</p>
+    <p class="do-muted do-small">No cached facility status. Refresh active-file health.</p>
   {% endif %}
 </details>
 

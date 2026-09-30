@@ -6,6 +6,7 @@ No parallel workflow state machine.
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 from typing import Any
 
@@ -158,7 +159,7 @@ def build_candidate_review_provenance(
 ) -> dict[str, Any]:
     """Review-surface provenance for the candidate under review (not ACTIVE)."""
     from active_release_registry import get_active_release, registry_path
-    from release_control_plane import load_candidates
+    from release_control_plane import load_candidates, what_would_change
 
     root = root or cms_data_paths.repo_root()
     active = get_active_release(source_id, registry_path(root)) or {}
@@ -172,19 +173,50 @@ def build_candidate_review_provenance(
 
     candidate_path = _uri_to_local_path(candidate.get("source_uri"))
     active_path = _uri_to_local_path(active.get("source_uri"))
+    validation = candidate.get("validation") if isinstance(candidate.get("validation"), dict) else {}
+    metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
+    preview = _candidate_csv_preview(candidate_path)
 
     return {
         "source_id": source_id,
         "release_id": release_id,
         "candidate_artifact_path": str(candidate_path) if candidate_path else candidate.get("source_uri"),
         "candidate_sha256": candidate.get("hash"),
-        "candidate_validated_at": (candidate.get("validation") or {}).get("validated_at"),
+        "candidate_validated_at": validation.get("validated_at"),
+        "candidate_validation_status": validation.get("status"),
+        "candidate_row_count": validation.get("row_count"),
+        "candidate_filename": candidate_path.name if candidate_path else metadata.get("filename"),
+        "change_kind": metadata.get("change_kind") or (
+            "REVISED" if metadata.get("publisher_revision_changed") else "NEWER"
+        ),
+        "cms_publisher_url": metadata.get("cms_publisher_url") or metadata.get("download_url"),
+        "cms_publisher_filename": metadata.get("cms_publisher_filename") or metadata.get("filename"),
+        "cms_file_uuid": metadata.get("cms_file_uuid"),
+        "cms_dataset_version_id": metadata.get("cms_dataset_version_id"),
+        "cms_dataset_version_label": metadata.get("cms_dataset_version_label"),
+        "cms_dataset_version_modified": metadata.get("cms_dataset_version_modified"),
+        "downstream_impact": what_would_change(source_id).get("would_mark_stale") or [],
+        "preview_columns": preview.get("columns") or [],
+        "preview_rows": preview.get("rows") or [],
         "active_release_id": active.get("active_release_id"),
         "active_artifact_path": str(active_path) if active_path else active.get("source_uri"),
         "active_sha256": active.get("hash"),
         "cms_publication_date": theme_fields.get("cms_publication_date"),
         "cms_publication_id": theme_fields.get("cms_publication_id"),
     }
+
+
+def _candidate_csv_preview(path: Path | None, *, limit: int = 5) -> dict[str, Any]:
+    if path is None or not path.is_file() or path.suffix.lower() != ".csv":
+        return {"columns": [], "rows": []}
+    with path.open("r", encoding="utf-8-sig", errors="replace", newline="") as handle:
+        reader = csv.DictReader(handle)
+        columns = list(reader.fieldnames or [])[:8]
+        rows = [
+            {column: str(row.get(column) or "") for column in columns}
+            for _, row in zip(range(limit), reader)
+        ]
+    return {"columns": columns, "rows": rows}
 
 
 def _evidence_summary(
@@ -322,6 +354,20 @@ def evaluate_governed_candidate_review(
             primary_label = f"Activate {release_label}"
             approvable = _promote_permitted(candidate)
             primary_kind = "activate" if approvable else "review"
+
+        if source_id in {"cms.provider_info", "cms.pbj_nurse_staffing"}:
+            from derived_provenance import activation_derivative_blockers
+
+            derivative_blockers = activation_derivative_blockers(source_id, root=root)
+            if derivative_blockers:
+                approvable = False
+                primary_kind = "blocked"
+                primary_label = "Activation blocked"
+                human_state = "VALIDATED · activation blocked"
+                evidence.extend(
+                    f"{item['dataset_id']}: {item['reason']}"
+                    for item in derivative_blockers
+                )
     elif state in {"STRUCTURAL_FAIL", "ERROR"}:
         human_state = "Structural validation failed"
         primary_label = "Inspect validation"
@@ -357,6 +403,9 @@ def evaluate_governed_candidate_review(
         "detail": " · ".join(evidence) if evidence else human_state,
         "acknowledged": has_acknowledgement(source_id, release_id),
         "zweli_report": (snap or {}).get("zweli_report") if snap else None,
+        "activation_blockers": derivative_blockers
+        if state == "VALIDATED" and source_id in {"cms.provider_info", "cms.pbj_nurse_staffing"}
+        else [],
     }
 
 
@@ -378,18 +427,28 @@ def build_ownership_pair_review_item(
     owners_state = str(pending.get("owners_state") or "").upper()
     enrollment_state = str(pending.get("enrollment_state") or "").upper()
     action = pair_lifecycle_action(pair)
-    both_validated = owners_state == "VALIDATED" and enrollment_state == "VALIDATED"
-    ready = review_state == "READY FOR REVIEW" and both_validated
+    candidate_states = [
+        owners_state if source_id == OWNERS else enrollment_state
+        for source_id in pair.get("candidate_source_ids") or []
+    ]
+    ready = review_state == "READY FOR REVIEW" and bool(candidate_states) and all(
+        state == "VALIDATED" for state in candidate_states
+    )
+    revision = pair.get("mode") == "ONE_SIDED_REVISION"
 
     if action.get("kind") == "validate_pair":
-        human_state = "Pair acquired — validate together"
+        human_state = "Revision acquired — validate with ACTIVE partner" if revision else "Pair acquired — validate together"
     elif action.get("kind") == "activate_pair":
-        human_state = "Ready to activate pair"
+        human_state = "Revised artifact ready for approval" if revision else "Ready to activate pair"
     else:
         human_state = "Pair alignment required"
 
     blockers = pair.get("blocking_reasons") or []
-    evidence = [f"Owners {owners_state or '—'}", f"Enrollments {enrollment_state or '—'}"]
+    evidence = [
+        f"Change {'REVISED' if revision else 'NEWER'}",
+        f"Owners {owners_state or '—'}",
+        f"Enrollments {enrollment_state or '—'}",
+    ]
     if blockers:
         evidence.extend(blockers[:2])
 
@@ -415,6 +474,7 @@ def build_ownership_pair_review_item(
         "zweli_report": None,
         "pair_members": [OWNERS, ENROLLMENTS],
         "pair_review_state": review_state,
+        "pair_mode": pair.get("mode"),
         "next_action": action,
     }
 
@@ -468,7 +528,8 @@ def assert_promotion_eligible(
     )
     if item is None or not item.get("approvable"):
         raise ApprovalError(
-            f"Promotion not eligible for {source_id} {release_id} at current lifecycle state"
+            f"Activation BLOCKED for {source_id} {release_id}: "
+            + str((item or {}).get("detail") or "not eligible at current lifecycle state")
         )
     return item
 

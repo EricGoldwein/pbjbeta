@@ -23,6 +23,8 @@ def _write_min_policy(pbj_root: Path, *, active: str = "2026-07-17") -> None:
                     active: {
                         "status": "active",
                         "bridge_lookup_filename": f"release_{active}_lookup.json",
+                        "ownership_source_sha256": "ownershash",
+                        "enrollment_source_sha256": "enrollhash",
                     }
                 },
             }
@@ -92,6 +94,82 @@ def test_audit_current_when_policy_and_bridge_match(
     audit = audit_ownership_downstream_stale(root=tmp_path, pbj_root=pbj_root)
     assert audit["is_stale"] is False
     assert audit["stale_capabilities"] == []
+
+
+def test_package_provenance_must_match_active_before_warning_clears(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ownership_downstream_rebuild import audit_ownership_downstream_stale
+    from release_control_plane import refresh_facility_index
+
+    pbj_root = tmp_path / "PBJapp"
+    release_id = "2026-07-31"
+    _write_min_policy(pbj_root, active=release_id)
+    _write_registry(tmp_path, release_id=release_id)
+    bridge_dir = pbj_root / "ownership" / "_derived" / "cms_snf_ownership_ccn_bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    (bridge_dir / f"release_{release_id}_lookup.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("PBJ_REPO_ROOT", str(pbj_root))
+
+    package_dir = pbj_root / "deployments" / "pbj320-335581"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = package_dir / "PACKAGE_MANIFEST.json"
+
+    def write_manifest(*, owners_release: str, owners_hash: str, enroll_release: str, enroll_hash: str) -> None:
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "source_release_provenance": [
+                        {
+                            "artifact": "ownership/SNF_All_Owners_facility_335581.csv",
+                            "source_dataset": "cms.snf_all_owners",
+                            "source_release": owners_release,
+                            "source_hash": owners_hash,
+                        },
+                        {
+                            "artifact": "ownership/_derived/packaged_bridge_manifest.json.cms_snf_all_owners",
+                            "source_dataset": "cms.snf_all_owners",
+                            "source_release": owners_release,
+                            "source_hash": owners_hash,
+                        },
+                        {
+                            "artifact": "ownership/_derived/packaged_bridge_manifest.json.cms_snf_enrollments",
+                            "source_dataset": "cms.snf_enrollments",
+                            "source_release": enroll_release,
+                            "source_hash": enroll_hash,
+                        },
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    write_manifest(
+        owners_release="2026-07-17",
+        owners_hash="oldowners",
+        enroll_release="2026-07-17",
+        enroll_hash="oldenroll",
+    )
+    refresh_facility_index(pbj_root, root=tmp_path, ccns=("335581",))
+    stale = audit_ownership_downstream_stale(root=tmp_path, pbj_root=pbj_root)
+    assert stale["is_stale"] is True
+    mismatches = stale["evidence"]["facility_package_provenance_mismatches"]
+    assert {item["artifact"] for item in mismatches} == {
+        "ownership/SNF_All_Owners_facility_335581.csv",
+        "ownership/_derived/packaged_bridge_manifest.json.cms_snf_all_owners",
+        "ownership/_derived/packaged_bridge_manifest.json.cms_snf_enrollments",
+    }
+
+    write_manifest(
+        owners_release=release_id,
+        owners_hash="ownershash",
+        enroll_release=release_id,
+        enroll_hash="enrollhash",
+    )
+    refresh_facility_index(pbj_root, root=tmp_path, ccns=("335581",))
+    current = audit_ownership_downstream_stale(root=tmp_path, pbj_root=pbj_root)
+    assert current["is_stale"] is False
+    assert current["evidence"]["facility_package_provenance_mismatches"] == []
 
 
 def test_needs_attention_includes_downstream_item_when_stale(

@@ -56,6 +56,17 @@
 
     {% endif %}
 
+    {% if item.review_provenance %}
+    <dl class="do-dl do-dl-compact">
+      <div><dt>Change</dt><dd><span class="do-badge do-badge-attention">{{ item.review_provenance.change_kind }}</span></dd></div>
+      <div><dt>Candidate / ACTIVE</dt><dd>{{ item.release_label or item.release_id }} / {{ item.review_provenance.active_release_id | do_release_label if item.review_provenance.active_release_id else '—' }}</dd></div>
+      <div><dt>Source file</dt><dd class="do-mono do-small">{{ item.review_provenance.candidate_filename or '—' }}</dd></div>
+      <div><dt>Rows</dt><dd>{{ item.review_provenance.candidate_row_count if item.review_provenance.candidate_row_count is not none else '—' }}</dd></div>
+      <div><dt>Validation</dt><dd>{{ item.review_provenance.candidate_validation_status or item.validation_status or '—' }}</dd></div>
+      <div><dt>Downstream if approved</dt><dd>{{ item.review_provenance.downstream_impact|join(', ') if item.review_provenance.downstream_impact else 'No governed stale impact' }}</dd></div>
+    </dl>
+    {% endif %}
+
     <div class="do-actions do-actions-inline">
 
       {% if item.approvable %}
@@ -84,17 +95,32 @@
 
       {% elif item.source_id != 'cms.snf_ownership_pair' %}
 
+      {% if item.primary_action_kind == 'blocked' %}
+      <button class="do-btn do-btn-ghost" type="button" disabled aria-disabled="true">Activation blocked</button>
+      {% else %}
       <a class="do-btn do-btn-ghost" href="{{ url_for('source_detail', source_id=item.source_id) }}">{{ item.primary_action_label or 'Inspect' }}</a>
+      {% endif %}
 
       {% else %}
 
-      <span class="do-muted do-small">{{ item.primary_action_label or 'Review pair' }}</span>
+      <a class="do-btn do-btn-primary" href="{{ url_for('source_detail', source_id='cms.snf_ownership_pair', check_cms='0') }}">Review candidate</a>
 
       {% endif %}
 
-      <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for('source_detail_panel', source_id=item.source_id if item.source_id != 'cms.snf_ownership_pair' else 'cms.snf_all_owners') }}">View provenance</a>
+      <a class="do-btn do-btn-compact do-btn-ghost" href="{{ url_for('source_detail_panel', source_id=item.source_id) }}">View provenance</a>
 
     </div>
+
+    {% if item.activation_blockers %}
+    <div class="do-alert do-alert-error do-small" role="alert">
+      <strong>ACTIVE is unchanged.</strong> Resolve every required derivative, then return to this VALIDATED candidate.
+      <ul>
+        {% for blocker in item.activation_blockers %}
+        <li><span class="do-mono">{{ blocker.dataset_id }}</span> — {{ blocker.reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
 
     {% if item.zweli_applicable and item.zweli_report and item.zweli_report.findings %}
 
@@ -126,6 +152,10 @@
         <div><dt>Currently ACTIVE</dt><dd>{{ item.review_provenance.active_release_id | do_release_label }}</dd></div>
         {% endif %}
         <div><dt>CMS publication</dt><dd class="do-mono do-tiny">{{ item.review_provenance.cms_publication_date or '—' }}</dd></div>
+        <div><dt>CMS publisher file</dt><dd class="do-mono do-tiny">{{ item.review_provenance.cms_publisher_filename or '—' }}</dd></div>
+        <div><dt>CMS publisher URL</dt><dd class="do-mono do-tiny">{{ item.review_provenance.cms_publisher_url or '—' }}</dd></div>
+        <div><dt>CMS version UUID</dt><dd class="do-mono do-tiny">{{ item.review_provenance.cms_dataset_version_id or '—' }}</dd></div>
+        <div><dt>CMS file UUID</dt><dd class="do-mono do-tiny">{{ item.review_provenance.cms_file_uuid or '—' }}</dd></div>
       </dl>
     </details>
     {% elif item.provenance %}
@@ -146,6 +176,22 @@
 
     </details>
 
+    {% endif %}
+
+    {% if item.review_provenance and item.review_provenance.preview_rows %}
+    <details class="do-details do-details-compact" open>
+      <summary>Data preview (first {{ item.review_provenance.preview_rows|length }} rows)</summary>
+      <div class="do-table-wrap do-table-wrap-compact">
+        <table class="do-table do-table-compact">
+          <thead><tr>{% for column in item.review_provenance.preview_columns %}<th>{{ column }}</th>{% endfor %}</tr></thead>
+          <tbody>
+          {% for row in item.review_provenance.preview_rows %}
+            <tr>{% for column in item.review_provenance.preview_columns %}<td class="do-small">{{ row[column] }}</td>{% endfor %}</tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
     {% endif %}
 
   </article>

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from active_release_registry import get_active_release, registry_path, sha256_file
-from release_control_plane import ReleaseState, record_candidate
+from release_control_plane import ReleaseState, load_candidates, record_candidate
 
 DATASET_ID = "cms.sff_pdf_list"
 OFFICIAL_AUGUST_2026_URL = "https://www.cms.gov/files/document/sff-posting-candidate-list-august-2026.pdf"
@@ -148,6 +148,7 @@ def check_sff_cms(
     fetch_bytes: Any | None = None,
     root: Path | None = None,
     months_back: int = 8,
+    record_detection: bool = True,
 ) -> dict[str, Any]:
     """Compare ACTIVE ``cms.sff_pdf_list`` against the newest CMS-posted SFF PDF."""
     control_root = (root or Path(__file__).resolve().parent).resolve()
@@ -155,9 +156,21 @@ def check_sff_cms(
     active_id = active.get("active_release_id")
     cms = discover_latest_cms_sff_posting(fetch_bytes=fetch_bytes, months_back=months_back)
     cms_release_id = str(cms["release_id"])
-    cms_is_newer = bool(active_id and cms_release_id != str(active_id))
-    if not active_id:
-        cms_is_newer = True
+    cms_is_newer = not active_id or cms_release_id > str(active_id)
+    if cms_is_newer and record_detection:
+        record_candidate(
+            DATASET_ID,
+            cms_release_id,
+            ReleaseState.DETECTED,
+            metadata={
+                "source_url": cms["source_url"],
+                "posting_period": cms_release_id,
+                "posting_label": cms["posting_label"],
+                "url_release_id": cms["url_release_id"],
+                "discovery": "monitored CMS monthly SFF slug probe",
+            },
+            root=control_root,
+        )
     return {
         "action": "check_cms",
         "cms": {
@@ -315,6 +328,13 @@ def stage_pdf(release_id: str, *, source_url: str | None = None, source_pdf: Pat
             with urllib.request.urlopen(req, timeout=180) as response: payload = response.read()
         provenance_url = source_url
     if not payload.startswith(b"%PDF-") or len(payload) < 10_000: raise RuntimeError("source is not a plausible CMS PDF")
+    parsed_posting = parse_sff_posting_updated_label(payload)
+    if parsed_posting is None:
+        raise RuntimeError("CMS SFF PDF is missing an embedded 'Updated Month Year' identity")
+    if parsed_posting[0] != release_id:
+        raise RuntimeError(
+            f"CMS SFF PDF identity {parsed_posting[0]} does not match candidate {release_id}"
+        )
     if pdf_path.exists() and pdf_path.read_bytes() != payload: raise RuntimeError("refusing to overwrite a differing staged SFF PDF")
     if not pdf_path.exists(): pdf_path.write_bytes(payload)
     rows = _rows_from_pdf(pdf_path)
@@ -329,3 +349,23 @@ def stage_pdf(release_id: str, *, source_url: str | None = None, source_pdf: Pat
     state = ReleaseState.VALIDATED if validation["status"] == "PASS" else ReleaseState.FAILED
     record_candidate(DATASET_ID, release_id, state, source_path=normalized if state == ReleaseState.VALIDATED else None, validation=validation, metadata={"source_url": provenance_url, "source_pdf_uri": pdf_path.as_uri(), "source_pdf_hash": evidence["source_pdf_hash"], "posting_period": release_id, "parser": "sff_release.py:v1", "pbj_handoff": pbj_handoff}, root=control_root)
     return evidence
+
+
+def stage_detected_candidate(*, root: Path | None = None, fetch_bytes=None) -> dict[str, Any]:
+    """Stage the governed DETECTED SFF candidate using its recorded CMS URL."""
+    control_root = (root or Path(__file__).resolve().parent).resolve()
+    candidate = (load_candidates(control_root).get("datasets") or {}).get(DATASET_ID) or {}
+    state = str(candidate.get("state") or "").upper()
+    if state != ReleaseState.DETECTED.value:
+        raise RuntimeError(f"SFF candidate must be DETECTED before staging; found {state or 'none'}")
+    release_id = str(candidate.get("release_id") or "")
+    metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
+    source_url = str((metadata or {}).get("source_url") or "")
+    if not source_url.startswith("https://www.cms.gov/"):
+        raise RuntimeError("detected SFF candidate is missing a trusted cms.gov source URL")
+    return stage_pdf(
+        release_id,
+        source_url=source_url,
+        root=control_root,
+        fetch_bytes=fetch_bytes,
+    )

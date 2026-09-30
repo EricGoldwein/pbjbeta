@@ -143,14 +143,22 @@ def test_derived_benchmark_stale_when_upstream_mismatch(tmp_path: Path, monkeypa
                     "pbj.benchmarks.national": {
                         "dataset_id": "pbj.benchmarks.national",
                         "active_release_id": "sha256:abc",
+                        "hash": "derived-hash",
                         "status": "ACTIVE",
                         "metadata": {
-                            "upstream_releases": {"cms.pbj_nurse_staffing": "CY2025Q4"},
+                            "output_artifact_hash": "derived-hash",
+                            "upstream_provenance": {
+                                "cms.pbj_nurse_staffing": {
+                                    "release_id": "CY2025Q4",
+                                    "source_hash": "old-hash",
+                                }
+                            },
                         },
                     },
                     "cms.pbj_nurse_staffing": {
                         "dataset_id": "cms.pbj_nurse_staffing",
                         "active_release_id": "CY2026Q1",
+                        "hash": "new-hash",
                         "status": "ACTIVE",
                     },
                 },
