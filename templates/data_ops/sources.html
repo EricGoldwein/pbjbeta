@@ -23,6 +23,8 @@
 </section>
 {% endif %}
 
+{% include 'data_ops/partials/nh_catalog.html' %}
+
 <section class="do-section do-section-primary{% if not needs_attention %} do-section-flush-top{% endif %}">
   <div class="do-release-toolbar">
     <h1 class="do-release-title">Active releases</h1>
@@ -55,8 +57,8 @@
           <th>Dataset</th>
           <th>Active</th>
           <th>Pending</th>
-          <th>Mechanism</th>
-          <th>Publisher</th>
+          <th>CMS released</th>
+          <th>Next update</th>
           <th>CMS result</th>
           <th>Active-file health</th>
         </tr>
@@ -95,33 +97,15 @@
             </span>
             {% else %}<span class="do-muted">—</span>{% endif %}
           </td>
-          <td class="do-small">{{ check.get('mechanism', '—') }}</td>
-          <td class="do-small">
-            {% set avail = availability_by_dataset.get(row.dataset_id) %}
-            {% if avail and avail.get('inventory_axis') == 'upstream' %}
-            <span class="do-muted do-tiny">Built from</span>
-            {{ avail.inventory_value }}
-            {% if avail.inventory_status == 'STALE' %}
-            <span class="do-badge do-badge-attention do-badge-inline">stale</span>
-            {% elif avail.inventory_status == 'UNKNOWN' %}
-            <span class="do-muted do-tiny">· provenance missing</span>
-            {% elif avail.inventory_status == 'CURRENT' %}
-            <span class="do-muted do-tiny">· current</span>
+          {% set cms_dates = namespace(released=none, planned=none) %}
+          {% for dataset in nh_catalog.datasets or [] %}
+            {% if dataset.coverage.dataset_id == row.dataset_id and (dataset.coverage.class == 'A' or row.dataset_id == 'cms.nh_ownership') %}
+              {% set cms_dates.released = dataset.released %}
+              {% set cms_dates.planned = dataset.planned_update %}
             {% endif %}
-            {% else %}
-            {% set pub_id = (avail.publisher_latest_release_id if avail else none) or check.get('publisher_latest_release_id') or check.get('release_id') or check.get('pending_release') %}
-            {{ pub_id | do_release_label if pub_id else '—' }}
-            {% if pending and pending.release_id == active_id and pending_state == 'ACQUIRED' %}
-            <span class="do-muted do-tiny">· re-acquired</span>
-            {% elif avail and avail.get('unchanged_in_latest_publication') %}
-            <span class="do-muted do-tiny">· unchanged</span>
-            {% elif avail and avail.get('new_release_available') %}
-            <span class="do-badge do-badge-attention do-badge-inline">available</span>
-            {% elif check.get('new_release_available') == true and not (active_id and pub_id and active_id == pub_id) %}
-            <span class="do-badge do-badge-attention do-badge-inline">available</span>
-            {% endif %}
-            {% endif %}
-          </td>
+          {% endfor %}
+          <td class="do-small">{{ cms_dates.released or '—' }}</td>
+          <td class="do-small">{{ cms_dates.planned or '—' }}</td>
           <td>
             {% set check_status = check.get('status') %}
             {% if check_status %}
@@ -147,8 +131,6 @@
     </table>
   </div>
 </section>
-
-{% include 'data_ops/partials/nh_catalog.html' %}
 
 <details class="do-collapse-panel">
   <summary>Facility package status{% if control.facilities.facilities.get('335581') %} · <span class="do-muted">335581 · {{ control.facilities.facilities.get('335581').status }}</span>{% endif %}</summary>

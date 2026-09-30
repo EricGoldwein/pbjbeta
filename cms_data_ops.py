@@ -1581,6 +1581,7 @@ def build_needs_attention_queue(
     paired = _ownership_pair_attention_item(control, check_by_dataset, snap_by_id, root=root)
     downstream = _ownership_downstream_attention_item(root=root)
     citations = _citation_packages_attention_item(root=root)
+    quarter_map = _provider_quarter_mapping_attention_item(root=root)
     prefix: list[dict[str, Any]] = []
     if paired:
         prefix.append(paired)
@@ -1588,12 +1589,16 @@ def build_needs_attention_queue(
         prefix.append(downstream)
     if citations:
         prefix.append(citations)
+    if quarter_map:
+        prefix.append(quarter_map)
     if prefix:
         skip = {"cms.snf_all_owners", "cms.snf_enrollments", "cms.health_citations"}
         if downstream:
             skip.add("ownership.downstream")
         if citations:
             skip.add("consumer.citation_packages")
+        if quarter_map:
+            skip.add("cms.provider_info.quarter_map")
         others = [i for i in items if i.get("source_id") not in skip]
         others.sort(
             key=lambda item: (
@@ -1669,6 +1674,46 @@ def _ownership_pair_attention_item(
             "concise_state": concise_state,
             "release_line": release_label or str(release_id or "—"),
             "panel_source_id": PAIR_SOURCE_ID,
+        }
+    )
+
+
+def _provider_quarter_mapping_attention_item(*, root: Path | None) -> dict[str, Any] | None:
+    from provider_quarter_mapping import audit_active_provider_quarter_mapping
+
+    audit = audit_active_provider_quarter_mapping(root=root)
+    if not audit.get("needs_attention"):
+        return None
+    release_id = audit.get("release_id") or ""
+    can_sync = bool(audit.get("can_sync"))
+    return _finalize_attention_item(
+        {
+            "source_id": "cms.provider_info.quarter_map",
+            "human_name": "Provider Information quarters",
+            "active_release_id": release_id,
+            "active_release_label": format_release_month_label(release_id) or release_id,
+            "publisher_latest_release_id": release_id,
+            "publisher_latest_label": format_release_month_label(release_id) or release_id,
+            "pending_release_id": None,
+            "pending_state": None,
+            "local_release_id": None,
+            "new_release_available": True,
+            "availability_summary": "quarter map missing",
+            "availability_source": "provider_quarter_mapping",
+            "health": None,
+            "downstream_stale": True,
+            "next_action": {
+                "label": audit.get("action_label") or "Apply extracted quarter map",
+                "detail": audit.get("detail") or "",
+                "endpoint": "action_provider_quarter_map_sync" if can_sync else "action_pi_check",
+                "wired": True,
+                "method": "post",
+                "read_only": False,
+            },
+            "mechanism": "extracted interval → dashboard quarter map",
+            "concise_state": "quarter map missing",
+            "release_line": format_release_month_label(release_id) or str(release_id or "—"),
+            "panel_source_id": "cms.provider_info",
         }
     )
 

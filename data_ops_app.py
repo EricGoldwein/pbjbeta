@@ -70,13 +70,17 @@ from data_ops_approval import (  # noqa: E402
     read_audit,
 )
 from data_ops_dashboard import (  # noqa: E402
-    COLD_NEW_V2_PATH,
-    EXISTING_V2_REFRESH_PATH,
+    builder_view_model,
     check_facility_readiness,
+    ensure_local_viewer,
     facility_dashboard_status,
-    refresh_existing_v2_runtime,
+    last_action_summary,
+    operator_failure_message,
+    run_dashboard_provision,
     run_preflight,
+    sanitize_action_payload,
 )
+from data_ops_dashboard_jobs import job_public_view, read_job, start_dashboard_job  # noqa: E402
 
 PASSWORD_ENV = "PBJ_DATA_OPS_PASSWORD"
 SECRET_ENV = "PBJ_DATA_OPS_SECRET"
@@ -137,13 +141,19 @@ def _source_detail_context(source_id: str, *, theme_publication: Any | None = No
         release_availability=availability,
         theme_publication=theme_publication,
     )
-    return {
+    ctx = {
         "record": record,
         "snapshot": snapshot,
         "control_row": control_row,
         "workflow": workflow,
         "release_availability": availability,
+        "release_mechanism": check_by_dataset.get(source_id, {}).get("mechanism"),
     }
+    if source_id == "cms.provider_info":
+        from provider_quarter_mapping import operator_quarter_flow
+
+        ctx["quarter_flow"] = operator_quarter_flow()
+    return ctx
 
 
 def _theme_publication_for_ui(check_cms: bool):
@@ -173,6 +183,9 @@ def create_app() -> Flask:
         app.secret_key = hashlib.sha256(f"pbj-data-ops-session::{password}".encode()).hexdigest()
     else:
         app.secret_key = secrets.token_hex(16)
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.jinja_env.auto_reload = True
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
     def _auth_cookie_value(expected: str) -> str:
         return hashlib.sha256(f"pbj320-data-ops-auth::{expected}".encode()).hexdigest()
@@ -530,6 +543,21 @@ def create_app() -> Flask:
         except Exception as exc:  # noqa: BLE001
             flash(f"Ownership rebuild failed: {exc}", "error")
         return redirect(url_for("source_detail", source_id="cms.snf_all_owners", check_cms="0"))
+
+    @app.post("/actions/provider-info/sync-quarter-map")
+    @require_auth
+    def action_provider_quarter_map_sync():
+        from provider_quarter_mapping import sync_interval_mapping_from_extract
+
+        try:
+            result = sync_interval_mapping_from_extract()
+            if result.get("ok"):
+                flash(result.get("detail") or "Provider Information quarter map updated", "ok")
+            else:
+                flash(result.get("detail") or "Could not apply the extracted quarter map", "error")
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Quarter map update failed: {exc}", "error")
+        return redirect(url_for("sources"))
 
     @app.get("/api/control-plane/status")
     @require_auth
@@ -965,13 +993,14 @@ def create_app() -> Flask:
                 provider_processed=bool(pi and pi.processed),
                 provider_available=bool(pi and pi.local_raw_present),
             ).to_dict()
+            status = builder_view_model(status)
+        last_action = session.pop("last_dash_action", None)
         return render_template(
             "data_ops/dashboard_builder.html",
             ccn=ccn,
-            status=status,
-            existing_refresh_path=EXISTING_V2_REFRESH_PATH,
-            cold_new_path=COLD_NEW_V2_PATH,
-            last_action=session.pop("last_dash_action", None),
+            view=status,
+            last_action=last_action,
+            last_summary=last_action_summary(last_action) if last_action else "",
         )
 
     @app.post("/actions/dashboard/readiness")
@@ -986,40 +1015,88 @@ def create_app() -> Flask:
         )
         return redirect(url_for("dashboard_builder", ccn=ccn))
 
-    @app.post("/actions/dashboard/refresh")
+    @app.post("/actions/dashboard/run")
     @require_auth
-    def action_dash_refresh():
+    def action_dash_run():
         ccn = (request.form.get("ccn") or "").strip()
-        snaps = probe_all_sources(check_cms=False, run_zweli=True)
-        pi = next((s for s in snaps if s.source_id == "cms.provider_info"), None)
-        st = facility_dashboard_status(
-            ccn,
-            zweli_state=pi.zweli_status if pi else None,
-            provider_release_id=pi.release_id if pi else None,
-            structural_ok=(pi.structural_status != "FAIL") if pi else True,
-            provider_processed=bool(pi and pi.processed),
-            provider_available=bool(pi and pi.local_raw_present),
-            run_readiness=False,
+        intent = (request.form.get("intent") or "").strip()
+        access_mode = (request.form.get("access_mode") or "password_required").strip()
+        password = (request.form.get("dashboard_password") or "").strip()
+        confirm_ccn = (request.form.get("confirm_ccn") or "").strip()
+        confirm_publish = (request.form.get("confirm_publish") or "") == "1"
+        refresh_data = (request.form.get("refresh_data") or "") == "1"
+        allow_dirty_local = True
+        wants_json = (
+            request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or (request.accept_mimetypes["application/json"] >= request.accept_mimetypes["text/html"])
         )
-        if not st.can_generate_refresh:
-            session["last_dash_action"] = {
-                "action": "refresh",
-                "ok": False,
-                "blockers": st.blockers,
-                "detail": st.detail,
-            }
+        if wants_json:
+            started = start_dashboard_job(
+                ccn=ccn,
+                intent=intent,
+                access_mode=access_mode,
+                password=password,
+                confirm_ccn=confirm_ccn,
+                confirm_publish=confirm_publish,
+                refresh_data=refresh_data,
+            )
+            if not started.get("ok"):
+                return jsonify(started), 400
+            return jsonify(started)
+        result = run_dashboard_provision(
+            ccn=ccn,
+            intent=intent,
+            access_mode=access_mode,
+            password=password,
+            confirm_ccn=confirm_ccn,
+            confirm_publish=confirm_publish,
+            refresh_data=refresh_data,
+            allow_dirty_tree=allow_dirty_local,
+            allow_dirty_critical_files=allow_dirty_local,
+        )
+        session["last_dash_action"] = sanitize_action_payload(
+            {"action": "run", "result": result}
+        )
+        if result.get("ok"):
+            if result.get("dry_run"):
+                flash("Preview plan finished (no package, no deploy).", "ok")
+            elif result.get("deployed"):
+                flash("Build and deploy finished.", "ok")
+            else:
+                flash("Local build finished (not deployed).", "ok")
+        else:
+            errors = result.get("errors") or []
             flash(
-                st.detail or ("Blocked: " + ", ".join(st.blockers)),
+                "; ".join(str(e) for e in errors)
+                if errors
+                else (result.get("operator_message") or operator_failure_message(result)),
                 "error",
             )
-            return redirect(url_for("dashboard_builder", ccn=ccn))
-        result = refresh_existing_v2_runtime(ccn)
-        session["last_dash_action"] = {"action": "refresh", "result": result}
-        flash(
-            "Refresh OK" if result.get("ok") else result.get("detail") or result.get("error") or "Failed",
-            "ok" if result.get("ok") else "error",
-        )
         return redirect(url_for("dashboard_builder", ccn=ccn))
+
+    @app.post("/actions/dashboard/open-local")
+    @require_auth
+    def action_dash_open_local():
+        ccn = (request.form.get("ccn") or request.args.get("ccn") or "").strip()
+        result = ensure_local_viewer(ccn, restart=(request.form.get("restart") or "") == "1")
+        wants_json = (
+            request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or (request.accept_mimetypes["application/json"] >= request.accept_mimetypes["text/html"])
+        )
+        if wants_json:
+            return jsonify(sanitize_action_payload(result))
+        if result.get("ok") and result.get("url"):
+            return redirect(str(result["url"]))
+        flash(result.get("detail") or "Could not open the local dashboard.", "error")
+        return redirect(url_for("dashboard_builder", ccn=ccn))
+
+    @app.get("/actions/dashboard/job/<job_id>")
+    @require_auth
+    def action_dash_job(job_id: str):
+        job = read_job(job_id)
+        if not job:
+            return jsonify({"ok": False, "error": "unknown job"}), 404
+        return jsonify(job_public_view(job))
 
     @app.post("/actions/dashboard/preflight")
     @require_auth
