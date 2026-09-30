@@ -1,0 +1,14 @@
+<section class="do-section" id="source-family-inventory">
+  <h2>Source-family inventory</h2>
+  <p class="do-muted do-small">Governance and implementation coverage. A listed source does not imply an ACTIVE release.</p>
+  <div class="do-table-wrap do-table-wrap-compact">
+    <table class="do-table do-table-compact do-table-striped">
+      <thead><tr><th>Source</th><th>Governance status</th><th>Implementation status</th><th>Current evidence/release</th><th>Health</th><th>Next action</th></tr></thead>
+      <tbody>{% for row in family_inventory %}<tr>
+        <td>{{ row.source }}</td><td>{{ row.governance_status }}</td><td>{{ row.implementation_status }}</td>
+        <td>{{ row.evidence }}</td><td>{{ row.health }}</td>
+        <td>{% if row.workflow_source_id %}<a href="{{ url_for('source_detail', source_id=row.workflow_source_id) }}">{{ row.next_action }}</a>{% else %}{{ row.next_action }}{% endif %}</td>
+      </tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</section>

@@ -19,6 +19,7 @@ import sys
 from functools import wraps
 from pathlib import Path
 from typing import Any
+from source_family_inventory import source_family_inventory
 
 from flask import (
     Flask,
@@ -329,6 +330,7 @@ def create_app() -> Flask:
             needs_attention=needs_attention,
             releases_checked_at=release_checks.get("checked_at"),
             nh_catalog=load_catalog(),
+            family_inventory=source_family_inventory(control, snaps, load_catalog()),
         )
 
     @app.post("/actions/control-panel/refresh")
