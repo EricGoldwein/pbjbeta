@@ -4,8 +4,10 @@
   {% if nh_catalog.error %}<p class="do-flash-error" role="alert">Catalog lookup failed: {{ nh_catalog.error }}. Last successful evidence is retained.</p>{% endif %}
   {% set summary = nh_catalog.summary or {} %}
   {% if nh_catalog.datasets %}
-  <p class="do-small">{{ summary.datasets }} datasets · {{ summary.published }} newer · {{ summary.revised }} revised · {{ summary.unchanged }} unchanged · {{ summary.planned_today }} planned today · {{ summary.new_datasets }} first/new observations · {{ summary.errors }} errors</p>
-  <details class="do-collapse-panel" {% if summary.published or summary.revised or summary.errors %}open{% endif %}>
+  <p class="do-small">{{ summary.datasets }} datasets · {{ summary.planned_today }} due today, not yet changed · {{ summary.published }} newer releases · {{ summary.revised }} revised · {{ summary.unchanged }} unchanged / not due · {{ summary.new_datasets }} first/new observations · {{ summary.errors }} errors</p>
+  {% set expansion = namespace(open=false) %}
+  {% for row in nh_catalog.datasets %}{% if row.status in ['NEWER', 'REVISED', 'NEW_DATASET', 'ERROR', 'PLANNED_TODAY'] %}{% set expansion.open = true %}{% endif %}{% endfor %}
+  <details class="do-collapse-panel" {% if expansion.open %}open{% endif %}>
     <summary>Inspect datasets and publisher evidence</summary>
     <div class="do-table-wrap do-nh-catalog-scroll">
       <table class="do-table do-table-compact">
@@ -43,7 +45,7 @@
           <td class="do-small">{{ row.released or '—' }}<br><span class="do-muted">{{ row.modified or '—' }}</span></td>
           <td class="do-small">{{ row.planned_update or 'Not supplied' }}</td>
           <td class="do-small">{{ row.coverage.label }}</td>
-          <td class="do-small">{% if row.coverage.source_id %}<a href="{{ url_for('source_detail', source_id=row.coverage.workflow_source_id or row.coverage.source_id, check_cms='0') }}">Open source</a>{% else %}<span class="do-muted">{{ 'Detected only — no governed lifecycle' if row.coverage.class == 'D' else 'No operational acquisition action' }}</span>{% endif %}</td>
+          <td class="do-small">{% if row.coverage.source_id %}<a href="{{ url_for('source_detail', source_id=row.coverage.workflow_source_id or row.coverage.source_id, check_cms='0') }}">{{ 'View Provider workflow' if row.coverage.class == 'B' else 'Review source' }}</a>{% else %}<span class="do-muted">{{ 'Not integrated' if row.coverage.class == 'C' else ('Out of scope' if row.coverage.class == 'E' else 'No workflow yet') }}</span>{% endif %}</td>
         </tr>
         {% endfor %}
         </tbody>

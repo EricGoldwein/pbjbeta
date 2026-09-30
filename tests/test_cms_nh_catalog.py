@@ -194,7 +194,10 @@ def test_sources_catalog_inspection_and_no_fake_acquire(tmp_path, monkeypatch):
     assert "CMS Nursing Home Provider Data" in section
     assert "Previous identity" in section and "Current identity" in section
     assert "PLANNED_TODAY" in section
-    assert "Detected only — no governed lifecycle" in section
+    assert "No workflow yet" in section
+    assert 'open>' in section
+    assert html.index('id="cms-nh-catalog"') < html.index('>Active releases</h1>')
+    assert "Open source" not in section
     assert "/sources/cms.provider_info?check_cms=0" in section
     assert catalog.coverage_for("y2hd-n93e")["dataset_id"] == "cms.nh_ownership"
     assert "<form" not in section and "Acquire" not in section
