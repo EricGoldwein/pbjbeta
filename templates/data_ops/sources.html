@@ -148,6 +148,8 @@
   </div>
 </section>
 
+{% include 'data_ops/partials/nh_catalog.html' %}
+
 <details class="do-collapse-panel">
   <summary>Facility package status{% if control.facilities.facilities.get('335581') %} · <span class="do-muted">335581 · {{ control.facilities.facilities.get('335581').status }}</span>{% endif %}</summary>
   {% set facility = control.facilities.facilities.get('335581') %}

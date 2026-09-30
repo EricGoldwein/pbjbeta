@@ -18,4 +18,7 @@ def isolated_release_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     active.write_text(json.dumps(empty) + "\n", encoding="utf-8")
     candidates.write_text(json.dumps(empty) + "\n", encoding="utf-8")
     monkeypatch.setenv("PBJ_ACTIVE_RELEASE_REGISTRY", str(active))
+    def no_live_catalog(_url):
+        raise RuntimeError("Live CMS catalog disabled in isolated tests; inject a fixture fetcher")
+    monkeypatch.setattr("cms_nh_catalog.fetch_json", no_live_catalog)
     yield tmp_path

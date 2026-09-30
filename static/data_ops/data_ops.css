@@ -143,6 +143,10 @@ body.do-body {
   gap: 0.2rem;
   justify-items: start;
 }
+.do-nh-catalog-scroll { max-height: 34rem; overflow: auto; }
+.do-nh-catalog-scroll td { vertical-align: top; }
+.do-nh-catalog-scroll .do-mono { overflow-wrap: anywhere; }
+.do-nh-catalog-scroll details { min-width: 14rem; max-width: 42rem; }
 .do-inline { display: inline; margin: 0; }
 .do-check-attention {
   font-weight: 600;

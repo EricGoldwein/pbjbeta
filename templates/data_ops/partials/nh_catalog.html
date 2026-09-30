@@ -1,0 +1,70 @@
+<section class="do-section" id="cms-nh-catalog">
+  <h2>CMS Nursing Home Provider Data</h2>
+  <p class="do-muted do-small">Publisher catalog · check with <strong>Check CMS releases</strong> · {{ nh_catalog.checked_at | do_datetime if nh_catalog.checked_at else 'not yet checked' }}. Discovery only; acquisition and approval stay in existing source workflows.</p>
+  {% if nh_catalog.error %}<p class="do-flash-error" role="alert">Catalog lookup failed: {{ nh_catalog.error }}. Last successful evidence is retained.</p>{% endif %}
+  {% set summary = nh_catalog.summary or {} %}
+  {% if nh_catalog.datasets %}
+  <p class="do-small">{{ summary.datasets }} datasets · {{ summary.published }} newer · {{ summary.revised }} revised · {{ summary.unchanged }} unchanged · {{ summary.planned_today }} planned today · {{ summary.new_datasets }} first/new observations · {{ summary.errors }} errors</p>
+  <details class="do-collapse-panel" {% if summary.published or summary.revised or summary.errors %}open{% endif %}>
+    <summary>Inspect datasets and publisher evidence</summary>
+    <div class="do-table-wrap do-nh-catalog-scroll">
+      <table class="do-table do-table-compact">
+        <thead><tr><th>Dataset / evidence</th><th>CMS status</th><th>Released / modified</th><th>Planned update</th><th>Data Ops coverage</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for row in nh_catalog.datasets %}
+        <tr id="cms-catalog-{{ row.stable_id }}" data-catalog-status="{{ row.status }}">
+          <td>
+            <details class="do-details do-details-compact">
+              <summary>{{ row.title }}</summary>
+              <p class="do-small">{{ row.description | striptags }}</p>
+              <dl class="do-dl do-dl-compact do-small">
+                <div><dt>CMS stable ID</dt><dd class="do-mono">{{ row.stable_id }}</dd></div>
+                <div><dt>Why this status</dt><dd>{{ row.reason }}</dd></div>
+                <div><dt>Current identity</dt><dd class="do-mono do-tiny">{{ row.publisher_identity or 'No successful lookup' }}</dd></div>
+                <div><dt>Previous identity</dt><dd class="do-mono do-tiny">{{ row.previous_successful.publisher_identity if row.previous_successful else 'No earlier baseline' }}</dd></div>
+                <div><dt>Last success</dt><dd>{{ row.last_successful_at | do_datetime if row.last_successful_at else 'None' }}</dd></div>
+                {% if row.error %}<div><dt>Attempt error</dt><dd>{{ row.error }}</dd></div>{% endif %}
+                <div><dt>Lifecycle / validator</dt><dd>{{ row.coverage.lifecycle }}</dd></div>
+                <div><dt>ACTIVE lifecycle</dt><dd>{{ row.coverage.active_lifecycle }}</dd></div>
+                <div><dt>Consumer</dt><dd>{{ row.coverage.consumer }}</dd></div>
+                <div><dt>Gap</dt><dd>{{ row.coverage.gap }}</dd></div>
+                {% if row.coverage.dataset_id %}<div><dt>Data Ops ID</dt><dd class="do-mono">{{ row.coverage.dataset_id }}</dd></div>{% endif %}
+              </dl>
+              {% for resource in row.resources or [] %}
+              <p class="do-small"><strong>{{ resource.filename }}</strong><br>Resource <span class="do-mono">{{ resource.resource_id or 'not supplied' }}</span> · version <span class="do-mono">{{ resource.version or 'not supplied' }}</span><br>
+                <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">Current CMS resource</a>{% if resource.dictionary_url %} · <a href="{{ resource.dictionary_url }}" target="_blank" rel="noopener noreferrer">Data dictionary</a>{% endif %}
+              </p>
+              {% endfor %}
+              <p class="do-small"><a href="{{ row.metadata_url or nh_catalog.listing_url }}" target="_blank" rel="noopener noreferrer">CMS API evidence</a>{% if row.overview_url %} · <a href="{{ row.overview_url }}" target="_blank" rel="noopener noreferrer">CMS overview</a>{% endif %}</p>
+              <p class="do-muted do-tiny">Identity is a fingerprint of publisher metadata, not a downloaded content hash. CMS metadata updated: {{ row.metadata_modified or 'not supplied' }}.</p>
+            </details>
+          </td>
+          <td><span class="do-badge">{{ row.status }}</span></td>
+          <td class="do-small">{{ row.released or '—' }}<br><span class="do-muted">{{ row.modified or '—' }}</span></td>
+          <td class="do-small">{{ row.planned_update or 'Not supplied' }}</td>
+          <td class="do-small">{{ row.coverage.label }}</td>
+          <td class="do-small">{% if row.coverage.source_id %}<a href="{{ url_for('source_detail', source_id=row.coverage.workflow_source_id or row.coverage.source_id, check_cms='0') }}">Open source</a>{% else %}<span class="do-muted">{{ 'Detected only — no governed lifecycle' if row.coverage.class == 'D' else 'No operational acquisition action' }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% else %}<p class="do-muted do-small">No successful catalog observation yet. Use Check CMS releases to establish the baseline.</p>{% endif %}
+  {% set archive = nh_catalog.theme_archive or {} %}
+  {% if archive %}
+  <details class="do-details do-details-compact">
+    <summary>Whole-theme archive · {{ archive.status }} · {{ archive.date or 'date unknown' }}</summary>
+    <dl class="do-dl do-dl-compact do-small">
+      <div><dt>Current archive ID</dt><dd>{{ archive.id or 'Unknown' }} (current-download row)</dd></div>
+      <div><dt>Latest dated publication</dt><dd>{{ archive.latest_publication.id if archive.latest_publication else 'Unknown' }} · {{ archive.latest_publication.date if archive.latest_publication else 'Unknown' }}</dd></div>
+      <div><dt>HEAD</dt><dd>{{ archive.content_length or 'Unknown' }} bytes · {{ archive.last_modified or 'Unknown' }} · ETag {{ archive.etag or 'not supplied' }}</dd></div>
+      <div><dt>Identity</dt><dd class="do-mono do-tiny">{{ archive.identity or 'Unknown' }}</dd></div>
+      {% if archive.error %}<div><dt>Error</dt><dd>{{ archive.error }}. Last-known metadata retained.</dd></div>{% endif %}
+    </dl>
+    <p class="do-small">Archive metadata corroborates publication; it does not change individual dataset statuses. No ZIP is downloaded by this page or the release check.</p>
+    <p class="do-small">{% if archive.url %}<a href="{{ archive.url }}" target="_blank" rel="noopener noreferrer">Download current theme ZIP from CMS</a> · {% endif %}<a href="{{ archive.history_url or 'https://data.cms.gov/provider-data/api/1/archive/aggregate/theme/nursing-homes/relative' }}" target="_blank" rel="noopener noreferrer">CMS archive history</a></p>
+  </details>
+  {% endif %}
+  <p class="do-muted do-tiny">Provider Data Ownership is separate from PECOS SNF All Owners / Enrollments. CMS State US Averages is separate from internal PBJ benchmarks.</p>
+</section>

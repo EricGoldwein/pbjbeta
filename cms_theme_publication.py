@@ -1,4 +1,4 @@
-"""CMS nursing-home theme publication discovery (official archive API + manifest.json).
+"""CMS nursing-home publication compatibility view over catalog/API metadata.
 
 Verified from PDC archive aggregate API and Aug 2026 theme zips (_scratch audit).
 """
@@ -141,8 +141,9 @@ def resolve_theme_publication(
     fetch_bytes: FetchBytes | None = None,
 ) -> ThemePublication:
     """Resolve latest NH theme publication and parse manifest members."""
+    explicit_bytes = fetch_bytes is not None
+    custom_json = fetch_json is not None
     fetch_json = fetch_json or _default_fetch_json
-    fetch_bytes = fetch_bytes or _default_fetch_bytes
 
     if archive_index is None:
         payload = fetch_json(NH_THEME_ARCHIVE_INDEX)
@@ -152,8 +153,34 @@ def resolve_theme_publication(
 
     row = pick_latest_theme_publication_row(archive_index)
     download_url = absolute_cms_url(str(row.get("url") or ""))
-    if manifest is None:
+    if manifest is None and explicit_bytes:
+        # Explicit fixture/audit path only. Routine discovery never fetches a ZIP.
         manifest = read_manifest_from_zip_bytes(fetch_bytes(download_url))
+    elif manifest is None:
+        from cms_nh_catalog import discover_theme, load_catalog
+
+        snapshot = load_catalog() if not custom_json else {}
+        observed = snapshot.get("datasets") or []
+        if snapshot.get("status") == "OK" and observed:
+            manifest = [
+                {"dataset_id": item["stable_id"], "name": item["title"],
+                 "modified_date": item.get("modified") or "",
+                 "resources": [{"filename": resource["filename"], "mime_type": resource.get("media_type"), "filesize": 0}
+                               for resource in item.get("resources") or []]}
+                for item in observed if item.get("status") != "REMOVED_OR_ARCHIVED"
+            ]
+        else:
+            datasets = discover_theme(fetch_json)
+            manifest = []
+            for item in datasets:
+                resources = []
+                for wrapper in item.get("distribution") or []:
+                    dist = wrapper.get("data", wrapper)
+                    url = str(dist.get("downloadURL") or "")
+                    if url:
+                        resources.append({"filename": url.rsplit("/", 1)[-1], "mime_type": dist.get("mediaType"), "filesize": 0})
+                manifest.append({"dataset_id": item["identifier"], "name": item.get("title"),
+                                 "modified_date": item.get("modified"), "resources": resources})
 
     members_by_source = parse_theme_manifest(manifest)
     members_by_dataset = {member.dataset_id: member for member in members_by_source.values()}

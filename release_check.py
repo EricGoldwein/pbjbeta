@@ -141,9 +141,14 @@ def check_releases(
     acquire: bool = True,
     root: Path = ROOT,
     external_handlers: dict[str, Callable[[bool], dict[str, Any]]] | None = None,
+    catalog_fetch: Callable[[str], Any] | None = None,
+    catalog_head: Callable[[str], dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Check all sources. Handlers may acquire/validate, but never promote."""
     handlers = external_handlers or {}
+    from cms_nh_catalog import refresh_catalog
+
+    catalog = refresh_catalog(root=root, fetch=catalog_fetch, head=catalog_head)
     active = load_registry(registry_path(root)).get("datasets", {})
     candidates = load_candidates(root).get("datasets", {})
     checked_at = datetime.now(timezone.utc).isoformat()
@@ -175,6 +180,10 @@ def check_releases(
         row["pending_release"] = (candidate or {}).get("release_id") if (candidate or {}).get("state") != "ACTIVE" else None
         rows.append(row)
     payload = {"schema_version": 1, "checked_at": checked_at, "datasets": rows}
+    payload["cms_nh_catalog"] = {
+        "checked_at": catalog.get("checked_at"), "status": catalog.get("status"),
+        "summary": catalog.get("summary"), "error": catalog.get("error"),
+    }
     from ownership_pairing import pairing_status
     payload["ownership_pairing"] = pairing_status(root)
     check_path = root / "state" / "release_checks.json"
@@ -340,7 +349,7 @@ def main() -> int:
             print(f"{row['label']:<22} {display}")
             if args.verbose:
                 print(f"  detector={row.get('detector') or '—'} mechanism={row['mechanism']} checked={row['checked_at']}")
-    return 1 if any(row["status"] == "FAILED" for row in payload["datasets"]) else 0
+    return 1 if any(row["status"] in {"FAILED", "ERROR"} for row in payload["datasets"]) or payload["cms_nh_catalog"]["status"] == "ERROR" else 0
 
 
 if __name__ == "__main__":

@@ -274,7 +274,8 @@ def create_app() -> Flask:
     @app.get("/sources")
     @require_auth
     def sources():
-        check_cms = request.args.get("check_cms", "1") != "0"
+        check_cms = request.args.get("check_cms", "0") != "0"
+        from cms_nh_catalog import load_catalog
         theme_publication = _theme_publication_for_ui(check_cms)
         control = control_panel_payload()
         release_checks = load_check_state()
@@ -314,6 +315,7 @@ def create_app() -> Flask:
             check_by_dataset=check_by_dataset,
             needs_attention=needs_attention,
             releases_checked_at=release_checks.get("checked_at"),
+            nh_catalog=load_catalog(),
         )
 
     @app.post("/actions/control-panel/refresh")
@@ -365,11 +367,20 @@ def create_app() -> Flask:
             attention_suffix = (
                 f" · {other_attention} non-CMS attention" if other_attention else ""
             )
+            catalog = result.get("cms_nh_catalog") or {}
+            summary = catalog.get("summary") or {}
+            catalog_suffix = (
+                f" · NH catalog: {summary.get('datasets', 0)} datasets, "
+                f"{summary.get('published', 0)} newer, {summary.get('revised', 0)} revised, "
+                f"{summary.get('unchanged', 0)} unchanged, {summary.get('planned_today', 0)} planned today, "
+                f"{summary.get('new_datasets', 0)} first/new observations, {summary.get('errors', 0)} errors"
+                f", {summary.get('archive_errors', 0)} archive errors"
+            ) if catalog else ""
             flash(
                 "CMS release check finished"
                 f" · {current} current · {newer} newer · {failures} errors"
-                f"{attention_suffix}",
-                "error" if failures else "ok",
+                f"{attention_suffix}{catalog_suffix}",
+                "error" if failures or catalog.get("status") == "ERROR" else "ok",
             )
         except Exception as exc:  # noqa: BLE001
             flash(f"CMS release check failed: {exc}", "error")
