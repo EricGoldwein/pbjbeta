@@ -4,7 +4,7 @@ This continuation is confined to Data Ops. PBJapp and Vercel deployment state we
 
 ## Repository and checkpoint
 
-Repository: `C:\Users\egold\PycharmProjects\pbj-data-ops`; branch: `feat/cms-nursing-home-catalog-20260930`; starting SHA: `09a1313eb2792dcec04ca6489bb4dcdd960e256c`. Ending implementation SHA is the commit containing this document (`git log -1 --format=%H -- docs/data-ops-survey-summary-20260930.md`). Exact commit/push evidence is in `_scratch/data-ops-checkpoint.log` and `_scratch/data-ops-push.log`.
+Repository: `C:\Users\egold\PycharmProjects\pbj-data-ops`; branch: `feat/cms-nursing-home-catalog-20260930`; starting SHA: `09a1313eb2792dcec04ca6489bb4dcdd960e256c`. Ending implementation SHA: `4a8a1863c219b52448d5eb345a4e6a91ab069ea3`, successfully pushed to the existing upstream. A documentation-only follow-up records this exact SHA; final repository SHA is recorded in `_scratch/data-ops-ending-sha.txt`. Exact commit/push evidence is in `_scratch/data-ops-checkpoint.log` and `_scratch/data-ops-push.log`.
 
 The preexisting dirty files and untracked datasets were preserved. `cms_data_ops.py` already had unrelated edits: only the three-line Survey Summary dispatch was staged against HEAD. No broad staging, reset, stash, clean, PR, merge, or PBJapp edits occurred.
 
@@ -46,7 +46,7 @@ No adjacent-source pipeline was rebuilt or added.
 
 ## Tests and browser acceptance
 
-Final result: **124 passed, 2 skipped** (30.82 seconds). The skipped live Health Citations cases require a pending review item absent from current ACTIVE state. Full test output is saved to `_scratch/data-ops-final-tests.log`; targeted adapter/inventory/registry/catalog output also exists in `_scratch/data-ops-targeted-tests.log`. The relevant suite covers malformed/duplicate source keys, schema drift, CCN preservation, dates/counts, immutable retention, unchanged ACTIVE registry, candidate/probe projections, authenticated UI preparation, source review page/modal rendering, catalog discovery and release-control behavior.
+Final result: **124 passed, 2 skipped** (30.82 seconds). The skipped live cases require pending Health Citations or ownership review items absent from current ACTIVE state. Tests ran against the existing working tree with its preserved preexisting work, not a claimed clean checkout. Full test output is saved to `_scratch/data-ops-final-tests.log`; targeted adapter/inventory/registry/catalog output also exists in `_scratch/data-ops-targeted-tests.log`. The relevant suite covers malformed/duplicate source keys, schema drift, CCN preservation, dates/counts, immutable retention, unchanged ACTIVE registry, candidate/probe projections, authenticated UI preparation, source review page/modal rendering, catalog discovery and release-control behavior.
 
 An existing live ownership test incorrectly treated the catalog preceding Active releases as part of Needs attention. Its assertion now isolates the actual attention section, so descriptive PECOS catalog text does not masquerade as an actionable ownership row.
 
