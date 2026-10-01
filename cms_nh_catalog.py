@@ -59,6 +59,8 @@ def load_catalog(root: Path | None = None) -> dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("schema_version") != SCHEMA_VERSION or not isinstance(data.get("datasets"), list):
             raise ValueError("unsupported catalog snapshot")
+        for row in data["datasets"]:
+            row["coverage"] = coverage_for(row["stable_id"])
         return data
     except (ValueError, OSError) as exc:
         return {"schema_version": SCHEMA_VERSION, "status": "ERROR", "error": str(exc), "datasets": [], "summary": {"errors": 1}}
@@ -169,7 +171,7 @@ def coverage_for(stable_id: str) -> dict[str, Any]:
         "tagd-9999": ("B", "Governed via Provider bundle", "cms.provider_info", "Provider extraction manifest; citation description member hashes", "Citation code descriptions", "No independent ACTIVE dataset"),
         "ifjz-ge4w": ("B", "Governed via Provider bundle", "cms.provider_info", "Provider retained member inventory/extraction; hashes only", "Retained source archive; no dedicated downstream consumer", "No standalone semantic validator or ACTIVE lifecycle"),
         "svdt-c123": ("B", "Governed via Provider bundle", "cms.provider_info", "Provider retained survey member inventory/extraction; hashes only", "Retained source archive", "No standalone semantic validator or ACTIVE lifecycle"),
-        "tbry-pc2d": ("B", "Governed via Provider bundle", "cms.provider_info", "Provider retained survey member inventory/extraction; hashes only", "Retained source archive", "No standalone semantic validator or ACTIVE lifecycle"),
+        "tbry-pc2d": ("C", "Candidate workflow available", "cms.survey_summary", "survey_summary.prepare_candidate; immutable raw + provenance + validation receipt; explicit review", "No downstream consumer or asserted foreign keys", "Candidate availability is not an ACTIVE release; inspect control state"),
         "djen-97ju": ("C", "Built, not integrated", None, "mds_quality_measures_lifecycle.prepare_mds_quality_measures_candidate", "Normalized MDS measure candidates in claims worktree", "cms.quality_measures_mds lifecycle at f09c7cb; no operational integration"),
         "ijh5-nb2v": ("C", "Built, not integrated", None, "claims_quality_measures_lifecycle.prepare_claims_quality_measures_candidate", "Normalized claims measure candidates in claims worktree", "cms.quality_measures_claims lifecycle at f09c7cb; no operational integration"),
         "fykj-qjee": ("C", "Built, not integrated", None, "snf_qrp_provider_lifecycle.prepare_snf_qrp_provider_candidate", "Normalized SNF QRP candidates in claims worktree", "cms.snf_qrp_provider lifecycle at f09c7cb; no operational integration"),
@@ -179,11 +181,15 @@ def coverage_for(stable_id: str) -> dict[str, Any]:
     category, label, source_id, lifecycle, consumer, gap = values
     external_id = {"djen-97ju": "cms.quality_measures_mds", "ijh5-nb2v": "cms.quality_measures_claims", "fykj-qjee": "cms.snf_qrp_provider"}.get(stable_id)
     workflow_source = "cms.provider_info" if stable_id == "y2hd-n93e" else source_id
-    return {"class": category, "label": label, "source_id": source_id, "workflow_source_id": workflow_source, "dataset_id": external_id or source_id,
+    result = {"class": category, "label": label, "source_id": source_id, "workflow_source_id": workflow_source, "dataset_id": external_id or source_id,
             "detector": "cms_nh_catalog / CMS search + metastore", "lifecycle": lifecycle, "consumer": consumer, "gap": gap,
             "active_lifecycle": "Existing explicit source approval" if category == "A" else ("Parent Provider bundle; no standalone promotion" if category == "B" else "Not integrated"),
             "acquirer": "Existing source workflow" if source_id else "No catalog acquisition action",
             "validator": lifecycle, "action": "Open source" if source_id else None}
+    if stable_id == "tbry-pc2d":
+        result["active_lifecycle"] = "Explicit approval required; ACTIVE determined by release registry"
+        result["acquirer"] = "survey_summary.prepare_candidate"
+    return result
 
 
 def compare_observation(current: dict[str, Any], previous: dict[str, Any] | None, today: str) -> tuple[str, str]:

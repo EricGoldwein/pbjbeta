@@ -420,6 +420,10 @@ def create_app() -> Flask:
     @app.get("/sources/<source_id>")
     @require_auth
     def source_detail(source_id: str):
+        if source_id == "cms.survey_summary":
+            from survey_summary import SOURCE_ID
+            row = next((r for r in control_panel_payload()["datasets"] if r["dataset_id"] == SOURCE_ID), {})
+            return render_template("data_ops/survey_summary.html", candidate=row.get("pending") or {}, active=row.get("active"))
         from ownership_pairing import PAIR_SOURCE_ID, build_pair_operator_context
 
         check_cms = request.args.get("check_cms", "1") != "0"
@@ -442,6 +446,9 @@ def create_app() -> Flask:
     @app.get("/sources/<source_id>/panel")
     @require_auth
     def source_detail_panel(source_id: str):
+        if source_id == "cms.survey_summary":
+            row = next((r for r in control_panel_payload()["datasets"] if r["dataset_id"] == source_id), {})
+            return render_template("data_ops/partials/survey_summary_panel.html", candidate=row.get("pending") or {}, active=row.get("active"), panel_mode="modal")
         from ownership_pairing import PAIR_SOURCE_ID, build_pair_operator_context
 
         check_cms = request.args.get("check_cms", "1") != "0"
@@ -459,6 +466,17 @@ def create_app() -> Flask:
             return ("Unknown source", 404)
         ctx["panel_mode"] = "modal"
         return render_template("data_ops/partials/source_detail_panel.html", **ctx)
+
+    @app.post("/actions/survey-summary/prepare")
+    @require_auth
+    def action_survey_summary_prepare():
+        from survey_summary import prepare_candidate
+        try:
+            candidate = prepare_candidate()
+            flash(f"Survey Summary {candidate['state']} · explicit review required", "ok" if candidate["state"] == "VALIDATED" else "error")
+        except Exception as exc:
+            flash(f"Survey Summary preparation failed: {exc}", "error")
+        return redirect(url_for("source_detail", source_id="cms.survey_summary"))
 
     @app.post("/actions/ownership-pair/validate")
     @require_auth

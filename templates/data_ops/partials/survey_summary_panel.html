@@ -1,0 +1,22 @@
+{% if panel_mode == 'modal' %}<header class="do-panel-head"><h2 id="do-source-panel-title">Survey Summary</h2><button type="button" class="do-btn" data-do-modal-close aria-label="Close">Close</button></header>{% endif %}
+<section class="do-section" id="survey-summary-review">
+  <h2>Survey Summary · tbry-pc2d</h2>
+  <p>One row per provider inspection cycle. This summary is separate from row-level Health Deficiencies, Fire Safety Deficiencies, Inspection Dates, Provider Information, and Penalties. No foreign-key relationships are asserted.</p>
+  <p>Candidate: <strong>{{ candidate.get('state', 'NOT_PREPARED') }}</strong>. {% if active %}ACTIVE release: {{ active.get('active_release_id') }}{% else %}No ACTIVE release.{% endif %}</p>
+  {% if candidate %}
+  {% set validation = candidate.get('validation') or {} %}
+  {% set metadata = candidate.get('metadata') or {} %}
+  <dl>
+    <dt>Release</dt><dd>{{ candidate.release_id }}</dd>
+    <dt>CMS modified / released</dt><dd>{{ metadata.get('modified') }} / {{ metadata.get('released') }}</dd>
+    <dt>Validation</dt><dd>{{ validation.get('status', 'PENDING') }}</dd>
+    <dt>Rows / providers</dt><dd>{{ validation.get('row_count', '—') }} / {{ validation.get('provider_count', '—') }}</dd>
+    <dt>Key</dt><dd>CCN + Inspection Cycle; {{ validation.get('duplicate_key_rows', '—') }} duplicate rows</dd>
+    <dt>Raw SHA256</dt><dd class="do-mono">{{ candidate.hash }}</dd>
+  </dl>
+  {% if validation.get('status') == 'PASS' %}<p>Review-ready candidate. Preparation does not activate this source.</p>{% endif %}
+  {% if validation.get('errors') %}<p>Validation errors: {{ validation.errors }}</p>{% endif %}
+  {% endif %}
+  <p><a href="https://data.cms.gov/provider-data/dataset/tbry-pc2d" target="_blank" rel="noopener">Official CMS dataset</a></p>
+  <form method="post" action="{{ url_for('action_survey_summary_prepare') }}"><button class="do-btn" type="submit">Check CMS and prepare candidate for review</button></form>
+</section>

@@ -851,6 +851,9 @@ def probe_source(
         )
     if family == SourceFamily.SFF_PDF_LIST:
         return _probe_sff_pdf_list(record, root, check_cms=check_cms)
+    if family == SourceFamily.SURVEY_SUMMARY:
+        from survey_summary import probe_snapshot
+        return probe_snapshot(_base_snap(record))
     return _probe_unmodeled(record, "Unhandled source family")
 
 

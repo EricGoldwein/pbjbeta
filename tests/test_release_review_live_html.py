@@ -98,7 +98,11 @@ def test_live_post_activation_ownership_downstream_and_sources_cleanup(monkeypat
 
     sources = client.get("/sources")
     sources_html = sources.get_data(as_text=True)
-    needs_block = sources_html.split("Active releases")[0]
+    # The catalog now precedes Active releases and mentions PECOS descriptively.
+    # Only the attention section can establish an actionable stale-source row.
+    import re
+    match = re.search(r'<section class="[^"]*do-section-attention[^"]*">(.*?)</section>', sources_html, re.S)
+    needs_block = match.group(1) if match else ""
     assert sources.status_code == 200
     assert "Activate pair" not in sources_html
     assert "SNF Owners / Enrollments" not in needs_block

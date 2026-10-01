@@ -64,7 +64,8 @@ def _metastore(filename: str = "NH_ProviderInfo_Aug2026.csv") -> dict:
 
 def test_probe_all_sources_runtime_unavailable(tmp_path: Path):
     snaps = ops.probe_all_sources(check_cms=False, root=tmp_path, run_zweli=False)
-    assert len(snaps) == 10
+    from cms_source_registry import get_registry
+    assert {s.source_id for s in snaps} == {r.source_id for r in get_registry()}
     by_id = {s.source_id: s for s in snaps}
     assert by_id["cms.snf_enrollments"].source_id != by_id["cms.snf_all_owners"].source_id
     assert "NOT AVAILABLE" in by_id["cms.pbj_nurse_staffing"].raw_available

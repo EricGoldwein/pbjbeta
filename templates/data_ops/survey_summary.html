@@ -1,0 +1,7 @@
+{% extends 'data_ops/base.html' %}
+{% block title %}Survey Summary{% endblock %}
+{% block content %}
+<h1>Survey Summary</h1>
+<p><a href="{{ url_for('sources') }}">← Sources</a></p>
+{% include 'data_ops/partials/survey_summary_panel.html' %}
+{% endblock %}

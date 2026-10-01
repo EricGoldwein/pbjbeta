@@ -116,6 +116,7 @@ class SourceFamily(str, Enum):
     SNF_CHOW = "snf_chow"
     CHAIN_PERFORMANCE = "chain_performance"
     HEALTH_CITATIONS = "health_citations"
+    SURVEY_SUMMARY = "survey_summary"
     SFF_PDF_LIST = "sff_pdf_list"
 
 
@@ -252,6 +253,23 @@ def _rec(**kwargs: Any) -> CmsSourceRecord:
 
 
 CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
+    _rec(
+        source_id="cms.survey_summary", human_name="Survey Summary", publisher=Publisher.CMS,
+        source_family=SourceFamily.SURVEY_SUMMARY, containers=(SourceContainer.CSV,),
+        cadence=SourceCadence.MONTHLY, release_identity_strategy="CMS modified month + resource identity + raw SHA256",
+        fingerprint_strategy="SHA256 of immutable raw CSV", cms_dataset_id="tbry-pc2d",
+        cms_dataset_id_provenance="Official CMS Provider Data metastore, re-resolved September 30, 2026",
+        landing_url="https://data.cms.gov/provider-data/dataset/tbry-pc2d",
+        catalog_mechanism=CatalogMechanism.PROVIDER_DATA_METASTORE,
+        metadata_endpoint="https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/tbry-pc2d?show-reference-ids=true",
+        raw_artifact_resolver="state/source_artifacts/cms.survey_summary/<SHA256>/source.csv",
+        normalized_artifact_resolver="None; validated source candidate only",
+        acquisition_implementation="survey_summary.prepare_candidate",
+        structural_validator="survey_summary.validate_csv", zweli_quality_profile=None,
+        downstream_consumers=(), automation_maturity=AutomationMaturity.PARTIALLY_AUTOMATED,
+        automation_notes="Detect/acquire/retain/validate; explicit review only, no automatic ACTIVE",
+        actions_enabled=(), notes="Grain: one provider inspection cycle; no asserted foreign keys to deficiency rows or other CMS datasets.",
+    ),
     _rec(
         source_id="cms.provider_info",
         human_name="Provider Information",
@@ -581,6 +599,15 @@ DERIVED_SIGNALS: tuple[DerivedSignalRecord, ...] = (
 
 def get_registry() -> tuple[CmsSourceRecord, ...]:
     return CMS_SOURCE_REGISTRY
+
+
+# Descriptive identities only. Runtime governance, evidence and health are never
+# encoded here. These sources have no operational adapter in this control plane.
+ADJACENT_SOURCE_IDENTITIES = (
+    {"source_id": "penalties", "human_name": "Penalties", "cms_dataset_id": "g6vv-u9sr"},
+    {"source_id": "hcris", "human_name": "HCRIS", "cms_dataset_id": None},
+    {"source_id": "npi_nppes", "human_name": "NPI / NPPES", "cms_dataset_id": None},
+)
 
 
 def get_source(source_id: str) -> Optional[CmsSourceRecord]:
