@@ -2,6 +2,45 @@
 {% from 'data_ops/partials/source_detail_macros.html' import render_workflow_action, render_attention_primary_action %}
 {% block title %}Sources{% endblock %}
 {% block content %}
+<section class="do-section do-section-primary do-section-flush-top" id="sources-next-steps">
+  <h1>Do these next</h1>
+
+  <p><strong>Local data and the live website are separate steps.</strong> Follow the actions supported by each source.</p>
+
+  <ol>
+
+    <li><strong>Check CMS for updates.</strong> Detect only · last check {{ releases_checked_at | do_datetime if releases_checked_at else 'not recorded' }}.</li>
+
+    <li><a href="{{ url_for('release_review') }}"><strong>Review prepared candidates.</strong></a> {{ needs_attention|length }} local source actions below. VALIDATED means downloaded, saved and checks passed; it does not mean ACTIVE or published.</li>
+
+    <li><strong>Activate locally, where supported.</strong> ACTIVE selects inputs for local builds; it does not mean deployed. Review-only sources need no activation.</li>
+
+    <li><strong>Prepare the website release.</strong> Use the current local releases and the website evidence below.</li>
+
+    <li><strong>Publish + verify.</strong> A prepared or pushed candidate is not verified production. Check the deployment and its source provenance.</li>
+
+  </ol>
+
+  <div class="do-actions"><form method="post" action="{{ url_for('action_control_panel_check_releases') }}"><button class="do-btn do-btn-primary" type="submit">Check CMS for updates</button></form><a class="do-btn" href="{{ url_for('release_review') }}">Review prepared candidates</a></div>
+
+  {% for item in reference_sources %}
+
+  <div class="do-callout" data-do-reference-source="{{ item.source_id }}"><strong>Survey Summary · VALIDATED / REVIEW-ONLY</strong><p>Saved for reference · No activation required.</p><a href="{{ url_for('source_detail', source_id=item.source_id) }}">Review saved Survey Summary</a><details><summary>Release and lifecycle evidence</summary><p>{{ item.release_id }} · {{ item.detail }}</p></details></div>
+
+  {% endfor %}
+
+  <h2>Ownership and SFF: does the website need updating?</h2>
+  <p class="do-muted do-small">These rows use local ACTIVE releases, staged source hashes, and publication receipts. They do not probe the live website.</p>
+  {% for item in public_updates %}
+  <div class="do-callout">
+    <h3>{{ item.label }} · selected locally: {{ item.local_release }}</h3>
+    <p><strong>{{ item.next_step }}</strong></p>
+    <button type="button" class="do-btn do-btn-compact" data-do-source-panel="{{ url_for('source_detail_panel', source_id=item.source_id) }}">Open source details</button>
+    <details><summary>Website release evidence</summary><p>{{ item.website_status }}. This evidence is separate from local activation.</p></details>
+  </div>
+  {% endfor %}
+  <p class="do-muted do-small">Publishing several source updates plus UI changes in one website deployment requires one combined website release. Source checks and local activation do not assemble or publish that combined release.</p>
+</section>
 {% if needs_attention %}
 <section class="do-section do-section-attention do-section-flush-top">
   <div class="do-release-toolbar">
@@ -27,7 +66,7 @@
 
 <section class="do-section do-section-primary{% if not needs_attention %} do-section-flush-top{% endif %}">
   <div class="do-release-toolbar">
-    <h1 class="do-release-title">Active releases</h1>
+    <h1 class="do-release-title">Selected local releases (ACTIVE)</h1>
     <div class="do-toolbar-controls" data-do-release-filters>
       <input class="do-input do-input-compact" type="search" placeholder="Filter datasets…" data-do-release-search aria-label="Filter datasets">
       <label class="do-check do-check-compact do-check-attention">
@@ -70,7 +109,8 @@
         {% set pending = row.pending %}
         {% set pending_state = (pending.state if pending else '')|upper %}
         {% set health = row.health|upper %}
-        {% set needs_attention = pending or health not in ['PASS', 'CURRENT'] or pending_state in ['ACQUIRED', 'VALIDATED', 'DETECTED'] %}
+        {% set reference_complete = row.dataset_id == 'cms.survey_summary' and pending_state == 'VALIDATED' and (pending.validation or {}).get('status') == 'PASS' %}
+        {% set needs_attention = not reference_complete and (pending or health not in ['PASS', 'CURRENT'] or pending_state in ['ACQUIRED', 'VALIDATED', 'DETECTED']) %}
         <tr data-do-release-row data-dataset-id="{{ row.dataset_id }}" data-needs-attention="{{ '1' if needs_attention else '0' }}">
           <td class="do-cell-dataset">
             <div class="do-dataset-cell">
@@ -93,7 +133,7 @@
             {% if pending %}
             <span class="do-release-cell">
               <span class="do-mono">{{ pending.release_id }}</span>
-              <span class="do-badge do-badge-{{ pending_state|lower }}">{{ pending_state }}</span>
+              <span class="do-badge do-badge-{{ pending_state|lower }}">{{ 'VALIDATED / REVIEW-ONLY' if reference_complete else pending_state }}</span>
             </span>
             {% else %}<span class="do-muted">—</span>{% endif %}
           </td>

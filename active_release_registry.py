@@ -70,6 +70,10 @@ def promote_release(
 ) -> dict[str, Any]:
     """Atomically promote one validated local source release."""
     source_id, release_id = source_id.strip(), release_id.strip()
+    from cms_source_registry import is_review_only_source
+
+    if is_review_only_source(source_id):
+        raise ActiveReleaseError(f"{source_id} is review-only; no activation is permitted")
     if not source_id or not release_id:
         raise ActiveReleaseError("source_id and release_id are required")
     if status != "ACTIVE" or not validated_at:

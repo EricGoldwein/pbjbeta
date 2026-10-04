@@ -632,3 +632,9 @@ def verified_cms_dataset_ids() -> dict[str, str]:
         for r in CMS_SOURCE_REGISTRY
         if r.cms_dataset_id
     }
+
+
+def is_review_only_source(source_id: str) -> bool:
+    """Canonical source lifecycle; validation alone never grants activation."""
+    record = get_source(source_id)
+    return bool(record and record.source_family == SourceFamily.SURVEY_SUMMARY)

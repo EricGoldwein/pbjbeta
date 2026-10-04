@@ -301,6 +301,16 @@ def create_app() -> Flask:
             snapshots=snaps,
             theme_publication=theme_publication,
         )
+        from source_operator_guidance import public_update_guidance, survey_review_guidance
+        reference_sources = []
+        completed_reference_ids = set()
+        for row in control.get("datasets", []):
+            if row.get("dataset_id") == "cms.survey_summary":
+                candidate = row.get("pending") or {}
+                if candidate.get("state") == "VALIDATED" and (candidate.get("validation") or {}).get("status") == "PASS":
+                    reference_sources.append({"source_id": row["dataset_id"], "release_id": candidate.get("release_id"), **survey_review_guidance(candidate)})
+                    completed_reference_ids.add(row["dataset_id"])
+        needs_attention = [item for item in needs_attention if item.get("source_id") not in completed_reference_ids]
         availability_by_dataset: dict[str, dict] = {}
         for row in control.get("datasets") or []:
             dataset_id = row.get("dataset_id")
@@ -331,6 +341,8 @@ def create_app() -> Flask:
             releases_checked_at=release_checks.get("checked_at"),
             nh_catalog=load_catalog(),
             family_inventory=source_family_inventory(control, snaps, load_catalog()),
+            public_updates=public_update_guidance(control),
+            reference_sources=reference_sources,
         )
 
     @app.post("/actions/control-panel/refresh")

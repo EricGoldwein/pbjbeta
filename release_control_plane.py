@@ -394,6 +394,10 @@ def promote_active_pair(
 
 
 def promote_candidate(dataset_id: str, *, root: Path | None = None) -> dict[str, Any]:
+    from cms_source_registry import is_review_only_source
+
+    if is_review_only_source(dataset_id):
+        raise ActiveReleaseError(f"{dataset_id} is review-only; no activation is permitted")
     candidates = load_candidates(root)
     candidate = candidates.get("datasets", {}).get(dataset_id)
     if not isinstance(candidate, dict) or candidate.get("state") != ReleaseState.VALIDATED.value:

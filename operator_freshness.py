@@ -319,10 +319,10 @@ def build_freshness_layers(
         layers.append(
             {
                 "key": "consumers",
-                "label": "Packaged bundles",
+                "label": "Facility packages (separate release)",
                 "status": "attention",
-                "status_label": "May lag",
-                "detail": "Facility PACKAGE_MANIFEST ownership provenance may trail canonical rebuild until repackage",
+                "status_label": "Verify package provenance",
+                "detail": "Local activation does not update existing facility packages. Compare their PACKAGE_MANIFEST source hashes; repackage any using older bytes. Do not reacquire or reactivate the same local release.",
             }
         )
     else:

@@ -38,3 +38,27 @@ def test_preparation_route_requires_auth_and_uses_canonical_adapter(monkeypatch)
     assert response.status_code == 302
     assert called == [True]
     assert response.headers['Location'].endswith('/sources/cms.survey_summary')
+
+
+def test_sources_page_explains_local_and_website_steps(monkeypatch):
+    candidate = {'state': 'VALIDATED', 'validation': {'status': 'PASS'}}
+    monkeypatch.setattr(data_ops_app, 'control_panel_payload', lambda: {
+        'datasets': [{'dataset_id': 'cms.survey_summary', 'pending': candidate,
+                      'impact': {'would_mark_stale': []}}],
+        'facilities': {'facilities': {}}})
+    monkeypatch.setattr(data_ops_app, 'snapshots_with_control_plane', lambda **kwargs: [])
+    monkeypatch.setattr(data_ops_app, 'build_needs_attention_queue', lambda **kwargs: [{
+        'source_id': 'cms.survey_summary', 'human_name': 'Survey Summary',
+        'release_line': 'Saved candidate', 'concise_state': 'ready to promote'}])
+    response = client(monkeypatch).get('/sources?check_cms=0')
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    for copy in ('Do these next', 'Local data and the live website are separate steps',
+                 'Ownership and SFF', 'Selected local releases (ACTIVE)',
+                 'VALIDATED / REVIEW-ONLY', 'Review saved Survey Summary'):
+        assert copy in html
+    assert 'ready to promote' not in html
+
+    assert 'data-do-reference-source="cms.survey_summary"' in html
+    row = re.search(r'<tr data-do-release-row data-dataset-id="cms.survey_summary"[^>]*>', html)
+    assert row and 'data-needs-attention="0"' in row.group()

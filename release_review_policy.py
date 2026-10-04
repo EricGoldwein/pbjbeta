@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import cms_data_paths
-from cms_source_registry import get_source
+from cms_source_registry import get_source, is_review_only_source
 from data_ops_approval import has_acknowledgement
 from data_ops_zweli import ZweliState
 from ownership_pairing import ENROLLMENTS, OWNERS, PAIR_SOURCE_ID, pair_lifecycle_action, pairing_status
@@ -63,7 +63,7 @@ def filter_release_review_focus(
 
 
 def _promote_permitted(candidate: dict[str, Any]) -> bool:
-    return str(candidate.get("state") or "").upper() == "VALIDATED"
+    return not is_review_only_source(str(candidate.get("source_id") or "")) and str(candidate.get("state") or "").upper() == "VALIDATED"
 
 
 def _format_release_month_label(release_id: str | None) -> str | None:
@@ -278,6 +278,9 @@ def evaluate_governed_candidate_review(
     if not source_id or not release_id:
         return None
 
+    if is_review_only_source(source_id) and state == "VALIDATED":
+        return None  # Completed reference candidate: no activation decision pending.
+
     if source_id in {OWNERS, ENROLLMENTS}:
         return None
 
@@ -490,6 +493,8 @@ def assert_promotion_eligible(
     from data_ops_approval import ApprovalError
     from release_control_plane import control_panel_payload
 
+    if is_review_only_source(source_id):
+        raise ApprovalError(f"{source_id} is review-only; no activation is permitted")
     root = root or cms_data_paths.repo_root()
     if control is None:
         control = control_panel_payload(root)

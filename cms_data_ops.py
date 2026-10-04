@@ -1185,8 +1185,12 @@ def release_review_items(
         seen.add(key)
         items.append(item)
 
+    from cms_source_registry import is_review_only_source
+
     governed_sources = {item["source_id"] for item in items if item.get("governed")}
     for s in snaps:
+        if is_review_only_source(s.source_id):
+            continue  # Reference candidates have no legacy activation path.
         if s.source_id in governed_sources:
             continue
         if s.source_id in {OWNERS, ENROLLMENTS} and pair_item:
@@ -3092,6 +3096,10 @@ def approve_release_authoritative(
     root = root or cms_data_paths.repo_root()
     release_id = (release_id or "").strip()
     source_id = (source_id or "").strip()
+    from cms_source_registry import is_review_only_source
+
+    if is_review_only_source(source_id):
+        raise ApprovalError(f"{source_id} is review-only; no activation is permitted")
     pending = load_governed_candidate(source_id, release_id, root=root)
     if not pending or str(pending.get("state") or "").upper() != "VALIDATED":
         raise ApprovalError(f"No VALIDATED candidate {source_id} {release_id} for activation")
