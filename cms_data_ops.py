@@ -357,12 +357,12 @@ def _probe_provider_info(
 
         if handoff_ready and cms is not None:
             snap.status = OpsStatus.READY_FOR_HANDOFF.value
-            snap.detail = "Local matches CMS; Norm + handoff artifact present"
+            snap.detail = "Local processing complete; CMS raw bytes not checked by metadata probe"
             return snap
 
         if cms is not None:
-            snap.status = OpsStatus.CURRENT.value
-            snap.detail = "Local Provider Info vintage matches CMS"
+            snap.status = OpsStatus.UNKNOWN.value
+            snap.detail = "CMS file period observed; run Check CMS for authoritative raw-byte comparison"
             return snap
 
         snap.status = OpsStatus.UNKNOWN.value
@@ -407,10 +407,9 @@ def _probe_nurse(
             snap.detail = f"Provenance mismatch: {identity.detail}"
         elif identity.cryptographically_identical:
             if snap.local_derived_present:
-                snap.status = OpsStatus.CURRENT.value
+                snap.status = OpsStatus.UNKNOWN.value
                 snap.detail = (
-                    "Local nurse quarter cryptographically matches CMS Primary "
-                    "(manifest SHA + raw + standardized)"
+                    "Local raw matches acquisition manifest; current CMS bytes and ACTIVE raw binding remain unverified"
                 )
             else:
                 snap.status = OpsStatus.PROCESSING_REQUIRED.value
@@ -685,7 +684,6 @@ def _probe_health_citations(
             check = check_health_citations_cms(
                 fetch_json=fetch_json,
                 root=root,
-                theme_publication=theme_publication,
             )
             cms = check["cms"]
             snap.publisher_latest = cms["data_vintage_label"]
@@ -696,7 +694,7 @@ def _probe_health_citations(
                 snap.status = OpsStatus.CMS_NEWER.value
             elif snap.local_raw_present and check.get("local_artifact_ready"):
                 snap.status = OpsStatus.LOCAL_RAW_ONLY.value
-            elif check.get("active_release_id") and not check.get("cms_is_newer"):
+            elif (check.get("release_identity") or {}).get("status") == "CURRENT":
                 snap.status = OpsStatus.CURRENT.value
         except Exception as exc:  # noqa: BLE001
             if theme_publication is not None:
@@ -717,8 +715,8 @@ def _probe_health_citations(
                     snap.publisher_latest = label
                     snap.cms_latest = label
                     if active_release_id == pub_id:
-                        snap.status = OpsStatus.CURRENT.value
-                        snap.detail = "CMS latest matches ACTIVE release (theme publication discovery)."
+                        snap.status = OpsStatus.UNKNOWN.value
+                        snap.detail = "CMS metadata period matches ACTIVE; raw bytes not verified."
                 else:
                     snap.error = str(exc)
                     snap.detail = f"CMS Health Citations probe failed: {exc}"
@@ -767,9 +765,9 @@ def _probe_sff_pdf_list(
                 snap.detail = (
                     f"CMS posting {cms.get('posting_label')} is newer than ACTIVE {active_id or '—'}."
                 )
-            elif active_id and not check.get("cms_is_newer"):
+            elif check.get("status") == "CURRENT":
                 snap.status = OpsStatus.CURRENT.value
-                snap.detail = f"CMS posting matches ACTIVE {format_release_month_label(active_id) or active_id}."
+                snap.detail = f"CMS PDF bytes match raw source bound to ACTIVE {format_release_month_label(active_id) or active_id}."
         except Exception as exc:  # noqa: BLE001 — probe must not crash callers
             snap.error = str(exc)
             snap.detail = f"CMS SFF posting probe failed: {exc}"
@@ -990,7 +988,7 @@ def overlay_control_plane_on_snapshot(
             if pending_same:
                 data["status"] = "PENDING VALIDATION"
             else:
-                data["status"] = OpsStatus.CURRENT.value
+                data["status"] = "ACTIVE" if source_id.startswith("cms.") else OpsStatus.CURRENT.value
 
     if pending:
         data["pending_release_id"] = pending.get("release_id")
@@ -1396,6 +1394,32 @@ def build_release_availability_context(
     if publisher_label is None and publisher_latest_id:
         publisher_label = str(publisher_latest_id)
 
+    ownership_evidence = {}
+    if source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
+        check = check_row or {}
+        metadata = active.get("metadata") or {}
+        vintage = check.get("cms_release_vintage")
+        # Historic metadata is display provenance, never proof of currentness.
+        active_vintage = metadata.get("cms_release_vintage") or str(metadata.get("cms_dataset_version_label") or "")[:7]
+        if vintage:
+            publisher_label = format_release_month_label(vintage) or vintage
+        elif not check.get("cms_release_vintage"):
+            publisher_label = "Not observed"
+        new_available = check.get("new_release_available") is True
+        ownership_evidence = {
+            "cms_release_vintage": vintage,
+            "active_cms_release_vintage": active_vintage or None,
+            "snapshot_date": check.get("snapshot_date") or active_id,
+            "publisher_sha256": check.get("publisher_sha256"),
+            "publisher_checked_at": check.get("publisher_checked_at"),
+            "acquired_at": active.get("downloaded_at") or metadata.get("acquired_at"),
+            "cms_dataset_version_label": check.get("cms_dataset_version_label"),
+            "cms_dataset_version_modified": check.get("cms_dataset_version_modified"),
+            "cms_byte_verified_current": bool(check.get("status") == "CURRENT" and
+                                               check.get("publisher_sha256") == active.get("hash") and
+                                               check.get("publisher_checked_at")),
+        }
+
     summary = "Current"
     if new_available and active_id and publisher_latest_id and active_id != publisher_latest_id:
         summary = "New release available"
@@ -1457,6 +1481,50 @@ def build_release_availability_context(
             and not pending_id
         ),
     }
+    if ownership_evidence:
+        result.update(ownership_evidence)
+        result["unchanged_in_latest_publication"] = ownership_evidence["cms_byte_verified_current"]
+        if new_available:
+            result["availability_summary"] = "CMS distribution differs from ACTIVE"
+        elif not ownership_evidence["cms_byte_verified_current"]:
+            result["availability_summary"] = "CMS bytes not verified"
+    if catalog and (catalog.mechanism == UpdateMechanism.EXTERNAL_RECURRING or source_id == "cms.sff_pdf_list"):
+        check = check_row or {}
+        byte_current = bool(check.get("status") == "CURRENT" and check.get("publisher_checked_at") and
+                            check.get("active_hash") == active.get("hash") and
+                            check.get("publisher_sha256") and
+                            check.get("publisher_sha256") == check.get("active_raw_sha256"))
+        # Ownership checks recorded before the shared assessment already bind
+        # their raw primary directly to the governed ACTIVE hash.
+        byte_current = byte_current or bool(ownership_evidence.get("cms_byte_verified_current"))
+        result.update(cms_byte_verified_current=byte_current,
+                      unchanged_in_latest_publication=byte_current,
+                      cms_identity_status=check.get("status") if check.get("identity_check_version") else "UNVERIFIED",
+                      publisher_sha256=check.get("publisher_sha256"),
+                      active_raw_sha256=check.get("active_raw_sha256"),
+                      publisher_checked_at=check.get("publisher_checked_at"),
+                      snapshot_date=check.get("snapshot_date") or ownership_evidence.get("snapshot_date"),
+                      publisher_released=check.get("publisher_released"),
+                      publisher_modified=check.get("publisher_modified"),
+                      publisher_url=check.get("publisher_url"),
+                      publisher_file_uuid=check.get("publisher_file_uuid"),
+                      publisher_resource_id=check.get("publisher_resource_id"),
+                      publisher_resource_version=check.get("publisher_resource_version"),
+                      cms_dataset_version_id=check.get("cms_dataset_version_id"),
+                      cms_dataset_version_label=check.get("cms_dataset_version_label"),
+                      cms_dataset_version_modified=check.get("cms_dataset_version_modified"),
+                      publisher_period_basis=check.get("publisher_period_basis"),
+                      cms_release_vintage=check.get("cms_release_vintage"),
+                      acquired_at=active.get("downloaded_at") or (active.get("metadata") or {}).get("acquired_at"))
+        if check.get("identity_check_version"):
+            result["new_release_available"] = check.get("new_release_available") is True
+            result["availability_source"] = "authoritative_raw_check"
+            result["publisher_latest_release_id"] = check.get("cms_release_vintage") or check.get("publisher_latest_release_id")
+            result["publisher_latest_label"] = format_release_month_label(result["publisher_latest_release_id"]) or result["publisher_latest_release_id"]
+        if not byte_current and not result.get("new_release_available") and not pending:
+            result["availability_summary"] = "CMS bytes not verified"
+        elif result.get("new_release_available"):
+            result["availability_summary"] = "CMS revision available" if check.get("status") == "REVISED" else "New CMS release available"
     if catalog and catalog.mechanism == UpdateMechanism.DERIVED:
         upstream_active = {}
         if availability_source == "derived_upstream":
@@ -1979,6 +2047,12 @@ def _next_operator_action(
     stale_map = stale_derived_consumers(root)
     downstream_stale = downstream_stale_capabilities_for_source(source_id, root=root)
 
+    if source_id in {"cms.provider_info", "cms.health_citations", "cms.pbj_nurse_staffing", "cms.pbj_non_nurse_staffing", "cms.sff_pdf_list"} and active_id and not pending and not release_availability.get("cms_byte_verified_current") and not release_availability.get("new_release_available"):
+        endpoint = {"cms.provider_info": "action_pi_check", "cms.pbj_nurse_staffing": "action_nurse_check",
+                    "cms.sff_pdf_list": "action_sff_check"}.get(source_id, "action_control_panel_check_releases")
+        return {"label": "Check CMS", "detail": "CMS raw bytes are not verified against ACTIVE; matching dates do not establish currentness.",
+                "endpoint": endpoint, "endpoint_args": {}, "wired": True, "method": "post", "read_only": True}
+
     if source_id == "cms.health_citations":
         target_label = release_availability.get("publisher_latest_label") or "next release"
         pub_id = release_availability.get("publisher_latest_release_id")
@@ -2205,13 +2279,13 @@ def _next_operator_action(
 
         audit = audit_ownership_downstream_stale()
         active_label = format_release_month_label(active_id) or active_id
-        pub_label = (release_availability or {}).get("publisher_latest_label") or active_label
+        pub_label = (release_availability or {}).get("publisher_latest_label") or "Not observed"
         if audit.get("is_stale"):
             caps = audit.get("stale_capabilities") or []
             return {
                 "label": "Rebuild downstream",
                 "detail": (
-                    f"Ownership · {active_label} active · CMS latest {pub_label}. "
+                    f"Ownership · CMS release: {pub_label} · Data snapshot: {active_label}. "
                     f"Derived outputs stale ({', '.join(caps[:2])}{'…' if len(caps) > 2 else ''})."
                 ),
                 "endpoint": "action_ownership_downstream_rebuild",
@@ -2222,7 +2296,9 @@ def _next_operator_action(
         if not release_availability.get("new_release_available"):
             return {
                 "label": "Check CMS",
-                "detail": f"Up to date · {active_label} active · CMS latest {pub_label}",
+                "detail": (f"CMS release: {pub_label} · Data snapshot: {active_label} · "
+                           + ("Exact ACTIVE bytes match" if release_availability.get("cms_byte_verified_current")
+                              else "Run Check CMS to verify bytes")),
                 "endpoint": "source_detail",
                 "endpoint_args": {"source_id": source_id},
                 "wired": True,
@@ -2308,6 +2384,12 @@ def _next_operator_action(
             "wired": True,
             "read_only": True,
         }
+    if pending_state == "VALIDATED" and source_id == "cms.sff_pdf_list":
+        from release_review_policy import release_review_query
+
+        return {"label": "Open Release Review", "detail": f"Pending {pending.get('release_id')} is VALIDATED — awaiting human review; older ACTIVE is unchanged.",
+                "endpoint": "release_review", "endpoint_args": release_review_query(source_id, pending.get("release_id")),
+                "wired": True, "read_only": True}
     if pending_state == "VALIDATED" and source_id == "cms.provider_info":
         from release_review_policy import release_review_query
 
@@ -2405,7 +2487,8 @@ def build_sff_lifecycle_steps(
     pending_state = str(pending.get("state") or "").upper()
     pending_id = pending.get("release_id")
     validation = _validation_status_from_control(control_row)
-    validated = validation == "PASS" or pending_state == "VALIDATED"
+    validated = ((pending.get("validation") or {}).get("status") == "PASS" or pending_state == "VALIDATED") if pending else validation == "PASS"
+    subject_active = bool(active_id and not pending)
 
     def step(
         step_id: str,
@@ -2428,7 +2511,7 @@ def build_sff_lifecycle_steps(
         step(
             "check_cms",
             "Check CMS",
-            state="current" if active_id else "upcoming",
+            state="completed" if pending_id or active_id else "upcoming",
             detail=(
                 f"Compare CMS SFF posting against ACTIVE {active_id}."
                 if active_id
@@ -2437,7 +2520,7 @@ def build_sff_lifecycle_steps(
         )
     )
 
-    acquire_state = "current" if pending_state == "DETECTED" else ("completed" if active_id or pending_id else "upcoming")
+    acquire_state = "current" if pending_state == "DETECTED" else ("completed" if subject_active or pending_state in {"ACQUIRED", "VALIDATED"} else "upcoming")
     if pending_state in {"ACQUIRED", "VALIDATED"} and not active_id:
         acquire_state = "completed"
     steps.append(
@@ -2465,22 +2548,22 @@ def build_sff_lifecycle_steps(
         )
     )
 
-    validate_state = "completed" if validated or active_id else ("current" if pending_state == "ACQUIRED" else "upcoming")
+    validate_state = "completed" if validated or subject_active else ("current" if pending_state == "ACQUIRED" else "upcoming")
     steps.append(
         step(
             "validate",
             "Validate",
             state=validate_state,
-            detail=f"Structural validation {'PASS' if (validated or active_id) else 'pending'} via sff_release.validate_rows.",
+            detail=f"Structural validation {'PASS' if (validated or subject_active) else 'pending'} via sff_release.validate_rows.",
         )
     )
 
-    if active_id:
+    if subject_active:
         review_state = "completed"
         promote_state = "completed"
     elif pending_state == "VALIDATED":
-        review_state = "completed"
-        promote_state = "current"
+        review_state = "current"
+        promote_state = "upcoming"
     elif pending_state == "ACQUIRED":
         review_state = "current"
         promote_state = "blocked"
@@ -2511,7 +2594,7 @@ def build_sff_lifecycle_steps(
             state=promote_state,
             detail=(
                 f"ACTIVE {active_id} — promotion is explicit and already recorded."
-                if active_id
+                if subject_active
                 else "Explicit promotion only — no auto-promote from this page."
             ),
         )
@@ -2520,7 +2603,7 @@ def build_sff_lifecycle_steps(
         step(
             "pbj_build",
             "PBJ build",
-            state="not_wired" if active_id else "upcoming",
+            state="not_wired",
             detail="Facility package build/deploy is explicit in Dashboard Builder.",
             action={
                 "label": "Dashboard Builder",
@@ -2647,6 +2730,7 @@ def build_source_operator_workflow(
 def check_provider_info_cms(
     *,
     fetch_json: FetchJson | None = None,
+    fetch_bytes: Callable[[str], bytes] | None = None,
     root: Path | None = None,
 ) -> dict[str, Any]:
     import cms_provider_info_acquire as acq
@@ -2697,6 +2781,15 @@ def check_provider_info_cms(
         )
         if availability and availability.get("in_latest_publication")
     ]
+    from cms_release_identity import assess_raw_identity
+    identity = assess_raw_identity("cms.provider_info", active=active_provider, fetch_bytes=fetch_bytes,
+        current={"release_id": f"{cms.year}-{cms.month:02d}", "snapshot_date": cms.modified,
+                 "cms_release_vintage": str(cms.released or "")[:7] or None,
+                 "publisher_latest_release_id": f"{cms.year}-{cms.month:02d}",
+                 "publisher_url": cms.distribution_url, "publisher_filename": cms.distribution_filename,
+                 "publisher_released": cms.released, "publisher_modified": cms.modified,
+                 "publisher_period_basis": "CMS released month; processing date separate", "cms_dataset_id": cms.dataset_id})
+    newer = identity.get("new_release_available") is True
     if newer:
         label = str(cms.data_vintage_label or "").strip()
         release_match = re.fullmatch(r"([A-Za-z]{3,9})\s+(20\d{2})", label)
@@ -2711,6 +2804,7 @@ def check_provider_info_cms(
             "cms.provider_info", canonical_release_id, ReleaseState.DETECTED,
             metadata={
                 "publisher_label": label,
+                **identity,
                 "publisher_modified": cms.modified,
                 "publisher_released": cms.released,
                 "theme_publication_id": getattr(theme_publication, "publication_id", None),
@@ -2750,6 +2844,7 @@ def check_provider_info_cms(
             "dataset_id": cms.dataset_id,
             "data_vintage_label": cms.data_vintage_label,
             "distribution_filename": cms.distribution_filename,
+            "distribution_url": cms.distribution_url,
             "released": cms.released,
             "modified": cms.modified,
             "next_update_date": cms.next_update_date,
@@ -2758,6 +2853,7 @@ def check_provider_info_cms(
             {"year": local[0], "month": local[1], "path": str(local[2])} if local else None
         ),
         "cms_is_newer": newer,
+        "release_identity": identity,
         "theme_publication": {
             "publication_id": getattr(theme_publication, "publication_id", None),
             "publication_date": getattr(theme_publication, "publication_date", None),
@@ -2812,24 +2908,45 @@ def acquire_provider_info(
 def check_nurse_cms(
     *,
     fetch_json: FetchJson | None = None,
+    fetch_bytes: Callable[[str], bytes] | None = None,
     root: Path | None = None,
 ) -> dict[str, Any]:
     import cms_pbj_nurse_acquire as nurse_acq
 
     root = root or cms_data_paths.repo_root()
-    cms = nurse_acq.resolve_cms_nurse_release(fetch_json=fetch_json)
+    from generic_cms_csv import CsvFeed, detect
+    from cms_source_registry import CMS_ID_PBJ_NURSE
+    found = detect(CsvFeed("cms.pbj_nurse_staffing", CMS_ID_PBJ_NURSE,
+        r"PBJ_dailynursestaffing_CY\d{4}Q[1-4]\.csv$", cms_data_paths.nurse_raw_dir(root), (), False,
+        cms_product_path="/quality-of-care/payroll-based-journal-daily-nurse-staffing",
+        cms_product_name="Payroll Based Journal Daily Nurse Staffing", version_date_basis="reporting_period"), fetch_json=fetch_json)
+    cms = nurse_acq.resolve_cms_nurse_release(fetch_json=lambda _url: {"data": [found["row"]]})
     newer = nurse_acq.cms_is_newer_than_local(cms, root)
     local = nurse_acq.latest_local_nurse(root)
     snap = probe_source(
         "cms.pbj_nurse_staffing", check_cms=True, fetch_json=fetch_json, root=root
     )
     dry = nurse_acq.acquire_and_process(root=root, fetch_json=fetch_json, dry_run=True)
+    from cms_release_identity import assess_raw_identity
+    from active_release_registry import get_active_release, registry_path
+    from release_control_plane import control_plane_root
+    active = get_active_release("cms.pbj_nurse_staffing", registry_path(control_plane_root(root))) or {}
+    identity = assess_raw_identity("cms.pbj_nurse_staffing", active=active, fetch_bytes=fetch_bytes,
+        current={"release_id": cms.quarter_label, "snapshot_date": cms.quarter_label,
+                 "publisher_latest_release_id": cms.quarter_label,
+                 "publisher_url": cms.distribution_url, "publisher_filename": cms.distribution_filename,
+                 "publisher_file_uuid": cms.file_uuid, "cms_dataset_id": cms.dataset_id,
+                 "cms_dataset_version_id": found.get("dataset_version_id"),
+                 "cms_dataset_version_label": found.get("dataset_version_label"),
+                 "cms_dataset_version_modified": found.get("dataset_version_modified"),
+                 "publisher_period_basis": "CMS reporting quarter"})
+    newer = identity.get("new_release_available") is True
     if newer:
         from release_control_plane import ReleaseState, control_plane_root, record_candidate
 
         record_candidate(
             "cms.pbj_nurse_staffing", cms.quarter_label, ReleaseState.DETECTED,
-            metadata={"publisher_dataset_id": cms.dataset_id},
+            metadata={"publisher_dataset_id": cms.dataset_id, **identity},
             root=control_plane_root(root),
         )
     return {
@@ -2845,6 +2962,7 @@ def check_nurse_cms(
             {"year": local[0], "quarter": local[1], "path": str(local[2])} if local else None
         ),
         "cms_is_newer": newer,
+        "release_identity": identity,
         "dry_run": dry,
         "snapshot": snap.to_dict(),
     }

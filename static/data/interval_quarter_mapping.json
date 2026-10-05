@@ -8,12 +8,12 @@
       "staffing_level_from": "10/01/2025",
       "staffing_level_through": "12/31/2025",
       "interval_staffing_level_quarter": "Q4 2025",
-      "manual_processing_quarter": "",
+      "manual_processing_quarter": "Q4 2025",
       "used_case_mix_quarter": "Q4 2025",
-      "pbj_quarter_url": "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data/q4-2025",
-      "turnover_from": "10/01/2024",
-      "turnover_through": "09/30/2025",
-      "turnover_quarter": "Q4 2024 - Q3 2025"
+      "turnover_from": "",
+      "turnover_through": "",
+      "turnover_quarter": "",
+      "pbj_quarter_url": "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data/q4-2025"
     },
     {
       "processing_month": "05-2026",
@@ -23,12 +23,27 @@
       "staffing_level_from": "10/01/2025",
       "staffing_level_through": "12/31/2025",
       "interval_staffing_level_quarter": "Q4 2025",
-      "manual_processing_quarter": "",
+      "manual_processing_quarter": "Q4 2025",
       "used_case_mix_quarter": "Q4 2025",
-      "pbj_quarter_url": "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data/q4-2025",
-      "turnover_from": "10/01/2024",
-      "turnover_through": "09/30/2025",
-      "turnover_quarter": "Q4 2024 - Q3 2025"
+      "turnover_from": "",
+      "turnover_through": "",
+      "turnover_quarter": "",
+      "pbj_quarter_url": "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data/q4-2025"
+    },
+    {
+      "processing_month": "08-2026",
+      "provider_info_csv_name": "NH_ProviderInfo_Aug2026.csv",
+      "provider_info_download_url": "/api/provider-info/download?file=NH_ProviderInfo_Aug2026.csv",
+      "interval_csv_name": "",
+      "staffing_level_from": "",
+      "staffing_level_through": "",
+      "interval_staffing_level_quarter": "Q1 2026",
+      "manual_processing_quarter": "Q1 2026",
+      "used_case_mix_quarter": "Q1 2026",
+      "turnover_from": "",
+      "turnover_through": "",
+      "turnover_quarter": "",
+      "pbj_quarter_url": "https://data.cms.gov/quality-of-care/payroll-based-journal-daily-nurse-staffing/data/q1-2026"
     },
     {
       "processing_month": "04-2026",
@@ -886,5 +901,6 @@
       "turnover_quarter": ""
     }
   ],
-  "generated_note": "Fallback when provider_info ZIPs are not on server (e.g. Vercel). Regenerate via export script."
+  "generated_note": "Fallback when provider_info ZIPs are not on server (e.g. Vercel). Regenerate via export script.",
+  "updated_at": "2026-09-30T00:50:28+00:00"
 }

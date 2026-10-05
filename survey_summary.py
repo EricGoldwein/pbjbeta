@@ -139,7 +139,9 @@ def prepare_candidate(*, root: Path | None = None, fetch=fetch_json, download=No
     meta_sha = hashlib.sha256(metadata_bytes).hexdigest()
     metadata_path = directory / f"metadata-{meta_sha}.json"
     _retain(metadata_path, metadata_bytes)
-    provenance = {**current, "sha256": sha, "byte_count": len(raw), "metadata_sha256": meta_sha,
+    provenance = {**current, "sha256": sha, "publisher_sha256": sha,
+                  "acquired_at": datetime.now(timezone.utc).isoformat(),
+                  "byte_count": len(raw), "metadata_sha256": meta_sha,
                   "metadata_path": str(metadata_path), "resource": resource,
                   "retained_source_reused": str(retained_source) if reused else None}
     record_candidate(SOURCE_ID, release, ReleaseState.ACQUIRED, source_path=source, metadata=provenance, root=root)

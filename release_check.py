@@ -24,6 +24,24 @@ def load_check_state(root: Path = ROOT) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def record_check_result(dataset_id: str, evidence: dict[str, Any], *, root: Path = ROOT) -> None:
+    """Persist only observed check metadata; leave lifecycle registries alone."""
+    payload = load_check_state(root)
+    rows = payload.setdefault("datasets", [])
+    row = next((item for item in rows if item.get("dataset_id") == dataset_id), None)
+    if row is None:
+        row = {"dataset_id": dataset_id}
+        rows.append(row)
+    row.update(evidence)
+    row["checked_at"] = evidence.get("publisher_checked_at")
+    payload["checked_at"] = evidence.get("publisher_checked_at")
+    path = root / "state" / "release_checks.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
 def derived_state(dataset_id: str, upstream: tuple[str, ...], *, root: Path = ROOT) -> dict[str, Any]:
     active = load_registry(registry_path(root)).get("datasets", {})
     target = active.get(dataset_id)
@@ -118,7 +136,9 @@ def acquire_detected_source(dataset_id: str, *, root: Path = ROOT) -> dict[str, 
         from generic_cms_csv import compare_publisher_artifact_identity
 
         metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
-        active_metadata = active.get("metadata") if isinstance(active.get("metadata"), dict) else {}
+        active_metadata = dict(active.get("metadata") or {})
+        if active.get("hash"):
+            active_metadata["cms_source_sha256"] = active["hash"]
         changes, _matches = compare_publisher_artifact_identity(active_metadata, metadata)
         if not metadata.get("publisher_revision_changed") or not changes:
             raise RuntimeError(
@@ -172,7 +192,8 @@ def check_releases(
         elif source.mechanism == UpdateMechanism.DERIVED:
             row.update(derived_state(source.dataset_id, source.upstream, root=root))
         elif source.mechanism == UpdateMechanism.MANUAL_VERSIONED:
-            row.update({"status": "MANUAL / CURRENT" if row["active_release"] else "MANUAL / MISSING", "new_release_available": None})
+            row.update({"status": "MANUAL / ACTIVE" if row["active_release"] else "MANUAL / MISSING", "new_release_available": None,
+                        "detail": "Publisher bytes not checked by the manual-reference inventory"})
         else:
             row.update({"status": "STATIC / CURRENT" if row["active_release"] else "STATIC / MISSING", "new_release_available": None})
         candidate = load_candidates(root).get("datasets", {}).get(source.dataset_id)
@@ -200,74 +221,38 @@ def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
     from nonnurse_lifecycle import normalize_validate_candidate
     import cms_data_paths
 
+    def checked_handler(check, source_id, acquire, acquirer=None):
+        # Only the shared authoritative assessment can declare CURRENT.
+        evidence = check.get("release_identity") or {
+            "status": "UNKNOWN", "new_release_available": None,
+            "detail": "Authoritative raw-byte assessment unavailable",
+            "release_id": (check.get("cms") or {}).get("quarter_label") or (check.get("cms") or {}).get("release_id"),
+        }
+        evidence.setdefault("publisher_latest_release_id", evidence.get("cms_release_vintage") or evidence.get("release_id"))
+        if acquire and evidence.get("new_release_available") is True:
+            if evidence.get("status") == "REVISED":
+                return {**evidence, "detail": "Publisher revision detected; source-specific immutable acquisition requires review"}
+            if acquirer:
+                result = acquirer()
+                state = ((load_candidates(ROOT).get("datasets") or {}).get(source_id) or {}).get("state")
+                return {**evidence, "status": state or evidence["status"], "acquisition": result.get("acquire_report")}
+        return evidence
+
     def provider(acquire: bool) -> dict[str, Any]:
-        check = check_provider_info_cms()
-        active_id = ((load_registry(registry_path(ROOT)).get("datasets") or {}).get("cms.provider_info") or {}).get("active_release_id")
-        label = str(check["cms"]["data_vintage_label"])
-        import re
-        match = re.fullmatch(r"([A-Za-z]+) (20\d{2})", label)
-        month = {name: index for index, name in enumerate(("", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))}.get(match.group(1)[:3].title()) if match else None
-        if match and month and active_id == f"{match.group(2)}-{month:02d}":
-            return {"status": "CURRENT", "new_release_available": False}
-        if not check["cms_is_newer"]:
-            return {"status": "CURRENT", "new_release_available": False}
-        result = acquire_provider_info() if acquire else None
-        state = ((load_candidates(ROOT).get("datasets") or {}).get("cms.provider_info") or {}).get("state")
-        return {"status": state or "DETECTED", "new_release_available": True, "release_id": check["cms"]["data_vintage_label"], "acquisition": (result or {}).get("acquire_report")}
+        return checked_handler(check_provider_info_cms(), "cms.provider_info", acquire, acquire_provider_info)
 
     def nurse(acquire: bool) -> dict[str, Any]:
-        check = check_nurse_cms()
-        active_id = ((load_registry(registry_path(ROOT)).get("datasets") or {}).get("cms.pbj_nurse_staffing") or {}).get("active_release_id")
-        quarter_label = check["cms"]["quarter_label"]
-        if active_id == quarter_label:
-            return {
-                "status": "CURRENT",
-                "new_release_available": False,
-                "release_id": quarter_label,
-                "publisher_latest_release_id": quarter_label,
-            }
-        if not check["cms_is_newer"]:
-            return {
-                "status": "CURRENT",
-                "new_release_available": False,
-                "release_id": quarter_label,
-                "publisher_latest_release_id": quarter_label,
-            }
-        result = acquire_nurse() if acquire else None
-        state = ((load_candidates(ROOT).get("datasets") or {}).get("cms.pbj_nurse_staffing") or {}).get("state")
-        return {"status": state or "DETECTED", "new_release_available": True, "release_id": check["cms"]["quarter_label"], "acquisition": (result or {}).get("acquire_report")}
+        return checked_handler(check_nurse_cms(), "cms.pbj_nurse_staffing", acquire, acquire_nurse)
 
     def health_citations(acquire: bool) -> dict[str, Any]:
         from health_citations_acquire import check_health_citations_cms
-
-        check = check_health_citations_cms(root=cms_data_paths.repo_root())
-        active_id = check.get("active_release_id")
-        cms_release = (check.get("cms") or {}).get("release_id")
-        if active_id and cms_release and str(active_id) == str(cms_release):
-            return {
-                "status": "CURRENT",
-                "new_release_available": False,
-                "release_id": cms_release,
-                "publisher_latest_release_id": cms_release,
-            }
-        if not check.get("cms_is_newer"):
-            return {
-                "status": "CURRENT",
-                "new_release_available": False,
-                "release_id": cms_release,
-                "publisher_latest_release_id": cms_release,
-            }
-        state = ((load_candidates(ROOT).get("datasets") or {}).get("cms.health_citations") or {}).get("state")
-        return {
-            "status": state or "DETECTED",
-            "new_release_available": True,
-            "release_id": cms_release,
-            "publisher_latest_release_id": cms_release,
-        }
+        return checked_handler(check_health_citations_cms(root=cms_data_paths.repo_root()), "cms.health_citations", acquire)
 
     pbj_root = cms_data_paths.repo_root()
     generic = {
-        "cms.pbj_non_nurse_staffing": CsvFeed("cms.pbj_non_nurse_staffing", CMS_ID_PBJ_NON_NURSE, r"PBJ_dailynonnursestaffing_CY\d{4}Q[1-4]\.csv$", cms_data_paths.nonnurse_raw_dir(), (("PROVNUM", "CCN"), ("WorkDate", "work_date")), False),
+        "cms.pbj_non_nurse_staffing": CsvFeed("cms.pbj_non_nurse_staffing", CMS_ID_PBJ_NON_NURSE, r"PBJ_dailynonnursestaffing_CY\d{4}Q[1-4]\.csv$", cms_data_paths.nonnurse_raw_dir(), (("PROVNUM", "CCN"), ("WorkDate", "work_date")), False,
+            cms_product_path="/quality-of-care/payroll-based-journal-daily-non-nurse-staffing",
+            cms_product_name="Payroll Based Journal Daily Non-Nurse Staffing", version_date_basis="reporting_period"),
         **ownership_csv_feeds(pbj_root),
     }
     def nonnurse(acquire: bool) -> dict[str, Any]:

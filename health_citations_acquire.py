@@ -51,6 +51,7 @@ class CmsHealthCitationsRelease:
     distribution_filename: str
     distribution_url: str
     modified: str | None
+    released: str | None = None
 
 
 class HealthCitationsAcquireError(RuntimeError):
@@ -135,6 +136,7 @@ def resolve_cms_health_citations_release(
         distribution_filename=filename or _basename_for_release(release_id),
         distribution_url=url,
         modified=modified,
+        released=payload.get("released"),
     )
 
 
@@ -230,13 +232,15 @@ def adopt_health_citations_candidate(
 def check_health_citations_cms(
     *,
     fetch_json: FetchJson | None = None,
+    fetch_bytes: Callable[[str], bytes] | None = None,
     root: Path | None = None,
 ) -> dict[str, Any]:
     cms = resolve_cms_health_citations_release(fetch_json=fetch_json)
     pbj_root = root or cms_data_paths.repo_root()
     from active_release_registry import get_active_release, registry_path
 
-    active_id = (get_active_release("cms.health_citations", registry_path()) or {}).get("active_release_id")
+    active = get_active_release("cms.health_citations", registry_path()) or {}
+    active_id = active.get("active_release_id")
     local_ready = citations_artifact_path(cms.release_id, root=pbj_root).is_file()
     bundle_ok = False
     bundle_detail = ""
@@ -247,7 +251,17 @@ def check_health_citations_cms(
             bundle_detail = "local artifact matches Provider Info bundle manifest"
         except HealthCitationsAcquireError as exc:
             bundle_detail = str(exc)
-    cms_is_newer = bool(active_id and cms.release_id != active_id) or (not active_id)
+    from cms_release_identity import assess_raw_identity
+    identity = assess_raw_identity("cms.health_citations", active=active, fetch_bytes=fetch_bytes,
+        current={"release_id": cms.release_id, "snapshot_date": None,
+                 "file_period": cms.release_id,
+                 "cms_release_vintage": str(cms.released or "")[:7] or None,
+                 "publisher_released": cms.released,
+                 "publisher_latest_release_id": cms.release_id,
+                 "publisher_url": cms.distribution_url, "publisher_filename": cms.distribution_filename,
+                 "publisher_modified": cms.modified, "cms_dataset_id": cms.dataset_id,
+                 "publisher_period_basis": "CMS file period"})
+    cms_is_newer = identity.get("new_release_available") is True
     return {
         "cms": {
             "data_vintage_label": cms.data_vintage_label,
@@ -255,6 +269,7 @@ def check_health_citations_cms(
             "distribution_filename": cms.distribution_filename,
         },
         "cms_is_newer": cms_is_newer,
+        "release_identity": identity,
         "active_release_id": active_id,
         "local_artifact_ready": local_ready,
         "bundle_provenance_ok": bundle_ok,

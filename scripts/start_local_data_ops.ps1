@@ -27,6 +27,13 @@ if ($env:PBJ_DATA_OPS_PORT -and [int]$env:PBJ_DATA_OPS_PORT -ne $CanonicalPort) 
 
 $env:PBJ_DATA_OPS_PORT = "$CanonicalPort"
 
+if (-not ($env:PRIVATE_DATA_ROOT -and $env:PRIVATE_DATA_ROOT.Trim())) {
+    $PrivateFallback = "D:\Data\PBJ320_Private"
+    if (Test-Path -LiteralPath $PrivateFallback) {
+        $env:PRIVATE_DATA_ROOT = $PrivateFallback
+    }
+}
+
 if (-not $env:PBJ_ACTIVE_RELEASE_REGISTRY) {
     $env:PBJ_ACTIVE_RELEASE_REGISTRY = Join-Path $RepoRoot "state\active_releases.json"
 }
@@ -37,6 +44,14 @@ if (-not $env:PBJ_REPO_ROOT) {
         exit 1
     }
     $env:PBJ_REPO_ROOT = (Resolve-Path $PbjApp).Path
+}
+
+# Facility deploy bundles live under PBJ_DATA_ROOT (not PBJapp\deployments stubs).
+if (-not ($env:PBJ_DATA_ROOT -and $env:PBJ_DATA_ROOT.Trim())) {
+    $DataRootFallback = "D:\PBJapp-data"
+    if (Test-Path -LiteralPath $DataRootFallback) {
+        $env:PBJ_DATA_ROOT = $DataRootFallback
+    }
 }
 
 if (-not ($env:PBJ_DATA_OPS_PASSWORD -and $env:PBJ_DATA_OPS_PASSWORD.Trim())) {
@@ -70,4 +85,5 @@ if ($listeners.Count -gt 0) {
 Write-Host "Data Ops URL: $CanonicalUrl"
 Write-Host "Registry:     $env:PBJ_ACTIVE_RELEASE_REGISTRY"
 Write-Host "PBJapp root:  $env:PBJ_REPO_ROOT"
+Write-Host "Data root:    $env:PBJ_DATA_ROOT"
 python data_ops_app.py

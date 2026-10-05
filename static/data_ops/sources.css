@@ -1,0 +1,40 @@
+/* Sources-only presentation; lifecycle and actions remain in existing handlers. */
+.do-sources-steps { list-style: none; padding: 0; margin: 1rem 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem; }
+.do-sources-steps li { display: flex; align-items: flex-start; gap: .5rem; padding: .75rem; border: 1px solid var(--do-line); border-radius: 8px; min-width: 0; background: #f8fafc; }
+.do-sources-steps li.is-actionable { background: #eff6ff; border-color: #bfdbfe; }
+.do-sources-step-number { display: grid; place-items: center; flex: 0 0 1.5rem; height: 1.5rem; border-radius: 50%; background: #e2e8f0; font-weight: 650; font-size: .8rem; }
+.is-actionable .do-sources-step-number { background: #dbeafe; color: #1e40af; }
+.do-sources-steps strong { display: block; font-size: .85rem; }
+.do-sources-steps small { display: block; margin-top: .3rem; color: var(--do-muted); font-size: .75rem; }
+.do-sources-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.do-sources-card { display: flex; flex-direction: column; gap: .8rem; padding: 1.1rem; border: 1px solid var(--do-line); border-radius: 10px; background: #fff; min-width: 0; overflow-wrap: anywhere; }
+.do-sources-card-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: .5rem .8rem; }
+.do-sources-card-head h3 { margin: 0; font-size: 1rem; }
+.do-sources-card-head .do-badge { white-space: normal; max-width: 100%; }
+.do-sources-card p { margin: 0; }
+.do-sources-card-status { flex: 1; }
+.do-sources-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem; }
+.do-sources-card details { border-top: 1px solid var(--do-line); padding-top: .65rem; font-size: .8rem; }
+.do-sources-card details p { margin-top: .6rem; }
+.do-sources-note { margin-top: .8rem; font-size: .8rem; color: var(--do-muted); }
+.do-sources-reference { max-width: 48rem; }
+.do-sources-page .do-attention-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.do-sources-page .do-attention-main, .do-sources-page .do-attention-action { min-width: 0; overflow-wrap: anywhere; }
+.do-sources-page .do-attention-action { align-items: flex-start; }
+.do-sources-page .do-btn { white-space: normal; text-align: center; max-width: 100%; }
+.do-sources-page .do-toolbar-controls { flex-wrap: wrap; min-width: 0; }
+.do-sources-health-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; align-items: stretch; }
+.do-sources-health-actions .do-source-action { display: grid; grid-template-rows: auto 1fr; align-items: start; gap: .4rem; min-width: 0; max-width: none; }
+.do-sources-health-actions form { margin: 0; width: 100%; }
+.do-sources-health-actions .do-btn { width: 100%; min-height: 2.5rem; }
+.do-sources-health-actions .do-tiny { line-height: 1.4; }
+@media (max-width: 1050px) { .do-sources-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .do-sources-steps { grid-template-columns: 1fr; }
+  .do-sources-card-grid { grid-template-columns: 1fr; }
+  .do-sources-page .do-attention-row { grid-template-columns: 1fr; }
+  .do-sources-health-actions { width: 100%; }
+  .do-sources-health-actions .do-btn { min-height: 3.2rem; }
+  .do-sources-page .do-toolbar-controls { width: 100%; }
+  .do-sources-page .do-release-toolbar { flex-wrap: wrap; }
+}

@@ -311,6 +311,16 @@ def create_app() -> Flask:
                     reference_sources.append({"source_id": row["dataset_id"], "release_id": candidate.get("release_id"), **survey_review_guidance(candidate)})
                     completed_reference_ids.add(row["dataset_id"])
         needs_attention = [item for item in needs_attention if item.get("source_id") not in completed_reference_ids]
+        for item in needs_attention:
+            if item.get("source_id") == "cms.survey_summary":
+                candidate = next((r.get("pending") or {} for r in control.get("datasets", [])
+                                  if r.get("dataset_id") == "cms.survey_summary"), {})
+                guidance = survey_review_guidance(candidate)
+                item["concise_state"] = guidance["label"]
+                item["next_action"] = {"label": "Review saved Survey Summary", "wired": True,
+                                       "read_only": True, "endpoint": "source_detail",
+                                       "endpoint_args": {"source_id": "cms.survey_summary"},
+                                       "detail": guidance["detail"]}
         availability_by_dataset: dict[str, dict] = {}
         for row in control.get("datasets") or []:
             dataset_id = row.get("dataset_id")
@@ -434,8 +444,10 @@ def create_app() -> Flask:
     def source_detail(source_id: str):
         if source_id == "cms.survey_summary":
             from survey_summary import SOURCE_ID
+            from source_operator_guidance import survey_review_guidance
             row = next((r for r in control_panel_payload()["datasets"] if r["dataset_id"] == SOURCE_ID), {})
-            return render_template("data_ops/survey_summary.html", candidate=row.get("pending") or {}, active=row.get("active"))
+            candidate = row.get("pending") or {}
+            return render_template("data_ops/survey_summary.html", candidate=candidate, active=row.get("active"), guidance=survey_review_guidance(candidate))
         from ownership_pairing import PAIR_SOURCE_ID, build_pair_operator_context
 
         check_cms = request.args.get("check_cms", "1") != "0"
@@ -459,8 +471,10 @@ def create_app() -> Flask:
     @require_auth
     def source_detail_panel(source_id: str):
         if source_id == "cms.survey_summary":
+            from source_operator_guidance import survey_review_guidance
             row = next((r for r in control_panel_payload()["datasets"] if r["dataset_id"] == source_id), {})
-            return render_template("data_ops/partials/survey_summary_panel.html", candidate=row.get("pending") or {}, active=row.get("active"), panel_mode="modal")
+            candidate = row.get("pending") or {}
+            return render_template("data_ops/partials/survey_summary_panel.html", candidate=candidate, active=row.get("active"), guidance=survey_review_guidance(candidate), panel_mode="modal")
         from ownership_pairing import PAIR_SOURCE_ID, build_pair_operator_context
 
         check_cms = request.args.get("check_cms", "1") != "0"
@@ -485,7 +499,9 @@ def create_app() -> Flask:
         from survey_summary import prepare_candidate
         try:
             candidate = prepare_candidate()
-            flash(f"Survey Summary {candidate['state']} · explicit review required", "ok" if candidate["state"] == "VALIDATED" else "error")
+            from source_operator_guidance import survey_review_guidance
+            guidance = survey_review_guidance(candidate)
+            flash(f"Survey Summary: {guidance['label']}. {guidance['detail']}", "ok" if candidate["state"] == "VALIDATED" else "error")
         except Exception as exc:
             flash(f"Survey Summary preparation failed: {exc}", "error")
         return redirect(url_for("source_detail", source_id="cms.survey_summary"))
@@ -608,6 +624,8 @@ def create_app() -> Flask:
     def action_pi_check():
         try:
             result = check_provider_info_cms()
+            from release_check import record_check_result
+            record_check_result("cms.provider_info", result["release_identity"])
             session["last_pi_action"] = {
                 "action": "check_cms",
                 "cms": result.get("cms"),
@@ -615,7 +633,7 @@ def create_app() -> Flask:
                 "dry_run_status": (result.get("dry_run") or {}).get("status"),
             }
             flash(
-                f"CMS {result['cms']['data_vintage_label']} · newer={result['cms_is_newer']}",
+                f"Provider CMS check: {result['release_identity']['status']} · {result['release_identity'].get('detail', '')}",
                 "ok",
             )
         except Exception as exc:  # noqa: BLE001
@@ -848,6 +866,8 @@ def create_app() -> Flask:
     def action_nurse_check():
         try:
             result = check_nurse_cms()
+            from release_check import record_check_result
+            record_check_result("cms.pbj_nurse_staffing", result["release_identity"])
             session["last_nurse_action"] = {
                 "action": "check_cms",
                 "cms": result.get("cms"),
@@ -855,7 +875,7 @@ def create_app() -> Flask:
                 "dry_run_status": (result.get("dry_run") or {}).get("status"),
             }
             flash(
-                f"Nurse CMS {result['cms']['quarter_label']} · newer={result['cms_is_newer']}",
+                f"Nurse reporting quarter {result['cms']['quarter_label']} · {result['release_identity']['status']}",
                 "ok",
             )
         except Exception as exc:  # noqa: BLE001
@@ -867,9 +887,11 @@ def create_app() -> Flask:
     def action_sff_check():
         try:
             result = check_sff_cms()
+            from release_check import record_check_result
+            record_check_result("cms.sff_pdf_list", result["release_identity"])
             cms = result.get("cms") or {}
             flash(
-                f"SFF CMS {cms.get('posting_label') or cms.get('release_id')} · newer={result.get('cms_is_newer')}",
+                f"SFF CMS posting {cms.get('posting_label') or cms.get('release_id')} · {result['status']}",
                 "ok",
             )
         except Exception as exc:  # noqa: BLE001

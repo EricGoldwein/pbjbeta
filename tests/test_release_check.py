@@ -23,7 +23,7 @@ def test_detect_validate_and_explicitly_promote(tmp_path: Path, monkeypatch) -> 
     assert load_registry(registry)["datasets"][feed.dataset_id]["active_release_id"] == "CY2026Q2"
 
 
-def test_nurse_current_check_includes_publisher_release_id(monkeypatch) -> None:
+def test_nurse_same_quarter_without_byte_evidence_is_not_current(monkeypatch) -> None:
     from release_check import production_handlers
 
     monkeypatch.setattr(
@@ -38,7 +38,8 @@ def test_nurse_current_check_includes_publisher_release_id(monkeypatch) -> None:
         lambda _path=None: {"datasets": {"cms.pbj_nurse_staffing": {"active_release_id": "CY2026Q1"}}},
     )
     result = production_handlers()["cms.pbj_nurse_staffing"](False)
-    assert result["status"] == "CURRENT"
+    assert result["status"] == "UNKNOWN"
+    assert result["new_release_available"] is None
     assert result["release_id"] == "CY2026Q1"
     assert result["publisher_latest_release_id"] == "CY2026Q1"
 
@@ -148,7 +149,7 @@ def test_changed_version_uuid_is_discovered_dynamically(tmp_path: Path) -> None:
     assert found["dataset_version_id"] == "future-version-uuid"
 
 
-def test_active_july_publisher_august_is_detected_not_current(tmp_path: Path, monkeypatch) -> None:
+def test_newer_snapshot_is_newer_not_current(tmp_path: Path, monkeypatch) -> None:
     registry = tmp_path / "state" / "active_releases.json"
     monkeypatch.setenv("PBJ_ACTIVE_RELEASE_REGISTRY", str(registry))
     active = tmp_path / "active.csv"
@@ -170,8 +171,9 @@ def test_active_july_publisher_august_is_detected_not_current(tmp_path: Path, mo
             rows,
             {"august-version": _resource("SNF_Owners_2026.08.31.csv", "https://cms/august.csv")},
         ),
+        fetch_bytes=lambda _: b"ENROLLMENT ID\n2\n",
     )
-    assert result["status"] == "DETECTED"
+    assert result["status"] == "NEWER"
     assert result["new_release_available"] is True
     assert result["release_id"] == "2026-08-31"
 
@@ -186,7 +188,7 @@ def test_lookup_or_parse_failure_is_error_never_current(tmp_path: Path) -> None:
     assert result["new_release_available"] is None
 
 
-def test_missing_active_publisher_provenance_is_unknown(tmp_path: Path, monkeypatch) -> None:
+def test_legacy_active_can_be_proven_current_by_exact_bytes(tmp_path: Path, monkeypatch) -> None:
     registry = tmp_path / "state" / "active_releases.json"
     monkeypatch.setenv("PBJ_ACTIVE_RELEASE_REGISTRY", str(registry))
     active = tmp_path / "active.csv"
@@ -207,9 +209,10 @@ def test_missing_active_publisher_provenance_is_unknown(tmp_path: Path, monkeypa
             rows,
             {"current-version": _resource("SNF_Owners_2026.07.31.csv", "https://cms/current.csv")},
         ),
+        fetch_bytes=lambda _: active.read_bytes(),
     )
-    assert result["status"] == "UNKNOWN"
-    assert result["new_release_available"] is None
+    assert result["status"] == "CURRENT"
+    assert result["new_release_available"] is False
 
 
 def test_next_month_metadata_requires_no_code_change(tmp_path: Path) -> None:
@@ -271,12 +274,13 @@ def test_same_release_changed_artifact_is_revised_and_acquired_without_overwrite
             )
         },
     )
-    assessment = assess_feed(feed, root=tmp_path, fetch_json=fetch)
+    assessment = assess_feed(feed, root=tmp_path, fetch_json=fetch, fetch_bytes=lambda _: b"ENROLLMENT ID\nnew\nnewer\n")
     assert assessment["status"] == "REVISED"
     assert set(assessment["revision_identity_changes"]) == {
         "publisher_url",
         "file_uuid",
         "version_uuid",
+        "source_sha256",
     }
 
     result = run_feed(

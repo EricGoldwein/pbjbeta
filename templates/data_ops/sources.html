@@ -1,60 +1,87 @@
 {% extends "data_ops/base.html" %}
 {% from 'data_ops/partials/source_detail_macros.html' import render_workflow_action, render_attention_primary_action %}
 {% block title %}Sources{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='data_ops/sources.css') }}?v=1">{% endblock %}
+{% macro release_date(value) -%}
+  {% set value = value or '' %}
+  {% set months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
+  {% set month = value[5:7]|int %}
+  {% if value[4:5] == '-' and month >= 1 and month <= 12 %}
+    {{ months[month - 1] }}{% if value|length == 10 and value[8:10]|int %} {{ value[8:10]|int }},{% endif %} {{ value[:4] }}
+  {% else %}{{ value or 'Saved candidate' }}{% endif %}
+{%- endmacro %}
 {% block content %}
+<div class="do-sources-page">
 <section class="do-section do-section-primary do-section-flush-top" id="sources-next-steps">
-  <h1>Do these next</h1>
-
-  <p><strong>Local data and the live website are separate steps.</strong> Follow the actions supported by each source.</p>
-
-  <ol>
-
-    <li><strong>Check CMS for updates.</strong> Detect only · last check {{ releases_checked_at | do_datetime if releases_checked_at else 'not recorded' }}.</li>
-
-    <li><a href="{{ url_for('release_review') }}"><strong>Review prepared candidates.</strong></a> {{ needs_attention|length }} local source actions below. VALIDATED means downloaded, saved and checks passed; it does not mean ACTIVE or published.</li>
-
-    <li><strong>Activate locally, where supported.</strong> ACTIVE selects inputs for local builds; it does not mean deployed. Review-only sources need no activation.</li>
-
-    <li><strong>Prepare the website release.</strong> Use the current local releases and the website evidence below.</li>
-
-    <li><strong>Publish + verify.</strong> A prepared or pushed candidate is not verified production. Check the deployment and its source provenance.</li>
-
+  <h1>Next actions</h1>
+  <p class="do-muted">Local source updates and website publishing are separate steps.</p>
+  <ol class="do-sources-steps" aria-label="Source workflow">
+    <li class="is-actionable"><span class="do-sources-step-number">1</span><div><strong>Check CMS</strong><small>Detect available updates</small></div></li>
+    <li class="is-actionable"><span class="do-sources-step-number">2</span><div><strong>Review candidates</strong><small>VALIDATED = saved, checks passed</small></div></li>
+    <li><span class="do-sources-step-number">3</span><div><strong>Activate locally</strong><small>ACTIVE = selected for local builds</small></div></li>
+    <li><span class="do-sources-step-number">4</span><div><strong>Prepare website release</strong><small>STAGED = candidate, not production</small></div></li>
+    <li><span class="do-sources-step-number">5</span><div><strong>Publish + verify</strong><small>Confirm deployment + provenance</small></div></li>
   </ol>
-
-  <div class="do-actions"><form method="post" action="{{ url_for('action_control_panel_check_releases') }}"><button class="do-btn do-btn-primary" type="submit">Check CMS for updates</button></form><a class="do-btn" href="{{ url_for('release_review') }}">Review prepared candidates</a></div>
-
-  {% for item in reference_sources %}
-
-  <div class="do-callout" data-do-reference-source="{{ item.source_id }}"><strong>Survey Summary · VALIDATED / REVIEW-ONLY</strong><p>Saved for reference · No activation required.</p><a href="{{ url_for('source_detail', source_id=item.source_id) }}">Review saved Survey Summary</a><details><summary>Release and lifecycle evidence</summary><p>{{ item.release_id }} · {{ item.detail }}</p></details></div>
-
-  {% endfor %}
-
-  <h2>Ownership and SFF: does the website need updating?</h2>
-  <p class="do-muted do-small">These rows use local ACTIVE releases, staged source hashes, and publication receipts. They do not probe the live website.</p>
-  {% for item in public_updates %}
-  <div class="do-callout">
-    <h3>{{ item.label }} · selected locally: {{ item.local_release }}</h3>
-    <p><strong>{{ item.next_step }}</strong></p>
-    <button type="button" class="do-btn do-btn-compact" data-do-source-panel="{{ url_for('source_detail_panel', source_id=item.source_id) }}">Open source details</button>
-    <details><summary>Website release evidence</summary><p>{{ item.website_status }}. This evidence is separate from local activation.</p></details>
-  </div>
-  {% endfor %}
-  <p class="do-muted do-small">Publishing several source updates plus UI changes in one website deployment requires one combined website release. Source checks and local activation do not assemble or publish that combined release.</p>
+  <p class="do-muted do-small">Follow only the steps supported by each source. Review-only sources stop at review; VALIDATED and ACTIVE do not mean published.</p>
+  <div class="do-actions"><form method="post" action="{{ url_for('action_control_panel_check_releases') }}"><button class="do-btn do-btn-compact do-btn-primary" type="submit">Check CMS for updates</button></form><a class="do-btn do-btn-compact" href="{{ url_for('release_review') }}">Review prepared candidates</a></div>
 </section>
+<section class="do-section do-section-primary" aria-labelledby="website-readiness-title">
+  <h2 id="website-readiness-title">Website release readiness</h2>
+  <div class="do-sources-card-grid">
+  {% for item in public_updates %}
+    {% set presentations = {
+      'CMS bytes require verification': ('CMS CHECK REQUIRED', 'Verify both current CMS distributions against ACTIVE bytes.', 'Check source evidence'),
+      'Website candidate needs provenance review': ('PROVENANCE REVIEW REQUIRED', 'Local raw sources match CMS. Website candidate release dates need provenance review.', 'Review release provenance'),
+      'Website update needs preparation': ('NEEDS PREPARATION', 'Local source is current. The website package is missing or uses older/different source bytes.', 'Prepare website release'),
+      'Website candidate needs checks': ('CHECKS REQUIRED', 'Website staging checks need attention.', 'Review staging checks'),
+      'Website candidate prepared': ('STAGED', 'Website candidate is staged and ready for review.', 'Review website release'),
+      'Sent for publication; live status unverified': ('AWAITING VERIFICATION', 'Release sent for publication. Live provenance is unverified.', 'Verify live website'),
+      'Production verification recorded': ('VERIFIED', 'Production verification recorded for this release.', 'Review verification')
+    } %}
+    {% set view = presentations.get(item.website_status, ('LOCAL REVIEW REQUIRED', 'Review local source data before preparing a website release.', 'Review local source')) %}
+    <article class="do-sources-card" data-do-website-source="{{ item.source_id }}">
+      <header class="do-sources-card-head"><div><h3>{{ 'PECOS ownership' if item.source_id == 'cms.snf_all_owners' else 'SFF' }}</h3><span class="do-muted do-small">{{ 'Owners + Enrollments' if item.source_id == 'cms.snf_all_owners' else 'Special Focus Facilities + Candidates' }}</span></div><span class="do-badge">{{ view[0] }}</span></header>
+      {% if item.source_id == 'cms.snf_all_owners' %}
+      <p class="do-muted do-small">CMS release: {{ release_date(item.cms_release_vintage) if item.cms_release_vintage else 'Not byte-verified' }} · Data snapshot / file date: {{ release_date(item.snapshot_date or item.local_release) }}</p>
+      {% else %}<p class="do-muted do-small">Selected locally: {{ release_date(item.local_release) }}</p>{% endif %}
+      <p class="do-sources-card-status">{{ view[1] }}</p>
+      <div class="do-sources-card-actions"><button type="button" class="do-btn do-btn-compact do-btn-primary" data-do-source-panel="{{ url_for('source_detail_panel', source_id=item.source_id) }}" aria-haspopup="dialog">{{ view[2] }}</button><a class="do-small" href="{{ url_for('source_detail', source_id=item.source_id) }}">Source details</a></div>
+      <details><summary>Release evidence</summary><p class="do-muted do-small">{{ item.website_status }}. Recorded evidence does not probe the live website.</p><p class="do-small">{{ item.next_step }}</p></details>
+    </article>
+  {% endfor %}
+  </div>
+  <details class="do-sources-note"><summary>About combined website releases</summary><p class="do-muted do-small">Several source updates and UI changes require one combined website release. Source checks and local activation do not assemble or publish it.</p></details>
+</section>
+{% if reference_sources %}
+<section class="do-section do-section-primary" aria-labelledby="local-review-title">
+  <h2 id="local-review-title">Local-data review</h2>
+  {% for item in reference_sources %}
+  <article class="do-sources-card do-sources-reference" data-do-reference-source="{{ item.source_id }}">
+    <header class="do-sources-card-head"><h3>Survey Summary</h3><span class="do-badge">REVIEW ONLY</span></header>
+    <p class="do-muted do-small">{{ release_date(item.release_id) }} <span class="do-badge do-badge-active">Checks passed</span></p>
+    <p>Saved with provenance and automated checks passed.</p>
+    <div class="do-sources-card-actions"><a class="do-btn do-btn-compact do-btn-primary" href="{{ url_for('source_detail', source_id=item.source_id) }}">Review saved file</a></div>
+    <p class="do-muted do-small">No activation or website publication required.</p>
+    <details><summary>Release and lifecycle evidence</summary><p class="do-mono do-small">{{ item.release_id or 'Candidate ID not recorded' }}</p><p class="do-small">{{ item.label }}. {{ item.detail }}</p></details>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
 {% if needs_attention %}
 <section class="do-section do-section-attention do-section-flush-top">
   <div class="do-release-toolbar">
-    <h1 class="do-release-title">Needs attention</h1>
+    <h2 class="do-release-title">Local data: next actions</h2>
   </div>
   <ul class="do-attention-list">
     {% for item in needs_attention %}
     <li class="do-attention-row">
       <button type="button" class="do-attention-main" data-do-source-panel="{{ url_for('source_detail_panel', source_id=item.panel_source_id or item.source_id) }}" aria-haspopup="dialog">
         <span class="do-attention-dataset">{{ item.human_name }}</span>
-        <span class="do-attention-meta">{{ item.release_line }} · {{ item.concise_state }}</span>
+        <span class="do-attention-meta">{% if item.source_id == 'cms.survey_summary' %}{{ release_date(item.release_line) }}{% else %}{{ item.release_line }}{% endif %} · {{ item.concise_state }}</span>
       </button>
       <div class="do-attention-action">
         {{ render_attention_primary_action(item.next_action) }}
+        {% if item.next_action.detail %}<details class="do-small"><summary>Action details</summary><p class="do-muted">{{ item.next_action.detail }}</p></details>{% endif %}
       </div>
     </li>
     {% endfor %}
@@ -66,12 +93,13 @@
 
 <section class="do-section do-section-primary{% if not needs_attention %} do-section-flush-top{% endif %}">
   <div class="do-release-toolbar">
-    <h1 class="do-release-title">Selected local releases (ACTIVE)</h1>
+    <h2 class="do-release-title">Selected local releases (ACTIVE)</h2>
     <div class="do-toolbar-controls" data-do-release-filters>
       <input class="do-input do-input-compact" type="search" placeholder="Filter datasets…" data-do-release-search aria-label="Filter datasets">
       <label class="do-check do-check-compact do-check-attention">
         <input type="checkbox" data-do-needs-attention-only> Needs attention
       </label>
+      <div class="do-sources-health-actions">
       <div class="do-source-action">
         <form method="post" action="{{ url_for('action_control_panel_refresh') }}">
           <button class="do-btn do-btn-compact" type="submit">Refresh active-file health</button>
@@ -84,11 +112,13 @@
         </form>
         <span class="do-muted do-tiny">Detect only · {{ releases_checked_at | do_datetime if releases_checked_at else 'not yet run' }}</span>
       </div>
+      </div>
       <form class="do-inline" method="get" action="{{ url_for('sources') }}">
         <label class="do-check do-check-compact"><input type="checkbox" name="check_cms" value="1" {% if check_cms %}checked{% endif %} onchange="this.form.submit()"> Live diagnostic probes</label>
       </form>
     </div>
   </div>
+  <p class="do-muted do-small">ACTIVE means selected for local builds. It does not mean deployed. Pending files are not used until approved and activated.</p>
   <div class="do-table-wrap do-table-wrap-compact">
     <table class="do-table do-table-compact do-table-striped" data-do-release-table>
       <thead>
@@ -275,5 +305,6 @@
       <p class="do-muted do-small">Loading…</p>
     </div>
   </div>
+</div>
 </div>
 {% endblock %}

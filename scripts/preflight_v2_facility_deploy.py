@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -23,6 +24,8 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+from path_display_lib import path_for_log
 
 REQUIRED_PARTIALS = (
     "templates/partials/superdynamic_url_macros.html",
@@ -79,6 +82,24 @@ def _run(cmd: list[str], cwd: Path) -> tuple[int, str]:
     return int(p.returncode), out.strip()
 
 
+def _check_data_path_api() -> tuple[bool, str]:
+    """Guard against stale import names (pbj_nurse_dir, ein_dir) at deploy start."""
+    try:
+        import cms_data_paths
+
+        for attr in (
+            "standardized_nurse_dir",
+            "nonnurse_raw_dir",
+            "facility_deploy_dir",
+            "provider_info_normalized_dir",
+        ):
+            if not hasattr(cms_data_paths, attr):
+                return False, f"FAIL cms_data_paths missing {attr}"
+    except Exception as exc:
+        return False, f"FAIL cms_data_paths import: {exc}"
+    return True, "OK   cms_data_paths discovery (use cms_data_paths.* not legacy pbj_nurse_dir/ein_dir)"
+
+
 def _check_file(deploy: Path, rel: str, ccn: str) -> tuple[bool, str]:
     rel = rel.replace("{ccn}", ccn)
     p = deploy / rel
@@ -127,11 +148,31 @@ def _check_vercel_json(deploy: Path, ccn: str) -> tuple[bool, str]:
 
 def _check_vercel_password(ccn: str, expected: str) -> tuple[bool, str]:
     deploy = _ROOT / "deployments" / f"pbj320-{ccn}"
+    sys.path.insert(0, str(_ROOT / "scripts"))
+    from pbj_facility_vercel_auth_policy import dashboard_password_required
+
     code, out = _run(_vercel_cmd() + ["env", "ls"], cwd=deploy)
     if code != 0:
         return False, f"WARN vercel env ls failed (not linked?): {out[:120]}"
-    if "PBJ_DASHBOARD_PASSWORD" not in out:
-        return False, "FAIL PBJ_DASHBOARD_PASSWORD not set on Vercel project"
+    has_pwd = "PBJ_DASHBOARD_PASSWORD" in out
+    if not dashboard_password_required(ccn, root=_ROOT):
+        if has_pwd:
+            return False, "FAIL open-access CCN still has PBJ_DASHBOARD_PASSWORD on Vercel"
+        return True, f"OK   open dashboard access for {ccn} (no password)"
+    if not has_pwd:
+        # Align with deploy_vercel_facility._ensure_vercel_password_env: local shell
+        # password is provisioned onto Vercel during --confirm-deploy.
+        local_pwd = (os.environ.get("PBJ_DASHBOARD_PASSWORD") or "").strip()
+        if local_pwd:
+            return (
+                True,
+                "OK   PBJ_DASHBOARD_PASSWORD missing on Vercel but set locally "
+                "(deploy will provision; value not shown)",
+            )
+        return False, (
+            "FAIL PBJ_DASHBOARD_PASSWORD not set on Vercel project "
+            "and PBJ_DASHBOARD_PASSWORD is unset locally"
+        )
     if expected:
         # Cannot read encrypted value; verify via local hash hint only in docs.
         return True, f"OK   PBJ_DASHBOARD_PASSWORD present (expected {expected!r} — confirm via login smoke)"
@@ -141,6 +182,7 @@ def _check_vercel_password(ccn: str, expected: str) -> tuple[bool, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ccn")
+    parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--password", default="", help="Expected dashboard password (for checklist note)")
     parser.add_argument(
         "--check-vercel-env",
@@ -152,15 +194,45 @@ def main() -> int:
         action="store_true",
         help="Skip repo-root inline JS gate (not recommended)",
     )
+    parser.add_argument(
+        "--deploy-dir",
+        default="",
+        help="Override deployment bundle directory (default: facility_deploy_dir / PBJ_DATA_ROOT)",
+    )
     args = parser.parse_args()
     ccn = str(args.ccn).strip().zfill(6)
-    deploy = _ROOT / "deployments" / f"pbj320-{ccn}"
+    if args.deploy_dir:
+        deploy = Path(args.deploy_dir).resolve()
+    else:
+        # Same contract as package/create_vercel_deployment: never the empty repo stub.
+        try:
+            from cms_data_paths import facility_deploy_dir, optional_repo_root
+
+            deploy = facility_deploy_dir(ccn, optional_repo_root(_ROOT))
+        except Exception:
+            deploy = _ROOT / "deployments" / f"pbj320-{ccn}"
     if not deploy.is_dir():
         print(f"ERROR: {deploy} missing — run create_vercel_deployment.py then bootstrap", file=sys.stderr)
         return 1
 
     print(f"\n=== V2 preflight: CCN {ccn} ===\n")
     fails = 0
+
+    # The declarative premium contract is the fail-fast release authority. Stop
+    # here so operators see the first broken capability, not cascading imports.
+    contract = _ROOT / "scripts" / "check_v2_facility_artifact_contract.py"
+    code, out = _run(
+        [sys.executable, str(contract), ccn, "--deploy-dir", str(deploy)], cwd=_ROOT
+    )
+    if code != 0:
+        print(out)
+        print("\nPACKAGE PREFLIGHT FAIL: premium release contract not proven")
+        return 1
+    print(out)
+
+    ok, msg = _check_data_path_api()
+    print(msg)
+    fails += 0 if ok else 1
 
     for rel in REQUIRED_PARTIALS + REQUIRED_CONFIG:
         ok, msg = _check_file(deploy, rel, ccn)
@@ -227,6 +299,7 @@ def main() -> int:
 
     for script, label in (
         (["scripts/check_v2_deployment_import.py", ccn, "--deploy-dir", str(deploy)], "import"),
+        (["scripts/check_v2_deployment_roster_runtime.py", ccn, "--deploy-dir", str(deploy)], "roster runtime"),
         (["scripts/check_v2_deployment_bootstrap.py", ccn, "--deploy-dir", str(deploy)], "bootstrap"),
     ):
         code, out = _run([sys.executable, str(_ROOT / script[0])] + script[1:], cwd=_ROOT)
@@ -276,7 +349,32 @@ def main() -> int:
     elif args.password:
         print(f"NOTE password expected: {args.password!r} (pass --check-vercel-env to verify Vercel env)")
 
-    print(f"\n{'PASS' if fails == 0 else 'FAIL'}: {fails} blocking issue(s)")
+    print(f"\n{'PACKAGE PREFLIGHT PASS' if fails == 0 else 'PACKAGE PREFLIGHT FAIL'}: {fails} blocking issue(s)")
+    checks_summary = [f"blocking_issues={fails}"]
+    manifest_path = deploy / "PACKAGE_MANIFEST.json"
+    if fails == 0 and not manifest_path.is_file():
+        print("FAIL PACKAGE_MANIFEST.json missing — run package with manifest write before preflight pass")
+        fails += 1
+    try:
+        from preflight_receipt_lib import write_preflight_receipt
+
+        receipt = write_preflight_receipt(
+            deploy,
+            ccn,
+            passed=(fails == 0),
+            checks=checks_summary,
+            generated_asset_result="validated" if fails == 0 else "failed",
+        )
+        print(f"OK   preflight receipt written: {path_for_log(receipt, _ROOT)}")
+    except Exception as exc:
+        print(f"WARN could not write preflight receipt: {exc}")
+        if fails == 0:
+            fails += 1
+    if fails == 0:
+        print(
+            "NOTE: package preflight pass does not imply production acceptance. "
+            "Run deploy with --confirm-deploy --production-acceptance after Vercel env is set."
+        )
     return 1 if fails else 0
 
 

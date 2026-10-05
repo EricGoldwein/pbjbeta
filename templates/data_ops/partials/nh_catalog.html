@@ -4,14 +4,14 @@
   {% if nh_catalog.error %}<p class="do-flash-error" role="alert">Catalog lookup failed: {{ nh_catalog.error }}. Last successful evidence is retained.</p>{% endif %}
   {% set summary = nh_catalog.summary or {} %}
   {% if nh_catalog.datasets %}
-  <p class="do-small">{{ summary.datasets }} datasets · {{ summary.planned_today }} due today, not yet changed · {{ summary.published }} newer releases · {{ summary.revised }} revised · {{ summary.unchanged }} unchanged / not due · {{ summary.new_datasets }} first/new observations · {{ summary.errors }} errors</p>
+  <p class="do-small">{{ summary.datasets }} datasets · {{ summary.planned_today }} due today, metadata unchanged · {{ summary.published }} newer publications · {{ summary.revised }} resource revisions · {{ summary.unchanged }} metadata unchanged (bytes not checked) · {{ summary.new_datasets }} first/new observations · {{ summary.errors }} errors</p>
   {% set expansion = namespace(open=false) %}
   {% for row in nh_catalog.datasets %}{% if row.status in ['NEWER', 'REVISED', 'NEW_DATASET', 'ERROR', 'PLANNED_TODAY'] %}{% set expansion.open = true %}{% endif %}{% endfor %}
   <details class="do-collapse-panel" {% if expansion.open %}open{% endif %}>
     <summary>Inspect datasets and publisher evidence</summary>
     <div class="do-table-wrap do-nh-catalog-scroll">
       <table class="do-table do-table-compact">
-        <thead><tr><th>Dataset / evidence</th><th>CMS status</th><th>Released / modified</th><th>Planned update</th><th>Data Ops coverage</th><th>Action</th></tr></thead>
+        <thead><tr><th>Dataset / evidence</th><th>Metadata observation</th><th>Released / modified</th><th>Planned update</th><th>Data Ops coverage</th><th>Action</th></tr></thead>
         <tbody>
         {% for row in nh_catalog.datasets %}
         <tr id="cms-catalog-{{ row.stable_id }}" data-catalog-status="{{ row.status }}">
@@ -22,7 +22,9 @@
               <dl class="do-dl do-dl-compact do-small">
                 <div><dt>CMS stable ID</dt><dd class="do-mono">{{ row.stable_id }}</dd></div>
                 <div><dt>Why this status</dt><dd>{{ row.reason }}</dd></div>
-                <div><dt>Current identity</dt><dd class="do-mono do-tiny">{{ row.publisher_identity or 'No successful lookup' }}</dd></div>
+                <div><dt>Current metadata identity</dt><dd class="do-mono do-tiny">{{ row.publisher_identity or 'No successful lookup' }}</dd></div>
+                <div><dt>CMS released month</dt><dd>{{ row.cms_release_vintage or 'Not observed' }}</dd></div>
+                <div><dt>Raw byte check</dt><dd>Not performed by catalog discovery</dd></div>
                 <div><dt>Previous identity</dt><dd class="do-mono do-tiny">{{ row.previous_successful.publisher_identity if row.previous_successful else 'No earlier baseline' }}</dd></div>
                 <div><dt>Last success</dt><dd>{{ row.last_successful_at | do_datetime if row.last_successful_at else 'None' }}</dd></div>
                 {% if row.error %}<div><dt>Attempt error</dt><dd>{{ row.error }}</dd></div>{% endif %}
@@ -41,7 +43,7 @@
               <p class="do-muted do-tiny">Identity is a fingerprint of publisher metadata, not a downloaded content hash. CMS metadata updated: {{ row.metadata_modified or 'not supplied' }}.</p>
             </details>
           </td>
-          <td><span class="do-badge">{{ row.status }}</span></td>
+          <td><span class="do-badge">{{ 'METADATA_UNCHANGED' if row.status == 'CURRENT' and not row.publisher_sha256 else row.status }}</span></td>
           <td class="do-small">{{ row.released or '—' }}<br><span class="do-muted">{{ row.modified or '—' }}</span></td>
           <td class="do-small">{{ row.planned_update or 'Not supplied' }}</td>
           <td class="do-small">{{ row.coverage.label }}</td>

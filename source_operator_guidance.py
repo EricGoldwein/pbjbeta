@@ -26,6 +26,22 @@ def public_update_guidance(control, *, root=None):
             continue
         release = next(iter(releases))
         item['local_release'] = release
+        if family == 'cms.snf_ownership_pair':
+            from release_check import load_check_state
+            checks = {row['dataset_id']: row for row in load_check_state(control_plane_root(root)).get('datasets', [])}
+            observations = [checks.get(key, {}) for key in members]
+            item['cms_release_vintage'] = observations[0].get('cms_release_vintage')
+            item['snapshot_date'] = observations[0].get('snapshot_date') or release
+            if len({check.get('cms_release_vintage') for check in observations}) != 1 or not all(
+                       check.get('cms_release_vintage') and check.get('snapshot_date') and
+                       check.get('publisher_url') and check.get('cms_dataset_version_id') and check.get('publisher_file_uuid') and
+                       check.get('status') == 'CURRENT' and check.get('publisher_checked_at') and
+                       check.get('publisher_sha256') == active[key].get('hash')
+                       for key, check in zip(members, observations)):
+                item.update(website_status='CMS bytes require verification',
+                            next_step='Check CMS for both Owners and Enrollments before website release review.')
+                result.append(item)
+                continue
         stage = load_stage_manifest(family, release, root=root) or {}
         inputs = [i for a in stage.get('artifacts', []) for i in a.get('inputs', [])]
         matches = all(a.get('hash') and any(i.get('source_id') == key and
@@ -35,6 +51,15 @@ def public_update_guidance(control, *, root=None):
             item['next_step'] = ('Prepare a website candidate from the current local release. '
                                  'Existing website staging is missing or uses different source bytes. '
                                  'Do not download or activate the same local release again.')
+        elif family == 'cms.snf_ownership_pair' and not all(any(
+                i.get('source_id') == key and i.get('cms_release_vintage') == check.get('cms_release_vintage')
+                and i.get('snapshot_date') == check.get('snapshot_date')
+                and i.get('cms_dataset_version_id') == check.get('cms_dataset_version_id')
+                and i.get('cms_file_uuid') == check.get('publisher_file_uuid')
+                and i.get('cms_publisher_url') == check.get('publisher_url')
+                for i in inputs) for key, check in zip(members, observations)):
+            item.update(website_status='Website candidate needs provenance review',
+                        next_step='Refresh website candidate provenance with the CMS release vintage and snapshot date. Do not reacquire or reactivate matching ACTIVE data.')
         elif stage.get('status') != 'STAGED' or not stage.get('validation_gates') or not all(
                 gate.get('passed') is True for gate in stage['validation_gates']):
             item.update(website_status='Website candidate needs checks',

@@ -173,6 +173,7 @@ def test_provider_check_records_distinct_nh_ownership_derivative(
 
     result = ops.check_provider_info_cms(
         fetch_json=lambda _url: _metastore("NH_ProviderInfo_Sep2026.csv"),
+        fetch_bytes=lambda _url: _nh_csv_bytes(1200, "2026-09-01", "300"),
         root=tmp_path,
     )
 
@@ -1038,6 +1039,7 @@ def test_needs_attention_provider_info_operator_action_passes_root(
         snapshot={"validation_status": "PASS"},
         control_row=control["datasets"][0],
         release_availability={
+            "cms_byte_verified_current": True,
             "new_release_available": False,
             "publisher_latest_label": "Aug 2026",
             "active_release_label": "Aug 2026",
@@ -1124,7 +1126,7 @@ def test_health_citations_release_availability_independent_of_provider_info(tmp_
         assert availability["new_release_available"] is False
         assert availability["availability_source"] == "theme_publication"
         assert availability["inventory_axis"] == "cms"
-        assert availability["inventory_label"] == "CMS latest"
+        assert availability["inventory_label"] == "CMS data period"
         assert availability["inventory_status"] is None
         assert availability.get("upstream_active") is None
     finally:

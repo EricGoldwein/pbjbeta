@@ -77,6 +77,7 @@
   <td><span class="do-badge do-badge-val-{{ (member.validation_status or 'none')|lower }}">{{ member.validation_status or '—' }}</span></td>
   <td class="do-small">
     {% if member.publisher_release_label %}{{ member.publisher_release_label }}{% else %}<span class="do-muted">—</span>{% endif %}
+    {% if member.publisher_snapshot_date %}<div class="do-tiny do-muted">Data snapshot / file date: {{ member.publisher_snapshot_date }}</div>{% endif %}
     {% if member.publisher_filename %}
     <div class="do-mono do-tiny do-muted">{{ member.publisher_filename }}</div>
     {% endif %}
@@ -108,7 +109,7 @@
           <th>Artifact</th>
           <th>State</th>
           <th>Validation</th>
-          <th>CMS latest</th>
+          <th>CMS release / snapshot</th>
           <th>Identity</th>
         </tr>
       </thead>

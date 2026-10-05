@@ -11,6 +11,7 @@ import tempfile
 import urllib.request
 from dataclasses import dataclass
 from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote
@@ -29,6 +30,7 @@ class CsvFeed:
     automatic_validation: bool
     cms_product_path: str | None = None
     cms_product_name: str | None = None
+    version_date_basis: str = "release"
 
 
 def _fetch(url: str) -> Any:
@@ -150,6 +152,11 @@ def detect(feed: CsvFeed, *, fetch_json: Callable[[str], Any] | None = None) -> 
         raise RuntimeError("CMS resource is missing a public file URL")
     return {
         "release_id": _release_id(row, filename),
+        # Keep the governed pair key stable: it is the file/snapshot period,
+        # not the CMS publication vintage or the acquisition date.
+        "snapshot_date": _release_id(row, filename) if re.search(r"CY\d{4}Q[1-4]|20\d{2}[._-]?\d{2}[._-]?\d{2}|[A-Za-z]{3,9}[_-]?20\d{2}", filename, re.I) else None,
+        "cms_release_vintage": (str(discovery.get("dataset_version_label") or "")[:7] or None) if feed.version_date_basis == "release" else None,
+        "publisher_period_basis": "CMS reporting quarter" if feed.version_date_basis == "reporting_period" else "CMS dataset release label",
         "filename": filename,
         "url": url,
         "file_uuid": row.get("file_uuid"),
@@ -164,6 +171,7 @@ def assess_feed(
     *,
     root: Path,
     fetch_json: Callable[[str], Any] | None = None,
+    fetch_bytes: Callable[[str], bytes] | None = None,
 ) -> dict[str, Any]:
     """Read-only authoritative comparison of CMS latest against ACTIVE."""
     try:
@@ -174,23 +182,25 @@ def assess_feed(
             "new_release_available": None,
             "detail": str(exc),
         }
-    return _assess_found(feed, root=root, found=found)
+    return _assess_found(feed, root=root, found=found, fetch_bytes=fetch_bytes)
 
 
-def _assess_found(feed: CsvFeed, *, root: Path, found: dict[str, Any]) -> dict[str, Any]:
+def _remote_sha256(url: str, fetch_bytes=None) -> str:
+    if fetch_bytes:
+        return hashlib.sha256(fetch_bytes(url)).hexdigest()
+    digest = hashlib.sha256()
+    request = urllib.request.Request(url, headers={"User-Agent": "PBJ-data-ops-release-check/1.0"})
+    with urllib.request.urlopen(request, timeout=600) as response:
+        for chunk in iter(lambda: response.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _assess_found(feed: CsvFeed, *, root: Path, found: dict[str, Any], fetch_bytes=None) -> dict[str, Any]:
     active = ((load_registry(registry_path(root)).get("datasets") or {}).get(feed.dataset_id) or {})
-    active_id = active.get("active_release_id")
-    metadata = active.get("metadata") if isinstance(active.get("metadata"), dict) else {}
-    same_release = str(found["release_id"]) == str(active_id or "")
-    found_metadata = {
-        "cms_publisher_url": found.get("url"),
-        "cms_file_uuid": found.get("file_uuid"),
-        "cms_dataset_version_id": found.get("dataset_version_id"),
-    }
-    identity_changes, identity_matches = compare_publisher_artifact_identity(metadata, found_metadata)
     common = {
         "release_id": found["release_id"],
-        "publisher_latest_release_id": found["release_id"],
+        "publisher_latest_release_id": found.get("cms_release_vintage") or found["release_id"],
         "publisher_filename": found["filename"],
         "publisher_url": found["url"],
         "publisher_file_uuid": found.get("file_uuid"),
@@ -199,27 +209,13 @@ def _assess_found(feed: CsvFeed, *, root: Path, found: dict[str, Any]) -> dict[s
         "cms_dataset_version_label": found.get("dataset_version_label"),
         "cms_dataset_version_modified": found.get("dataset_version_modified"),
         "cms_resources_url": found.get("resources_url"),
+        "cms_release_vintage": found.get("cms_release_vintage"),
+        "snapshot_date": found.get("snapshot_date"),
+        "publisher_period_basis": found.get("publisher_period_basis"),
     }
-    if same_release and feed.cms_product_path and not identity_changes and not identity_matches:
-        return {
-            "status": "UNKNOWN",
-            "new_release_available": None,
-            "detail": "ACTIVE lacks publisher artifact provenance; CMS equality cannot be established",
-            **common,
-        }
-    if same_release and not identity_changes:
-        return {"status": "CURRENT", "new_release_available": False, **common}
-    if same_release:
-        return {
-            "status": "REVISED",
-            "new_release_available": True,
-            "detail": "CMS replaced the publisher artifact for the active release identity",
-            "publisher_revision_changed": True,
-            "revision_identity_changes": identity_changes,
-            "active_hash": active.get("hash"),
-            **common,
-        }
-    return {"status": "DETECTED", "new_release_available": True, **common}
+    from cms_release_identity import assess_raw_identity
+    return assess_raw_identity(feed.dataset_id, active=active, current=common, fetch_bytes=fetch_bytes)
+
 
 
 def validate_local_csv(path: Path, groups: tuple[tuple[str, ...], ...]) -> dict[str, Any]:
@@ -258,6 +254,7 @@ def compare_publisher_artifact_identity(
     left = left or {}
     right = right or {}
     aliases = {
+        "source_sha256": ("cms_source_sha256", "publisher_sha256"),
         "publisher_url": ("cms_publisher_url", "download_url", "publisher_url", "url"),
         "file_uuid": ("cms_file_uuid", "cms_publisher_file_uuid", "publisher_file_uuid", "file_uuid"),
         "version_uuid": ("cms_dataset_version_id", "dataset_version_id", "version_uuid"),
@@ -281,7 +278,9 @@ def run_feed(feed: CsvFeed, acquire: bool, *, root: Path, fetch_json=None, fetch
         found = detect(feed, fetch_json=fetch_json)
     except Exception as exc:
         return {"status": "ERROR", "new_release_available": None, "detail": str(exc)}
-    assessment = _assess_found(feed, root=root, found=found)
+    assessment = _assess_found(feed, root=root, found=found, fetch_bytes=fetch_bytes)
+    if assessment["status"] in {"ERROR"}:
+        return assessment
     if assessment["status"] in {"CURRENT", "UNKNOWN"}:
         return assessment
     pending = ((load_candidates(root).get("datasets") or {}).get(feed.dataset_id) or {})
@@ -292,26 +291,34 @@ def run_feed(feed: CsvFeed, acquire: bool, *, root: Path, fetch_json=None, fetch
             "cms_publisher_url": found.get("url"),
             "cms_file_uuid": found.get("file_uuid"),
             "cms_dataset_version_id": found.get("dataset_version_id"),
+            "cms_source_sha256": assessment.get("publisher_sha256"),
         },
     )
-    if pending.get("release_id") == found["release_id"] and not pending_changes and pending_matches and (
+    pending_hash_matches = not assessment.get("publisher_sha256") or (
+        pending.get("hash") == assessment["publisher_sha256"] or
+        pending_meta.get("cms_source_sha256") == assessment["publisher_sha256"])
+    if pending.get("release_id") == found["release_id"] and pending_hash_matches and not pending_changes and pending_matches and (
         pending.get("state") in {"ACQUIRED", "VALIDATED"}
         or (pending.get("state") == "DETECTED" and not acquire)
     ):
-        return {"status": pending["state"], "new_release_available": True, "release_id": found["release_id"], "detail": "existing pending candidate"}
+        return {**assessment, "status": pending["state"], "new_release_available": True, "detail": "existing pending candidate"}
     publisher_metadata = {
         "download_url": found["url"],
         "filename": found["filename"],
         "cms_publisher_url": found["url"],
         "cms_publisher_filename": found["filename"],
-        "cms_publisher_release_id": found["release_id"],
+        "cms_publisher_release_id": found.get("cms_release_vintage") or found["release_id"],
         "cms_product_id": found.get("product_id") or feed.cms_dataset_id,
         "cms_dataset_version_id": found.get("dataset_version_id") or feed.cms_dataset_id,
         "cms_dataset_version_label": found.get("dataset_version_label"),
         "cms_dataset_version_modified": found.get("dataset_version_modified"),
+        "cms_release_vintage": found.get("cms_release_vintage"),
+        "snapshot_date": found.get("snapshot_date"),
+        "cms_source_sha256": assessment.get("publisher_sha256"),
+        "publisher_checked_at": assessment.get("publisher_checked_at"),
         "cms_file_uuid": found.get("file_uuid"),
         "publisher_revision_changed": assessment.get("publisher_revision_changed", False),
-        "change_kind": "REVISED" if assessment.get("publisher_revision_changed") else "NEWER",
+        "change_kind": "REVISED" if assessment.get("status") == "REVISED" else "NEWER",
         "revision_of_active_hash": assessment.get("active_hash"),
         "revision_identity_changes": assessment.get("revision_identity_changes") or [],
     }
@@ -332,6 +339,8 @@ def run_feed(feed: CsvFeed, acquire: bool, *, root: Path, fetch_json=None, fetch
                 for chunk in iter(lambda: response.read(1024 * 1024), b""):
                     output.write(chunk)
         validation = _validate(temp, feed.required_column_groups)
+        if assessment.get("publisher_sha256") and validation["hash"] != assessment["publisher_sha256"]:
+            raise RuntimeError("CMS bytes changed between detection and acquisition; check again")
         existing_hash = None
         if final.exists():
             digest_builder = hashlib.sha256()
@@ -340,12 +349,18 @@ def run_feed(feed: CsvFeed, acquire: bool, *, root: Path, fetch_json=None, fetch
                     digest_builder.update(chunk)
             existing_hash = digest_builder.hexdigest()
         if final.exists() and existing_hash != validation["hash"]:
-            raise RuntimeError(f"refusing to overwrite differing {final.name}")
+            if feed.dataset_id not in {"cms.snf_all_owners", "cms.snf_enrollments"}:
+                raise RuntimeError(f"refusing to overwrite differing {final.name}")
+            # Immutable revision path; the currently ACTIVE file is never replaced.
+            final = feed.destination / f"{final.stem}__sha256_{validation['hash']}{final.suffix}"
+            if final.exists() and _validate(final, feed.required_column_groups)["hash"] != validation["hash"]:
+                raise RuntimeError("revision artifact hash collision")
         if not final.exists():
             os.replace(temp, final)
         else:
             temp.unlink()
         state = ReleaseState.VALIDATED if feed.automatic_validation else ReleaseState.ACQUIRED
+        publisher_metadata["acquired_at"] = datetime.now(timezone.utc).isoformat()
         record_candidate(feed.dataset_id, found["release_id"], state, source_path=final, validation=validation, metadata=publisher_metadata, root=root)
         return {"status": state.value, "new_release_available": True, "release_id": found["release_id"]}
     except Exception:
