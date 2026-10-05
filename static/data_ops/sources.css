@@ -38,3 +38,18 @@
   .do-sources-page .do-toolbar-controls { width: 100%; }
   .do-sources-page .do-release-toolbar { flex-wrap: wrap; }
 }
+.do-website-release-review { min-width: 0; overflow-wrap: anywhere; }
+.do-website-release-review .do-mono { white-space: normal; overflow-wrap: anywhere; }
+.do-modal-panel.do-modal-website-review { width: min(1120px, calc(100vw - 2rem)); padding: 1.1rem 1.4rem; }
+.do-website-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem 1rem; padding: .9rem; margin: .7rem 0 1rem; background: var(--do-bg); border: 1px solid var(--do-line); border-radius: 8px; }
+.do-website-summary span, .do-website-summary strong { display: block; }
+.do-website-summary span { font-size: .75rem; color: var(--do-muted); margin-bottom: .25rem; }
+.do-website-summary strong { font-size: .88rem; }
+.do-review-section { margin: .8rem 0; border: 1px solid var(--do-line); border-radius: 8px; padding: .75rem .9rem; }
+.do-review-section > summary { font-weight: 650; font-size: .95rem; cursor: pointer; }
+.do-review-row { display: flex; justify-content: space-between; align-items: center; gap: .7rem; margin: .65rem 0 .3rem; font-size: .83rem; }
+.do-review-row .do-muted { display: block; margin-top: .2rem; }
+.do-review-forensics { font-size: .75rem; color: var(--do-muted); padding-bottom: .55rem; border-bottom: 1px solid var(--do-line); }
+.do-review-source { margin-top: .65rem; padding: .65rem; border: 1px solid var(--do-line); border-radius: 6px; font-size: .8rem; }
+.do-website-release-review pre { white-space: pre-wrap !important; }
+@media (max-width: 640px) { .do-modal-panel.do-modal-website-review { width: calc(100vw - 1rem); padding: .65rem; } .do-website-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

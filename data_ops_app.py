@@ -134,6 +134,21 @@ def _source_detail_context(source_id: str, *, theme_publication: Any | None = No
         record=record,
         theme_publication=theme_publication,
     )
+    from website_release_readiness import FAMILIES, family_readiness
+    family = next((key for key, spec in FAMILIES.items() if any(req.source_id == source_id for req in spec.required_source_evidence)), None)
+    readiness = family_readiness(family, control) if family else None
+    if readiness:
+        evidence = next(s for s in readiness['source_evidence'] if s['source_id'] == source_id)
+        observation = evidence['observation']
+        availability.update({key: observation.get(key) for key in (
+            'cms_dataset_version_label', 'cms_dataset_version_id', 'cms_dataset_version_modified',
+            'publisher_resource_id', 'publisher_resource_version', 'publisher_file_uuid',
+            'publisher_url', 'publisher_period_basis', 'publisher_sha256', 'publisher_checked_at')})
+        availability.update(cms_byte_verified_current=evidence['verified'],
+                            cms_release_vintage=evidence['vintage'], snapshot_date=evidence['snapshot'],
+                            publisher_latest_label=format_release_month_label(evidence['vintage']) if evidence['vintage'] else 'Not observed',
+                            new_release_available=observation.get('status') in {'NEWER', 'REVISED'},
+                            availability_summary=evidence['status'])
     workflow = build_source_operator_workflow(
         source_id,
         record=record,
@@ -142,6 +157,17 @@ def _source_detail_context(source_id: str, *, theme_publication: Any | None = No
         release_availability=availability,
         theme_publication=theme_publication,
     )
+    if family:
+        if workflow.get('operator_reference'):
+            workflow['operator_reference'].update(status_label=readiness['source_status'],
+                                                  status_tone='current' if readiness['verified_count'] == readiness['required_count'] else 'attention')
+        for layer in workflow.get('freshness_layers', []):
+            if layer.get('key') == 'cms_source':
+                layer.update(status_label=readiness['source_status'], detail=readiness['next_step'],
+                             status='current' if readiness['verified_count'] == readiness['required_count'] else 'attention')
+        if readiness['next_action'] == 'verify_sources' and readiness['release_id']:
+            workflow['next_action'] = dict(label='Verify CMS source bytes', detail='Verify every required source against the exact staged website release.',
+                method='post', wired=True, busy_submit=True, busy_label='Verifying CMS bytes…', endpoint='action_website_verify_sources', endpoint_args=dict(family=family, release_id=readiness['release_id']))
     ctx = {
         "record": record,
         "snapshot": snapshot,
@@ -302,6 +328,8 @@ def create_app() -> Flask:
             theme_publication=theme_publication,
         )
         from source_operator_guidance import public_update_guidance, survey_review_guidance
+        public_updates = public_update_guidance(control)
+        website_sources = {source['source_id']: source for family in public_updates for source in family.get('source_evidence', [])}
         reference_sources = []
         completed_reference_ids = set()
         for row in control.get("datasets", []):
@@ -351,7 +379,8 @@ def create_app() -> Flask:
             releases_checked_at=release_checks.get("checked_at"),
             nh_catalog=load_catalog(),
             family_inventory=source_family_inventory(control, snaps, load_catalog()),
-            public_updates=public_update_guidance(control),
+            public_updates=public_updates,
+            website_sources=website_sources,
             reference_sources=reference_sources,
         )
 
@@ -715,6 +744,34 @@ def create_app() -> Flask:
         except Exception as exc:  # noqa: BLE001
             flash(f"PBJ320 Stage manifest refresh failed: {exc}", "error")
         return redirect(url_for("source_detail", source_id="cms.provider_info"))
+
+    @app.get("/website-releases/<family>/<release_id>/panel")
+    @require_auth
+    def website_release_review_panel(family: str, release_id: str):
+        from flask import abort
+        from website_release_review import FAMILIES, website_review_context
+
+        if family not in FAMILIES or not release_id or any(c not in '0123456789-' for c in release_id):
+            abort(404)
+        context = website_review_context(family, release_id, control_panel_payload())
+        if context is None:
+            return '<h2 id="do-source-panel-title">Website candidate unavailable</h2><p>No staged manifest exists for this release. Return to Sources to review the current readiness.</p><button type="button" data-do-modal-close>Close</button>', 200
+        return render_template("data_ops/partials/website_release_review.html", **context)
+
+    @app.post("/actions/website-releases/<family>/<release_id>/verify-sources")
+    @require_auth
+    def action_website_verify_sources(family: str, release_id: str):
+        from flask import abort
+        from website_release_readiness import FAMILIES, verify_family_sources
+        if family not in FAMILIES or not release_id or any(c not in '0123456789-' for c in release_id):
+            abort(404)
+        try:
+            result = verify_family_sources(family, release_id, control_panel_payload())
+            flash(f"{result['label']}: {result['verified_count']}/{result['required_count']} source bytes verified. {result['next_step']}",
+                  'ok' if result['verified_count'] == result['required_count'] else 'error')
+        except Exception as exc:
+            flash(f"Source verification unavailable: {exc}", 'error')
+        return redirect(url_for('sources', check_cms='0'))
 
     @app.get("/provider-info/stage-manifest/<release_id>")
     @require_auth

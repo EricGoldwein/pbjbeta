@@ -19,12 +19,13 @@ def test_same_release_revision_requires_new_website_preparation(tmp_path):
     control, _ = setup_stage(tmp_path, stage_hash='old')
     row = public_update_guidance(control, root=tmp_path)[1]
     assert row['local_release'] == '2026-09'
-    assert row['website_status'] == 'Website update needs preparation'
+    assert not row['candidate_valid']
+    assert any('ACTIVE source hashes' in reason for reason in row['blocked_reasons'])
 
 
 def test_failed_stage_checks_are_not_a_prepared_website_candidate(tmp_path):
     control, _ = setup_stage(tmp_path, gates=False)
-    assert public_update_guidance(control, root=tmp_path)[1]['website_status'] == 'Website candidate needs checks'
+    assert not public_update_guidance(control, root=tmp_path)[1]['validation_passed']
 
 
 def test_only_receipt_for_exact_stage_proves_publication(tmp_path):
@@ -33,15 +34,16 @@ def test_only_receipt_for_exact_stage_proves_publication(tmp_path):
     receipt.parent.mkdir(parents=True)
     record = {'stage_manifest_sha256': 'old', 'production_verified': True}
     receipt.write_text(json.dumps(record))
-    assert public_update_guidance(control, root=tmp_path)[1]['website_status'] == 'Website candidate prepared'
-    record['stage_manifest_sha256'] = hashlib.sha256(stage.read_bytes()).hexdigest()
-    record.pop('production_verified')
-    record['destination_layers'] = {'pushed': 'YES', 'production_verified': 'NO'}
+    row = public_update_guidance(control, root=tmp_path)[1]
+    assert not row['publication']['receipt_matches']
+    assert row['publication']['label'] == 'Not published'
+    record.update(stage_manifest_sha256=hashlib.sha256(stage.read_bytes()).hexdigest(),
+                  commit_sha='commit', committed_at='observed', push_succeeded=True, push_timestamp='observed')
     receipt.write_text(json.dumps(record))
-    assert 'live status unverified' in public_update_guidance(control, root=tmp_path)[1]['website_status']
-    record['production_verified'] = True
-    receipt.write_text(json.dumps(record))
-    assert public_update_guidance(control, root=tmp_path)[1]['website_status'] == 'Production verification recorded'
+    row = public_update_guidance(control, root=tmp_path)[1]
+    assert row['publication']['receipt_matches']
+    assert row['publication']['label'] == 'Pushed; deployment not verified'
+    assert not row['publication']['production_verified']  # A flag is not artifact provenance.
 
 
 def test_validation_is_review_readiness_not_activation():

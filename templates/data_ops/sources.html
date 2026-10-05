@@ -1,7 +1,7 @@
 {% extends "data_ops/base.html" %}
 {% from 'data_ops/partials/source_detail_macros.html' import render_workflow_action, render_attention_primary_action %}
 {% block title %}Sources{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='data_ops/sources.css') }}?v=1">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='data_ops/sources.css') }}?v=2">{% endblock %}
 {% macro release_date(value) -%}
   {% set value = value or '' %}
   {% set months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %}
@@ -28,27 +28,7 @@
 <section class="do-section do-section-primary" aria-labelledby="website-readiness-title">
   <h2 id="website-readiness-title">Website release readiness</h2>
   <div class="do-sources-card-grid">
-  {% for item in public_updates %}
-    {% set presentations = {
-      'CMS bytes require verification': ('CMS CHECK REQUIRED', 'Verify both current CMS distributions against ACTIVE bytes.', 'Check source evidence'),
-      'Website candidate needs provenance review': ('PROVENANCE REVIEW REQUIRED', 'Local raw sources match CMS. Website candidate release dates need provenance review.', 'Review release provenance'),
-      'Website update needs preparation': ('NEEDS PREPARATION', 'Local source is current. The website package is missing or uses older/different source bytes.', 'Prepare website release'),
-      'Website candidate needs checks': ('CHECKS REQUIRED', 'Website staging checks need attention.', 'Review staging checks'),
-      'Website candidate prepared': ('STAGED', 'Website candidate is staged and ready for review.', 'Review website release'),
-      'Sent for publication; live status unverified': ('AWAITING VERIFICATION', 'Release sent for publication. Live provenance is unverified.', 'Verify live website'),
-      'Production verification recorded': ('VERIFIED', 'Production verification recorded for this release.', 'Review verification')
-    } %}
-    {% set view = presentations.get(item.website_status, ('LOCAL REVIEW REQUIRED', 'Review local source data before preparing a website release.', 'Review local source')) %}
-    <article class="do-sources-card" data-do-website-source="{{ item.source_id }}">
-      <header class="do-sources-card-head"><div><h3>{{ 'PECOS ownership' if item.source_id == 'cms.snf_all_owners' else 'SFF' }}</h3><span class="do-muted do-small">{{ 'Owners + Enrollments' if item.source_id == 'cms.snf_all_owners' else 'Special Focus Facilities + Candidates' }}</span></div><span class="do-badge">{{ view[0] }}</span></header>
-      {% if item.source_id == 'cms.snf_all_owners' %}
-      <p class="do-muted do-small">CMS release: {{ release_date(item.cms_release_vintage) if item.cms_release_vintage else 'Not byte-verified' }} · Data snapshot / file date: {{ release_date(item.snapshot_date or item.local_release) }}</p>
-      {% else %}<p class="do-muted do-small">Selected locally: {{ release_date(item.local_release) }}</p>{% endif %}
-      <p class="do-sources-card-status">{{ view[1] }}</p>
-      <div class="do-sources-card-actions"><button type="button" class="do-btn do-btn-compact do-btn-primary" data-do-source-panel="{{ url_for('source_detail_panel', source_id=item.source_id) }}" aria-haspopup="dialog">{{ view[2] }}</button><a class="do-small" href="{{ url_for('source_detail', source_id=item.source_id) }}">Source details</a></div>
-      <details><summary>Release evidence</summary><p class="do-muted do-small">{{ item.website_status }}. Recorded evidence does not probe the live website.</p><p class="do-small">{{ item.next_step }}</p></details>
-    </article>
-  {% endfor %}
+  {% include 'data_ops/partials/website_release_cards.html' %}
   </div>
   <details class="do-sources-note"><summary>About combined website releases</summary><p class="do-muted do-small">Several source updates and UI changes require one combined website release. Source checks and local activation do not assemble or publish it.</p></details>
 </section>
@@ -135,12 +115,13 @@
       <tbody>
       {% for row in control.datasets %}
         {% set check = check_by_dataset.get(row.dataset_id, {}) %}
+        {% set website_source = website_sources.get(row.dataset_id) %}
         {% set active_id = (row.active or {}).get('active_release_id') %}
         {% set pending = row.pending %}
         {% set pending_state = (pending.state if pending else '')|upper %}
         {% set health = row.health|upper %}
         {% set reference_complete = row.dataset_id == 'cms.survey_summary' and pending_state == 'VALIDATED' and (pending.validation or {}).get('status') == 'PASS' %}
-        {% set needs_attention = not reference_complete and (pending or health not in ['PASS', 'CURRENT'] or pending_state in ['ACQUIRED', 'VALIDATED', 'DETECTED']) %}
+        {% set needs_attention = not reference_complete and (pending or health not in ['PASS', 'CURRENT'] or pending_state in ['ACQUIRED', 'VALIDATED', 'DETECTED'] or (website_source and not website_source.verified)) %}
         <tr data-do-release-row data-dataset-id="{{ row.dataset_id }}" data-needs-attention="{{ '1' if needs_attention else '0' }}">
           <td class="do-cell-dataset">
             <div class="do-dataset-cell">
@@ -174,10 +155,10 @@
               {% set cms_dates.planned = dataset.planned_update %}
             {% endif %}
           {% endfor %}
-          <td class="do-small">{{ cms_dates.released or '—' }}</td>
+          <td class="do-small">{{ website_source.vintage if website_source and website_source.vintage else cms_dates.released or '—' }}</td>
           <td class="do-small">{{ cms_dates.planned or '—' }}</td>
           <td>
-            {% set check_status = check.get('status') %}
+            {% set check_status = website_source.status if website_source else check.get('status') %}
             {% if check_status %}
             <span class="do-badge do-badge-{{ check_status|lower|replace(' ', '-')|replace('/', '-') }}"{% if check.get('detail') %} title="{{ check.get('detail') }}"{% endif %}>{{ check_status }}</span>
             {% else %}<span class="do-muted">—</span>{% endif %}

@@ -1,0 +1,23 @@
+{% for item in public_updates %}
+<article class="do-sources-card" data-do-website-source="{{ item.source_id }}">
+  <header class="do-sources-card-head"><div><h3>{{ item.label }}</h3><span class="do-muted do-small">{{ item.family_description }}</span></div><span class="do-badge">{{ item.manifest.status if item.manifest else 'NOT STAGED' }}</span></header>
+  <p class="do-muted do-small">Selected locally: {{ release_date(item.local_release) }}{% if item.cms_release_vintage %} · CMS release: {{ release_date(item.cms_release_vintage) }}{% endif %}{% if item.snapshot_date %} · Snapshot: {{ release_date(item.snapshot_date) }}{% endif %}</p>
+  <p class="do-sources-card-status"><strong>{{ item.source_status }}</strong> · {{ item.verified_count }}/{{ item.required_count }} verified<br><span class="do-muted do-small">{{ item.publication.label }} · {{ 'Publication blocked' if item.blocked_reasons else 'Checks passed' }}</span></p>
+  <div class="do-sources-card-actions">
+    {% if item.next_action == 'verify_sources' and item.manifest %}
+    <form method="post" action="{{ url_for('action_website_verify_sources', family=item.family, release_id=item.release_id) }}" data-do-busy-form data-do-busy-label="Verifying CMS bytes…" data-do-busy-detail="Observing required CMS distributions. No source acquisition, activation, or staging.">
+      <button class="do-btn do-btn-compact do-btn-primary" type="submit" data-do-busy-submit>Verify CMS source bytes</button>
+    </form>
+    {% elif item.next_action == 'review' %}
+    <button type="button" class="do-btn do-btn-compact do-btn-primary" data-do-source-panel="{{ url_for('website_release_review_panel', family=item.family, release_id=item.release_id) }}" aria-haspopup="dialog">{{ item.action_label }}</button>
+    {% elif item.next_action == 'source_details' %}
+    <a class="do-btn do-btn-compact do-btn-primary" href="{{ url_for('source_detail', source_id=item.source_id, check_cms=0) }}">{{ item.action_label }}</a>
+    {% endif %}
+    <a class="do-small" href="{{ url_for('source_detail', source_id=item.source_id, check_cms=0) }}">Source details</a>
+  </div>
+  <details><summary>Release evidence</summary><p class="do-small">{{ item.next_step }}</p>
+    {% if item.publication.receipt_notice %}<p class="do-small">{{ item.publication.receipt_notice }}</p>{% endif %}
+    {% if item.manifest %}<button type="button" class="do-btn do-btn-compact do-btn-ghost" data-do-source-panel="{{ url_for('website_release_review_panel', family=item.family, release_id=item.release_id) }}" aria-haspopup="dialog">Review website release</button>{% endif %}
+  </details>
+</article>
+{% endfor %}

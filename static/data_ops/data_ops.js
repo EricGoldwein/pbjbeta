@@ -243,6 +243,7 @@
     lastFocus = document.activeElement;
 
     modal.hidden = false;
+    if (modalPanel) modalPanel.classList.toggle('do-modal-website-review', url.indexOf('/website-releases/') !== -1);
 
     document.body.classList.add("do-modal-open");
 

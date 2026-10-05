@@ -1,0 +1,67 @@
+<header class="do-panel-head">
+  <div><h2 class="do-panel-title" id="do-source-panel-title">{{ label }} · Review website release</h2><p class="do-muted do-small">Staged release {{ release_id }} · {{ manifest.status }} · CMS vintage {{ cms_release_vintage or 'Not observed' }}{% if snapshot_date %} · Snapshot {{ snapshot_date }}{% endif %}</p></div>
+  <button type="button" class="do-btn do-btn-compact do-btn-ghost" data-do-modal-close aria-label="Close">Close</button>
+</header>
+<div class="do-website-release-review" data-do-website-review="{{ family }}">
+  <div class="do-website-summary">
+    <div><span>Candidate</span><strong>{{ manifest.status }}</strong></div>
+    <div><span>Source verification</span><strong>{{ verified_count }}/{{ required_count }} verified</strong></div>
+    <div><span>Validation</span><strong>{{ 'Passed' if validation_passed else 'Failed / missing' }}</strong></div>
+    <div><span>Publication readiness</span><strong>{{ 'Blocked' if blocked_reasons else 'Already sent' if publication.pushed else 'Ready' }}</strong></div>
+    <div><span>Production</span><strong>{{ publication.label }}</strong></div>
+    <div><span>Next action</span><strong>{{ 'Review recorded commit' if publication_ready and publication.committed else 'Review publication handoff' if publication_ready else action_label or 'No urgent action' }}</strong></div>
+  </div>
+  {% if blocked_reasons %}
+  <details class="do-review-section" open><summary>Publication blockers</summary>
+    <ul>{% for reason in blocked_reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+    {% if next_action == 'verify_sources' %}
+    <form method="post" action="{{ url_for('action_website_verify_sources', family=family, release_id=release_id) }}" data-do-busy-form data-do-busy-label="Verifying CMS bytes…"><button class="do-btn do-btn-compact do-btn-primary" type="submit" data-do-busy-submit>Verify CMS source bytes</button></form>
+    {% endif %}
+  </details>
+  {% endif %}
+  <details class="do-review-section" open><summary>What would be published</summary>
+    {% for artifact in manifest.artifacts or [] %}
+    <div class="do-review-row"><div><strong>{{ artifact.display_name }}</strong><span class="do-muted do-small">{{ artifact.display_category }}</span></div><span class="do-badge">{{ artifact.display_change }}</span></div>
+    <details class="do-review-forensics"><summary>Artifact evidence</summary><dl class="do-dl do-dl-wide">
+      {% for key, value in artifact|dictsort if key not in ['inputs', 'display_name', 'display_category'] %}<div><dt>{{ key }}</dt><dd class="do-mono do-tiny">{{ value }}</dd></div>{% endfor %}
+    </dl></details>
+    {% else %}<p>No destination artifacts recorded.</p>{% endfor %}
+  </details>
+  <details class="do-review-section" open><summary>Validation gates</summary>
+    {% for gate in manifest.validation_gates or [] %}
+    <div class="do-review-row"><strong>{{ gate.name or gate.command|replace('python ', '')|replace('_', ' ') }}</strong><span class="do-badge do-badge-{{ 'active' if gate.passed is sameas true else 'attention' }}">{{ 'PASS' if gate.passed is sameas true else 'FAIL' }}</span></div>
+    <details class="do-review-forensics"><summary>Check command and output</summary><p class="do-mono do-tiny">{{ gate.command }}</p><p class="do-small">{{ gate.summary }}</p></details>
+    {% else %}<p>No validation gates recorded.</p>{% endfor %}
+  </details>
+  <details class="do-review-section"><summary>Source evidence · {{ verified_count }}/{{ required_count }} verified</summary>
+    {% for source in source_evidence %}
+    <details class="do-review-source"><summary>{{ source.name }} · {{ source.role }} · {{ source.vintage or 'Release not observed' }} · {{ source.status }}</summary>
+      <p class="do-small">CMS release / vintage: {{ source.vintage or 'Not observed' }} · Data snapshot / file date: {{ source.snapshot or 'Not supplied by publisher' }}</p>
+      <p class="do-mono do-tiny">Staged SHA256: {{ source.staged_sha256 or 'Missing' }}<br>ACTIVE SHA256: {{ source.active_sha256 or 'Missing' }}<br>Immutable raw SHA256: {{ source.raw_sha256 or 'Unproven' }}</p>
+      <p class="do-mono do-tiny">Selected source path: {{ source.active_source_uri or 'Not recorded' }}<br>Immutable raw path: {{ source.raw_source_uri or 'Not recorded' }}<br>Acquisition timestamp: {{ source.acquired_at or 'Not recorded; verification time is not acquisition time' }}</p>
+      <dl class="do-dl do-dl-wide">{% for key, value in source.observation|dictsort %}<div><dt>{{ key }}</dt><dd class="do-mono do-tiny">{{ value }}</dd></div>{% endfor %}</dl>
+      {% for input in source.fingerprints %}<details><summary>Recorded stage input</summary><dl class="do-dl do-dl-wide">{% for key, value in input|dictsort %}<div><dt>{{ key }}</dt><dd class="do-mono do-tiny">{{ value }}</dd></div>{% endfor %}</dl></details>{% endfor %}
+    </details>
+    {% endfor %}
+    {% if other_inputs %}<details><summary>Baseline and supporting inputs</summary><pre class="do-mono do-tiny">{{ other_inputs|tojson(indent=2) }}</pre></details>{% endif %}
+  </details>
+  <details class="do-review-section"><summary>Publication and provenance details</summary>
+    {% if publication.receipt_notice %}<p>{{ publication.receipt_notice }}</p>{% endif %}
+    <p class="do-small">{{ publication.deployment_detail }}</p>
+    <dl class="do-dl do-dl-wide">
+      <div><dt>Local source selection</dt><dd>{{ 'ACTIVE' if local_selected else 'Not selected / pair not aligned' }}</dd></div>
+      <div><dt>Candidate committed</dt><dd>{{ 'Recorded' if publication.committed else 'No matching commit evidence' }}</dd></div>
+      <div><dt>Publication commit pushed</dt><dd>{{ 'Recorded' if publication.pushed else 'No matching push evidence' }}</dd></div>
+      <div><dt>Deployment observed</dt><dd>{{ 'Yes' if publication.deployment_observed else 'No deployment observation recorded' }}</dd></div>
+      <div><dt>Production provenance</dt><dd>{{ 'Verified against this candidate' if publication.production_verified else 'Not verified against this candidate' }}</dd></div>
+      <div><dt>Stage timestamp</dt><dd>{{ manifest.stage_timestamp or 'Not recorded' }}</dd></div>
+      <div><dt>Stage manifest SHA256</dt><dd class="do-mono do-tiny">{{ stage_sha }}</dd></div>
+      <div><dt>Publication baseline SHA</dt><dd class="do-mono do-tiny">{{ manifest.publication_base_sha or 'Not recorded' }}</dd></div>
+      <div><dt>Family / release ID</dt><dd class="do-mono do-tiny">{{ family }} / {{ release_id }}</dd></div>
+    </dl>
+    <details><summary>Publication receipt</summary><pre class="do-mono do-tiny">{{ publication.receipt|tojson(indent=2) }}</pre></details>
+    <details><summary>Complete staged manifest</summary><pre class="do-mono do-tiny">{{ original_manifest|tojson(indent=2) }}</pre></details>
+  </details>
+  {% if publication_ready %}<p class="do-small"><strong>Next publication action:</strong> {{ publication_next_step }}</p><p class="do-muted do-small">Publication is not wired in Data Ops for this family; use the governed workflow explicitly.</p>{% elif publication.pushed and not publication.production_verified %}<p class="do-small">Verify publication against the exact staged artifact hashes. No family production-verification handler is currently wired in Data Ops; deployment remains unverified.</p>{% endif %}
+  <p><a href="{{ url_for('source_detail', source_id=source_id, check_cms=0) }}">Source details</a></p>
+</div>

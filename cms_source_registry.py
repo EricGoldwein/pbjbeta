@@ -556,7 +556,7 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
             "No stable open-data dataset ID verified for the PDF/list publication "
             "in PBJapp; distinct from Provider Info sff_status column."
         ),
-        landing_url="https://www.cms.gov/medicare/health-safety-standards/certification-compliance/special-focus-facility-program",
+        landing_url="https://www.cms.gov/medicare/health-safety-standards/certification-compliance/nursing-homes",
         catalog_mechanism=CatalogMechanism.NONE_VERIFIED,
         metadata_endpoint=None,
         raw_artifact_resolver="sff/releases/<YYYY-MM>/cms_sff_posting_<YYYY-MM>.pdf",

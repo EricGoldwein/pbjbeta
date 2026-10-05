@@ -70,28 +70,30 @@ def test_sources_page_explains_local_and_website_steps(monkeypatch):
     assert row and 'data-needs-attention="0"' in row.group()
 
 
-@pytest.mark.parametrize('status,chip,action', [
-    ('Website update needs preparation', 'NEEDS PREPARATION', 'Prepare website release'),
-    ('Website candidate needs checks', 'CHECKS REQUIRED', 'Review staging checks'),
-    ('Website candidate prepared', 'STAGED', 'Review website release'),
-    ('Sent for publication; live status unverified', 'AWAITING VERIFICATION', 'Verify live website'),
-    ('Production verification recorded', 'VERIFIED', 'Review verification'),
-    ('Not verified', 'LOCAL REVIEW REQUIRED', 'Review local source'),
-])
-def test_sources_website_action_follows_existing_guidance(monkeypatch, status, chip, action):
-    monkeypatch.setattr(data_ops_app, 'control_panel_payload', lambda: {
-        'datasets': [], 'facilities': {'facilities': {}}})
+@pytest.mark.parametrize('action,label', [('verify_sources', 'Verify CMS source bytes'), ('review', 'Review website release'), ('none', None)])
+def test_sources_website_action_follows_shared_guidance(monkeypatch, action, label):
+    monkeypatch.setattr(data_ops_app, 'control_panel_payload', lambda: {'datasets': [], 'facilities': {'facilities': {}}})
     monkeypatch.setattr(data_ops_app, 'snapshots_with_control_plane', lambda **kwargs: [])
     monkeypatch.setattr(data_ops_app, 'build_needs_attention_queue', lambda **kwargs: [])
     monkeypatch.setattr('source_operator_guidance.public_update_guidance', lambda control: [{
-        'source_id': 'cms.snf_all_owners', 'local_release': '2026-07-31',
-        'website_status': status, 'next_step': 'Recorded guidance'}])
-    html = client(monkeypatch).get('/sources?check_cms=0').get_data(as_text=True)
-    card = re.search(r'<article[^>]*data-do-website-source=.*?</article>', html, re.S).group()
-    assert chip in card
-    assert f'>{action}</button>' in card
+        'source_id': 'cms.snf_all_owners', 'family': 'cms.snf_ownership_pair', 'label': 'PECOS ownership',
+        'local_release': '2026-07-31', 'release_id': '2026-07-31', 'manifest': {'status': 'STAGED'},
+        'source_status': 'Verification required' if action == 'verify_sources' else 'Byte verified current',
+        'verified_count': 0 if action == 'verify_sources' else 2, 'required_count': 2,
+        'publication': {'label': 'Not published'}, 'blocked_reasons': ['Verification required'] if action == 'verify_sources' else [],
+        'next_step': 'Recorded guidance', 'next_action': action, 'action_label': label}])
+    response = client(monkeypatch).get('/sources?check_cms=0')
+    assert response.status_code == 200
+    card = re.search(r'<article[^>]*data-do-website-source=.*?</article>', response.get_data(as_text=True), re.S).group()
     assert 'Jul 31, 2026' in card
-    assert '<form' not in card  # Opening details must never execute a lifecycle action.
+    primary = card.split('<details>')[0]
+    assert primary.count('do-btn-primary') == (0 if action == 'none' else 1)
+    if label:
+        assert label in primary
+    if action == 'verify_sources':
+        assert '/verify-sources' in primary and 'method="post"' in primary
+    else:
+        assert '<form' not in card
 
 
 def test_saved_survey_card_keeps_hash_secondary_and_only_offers_review(monkeypatch):
