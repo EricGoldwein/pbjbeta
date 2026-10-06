@@ -14,7 +14,7 @@ from typing import Any
 from active_release_registry import sha256_file
 from release_control_plane import candidate_local_path
 
-RAW_PRIMARY_SOURCES = {"cms.snf_all_owners", "cms.snf_enrollments", "cms.health_citations", "cms.nh_ownership"}
+RAW_PRIMARY_SOURCES = {"cms.chain_performance", "cms.snf_all_owners", "cms.snf_enrollments", "cms.health_citations", "cms.nh_ownership"}
 
 
 def active_raw_record(source_id: str, active: dict[str, Any]) -> dict[str, Any] | None:

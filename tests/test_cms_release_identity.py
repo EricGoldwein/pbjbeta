@@ -7,7 +7,7 @@ import pytest
 
 from cms_release_identity import assess_raw_identity, active_raw_record, RAW_PRIMARY_SOURCES
 
-SOURCES = ["cms.provider_info", "cms.pbj_nurse_staffing", "cms.pbj_non_nurse_staffing",
+SOURCES = ["cms.chain_performance", "cms.provider_info", "cms.pbj_nurse_staffing", "cms.pbj_non_nurse_staffing",
            "cms.health_citations", "cms.snf_all_owners", "cms.snf_enrollments", "cms.sff_pdf_list"]
 CATALOG_FIXTURE=json.loads((Path(__file__).parent/'fixtures/cms_nh_release_metadata_20261005.json').read_text())['datasets']
 

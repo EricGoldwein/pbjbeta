@@ -26,3 +26,26 @@ def test_chain_probe_includes_current_and_history_filename_patterns(tmp_path):
     snap=_probe_chain(get_source('cms.chain_performance'),tmp_path)
     assert snap.pbjapp_latest == 'September 2026 file date'
     assert 'ACTIVE' not in snap.status
+
+
+def test_registered_chain_adapter_surfaces_next_release_without_touching_local(tmp_path,monkeypatch):
+    import hashlib
+    import generic_cms_csv as adapter
+    feed=production_handlers()['cms.chain_performance'].__defaults__[0]
+    artifact=tmp_path/'Chain_Performance_20260909.csv'
+    artifact.write_bytes(b'Chain,Chain ID\nA,1\n')
+    before=artifact.read_bytes();sha=hashlib.sha256(before).hexdigest()
+    active={'active_release_id':'2026-09-09','source_uri':artifact.as_uri(),'hash':sha,
+            'downloaded_at':'2026-10-05T00:00:00Z','metadata':{'cms_release_vintage':'2026-08'}}
+    monkeypatch.setattr(adapter,'load_registry',lambda path:{'datasets':{feed.dataset_id:active}})
+    found={'release_id':'2026-10-14','cms_release_vintage':'2026-09','filename':'Chain_Performance_20261014.csv',
+           'url':'https://data.cms.gov/next.csv','dataset_version_label':'2026-09-01',
+           'dataset_version_modified':'2026-10-14','snapshot_date':'2026-10-14'}
+    result=adapter._assess_found(feed,root=tmp_path,found=found,fetch_bytes=lambda url:b'Chain,Chain ID\nA,1\nB,2\n')
+    assert result['status']=='NEWER'
+    assert result['new_release_available'] is True
+    assert result['publisher_latest_release_id']=='2026-09'
+    assert result['cms_dataset_version_modified']=='2026-10-14'
+    assert result['active_hash']==sha
+    assert result['active_raw_sha256']==sha
+    assert artifact.read_bytes()==before
