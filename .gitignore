@@ -163,7 +163,8 @@ tatus*
 *_pre_rebase_diff_report.txt
 .cursorignore.*.local
 
-# --- IDE / OS ---
+# --- Scratch / local jobs ---
+_scratch/
 .vscode/
 .idea/
 Thumbs.db

@@ -218,3 +218,5 @@ def test_interval_mapping_json_has_june() -> None:
     assert "06-2026" in rows
     assert rows["06-2026"]["interval_staffing_level_quarter"] == "Q4 2025"
     assert rows["06-2026"]["interval_csv_name"] == "NH_DataCollectionIntervals_Jun2026.csv"
+    assert "08-2026" in rows
+    assert rows["08-2026"]["interval_staffing_level_quarter"] == "Q1 2026"

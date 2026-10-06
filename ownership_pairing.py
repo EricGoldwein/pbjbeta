@@ -208,6 +208,8 @@ def detect_cms_publisher_release(
         "source_id": source_id,
         "cms_dataset_id": feed.cms_dataset_id,
         "release_id": found.get("release_id"),
+        "cms_release_vintage": found.get("cms_release_vintage"),
+        "snapshot_date": found.get("snapshot_date"),
         "filename": found.get("filename"),
         "url": found.get("url"),
         "last_updated": row.get("last_updated") or row.get("modified") or row.get("updated"),
@@ -345,7 +347,8 @@ def _member_view(
         "preview_columns": summary.get("preview_columns") or [],
         "change_kind": (pending_record.get("metadata") or {}).get("change_kind") if pair_role == "CANDIDATE" else "UNCHANGED",
         "publisher_release_id": publisher_id,
-        "publisher_release_label": format_ownership_release_label(publisher_id),
+        "publisher_release_label": format_ownership_release_label((publisher or {}).get("cms_release_vintage") or publisher_id),
+        "publisher_snapshot_date": (publisher or {}).get("snapshot_date") or publisher_id,
         "publisher_filename": (publisher or {}).get("filename") or display_metadata.get("cms_publisher_filename"),
         "publisher_url": (publisher or {}).get("url") or display_metadata.get("cms_publisher_url"),
         "publisher_last_updated": (publisher or {}).get("last_updated") or display_metadata.get("cms_dataset_version_modified"),
@@ -563,7 +566,9 @@ def validate_ownership_pair(
         candidate_metadata = dict(metadata)
         candidate_metadata.update(
             {
-                "cms_publisher_release_id": publisher.get("release_id"),
+                "cms_publisher_release_id": publisher.get("cms_release_vintage") or publisher.get("release_id"),
+                "cms_release_vintage": publisher.get("cms_release_vintage"),
+                "snapshot_date": publisher.get("snapshot_date") or publisher.get("release_id"),
                 "cms_publisher_filename": publisher.get("filename"),
                 "cms_publisher_url": publisher.get("url"),
                 "pair_validated_at": now,

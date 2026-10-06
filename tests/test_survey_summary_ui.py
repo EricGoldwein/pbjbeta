@@ -1,5 +1,7 @@
 import re
 
+import pytest
+
 import data_ops_app
 
 
@@ -23,6 +25,10 @@ def test_review_page_and_modal_present_candidate_without_activation(monkeypatch)
         assert response.status_code == 200
         assert 'VALIDATED' in html and 'No ACTIVE release' in html
         assert 'CCN + Inspection Cycle' in html
+        assert 'VALIDATED / REVIEW-ONLY — saved for reference' in html
+        assert 'Check CMS again for a newer file' in html
+        assert 'not ACTIVE' in html
+        assert 'explicit review required' not in html
         assert '/actions/survey-summary/prepare' in html
         actions = re.findall(r'<form[^>]+action="([^"]+)"', html)
         assert '/actions/survey-summary/prepare' in actions
@@ -53,12 +59,55 @@ def test_sources_page_explains_local_and_website_steps(monkeypatch):
     response = client(monkeypatch).get('/sources?check_cms=0')
     html = response.get_data(as_text=True)
     assert response.status_code == 200
-    for copy in ('Do these next', 'Local data and the live website are separate steps',
-                 'Ownership and SFF', 'Selected local releases (ACTIVE)',
-                 'VALIDATED / REVIEW-ONLY', 'Review saved Survey Summary'):
+    for copy in ('Next actions', 'Local source updates and website publishing are separate steps',
+                 'Website release readiness', 'Selected local releases (ACTIVE)',
+                 'VALIDATED / REVIEW-ONLY', 'Review saved file'):
         assert copy in html
     assert 'ready to promote' not in html
 
     assert 'data-do-reference-source="cms.survey_summary"' in html
     row = re.search(r'<tr data-do-release-row data-dataset-id="cms.survey_summary"[^>]*>', html)
     assert row and 'data-needs-attention="0"' in row.group()
+
+
+@pytest.mark.parametrize('action,label', [('verify_sources', 'Verify CMS source bytes'), ('review', 'Review website release'), ('none', None)])
+def test_sources_website_action_follows_shared_guidance(monkeypatch, action, label):
+    monkeypatch.setattr(data_ops_app, 'control_panel_payload', lambda: {'datasets': [], 'facilities': {'facilities': {}}})
+    monkeypatch.setattr(data_ops_app, 'snapshots_with_control_plane', lambda **kwargs: [])
+    monkeypatch.setattr(data_ops_app, 'build_needs_attention_queue', lambda **kwargs: [])
+    monkeypatch.setattr('source_operator_guidance.public_update_guidance', lambda control: [{
+        'source_id': 'cms.snf_all_owners', 'family': 'cms.snf_ownership_pair', 'label': 'PECOS ownership',
+        'local_release': '2026-07-31', 'release_id': '2026-07-31', 'manifest': {'status': 'STAGED'},
+        'source_status': 'Verification required' if action == 'verify_sources' else 'Byte verified current',
+        'verified_count': 0 if action == 'verify_sources' else 2, 'required_count': 2,
+        'publication': {'label': 'Not published'}, 'blocked_reasons': ['Verification required'] if action == 'verify_sources' else [],
+        'next_step': 'Recorded guidance', 'next_action': action, 'action_label': label}])
+    response = client(monkeypatch).get('/sources?check_cms=0')
+    assert response.status_code == 200
+    card = re.search(r'<article[^>]*data-do-website-source=.*?</article>', response.get_data(as_text=True), re.S).group()
+    assert 'Jul 31, 2026' in card
+    primary = card.split('<details>')[0]
+    assert primary.count('do-btn-primary') == (0 if action == 'none' else 1)
+    if label:
+        assert label in primary
+    if action == 'verify_sources':
+        assert '/verify-sources' in primary and 'method="post"' in primary
+    else:
+        assert '<form' not in card
+
+
+def test_saved_survey_card_keeps_hash_secondary_and_only_offers_review(monkeypatch):
+    candidate_id = '2026-08-9b534d95f43a-76ad33cab36e'
+    monkeypatch.setattr(data_ops_app, 'control_panel_payload', lambda: {
+        'datasets': [{'dataset_id': 'cms.survey_summary', 'pending': {
+            'release_id': candidate_id, 'state': 'VALIDATED', 'validation': {'status': 'PASS'}},
+            'impact': {'would_mark_stale': []}}], 'facilities': {'facilities': {}}})
+    monkeypatch.setattr(data_ops_app, 'snapshots_with_control_plane', lambda **kwargs: [])
+    monkeypatch.setattr(data_ops_app, 'build_needs_attention_queue', lambda **kwargs: [])
+    html = client(monkeypatch).get('/sources?check_cms=0').get_data(as_text=True)
+    card = re.search(r'<article[^>]*data-do-reference-source=.*?</article>', html, re.S).group()
+    visible, evidence = card.split('<details>', 1)
+    assert 'Aug 2026' in visible and 'Checks passed' in visible
+    assert candidate_id not in visible and candidate_id in evidence
+    assert 'Review saved file' in visible
+    assert '<form' not in card and '/actions/approve' not in card and '/actions/promote' not in card

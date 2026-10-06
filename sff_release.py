@@ -7,6 +7,7 @@ explicit/monitored and this module never promotes a release.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 import tempfile
@@ -43,6 +44,30 @@ CATEGORIES = {"Table A": "CURRENT_SFF", "Table B": "GRADUATED", "Table C": "NO_L
 PBJ_TABLE_FILES = {"Table A": "sff_table_a.csv", "Table B": "sff_table_b.csv", "Table C": "sff_table_c.csv", "Table D": "sff_table_d.csv"}
 USPS = set("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU MP AS".split())
 CCN_RE = re.compile(r"^[0-9A-Z]{6}$")
+PARSER_ID = "sff_release.py:v2-continuation"
+
+
+def _table_context(table, previous: str | None, previous_bounds: list[float] | None, page_number: int):
+    extracted = table.extract()
+    title = str((extracted[0] or [""])[0] or "") if extracted else ""
+    recognized = next((key for key in CATEGORIES if title.startswith(key + ":")), None)
+    key = recognized or previous
+    if key is None:
+        return None, None
+    expected = ["providernumber", "facilityname", "address", "city", "state", "zip", "phonenumber"]
+    expected += {
+        "Table A": ["mostrecentinspection", "metsurveycriteria", "monthsasansff"],
+        "Table B": ["dateofgraduation", "monthsasansff"],
+        "Table C": ["dateoftermination", "monthsasansff"],
+        "Table D": ["monthsasansffcandidate"],
+    }[key]
+    headers = [[re.sub(r"[^a-z]", "", str(cell or "").lower()) for cell in row] for row in extracted if row]
+    bounds = [table.bbox[0]] + [col.bbox[0] for col in table.columns[1:]] + [table.bbox[2]]
+    if expected not in headers or len(bounds) != len(expected) + 1 or any(a >= b for a, b in zip(bounds, bounds[1:])):
+        raise RuntimeError(f"Ambiguous SFF table schema/geometry on page {page_number}")
+    if not recognized and previous_bounds and any(abs(a - b) > 2 for a, b in zip(bounds, previous_bounds)):
+        raise RuntimeError(f"Ambiguous SFF continuation geometry on page {page_number}")
+    return key, bounds
 
 
 def sff_posting_url_candidates(*, months_back: int = 8, anchor: datetime | None = None) -> list[tuple[str, str]]:
@@ -128,6 +153,8 @@ def discover_latest_cms_sff_posting(
                 "url_release_id": url_release_id,
                 "release_id": release_id,
                 "posting_label": posting_label,
+                "publisher_sha256": hashlib.sha256(payload).hexdigest(),
+                "posting_date_verified": bool(parsed),
             }
         )
     if not discovered:
@@ -139,6 +166,8 @@ def discover_latest_cms_sff_posting(
         "posting_label": best["posting_label"],
         "source_url": best["source_url"],
         "url_release_id": best["url_release_id"],
+        "publisher_sha256": best["publisher_sha256"],
+        "posting_date_verified": best["posting_date_verified"],
         "candidates": discovered,
     }
 
@@ -156,7 +185,17 @@ def check_sff_cms(
     active_id = active.get("active_release_id")
     cms = discover_latest_cms_sff_posting(fetch_bytes=fetch_bytes, months_back=months_back)
     cms_release_id = str(cms["release_id"])
-    cms_is_newer = not active_id or cms_release_id > str(active_id)
+    from cms_release_identity import assess_raw_identity
+    identity = assess_raw_identity(DATASET_ID, active=active,
+        remote_sha256=cms["publisher_sha256"], current={
+            "release_id": cms_release_id, "publisher_latest_release_id": cms_release_id,
+            "publisher_url": cms["source_url"], "snapshot_date": None,
+            "cms_release_vintage": cms_release_id if cms["posting_date_verified"] else None,
+            "publisher_period_basis": "CMS PDF Updated label" if cms["posting_date_verified"] else "Unverified URL period"})
+    if not cms["posting_date_verified"] and identity["status"] != "CURRENT":
+        identity.update(status="UNKNOWN", new_release_available=None,
+                        detail="CMS PDF posting date unavailable; URL month is not authoritative")
+    cms_is_newer = identity.get("new_release_available") is True
     if cms_is_newer and record_detection:
         record_candidate(
             DATASET_ID,
@@ -164,6 +203,7 @@ def check_sff_cms(
             ReleaseState.DETECTED,
             metadata={
                 "source_url": cms["source_url"],
+                **identity,
                 "posting_period": cms_release_id,
                 "posting_label": cms["posting_label"],
                 "url_release_id": cms["url_release_id"],
@@ -182,7 +222,8 @@ def check_sff_cms(
         },
         "active_release_id": active_id,
         "cms_is_newer": cms_is_newer,
-        "status": "CURRENT" if active_id and not cms_is_newer else ("NEWER_AVAILABLE" if cms_is_newer else "UNKNOWN"),
+        "status": identity["status"],
+        "release_identity": identity,
     }
 
 
@@ -192,15 +233,21 @@ def _rows_from_pdf(pdf_path: Path) -> list[dict[str, str]]:
     except ImportError as exc:
         raise RuntimeError("pdfplumber is required to parse CMS SFF postings") from exc
     rows: list[dict[str, str]] = []
+    table_context = None
+    context_bounds = None
     with pdfplumber.open(pdf_path) as pdf:
         for page_number, page in enumerate(pdf.pages, 1):
             tables = page.find_tables()
             if not tables:
+                if table_context:
+                    words = page.extract_words(x_tolerance=1, y_tolerance=1)
+                    if any(CCN_RE.fullmatch(word["text"].upper()) and any(ch.isdigit() for ch in word["text"]) and context_bounds[0] - 2 <= word["x0"] < context_bounds[1] and word["top"] > 75 for word in words):
+                        raise RuntimeError(f"SFF row anchors without table geometry on page {page_number}")
                 continue
+            if len(tables) != 1 and table_context:
+                raise RuntimeError(f"Ambiguous multiple SFF tables on page {page_number}")
             table = tables[0]
-            extracted = table.extract()
-            title = str((extracted[0] or [""])[0] or "")
-            table_key = next((key for key in CATEGORIES if title.startswith(key)), None)
+            table_key, bounds = _table_context(table, table_context, context_bounds, page_number)
             if not table_key:
                 continue
             # CMS supplies vertical column rules but no horizontal row rules.
@@ -209,9 +256,11 @@ def _rows_from_pdf(pdf_path: Path) -> list[dict[str, str]]:
             # The title row spans the first logical column, so pdfplumber reports
             # that column as the whole table. Remaining column left edges are
             # accurate; prepend the table's left edge to recover provider number.
-            bounds = [table.bbox[0]] + [col.bbox[0] for col in table.columns[1:]] + [table.bbox[2]]
             words = page.extract_words(x_tolerance=1, y_tolerance=1)
             anchors = [word for word in words if CCN_RE.fullmatch(word["text"].upper()) and any(ch.isdigit() for ch in word["text"]) and bounds[0] - 2 <= word["x0"] < bounds[1] and word["top"] > 75]
+            if not anchors:
+                raise RuntimeError(f"SFF table has no CCN row anchors on page {page_number}")
+            table_context, context_bounds = table_key, bounds
             for anchor in anchors:
                 cells: list[list[str]] = [[] for _ in range(len(bounds) - 1)]
                 center_y = (anchor["top"] + anchor["bottom"]) / 2
@@ -339,6 +388,8 @@ def stage_pdf(release_id: str, *, source_url: str | None = None, source_pdf: Pat
     if not pdf_path.exists(): pdf_path.write_bytes(payload)
     rows = _rows_from_pdf(pdf_path)
     validation = validate_rows(rows, provider_ccns=_provider_ccns(control_root))
+    validation["parser"] = PARSER_ID
+    validation["parser_hash"] = sha256_file(Path(__file__))
     normalized = release_dir / f"cms_sff_posting_{release_id}.csv"
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", delete=False, dir=release_dir, suffix=".tmp") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows); temp = Path(handle.name)
@@ -347,7 +398,7 @@ def stage_pdf(release_id: str, *, source_url: str | None = None, source_pdf: Pat
     evidence = {"dataset_id": DATASET_ID, "release_id": release_id, "source_url": provenance_url, "source_pdf": pdf_path.name, "source_pdf_hash": sha256_file(pdf_path), "normalized_hash": sha256_file(normalized), "pbj_handoff": pbj_handoff, "validation": validation}
     (release_dir / "validation.json").write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     state = ReleaseState.VALIDATED if validation["status"] == "PASS" else ReleaseState.FAILED
-    record_candidate(DATASET_ID, release_id, state, source_path=normalized if state == ReleaseState.VALIDATED else None, validation=validation, metadata={"source_url": provenance_url, "source_pdf_uri": pdf_path.as_uri(), "source_pdf_hash": evidence["source_pdf_hash"], "posting_period": release_id, "parser": "sff_release.py:v1", "pbj_handoff": pbj_handoff}, root=control_root)
+    record_candidate(DATASET_ID, release_id, state, source_path=normalized if state == ReleaseState.VALIDATED else None, validation=validation, metadata={"source_url": provenance_url, "source_pdf_uri": pdf_path.as_uri(), "source_pdf_hash": evidence["source_pdf_hash"], "posting_period": release_id, "parser": PARSER_ID, "pbj_handoff": pbj_handoff}, root=control_root)
     return evidence
 
 

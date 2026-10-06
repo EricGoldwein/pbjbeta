@@ -69,7 +69,7 @@ def test_discover_latest_cms_sff_posting_uses_updated_label(monkeypatch):
     assert discovered["source_url"] == OFFICIAL_AUGUST_2026_URL
 
 
-def test_check_sff_cms_current_when_active_matches(tmp_path, monkeypatch):
+def test_check_sff_cms_matching_month_without_raw_provenance_is_unknown(tmp_path, monkeypatch):
     from active_release_registry import load_registry
 
     state = tmp_path / "state"
@@ -96,6 +96,7 @@ def test_check_sff_cms_current_when_active_matches(tmp_path, monkeypatch):
 
     result = check_sff_cms(fetch_bytes=fake_fetch, root=tmp_path)
     assert result["cms_is_newer"] is False
+    assert result["status"] == "UNKNOWN"
     assert result["cms"]["release_id"] == "2026-08"
 
 
@@ -129,6 +130,8 @@ def test_check_sff_cms_records_detected_candidate_with_trusted_url(tmp_path, mon
         lambda **_kwargs: {
             "release_id": "2026-09",
             "posting_label": "September 2026",
+            "publisher_sha256": "a" * 64,
+            "posting_date_verified": True,
             "source_url": september_url,
             "url_release_id": "2026-09",
             "candidates": [{"release_id": "2026-09"}],
@@ -173,6 +176,8 @@ def test_sff_diagnostic_probe_does_not_create_candidate(tmp_path, monkeypatch):
         lambda **_kwargs: {
             "release_id": "2026-09",
             "posting_label": "September 2026",
+            "publisher_sha256": "a" * 64,
+            "posting_date_verified": True,
             "source_url": OFFICIAL_AUGUST_2026_URL.replace("august", "september"),
             "url_release_id": "2026-09",
             "candidates": [{"release_id": "2026-09"}],

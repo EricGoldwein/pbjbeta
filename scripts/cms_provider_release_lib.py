@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import re
+import sys
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -570,6 +571,33 @@ def extract_active_csvs(
     )
     diff = build_release_diff(key, manifest, prior_manifest, root=root)
     blocked, reasons = compute_promotion_blocked(manifest, diff, prior_manifest=prior_manifest)
+    quarter_map: dict[str, Any] = {}
+    if not dry_run:
+        ops_root = Path(__file__).resolve().parents[1]
+        if str(ops_root) not in sys.path:
+            sys.path.insert(0, str(ops_root))
+        try:
+            from provider_quarter_mapping import sync_interval_mapping_from_extract
+
+            quarter_map = sync_interval_mapping_from_extract(key.label, root=root)
+        except Exception as exc:  # noqa: BLE001
+            quarter_map = {"ok": False, "detail": str(exc), "updated": []}
+        from prov_info_quarter_map import get_quarter_from_processing_month
+
+        if not get_quarter_from_processing_month(key.label):
+            blocked = True
+            reasons = sorted(
+                set(
+                    list(reasons)
+                    + [
+                        (
+                            f"Provider Information {key.label} has no PBJ quarter map "
+                            "(interval extract or manual processing-month table)."
+                        )
+                    ]
+                )
+            )
+    manifest["quarter_mapping"] = quarter_map
     manifest["promotion_blocked"] = blocked
     manifest["promotion_blocked_reasons"] = reasons
     diff["promotion_blocked"] = blocked

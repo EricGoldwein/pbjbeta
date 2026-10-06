@@ -62,6 +62,30 @@ PAIRING_MANIFEST_FIELDS = [
 VERIFICATION_CCNS = ("335513", "335581")
 
 
+def ownership_input_provenance(source_id: str, active: dict[str, Any], *, root: Path) -> dict[str, Any]:
+    """Publisher observation bound to exact ACTIVE bytes, separate from pair key."""
+    from release_check import load_check_state
+    check = next((row for row in load_check_state(root).get('datasets', [])
+                  if row.get('dataset_id') == source_id), {})
+    if not (check.get('cms_release_vintage') and check.get('snapshot_date') and
+            check.get('cms_dataset_version_id') and check.get('publisher_file_uuid') and check.get('publisher_url') and
+            check.get('status') == 'CURRENT' and check.get('publisher_checked_at') and
+            check.get('publisher_sha256') == active.get('hash')):
+        raise StageError(f'{source_id}: Check CMS must verify current raw bytes before ownership staging')
+    return {
+        'cms_release_vintage': check.get('cms_release_vintage'),
+        'snapshot_date': check.get('snapshot_date'),
+        'cms_dataset_version_id': check.get('cms_dataset_version_id'),
+        'cms_dataset_version_label': check.get('cms_dataset_version_label'),
+        'cms_dataset_version_modified': check.get('cms_dataset_version_modified'),
+        'cms_file_uuid': check.get('publisher_file_uuid'),
+        'cms_publisher_url': check.get('publisher_url'),
+        'cms_source_sha256': check.get('publisher_sha256'),
+        'publisher_checked_at': check.get('publisher_checked_at'),
+        'acquired_at': active.get('downloaded_at'),
+    }
+
+
 def _ownership_paths(release_id: str, *, owners_name: str, enroll_name: str) -> dict[str, str]:
     bridge_rel = f"ownership/_derived/cms_snf_ownership_ccn_bridge/release_{release_id}_lookup.json"
     return {
@@ -240,6 +264,11 @@ def stage_ownership_pair_for_pbj320(
     if release_id and release_id != active_release_id:
         raise StageError(f"requested release_id {release_id} != aligned ACTIVE {active_release_id}")
 
+    owners_provenance = ownership_input_provenance(OWNERS, owners_active, root=root)
+    enroll_provenance = ownership_input_provenance(ENROLLMENTS, enroll_active, root=root)
+    if owners_provenance['cms_release_vintage'] != enroll_provenance['cms_release_vintage']:
+        raise StageError('Owners and Enrollments current CMS publication vintages differ; review the pair')
+
     publish_branch, publish_remote = resolve_publish_branch(dev_pbj_root)
     publication_base_sha = fetch_publish_base(dev_pbj_root, remote=publish_remote, branch=publish_branch)
     baseline_wt = stage_baseline_worktree_path(SOURCE_ID, active_release_id, root=root)
@@ -263,6 +292,10 @@ def stage_ownership_pair_for_pbj320(
         and pre_manifest.get("status") == "STAGED"
         and not force
         and str(pre_manifest.get("publication_base_sha") or "") == publication_base_sha
+        and all(any(i.get('source_id') == source_id and all(i.get(key) == provenance.get(key)
+                    for key in ('cms_release_vintage', 'snapshot_date', 'cms_dataset_version_id', 'cms_file_uuid', 'cms_publisher_url'))
+                    for artifact in pre_manifest.get('artifacts', []) for i in artifact.get('inputs', []))
+                for source_id, provenance in ((OWNERS, owners_provenance), (ENROLLMENTS, enroll_provenance)))
     ):
         cache_ok = all(
             (artifact_cache / rel.replace("/", os.sep)).is_file()
@@ -328,6 +361,8 @@ def stage_ownership_pair_for_pbj320(
             sha256=str(enroll_active.get("hash") or ""),
             role="enrollment_release_artifact",
         )
+        owners_overlay.update(owners_provenance)
+        enroll_overlay.update(enroll_provenance)
         baseline_pi = _collect_baseline_pi_input(dev_pbj_root, baseline_wt, publication_base_sha)
 
         for role_key, pub_class in (

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='data_ops/data_ops.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='data_ops/data_ops.css') }}?v=builder21">
   <style>{% include 'partials/v2/brand_styles.html' %}</style>
   {% block head %}{% endblock %}
 </head>
@@ -51,7 +51,7 @@
   <footer class="do-footer">
     <span class="do-mono">PBJ320 Data Ops control plane · governed Stage / Publish / Verify</span>
   </footer>
-  <script src="{{ url_for('static', filename='data_ops/data_ops.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='data_ops/data_ops.js') }}?v=builder21" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

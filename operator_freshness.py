@@ -171,7 +171,7 @@ def inventory_fields_for_source(
     pub_label = availability.get("publisher_latest_label") or availability.get("publisher_latest_release_id")
     return {
         "inventory_axis": "cms",
-        "inventory_label": "CMS latest",
+        "inventory_label": "CMS release" if availability.get("cms_release_vintage") else "CMS data period",
         "inventory_value": pub_label or "—",
         "inventory_status": None,
         "inventory_detail": None,
@@ -192,12 +192,14 @@ def build_freshness_layers(
     layers: list[dict[str, Any]] = []
 
     cms_current = (
-        not release_availability.get("new_release_available")
+        bool(release_availability.get("cms_byte_verified_current"))
         and pending_state not in {"ACQUIRED", "VALIDATED", "DETECTED"}
     )
     active_label = release_availability.get("active_release_label") or workflow.get("active_release_id") or "—"
     cms_latest = release_availability.get("publisher_latest_label") or "—"
     cms_detail = f"{active_label} active"
+    if not cms_current and not release_availability.get("new_release_available"):
+        cms_detail += " · CMS bytes not verified; run Check CMS"
     if release_availability.get("unchanged_in_latest_publication"):
         cms_detail += f" · CMS latest {cms_latest} · unchanged"
     elif release_availability.get("new_release_available"):
@@ -206,6 +208,24 @@ def build_freshness_layers(
     elif pending_state == "ACQUIRED" and workflow.get("pending_release_id"):
         cms_detail = f"ACTIVE {active_label} · pending candidate {workflow.get('pending_release_id')}"
         cms_current = False
+
+    if source_id in {"cms.snf_all_owners", "cms.snf_enrollments"}:
+        cms_current = bool(release_availability.get("cms_byte_verified_current")) and pending_state not in {"ACQUIRED", "VALIDATED", "DETECTED"}
+        cms_detail = (f"CMS release: {cms_latest} · Data snapshot (filename): "
+                      f"{release_availability.get('snapshot_date') or active_label}")
+        if release_availability.get("cms_byte_verified_current"):
+            cms_detail += " · Exact ACTIVE bytes match"
+        elif release_availability.get("new_release_available"):
+            cms_detail += " · Distribution differs from ACTIVE"
+        else:
+            cms_detail += " · Run Check CMS to verify bytes"
+    elif release_availability.get("cms_release_vintage"):
+        cms_detail = (f"CMS release: {release_availability['cms_release_vintage']} · "
+                      f"Processing / snapshot date: {release_availability.get('snapshot_date') or 'Not supplied'} · "
+                      f"{'Exact raw bytes match ACTIVE' if cms_current else release_availability.get('availability_summary') or 'CMS bytes not verified'}")
+    elif source_id in {"cms.pbj_nurse_staffing", "cms.pbj_non_nurse_staffing"}:
+        cms_detail = (f"CMS reporting quarter: {cms_latest} · CMS release vintage: Not observed · "
+                      f"{'Exact raw bytes match ACTIVE' if cms_current else 'CMS bytes not verified'}")
 
     layers.append(
         {

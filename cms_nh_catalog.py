@@ -154,6 +154,9 @@ def normalize_dataset(dataset: dict[str, Any], expected_id: str) -> dict[str, An
         "description": str(dataset.get("description") or "")[:4000],
         "modified": modified, "released": released, "planned_update": dataset.get("nextUpdateDate"),
         "metadata_modified": dataset.get("%modified"), "logical_release": logical_release,
+        "cms_release_vintage": released[:7] if re.match(r"^\d{4}-\d{2}-\d{2}", released) else None,
+        "cms_release_basis": "CMS released date", "processing_modified_date": modified,
+        "snapshot_date": None, "byte_check": "NOT_PERFORMED",
         "resources": resources, "artifact_identity": artifact_identity,
         "publisher_identity": _fingerprint({"id": expected_id, "resources": artifact_identity, "modified": modified, "released": released}),
         "metadata_url": METASTORE + expected_id + "?show-reference-ids=true",
@@ -187,7 +190,7 @@ def coverage_for(stable_id: str) -> dict[str, Any]:
             "acquirer": "Existing source workflow" if source_id else "No catalog acquisition action",
             "validator": lifecycle, "action": "Open source" if source_id else None}
     if stable_id == "tbry-pc2d":
-        result["active_lifecycle"] = "Explicit approval required; ACTIVE determined by release registry"
+        result["active_lifecycle"] = "Review only; activation and publication unavailable"
         result["acquirer"] = "survey_summary.prepare_candidate"
     return result
 
@@ -195,15 +198,23 @@ def coverage_for(stable_id: str) -> dict[str, Any]:
 def compare_observation(current: dict[str, Any], previous: dict[str, Any] | None, today: str) -> tuple[str, str]:
     if previous is None:
         return "NEW_DATASET", "First successful observation; no earlier catalog baseline to establish publication timing"
+    # Publication and processing periods are distinct. A metadata lookup does
+    # not prove that a stable resource still serves the same bytes.
+    current_vintage = current.get("cms_release_vintage") or str(current.get("released") or "")[:7]
+    previous_vintage = previous.get("cms_release_vintage") or str(previous.get("released") or "")[:7]
+    if current_vintage > previous_vintage:
+        return "NEWER", "CMS released month advanced; content equality has not been checked"
+    if current_vintage < previous_vintage:
+        return "ERROR", "CMS released month regressed; inspect publisher evidence"
+    if current.get("publisher_sha256") and previous.get("publisher_sha256"):
+        if current["publisher_sha256"] != previous["publisher_sha256"]:
+            return "REVISED", "Publisher bytes changed, including under a stable resource ID/date"
+        return "BYTES_UNCHANGED", "Exact authoritative raw bytes match the prior observation; this is not an ACTIVE assessment"
     if current["artifact_identity"] == previous["artifact_identity"]:
         if str(current.get("planned_update") or "")[:10] == today:
             return "PLANNED_TODAY", "CMS planned an update today; current resource identity has not advanced since the previous successful observation"
-        return "CURRENT", "Authoritative lookup succeeded; current resource identity matches the previous successful observation"
-    if current["logical_release"] > previous["logical_release"]:
-        return "NEWER", "A changed publisher artifact has a newer logical modified month/version"
-    if current["logical_release"] < previous["logical_release"]:
-        return "ERROR", "Publisher logical release regressed; inspect evidence before treating it as a new release"
-    return "REVISED", "Publisher resource identity changed under the same logical month/version"
+        return "METADATA_UNCHANGED", "Publisher resource metadata unchanged; raw bytes and ACTIVE currentness not verified"
+    return "REVISED", "Publisher resource identity changed under the same CMS released month; bytes not checked"
 
 
 def _archive_observation(fetch: Callable[[str], Any], head: Callable[[str], dict[str, str]]) -> dict[str, Any]:
@@ -240,7 +251,7 @@ def catalog_summary(rows: list[dict[str, Any]], archive: dict[str, Any]) -> dict
     counts = Counter(row.get("status") for row in rows)
     return {"datasets": sum(row.get("status") != "REMOVED_OR_ARCHIVED" for row in rows),
             "published": counts["NEWER"], "revised": counts["REVISED"], "new_datasets": counts["NEW_DATASET"],
-            "unchanged": counts["CURRENT"], "planned_today": counts["PLANNED_TODAY"],
+            "unchanged": counts["METADATA_UNCHANGED"] + counts["BYTES_UNCHANGED"], "planned_today": counts["PLANNED_TODAY"],
             "removed": counts["REMOVED_OR_ARCHIVED"], "errors": counts["ERROR"],
             "archive_errors": int(archive.get("status") == "ERROR")}
 
@@ -300,7 +311,7 @@ def refresh_catalog(*, root: Path | None = None, fetch: Callable[[str], Any] | N
         archive_previous = prior_archive.get("last_successful")
         archive = {**archive_success, "checked_at": checked_at, "last_successful": archive_success,
                    "previous_successful": archive_previous, "error": None,
-                   "status": "NEW_OBSERVATION" if not archive_previous else ("CHANGED" if archive_success["identity"] != archive_previous["identity"] else "CURRENT")}
+                   "status": "NEW_OBSERVATION" if not archive_previous else ("CHANGED" if archive_success["identity"] != archive_previous["identity"] else "METADATA_UNCHANGED")}
     except Exception as exc:
         archive = {**prior_archive, "checked_at": checked_at, "status": "ERROR", "error": str(exc)}
     summary = catalog_summary(datasets, archive)

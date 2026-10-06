@@ -1,61 +1,173 @@
 {% extends "data_ops/base.html" %}
 {% block title %}Dashboard Builder{% endblock %}
 {% block content %}
-<section class="do-page-head">
-  <h1>Subscription Dashboard Builder</h1>
-  <p class="do-muted">Premium / dynamic facility dashboards — not public pbj-root. No Deploy in V0.</p>
-</section>
-
-<form class="do-form do-form-row" method="get" action="{{ url_for('dashboard_builder') }}">
-  <label class="do-label" for="ccn">CCN</label>
-  <input id="ccn" class="do-input do-mono" name="ccn" value="{{ ccn }}" placeholder="315128" pattern="[0-9A-Za-z]{5,6}" required>
-  <button class="do-btn do-btn-primary" type="submit">Resolve</button>
-</form>
-
-{% if status %}
-<section class="do-section">
-  <h2>{{ status.facility_name or 'Facility' }} <span class="do-mono">{{ status.ccn }}</span></h2>
-  <dl class="do-dl do-dl-wide">
-    <div><dt>Bundle</dt><dd><span class="do-badge">{{ status.bundle_state }}</span></dd></div>
-    <div><dt>V2</dt><dd>{{ status.is_v2 }}</dd></div>
-    <div><dt>Deploy dir</dt><dd class="do-mono">{{ status.deploy_dir or '—' }}</dd></div>
-    <div><dt>V2 reference</dt><dd class="do-mono">{{ status.reference_ccn or 'none in runtime' }}</dd></div>
-    <div><dt>Blockers</dt><dd class="do-mono">{{ status.blockers|join(', ') or 'none' }}</dd></div>
-    <div><dt>Source gates</dt><dd class="do-mono">{{ status.source_gates | tojson }}</dd></div>
-  </dl>
-  <p>{{ status.detail }}</p>
-
-  <div class="do-actions">
-    <form method="post" action="{{ url_for('action_dash_readiness') }}">
-      <input type="hidden" name="ccn" value="{{ status.ccn }}">
-      <button class="do-btn" type="submit">Check readiness</button>
+<section class="do-builder">
+  <header class="do-builder-head">
+    <h1>Dashboard Builder</h1>
+    <form class="do-builder-lookup" method="get" action="{{ url_for('dashboard_builder') }}">
+      <label class="do-label" for="ccn">Facility CCN</label>
+      <div class="do-builder-lookup-row">
+        <input id="ccn" class="do-input do-mono" name="ccn" value="{{ ccn }}" placeholder="365865" pattern="[0-9A-Za-z]{5,6}" required>
+        <button class="do-btn do-btn-primary" type="submit">Look up</button>
+      </div>
     </form>
-    <form method="post" action="{{ url_for('action_dash_refresh') }}">
-      <input type="hidden" name="ccn" value="{{ status.ccn }}">
-      <button class="do-btn do-btn-primary" type="submit" {% if not status.can_generate_refresh %}disabled{% endif %}>Generate / Refresh</button>
-    </form>
-    <form method="post" action="{{ url_for('action_dash_preflight') }}">
-      <input type="hidden" name="ccn" value="{{ status.ccn }}">
-      <button class="do-btn" type="submit" {% if not status.can_run_preflight %}disabled{% endif %}>Run Preflight</button>
-    </form>
-  </div>
-  {% if not status.can_generate_refresh %}
-  <p class="do-flash-error">Generate/Refresh disabled: {{ status.blockers|join(', ') }}</p>
+  </header>
+
+  {% if view %}
+  <article class="do-builder-card">
+    <div class="do-builder-identity">
+      <h2>{{ view.headline }}</h2>
+      <p class="do-mono do-muted">{{ view.ccn }}
+        · <strong class="do-builder-state do-builder-state-{{ view.state_kind }}">{{ view.state_label }}</strong>
+        {% if view.last_built %} · {{ view.last_built }}{% endif %}
+      </p>
+    </div>
+    {% if view.local_view_url %}
+    <div class="do-builder-open">
+      <a
+        class="do-btn do-btn-primary"
+        href="{{ view.local_view_url }}"
+        target="_blank"
+        rel="noopener"
+        data-do-open-local
+        data-ccn="{{ view.ccn }}"
+      >Open local dashboard</a>
+      <p class="do-muted do-small">
+        {{ view.local_view_url }}{% if view.local_view_running %} · running{% else %} · starts on first open{% endif %}
+        · this computer only
+      </p>
+      <p class="do-muted do-small" data-do-open-local-status hidden role="status"></p>
+    </div>
+    {% endif %}
+  </article>
+
+  <form
+    class="do-builder-card do-builder-run do-busy-form"
+    method="post"
+    action="{{ url_for('action_dash_run') }}"
+    data-do-busy-form
+    data-do-dash-run
+    data-do-busy-label="Working…"
+    data-do-busy-detail="This can take several minutes. Stay on this page."
+  >
+    <input type="hidden" name="ccn" value="{{ view.ccn }}">
+    <h3>1. Build locally</h3>
+    <div class="do-builder-access">
+      <label class="do-check">
+        <input type="radio" name="access_mode" value="password_required" checked data-do-access-mode>
+        Password protected
+      </label>
+      <label class="do-check">
+        <input type="radio" name="access_mode" value="open" data-do-access-mode>
+        Open
+      </label>
+    </div>
+    <div class="do-password-field" data-do-password-wrap>
+      <label class="do-label" for="dashboard_password">Dashboard password</label>
+      <input
+        id="dashboard_password"
+        class="do-input"
+        type="password"
+        name="dashboard_password"
+        autocomplete="new-password"
+      >
+    </div>
+    <label class="do-check do-check-quiet">
+      <input type="checkbox" name="refresh_data" value="1">
+      Also rebuild PBJ nurse hours from CMS
+    </label>
+        <div class="do-builder-primary-actions">
+      <button class="do-btn do-btn-primary" type="submit" name="intent" value="build" data-do-busy-submit data-do-busy-label="Building…" {% if not view.can_build_local %}disabled{% endif %}>{{ view.primary_build_label }}</button>
+    </div>
+
+    <div class="do-builder-publish-card">
+      <h3>2. Publish to Vercel</h3>
+      {% if view.publish_block_reason %}
+      <p class="do-muted do-small">{{ view.publish_block_reason }}</p>
+      {% else %}
+      <p class="do-muted do-small">Uses the local dashboard you just built. Type {{ view.ccn }} once, then Staging or Production.</p>
+      {% endif %}
+      <label class="do-check">
+        <input type="checkbox" name="confirm_publish" value="1" {% if not view.can_publish %}disabled{% endif %}>
+        Publish this facility
+      </label>
+      <div class="do-password-field" data-do-publish-password-wrap>
+        <label class="do-label" for="publish_dashboard_password">Dashboard password</label>
+        <input
+          id="publish_dashboard_password"
+          class="do-input"
+          type="password"
+          autocomplete="new-password"
+          data-do-publish-password
+          {% if not view.can_publish %}disabled{% endif %}
+        >
+        <p class="do-muted do-small">Required for Staging/Production. Same password as Build above &mdash; no need to scroll up.</p>
+      </div>
+      <label class="do-label" for="confirm_ccn">Confirm CCN</label>
+      <input id="confirm_ccn" class="do-input do-mono" name="confirm_ccn" placeholder="{{ view.ccn }}" autocomplete="off" {% if not view.can_publish %}disabled{% endif %}>
+      <div class="do-builder-primary-actions">
+        <button class="do-btn" type="submit" name="intent" value="deploy_staging" data-do-busy-submit data-do-busy-label="Deploying staging…" data-do-deploy-btn {% if not view.can_publish %}disabled{% endif %}>Staging</button>
+        <button class="do-btn do-btn-danger" type="submit" name="intent" value="deploy_production" data-do-busy-submit data-do-busy-label="Deploying production…" data-do-deploy-btn {% if not view.can_publish %}disabled{% endif %}>Production</button>
+      </div>
+      <div class="do-builder-result" data-do-builder-result hidden role="status" aria-live="polite"></div>
+
+    </div>
+
+    <p class="do-muted do-small do-busy-status" data-do-busy-status hidden aria-live="polite"></p>
+    <div id="do-builder-progress" class="do-builder-progress" hidden>
+      <div class="do-builder-progress-head">
+        <strong data-do-progress-pct>0</strong><span class="do-muted">%</span>
+        <span data-do-progress-label>Starting</span>
+      </div>
+      <div class="do-progress-track" aria-hidden="true"><div class="do-progress-fill" data-do-progress-fill></div></div>
+      <ol class="do-builder-progress-steps" data-do-progress-steps></ol>
+      <p class="do-mono do-small do-muted" data-do-progress-detail></p>
+    </div>
+  </form>
+
+  <details class="do-builder-card do-builder-diagnostics">
+    <summary>Diagnostics</summary>
+    {% if view.data_status %}
+    <p class="do-muted do-small">A few local files used for packaging checks — not the dashboard inventory.</p>
+    <dl class="do-builder-file-notes">
+      {% for row in view.data_status %}
+      <div>
+        <dt>{{ row.label }}</dt>
+        <dd class="{% if row.ok %}is-ok{% else %}is-warn{% endif %}">{{ row.text }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% endif %}
+    {% if view.notes %}
+    <ul class="do-builder-notes">
+      {% for note in view.notes %}
+      <li>{{ note }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <p class="do-muted do-small">From pbj-data-ops. Status:</p>
+    <pre class="do-pre do-pre-compact">{{ view.status_command }}</pre>
+    <p class="do-muted do-small">Prove (clears pytest cache, both repos):</p>
+    <pre class="do-pre do-pre-compact">{{ view.prove_command }}</pre>
+    <div class="do-builder-utils">
+      <form method="post" action="{{ url_for('action_dash_readiness') }}">
+        <input type="hidden" name="ccn" value="{{ view.ccn }}">
+        <button class="do-btn do-btn-ghost" type="submit">Check readiness</button>
+      </form>
+      <form method="post" action="{{ url_for('action_dash_preflight') }}">
+        <input type="hidden" name="ccn" value="{{ view.ccn }}">
+        <button class="do-btn do-btn-ghost" type="submit" {% if not view.can_run_preflight %}disabled{% endif %}>Run preflight</button>
+      </form>
+    </div>
+  </details>
+  {% elif ccn %}
+  <p class="do-muted">No status for that CCN.</p>
+  {% else %}
+  <p class="do-muted">Enter a six-digit CCN to look up the facility, then build a local dashboard.</p>
   {% endif %}
-{% endif %}
 
-<details class="do-details">
-  <summary>Proven paths</summary>
-  <p><strong>Existing V2 refresh</strong></p>
-  <p class="do-mono do-small">{{ existing_refresh_path }}</p>
-  <p><strong>Cold / new V2</strong></p>
-  <p class="do-mono do-small">{{ cold_new_path }}</p>
-</details>
-
-{% if last_action %}
-<details class="do-details" open>
-  <summary>Last action</summary>
-  <pre class="do-pre">{{ last_action | tojson(indent=2) }}</pre>
-</details>
-{% endif %}
+  {% if last_summary %}
+  <p class="do-builder-last" role="status">{{ last_summary }}</p>
+  {% endif %}
+</section>
 {% endblock %}

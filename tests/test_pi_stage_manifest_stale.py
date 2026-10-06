@@ -50,8 +50,9 @@ def _write_legacy_pi_stage_manifest(tmp_path: Path, release_id: str = "2026-08")
     return manifest_path
 
 
+@pytest.mark.parametrize('byte_verified', [False, True])
 def test_schema_v1_manifest_next_action_is_restage_not_publish(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, byte_verified: bool
 ) -> None:
     import cms_data_ops as ops
 
@@ -74,12 +75,12 @@ def test_schema_v1_manifest_next_action_is_restage_not_publish(
             "active": {"active_release_id": "2026-08", "status": "ACTIVE"},
             "pending": None,
         },
-        release_availability={"new_release_available": False, "publisher_latest_label": "Aug 2026"},
+        release_availability={"new_release_available": False, "publisher_latest_label": "Aug 2026", "cms_byte_verified_current": byte_verified},
         root=tmp_path,
     )
 
-    assert action["label"] == "Stage again against current production"
-    assert action["endpoint"] == "action_pi_stage_pbj320"
+    assert action["label"] == ("Stage again against current production" if byte_verified else "Check CMS")
+    assert action["endpoint"] == ("action_pi_stage_pbj320" if byte_verified else "action_pi_check")
     assert "Publish to PBJ320" not in action["label"]
 
 

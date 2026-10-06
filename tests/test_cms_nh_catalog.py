@@ -89,11 +89,11 @@ def test_planned_today_with_unchanged_resource_is_not_newer(tmp_path):
     assert result["summary"]["published"] == 0
 
 
-def test_not_due_and_metadata_only_change_remain_current(tmp_path):
+def test_not_due_and_metadata_only_change_do_not_assert_byte_current(tmp_path):
     cms = CMS([dataset(planned="2026-10-28")]); cms.refresh(tmp_path)
     cms.rows[0]["description"] = "Changed description"
     cms.rows[0]["%modified"] = "2026-09-30"
-    assert cms.refresh(tmp_path)["datasets"][0]["status"] == "CURRENT"
+    assert cms.refresh(tmp_path)["datasets"][0]["status"] == "METADATA_UNCHANGED"
 
 
 def test_lookup_failure_preserves_success_and_recovery_compares_it(tmp_path):
@@ -192,11 +192,11 @@ def test_sources_catalog_inspection_and_no_fake_acquire(tmp_path, monkeypatch):
     html = response.get_data(as_text=True)
     section = html.split('id="cms-nh-catalog"')[1].split('</section>')[0]
     assert "CMS Nursing Home Provider Data" in section
-    assert "Previous identity" in section and "Current identity" in section
+    assert "Previous identity" in section and "Current metadata identity" in section
     assert "PLANNED_TODAY" in section
     assert "No workflow yet" in section
     assert 'open>' in section
-    assert html.index('id="cms-nh-catalog"') < html.index('>Active releases</h1>')
+    assert html.index('id="cms-nh-catalog"') < html.index('id="source-family-inventory"')
     assert "Open source" not in section
     assert "/sources/cms.provider_info?check_cms=0" in section
     assert catalog.coverage_for("y2hd-n93e")["dataset_id"] == "cms.nh_ownership"

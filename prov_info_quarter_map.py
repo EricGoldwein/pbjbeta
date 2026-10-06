@@ -7,6 +7,8 @@ loading the full prov_info Streamlit app.
 
 from __future__ import annotations
 
+import re
+
 # Format: (processing_year, processing_month) -> "Qn YYYY" PBJ quarter label.
 PROCESSING_MONTH_TO_PBJ_QUARTER: dict[tuple[int, int], str] = {
     (2018, 4): "Q4 2017",
@@ -101,6 +103,8 @@ PROCESSING_MONTH_TO_PBJ_QUARTER: dict[tuple[int, int], str] = {
     (2026, 4): "Q4 2025",
     (2026, 5): "Q4 2025",
     (2026, 6): "Q4 2025",
+    (2026, 7): "Q1 2026",
+    (2026, 8): "Q1 2026",
 }
 
 
@@ -127,7 +131,70 @@ def get_quarter_from_processing_month(
         return manual
     if not use_interval_fallback or not proc_month:
         return None
-    return _interval_staffing_quarter_from_bundled_json(proc_month)
+    return _interval_staffing_quarter_from_bundled_json(proc_month) or _interval_staffing_quarter_from_extracted_csv(
+        proc_month
+    )
+
+
+_MONTH_ABBR = (
+    "",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
+
+def _interval_staffing_quarter_from_extracted_csv(proc_month: str) -> str | None:
+    """Derive the PBJ quarter from extracted NH_DataCollectionIntervals_*.csv."""
+    import csv
+    from pathlib import Path
+
+    try:
+        year, month = map(int, str(proc_month).strip().split("-")[:2])
+    except (ValueError, TypeError):
+        return None
+    if month < 1 or month > 12:
+        return None
+    name = f"NH_DataCollectionIntervals_{_MONTH_ABBR[month]}{year}.csv"
+    roots = [Path(__file__).resolve().parent, Path.cwd()]
+    try:
+        import cms_data_paths
+
+        roots.insert(0, cms_data_paths.provider_info_dir().parent)
+        roots.insert(0, cms_data_paths.repo_root())
+    except Exception:
+        pass
+    seen: set[Path] = set()
+    for root in roots:
+        path = Path(root) / "provider_info" / name
+        if path in seen or not path.is_file():
+            continue
+        seen.add(path)
+        try:
+            with path.open(encoding="utf-8-sig", newline="") as handle:
+                for row in csv.DictReader(handle):
+                    code = str(row.get("Measure Code") or "").strip()
+                    if code not in {"STAFFING_LEVELS", "STAFFING"}:
+                        continue
+                    raw = str(row.get("Data Collection Period From Date") or "").strip()
+                    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", raw)
+                    if not m:
+                        continue
+                    mm, yy = int(m.group(1)), int(m.group(3))
+                    q = ((mm - 1) // 3) + 1
+                    return f"Q{q} {yy}"
+        except OSError:
+            continue
+    return None
 
 
 def _interval_staffing_quarter_from_bundled_json(proc_month: str) -> str | None:

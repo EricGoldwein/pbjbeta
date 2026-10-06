@@ -86,6 +86,13 @@ def _write_ownership_registry(control: Path, tmp_path: Path, *, release_id: str 
     reg = control / "state" / "active_releases.json"
     reg.parent.mkdir(parents=True, exist_ok=True)
     reg.write_text(json.dumps(active), encoding="utf-8")
+    (reg.parent / 'release_checks.json').write_text(json.dumps({'datasets': [
+        {'dataset_id': key, 'status': 'CURRENT', 'publisher_sha256': member['hash'],
+         'publisher_checked_at': 'fixture', 'cms_release_vintage': '2026-08',
+         'snapshot_date': release_id, 'cms_dataset_version_id': key+'-version',
+         'publisher_file_uuid': key+'-file', 'publisher_url': 'https://data.cms.gov/'+key}
+        for key, member in active['datasets'].items()
+    ]}), encoding='utf-8')
     return owners_csv, enroll_csv
 
 
@@ -145,6 +152,12 @@ def test_ownership_stage_produces_staged_manifest(tmp_path: Path, monkeypatch: p
     assert result["status"] == "STAGED"
     assert manifest["publication_base_sha"] == base_sha
     assert manifest["verification_contract"]["release_id"] == "2026-07-31"
+    for artifact in manifest['artifacts']:
+        for member in artifact['inputs']:
+            if member['source_id'] in ('cms.snf_all_owners', 'cms.snf_enrollments'):
+                assert member['cms_release_vintage'] == '2026-08'
+                assert member['snapshot_date'] == '2026-07-31'
+                assert member['cms_source_sha256'] == member['sha256']
     roles = {row["destination_id"] for row in manifest["artifacts"]}
     assert "ownership_bridge_lookup" in roles
     cache = Path(manifest["stage_artifact_cache"])

@@ -486,8 +486,8 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
         source_family=SourceFamily.CHAIN_PERFORMANCE,
         containers=(SourceContainer.CSV,),
         cadence=SourceCadence.IRREGULAR,
-        release_identity_strategy="Nursing_Home_Chain_Performance_Measures_{Mon}_{YYYY}.csv",
-        fingerprint_strategy="Filename vintage; optional SHA256",
+        release_identity_strategy="CMS product/version/resources revision + raw CSV SHA256",
+        fingerprint_strategy="Immutable acquired CSV SHA256 + publisher version metadata",
         cms_dataset_id=CMS_ID_CHAIN_PERFORMANCE,
         cms_dataset_id_provenance=_ID_PROVENANCE,
         landing_url=(
@@ -495,14 +495,14 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
         ),
         catalog_mechanism=CatalogMechanism.DATA_CMS_GOV_DATASET_UUID,
         metadata_endpoint=None,
-        raw_artifact_resolver="ownership/Nursing_Home_Chain_Performance_Measures_*.csv",
+        raw_artifact_resolver="ownership/_sources/cms_chain_performance/raw/downloaded; existing ownership/chain_history_source",
         normalized_artifact_resolver="facility entity_lookup / longitudinal slices",
-        acquisition_implementation=None,
-        structural_validator=None,
+        acquisition_implementation="generic_cms_csv.run_feed via release_check",
+        structural_validator="generic_cms_csv required-column review; no automatic validation or activation",
         zweli_quality_profile=None,
         downstream_consumers=("utils/file_finder.py", "PBJ_Dashboard.py"),
         automation_maturity=AutomationMaturity.PARTIALLY_AUTOMATED,
-        automation_notes="Latest-file detection exists; acquire is manual drop.",
+        automation_notes="Publisher product/version/resources detection; generic CSV acquire; explicit validation and review.",
         evidence=("utils/file_finder.py", "ownership/*.csv"),
     ),
     _rec(
@@ -556,7 +556,7 @@ CMS_SOURCE_REGISTRY: tuple[CmsSourceRecord, ...] = (
             "No stable open-data dataset ID verified for the PDF/list publication "
             "in PBJapp; distinct from Provider Info sff_status column."
         ),
-        landing_url="https://www.cms.gov/medicare/health-safety-standards/certification-compliance/special-focus-facility-program",
+        landing_url="https://www.cms.gov/medicare/health-safety-standards/certification-compliance/nursing-homes",
         catalog_mechanism=CatalogMechanism.NONE_VERIFIED,
         metadata_endpoint=None,
         raw_artifact_resolver="sff/releases/<YYYY-MM>/cms_sff_posting_<YYYY-MM>.pdf",

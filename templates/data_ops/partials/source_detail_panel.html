@@ -10,7 +10,7 @@
 </header>
 {% endif %}
 
-{% if workflow and workflow.freshness_layers and record.source_id in ['cms.health_citations', 'cms.snf_all_owners', 'cms.snf_enrollments', 'cms.provider_info'] %}
+{% if workflow and workflow.freshness_layers and record.source_id in ['cms.health_citations', 'cms.snf_all_owners', 'cms.snf_enrollments', 'cms.provider_info', 'cms.sff_pdf_list'] %}
 <section class="do-operator-ref do-section do-section-primary">
   <div class="do-operator-ref-head">
     <h3 class="do-section-title-sm">At a glance</h3>
@@ -45,6 +45,27 @@
     <p class="do-muted do-tiny">{{ workflow.next_action.not_wired_label }}</p>
     {% endif %}
   </div>
+  {% if workflow.release_availability and record.source_id.startswith('cms.') and record.source_id != 'cms.survey_summary' %}
+  {% set evidence = workflow.release_availability %}
+  <details><summary>CMS release and raw-source evidence</summary>
+    <dl class="do-dl do-dl-wide do-dl-compact">
+      <div><dt>CMS release vintage</dt><dd>{{ evidence.cms_release_vintage or 'Not observed' }}</dd></div>
+      <div><dt>Data snapshot / file / reporting period</dt><dd>{{ evidence.snapshot_date or 'Not recorded' }}</dd></div>
+      <div><dt>CMS version date</dt><dd>{{ evidence.cms_dataset_version_label or 'Not observed' }}</dd></div>
+      <div><dt>CMS dataset version UUID</dt><dd>{{ evidence.cms_dataset_version_id or 'Not observed' }}</dd></div>
+      <div><dt>CMS resource / version</dt><dd>{{ evidence.publisher_resource_id or 'Not supplied' }} / {{ evidence.publisher_resource_version or 'Not supplied' }}</dd></div>
+      <div><dt>CMS file UUID</dt><dd>{{ evidence.publisher_file_uuid or 'Not supplied' }}</dd></div>
+      {% if evidence.publisher_url %}<div><dt>Official CMS resource</dt><dd><a href="{{ evidence.publisher_url }}" target="_blank" rel="noopener noreferrer">Inspect source resource</a></dd></div>{% endif %}
+      <div><dt>CMS last updated</dt><dd>{{ evidence.cms_dataset_version_modified or 'Not observed' }}</dd></div>
+      <div><dt>CMS released date</dt><dd>{{ evidence.publisher_released or 'Not observed' }}</dd></div>
+      <div><dt>CMS modified / processing date</dt><dd>{{ evidence.publisher_modified or 'Not observed' }}</dd></div>
+      <div><dt>Period basis</dt><dd>{{ evidence.publisher_period_basis or 'Not recorded' }}</dd></div>
+      <div><dt>Current raw-source SHA</dt><dd class="do-provenance-hash do-mono do-small">{{ evidence.publisher_sha256 or 'Not verified' }}</dd></div>
+      <div><dt>Bytes checked</dt><dd>{{ evidence.publisher_checked_at or 'Not verified' }}</dd></div>
+      <div><dt>Acquisition timestamp</dt><dd>{{ evidence.acquired_at or 'Not recorded; check time is not acquisition time' }}</dd></div>
+    </dl>
+  </details>
+  {% endif %}
 </section>
 
 {% set pf = workflow.provenance_freshness if workflow else none %}
@@ -104,7 +125,7 @@
     </div>
     {% if workflow.release_availability %}
     <div>
-      <dt>CMS latest</dt>
+      <dt>{{ workflow.release_availability.inventory_label or 'CMS data period' }}</dt>
       <dd>
         {% if workflow.release_availability.publisher_latest_label %}
         {{ workflow.release_availability.publisher_latest_label }}
@@ -183,7 +204,7 @@
       <li class="do-lifecycle-step do-lifecycle-{{ step.state }}">
         <div class="do-lifecycle-step-head">
           <span class="do-lifecycle-label">{{ step.label }}</span>
-          <span class="do-lifecycle-state">{{ step.state|replace('_', ' ') }}</span>
+          <span class="do-lifecycle-state">{{ ({'current': 'READY / NEXT', 'upcoming': 'NOT YET'}.get(step.state, step.state|replace('_', ' '))) if record.source_id == 'cms.sff_pdf_list' else step.state|replace('_', ' ') }}</span>
         </div>
         <p class="do-muted do-small do-lifecycle-detail">{{ step.detail }}</p>
         {% if step.action %}
@@ -200,6 +221,23 @@
 {% endif %}
 
 {% if record.source_id == 'cms.provider_info' and panel_mode != 'modal' %}
+{% if quarter_flow %}
+<section class="do-section do-section-flush-top">
+  <h2 class="do-subhead">Stars / provider charts</h2>
+  <p class="do-small">{{ quarter_flow.detail }}</p>
+  <p class="do-small"><strong>Next:</strong> {{ quarter_flow.next_step }}</p>
+  <ol class="do-small">
+    {% for step in quarter_flow.steps %}
+    <li>{{ step }}</li>
+    {% endfor %}
+  </ol>
+  {% if quarter_flow.can_sync %}
+  <form method="post" action="{{ url_for('action_provider_quarter_map_sync') }}">
+    <button class="do-btn do-btn-compact do-btn-primary" type="submit">Apply extracted quarter map</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
 <details class="do-collapse-panel">
   <summary>Advanced actions · Provider Information</summary>
   <div class="do-actions do-actions-inline">
@@ -284,6 +322,7 @@
 <details class="do-collapse-panel">
   <summary>Source registry</summary>
   <dl class="do-dl do-dl-wide do-dl-compact">
+    {% if release_mechanism %}<div><dt>Update mechanism</dt><dd>{{ release_mechanism }}</dd></div>{% endif %}
     <div><dt>Cadence</dt><dd>{{ record.cadence }}</dd></div>
     <div><dt>Containers</dt><dd>{{ record.containers|join(', ') if record.containers else '—' }}</dd></div>
     <div><dt>Automation</dt><dd>{{ record.automation_maturity }}</dd></div>
