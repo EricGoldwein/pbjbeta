@@ -216,7 +216,7 @@ def check_releases(
 def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
     """Adapters already proven in this repository; missing adapters stay explicit."""
     from cms_data_ops import acquire_nurse, acquire_provider_info, check_nurse_cms, check_provider_info_cms
-    from cms_source_registry import CMS_ID_PBJ_NON_NURSE
+    from cms_source_registry import CMS_ID_PBJ_NON_NURSE, CMS_ID_CHAIN_PERFORMANCE
     from generic_cms_csv import CsvFeed, run_feed
     from nonnurse_lifecycle import normalize_validate_candidate
     import cms_data_paths
@@ -253,6 +253,13 @@ def production_handlers() -> dict[str, Callable[[bool], dict[str, Any]]]:
         "cms.pbj_non_nurse_staffing": CsvFeed("cms.pbj_non_nurse_staffing", CMS_ID_PBJ_NON_NURSE, r"PBJ_dailynonnursestaffing_CY\d{4}Q[1-4]\.csv$", cms_data_paths.nonnurse_raw_dir(), (("PROVNUM", "CCN"), ("WorkDate", "work_date")), False,
             cms_product_path="/quality-of-care/payroll-based-journal-daily-non-nurse-staffing",
             cms_product_name="Payroll Based Journal Daily Non-Nurse Staffing", version_date_basis="reporting_period"),
+        "cms.chain_performance": CsvFeed(
+            "cms.chain_performance", CMS_ID_CHAIN_PERFORMANCE,
+            r"(?:Chain_Performance_\d{8}|Nursing_Home_Chain_Performance_Measures_.+)\.csv$",
+            pbj_root / "ownership" / "_sources" / "cms_chain_performance" / "raw" / "downloaded",
+            (("Chain ID",), ("Chain", "Chain Name")), False,
+            cms_product_path="/quality-of-care/nursing-home-chain-performance-measures",
+            cms_product_name="Nursing Home Chain Performance Measures"),
         **ownership_csv_feeds(pbj_root),
     }
     def nonnurse(acquire: bool) -> dict[str, Any]:

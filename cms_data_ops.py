@@ -126,6 +126,12 @@ _MONTH_NAME_TO_NUM = {
 
 
 def _chain_label_from_name(name: str) -> Optional[str]:
+    dated = re.search(r"(?:Chain_Performance_)?(20\d{2})[-_]?(\d{2})[-_]?(\d{2})", name)
+    if dated:
+        try:
+            return datetime(*map(int, dated.groups())).strftime("%B %Y") + " file date"
+        except ValueError:
+            return None
     m = re.search(
         r"Nursing_Home_(?:Chain_Performance|Affiliated_Entity)_Measures_([A-Za-z]+)_(\d{4})",
         name,
@@ -135,15 +141,18 @@ def _chain_label_from_name(name: str) -> Optional[str]:
     return None
 
 
-def _chain_sort_key(path: Path) -> tuple[int, int, float]:
+def _chain_sort_key(path: Path) -> tuple[int, int, int, float]:
+    dated = re.search(r"(?:Chain_Performance_)?(20\d{2})[-_]?(\d{2})[-_]?(\d{2})", path.name)
+    if dated:
+        return (int(dated[1]), int(dated[2]), int(dated[3]), path.stat().st_mtime)
     m = re.search(
         r"Nursing_Home_(?:Chain_Performance|Affiliated_Entity)_Measures_([A-Za-z]+)_(\d{4})",
         path.name,
     )
     if not m:
-        return (0, 0, path.stat().st_mtime)
+        return (0, 0, 0, path.stat().st_mtime)
     mon = _MONTH_NAME_TO_NUM.get(m.group(1).lower(), 0)
-    return (int(m.group(2)), mon, path.stat().st_mtime)
+    return (int(m.group(2)), mon, 1, path.stat().st_mtime)
 
 
 def _base_snap(record: CmsSourceRecord) -> SourceOpsSnapshot:
@@ -610,6 +619,8 @@ def _probe_chain(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
     candidates: list[Path] = []
     if own.is_dir():
         candidates.extend(own.glob("Nursing_Home_Chain_Performance_Measures_*.csv"))
+        candidates.extend(own.glob("Chain_Performance_*.csv"))
+        candidates.extend((own / "chain_history_source").glob("*.csv"))
         candidates.extend(own.glob("Nursing_Home_Affiliated_Entity_Performance_Measures_*.csv"))
     raw = max(candidates, key=_chain_sort_key) if candidates else None
     label = _chain_label_from_name(raw.name) if raw else None
@@ -617,7 +628,7 @@ def _probe_chain(record: CmsSourceRecord, root: Path) -> SourceOpsSnapshot:
         _apply_raw_ref(snap, local_file_ref("chain", raw, release_id=label))
         snap.pbjapp_latest = label or raw.name
         snap.status = OpsStatus.LOCAL_RAW_ONLY.value
-        snap.detail = "Chain performance CSV present; manual acquire"
+        snap.detail = "Chain performance CSV present; publisher freshness requires release check"
         snap.last_successful_local_processing = _mtime_iso(raw)
         snap.local_raw_present = True
     else:
